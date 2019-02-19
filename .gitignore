@@ -1,4 +1,6 @@
 *.o
-mpi*.?pp
+*.x
+
+mpi_backup/*.?pp
 
 *dSYM
