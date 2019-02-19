@@ -1,3 +1,4 @@
 *.o
+mpi*.?pp
 
 *dSYM
