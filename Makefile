@@ -29,14 +29,17 @@ LDFLAGS:=$(LDFLAGS) $(INC_DIRS)
 NETCDF_IO_CPPS := $(wildcard NETCDF_IO/*.cpp)
 NETCDF_IO_OBJS := $(addprefix NETCDF_IO/,$(notdir $(NETCDF_IO_CPPS:.cpp=.o)))
 
+FUNCTIONS_CPPS := $(wildcard Functions/*.cpp)
+FUNCTIONS_OBJS := $(addprefix FUNCTIONS/,$(notdir $(FUNCTIONS_CPPS:.cpp=.o)))
+
 .PHONY: clean
 clean:
-	rm -f *.o NETCDF_IO/*.o Derivatives/*.o
+	rm -f *.o NETCDF_IO/*.o Functions/*.o
 
-all: solver.x tracker.x
+all: filter.x
 
 %.o: %.cpp
 	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
-filter.x: ${NETCDF_IO_OBJS} filter.o
+filter.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} filter.o
 	$(MPICXX) $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
