@@ -28,15 +28,17 @@ void apply_filter_at_point(
 
             kern = kernel(dist, scale);
 
-            index = Index(Itime, Idepth, Ilat, Ilon,
+            index = Index(Itime, Idepth, LAT,  LON,
                           Ntime, Ndepth, Nlat, Nlon);
 
             area    = dAreas[index];
             kA_sum += kern * area;
 
-            u_x_tmp = u_x[index] * kern * area;
-            u_y_tmp = u_y[index] * kern * area;
-            u_z_tmp = u_z[index] * kern * area;
+            u_x_tmp += u_x[index] * kern * area;
+            u_y_tmp += u_y[index] * kern * area;
+            u_z_tmp += u_z[index] * kern * area;
+
+            //fprintf(stdout, "           (u_x, u_y, u_z) = (%.4g, %.4g, %.4g)\n", u_x[index], u_y[index], u_z[index]);
         }
     }
 

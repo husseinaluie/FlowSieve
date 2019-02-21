@@ -30,4 +30,5 @@ double distance(const double lon1, const double lat1, const double lon2, const d
     distance = constants::R_earth * Delta_sigma;
 
     return distance;
+
 }

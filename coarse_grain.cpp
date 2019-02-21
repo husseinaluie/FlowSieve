@@ -72,7 +72,9 @@ int main(int argc, char *argv[]) {
               filter_scales, Nfilt,
               dlon, dlat,
               Ntime, Ndepth, Nlon, Nlat,
-              areas, longitude, latitude);
+              areas, 
+              time, depth,
+              longitude, latitude);
 
     // Done!
     fprintf(stdout, "\n\n");

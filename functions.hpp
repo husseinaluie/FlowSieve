@@ -31,7 +31,9 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
                const double * scales, const int Nscales,
                const double dlon, const double dlat,
                const int Ntime, const int Ndepth, const int Nlon, const int Nlat,
-               const double * dAreas, const double * longitude, const double * latitude);
+               const double * dAreas, 
+               const double * time, const double * depth,
+               const double * longitude, const double * latitude);
 
 void apply_filter_at_point(
         double & u_x_tmp,   double & u_y_tmp,   double & u_z_tmp,
