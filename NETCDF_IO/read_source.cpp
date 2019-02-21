@@ -6,6 +6,8 @@
  *    Variables to read: uo (as u_lon), vo (as u_lat)
  *    Dimensions: time, depth, longitude, latitude (in that order)
  *
+ * There's no u_r in the current data files, so we'll zero it out.
+ *
  */
 
 #include "../netcdf_io.hpp"
@@ -21,7 +23,7 @@ void read_source(
         int & Ntime,         int & Ndepth,
         double ** longitude, double ** latitude,
         double ** time,      double ** depth,
-        double ** u_lon,     double ** u_lat) {
+        double ** u_r,       double ** u_lon,     double ** u_lat) {
 
     const bool debug = DEBUG;
 
@@ -78,6 +80,7 @@ void read_source(
     longitude[0] = new double[Nlon];
     latitude[0]  = new double[Nlat];
 
+    u_r[0]   = new double[Ntime * Ndepth * Nlat * Nlon];
     u_lon[0] = new double[Ntime * Ndepth * Nlat * Nlon];
     u_lat[0] = new double[Ntime * Ndepth * Nlat * Nlon];
 
@@ -123,6 +126,11 @@ void read_source(
 
     if ((retval = nc_get_vara_double(ncid, ulon_varid, start, count, u_lon[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
     if ((retval = nc_get_vara_double(ncid, ulat_varid, start, count, u_lat[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
+
+    // At the moment there's no u_r in the data, so just zero it out
+    for (int index = 0; index < Ntime * Ndepth * Nlat * Nlon; index++) {
+        u_r[0][index] = 0;
+    }
 
     // Close the file
     if ((retval = nc_close(ncid))) { NC_ERR(retval, __LINE__, __FILE__); }

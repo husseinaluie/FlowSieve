@@ -24,6 +24,6 @@ void read_source(
         int & Ntime,         int & Ndepth,
         double ** longitude, double ** latitude,
         double ** time,      double ** depth,
-        double ** u_lon,     double ** u_lat);
+        double ** u_r,       double ** u_lon,     double ** u_lat);
 
 #endif

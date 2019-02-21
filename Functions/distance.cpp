@@ -13,7 +13,7 @@
 #include <math.h>    
 #include "../constants.hpp"
 
-double dist(const double lon1, const double lat1, const double lon2, const double lat2) {
+double distance(const double lon1, const double lat1, const double lon2, const double lat2) {
 
     double Delta_lon, numer, denom, Delta_sigma, distance;
 

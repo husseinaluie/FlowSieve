@@ -30,12 +30,10 @@ int main(int argc, char *argv[]) {
     //MPI_Init( &argc, &argv);
 
     double *longitude, *latitude, *time, *depth;
-    double *u_lon, *u_lat;
+    double *u_r, *u_lon, *u_lat;
     int Nlon, Nlat, Ntime, Ndepth;
 
     // For the time being, hard-code the filter scales
-    //const int Nfilt = 4;
-    //const double filter_scales [4] = {50e3, 150e3, 250e3, 350e3};
     const int Nfilt = 1;
     const double filter_scales [4] = {200e3};
 
@@ -47,7 +45,7 @@ int main(int argc, char *argv[]) {
             Nlon, Nlat, Ntime, Ndepth,
             &longitude, &latitude, 
             &time, &depth, 
-            &u_lon, &u_lat
+            &u_r, &u_lon, &u_lat
             );
 
     // Convert coordinate to radians
@@ -57,7 +55,8 @@ int main(int argc, char *argv[]) {
     for (int ii = 0; ii < Nlat; ii++) {
         latitude[ii] = latitude[ii] * M_PI / 180;
     }
-
+    double dlon = longitude[1] - longitude[0];
+    double dlat = latitude[1]  - latitude[0];
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration
@@ -68,36 +67,12 @@ int main(int argc, char *argv[]) {
     areas = new double[Nlon * Nlat];
     compute_areas(areas, longitude, latitude, Nlon, Nlat);
 
-    // Now convert the Spherical velocities to Cartesian
-    //   (although we will still be on a spherical
-    //     coordinate system)
-    if (debug) {
-        fprintf(stdout, "Converting to Cartesian velocities.\n");
-    }
-    double *u_x, *u_y, *u_z;
-    u_x = new double[Ntime * Ndepth * Nlon * Nlat];
-    u_y = new double[Ntime * Ndepth * Nlon * Nlat];
-    u_z = new double[Ntime * Ndepth * Nlon * Nlat];
-
-    int index;
-    for (int Itime = 0; Itime < Ntime; Itime++) {
-        for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-            for (int Ilat = 0; Ilat < Nlat; Ilat++) {
-                for (int Ilon = 0; Ilon < Nlon; Ilon++) {
-
-                    // Convert our four-index to a one-index
-                    index = Index(Itime, Idepth, Ilat, Ilon,
-                                  Ntime, Ndepth, Nlat, Nlon);
-
-                    // Note that 0 is in place of u_r, since 
-                    // the current datasets don't have u_r
-                    vel_Spher_to_Cart(u_x[index], u_y[index],   u_z[index],
-                                      0.,         u_lon[index], u_lat[index],
-                                      longitude[Ilon], latitude[Ilat]);
-                }
-            }
-        }
-    }
+    // Now pass the arrays along to the filtering routines
+    filtering(u_r, u_lon, u_lat,
+              filter_scales, Nfilt,
+              dlon, dlat,
+              Ntime, Ndepth, Nlon, Nlat,
+              areas, longitude, latitude);
 
     // Done!
     fprintf(stdout, "\n\n");

@@ -32,14 +32,17 @@ NETCDF_IO_OBJS := $(addprefix NETCDF_IO/,$(notdir $(NETCDF_IO_CPPS:.cpp=.o)))
 FUNCTIONS_CPPS := $(wildcard Functions/*.cpp)
 FUNCTIONS_OBJS := $(addprefix FUNCTIONS/,$(notdir $(FUNCTIONS_CPPS:.cpp=.o)))
 
-.PHONY: clean
+.PHONY: clean hardclean
 clean:
 	rm -f *.o NETCDF_IO/*.o Functions/*.o
+hardclean:
+	rm -f *.o NETCDF_IO/*.o Functions/*.o coarse_grain.x
+	rm -r coarse_grain.x.dSYM
 
-all: filter.x
+all: coarse_grain.x
 
 %.o: %.cpp
 	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
-filter.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} filter.o
+coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} coarse_grain.o
 	$(MPICXX) $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
