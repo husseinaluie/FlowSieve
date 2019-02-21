@@ -13,8 +13,11 @@
 
 namespace constants
 {
+    // Mean radius of the Earth
     const double R_earth = 6471e3;
-    const double rho0    = 1e3;
+
+    // Mean fluid density
+    const double rho0 = 1e3;
 }
 
 #endif

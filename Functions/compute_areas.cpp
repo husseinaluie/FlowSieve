@@ -1,3 +1,9 @@
+/*
+ *
+ * Compute (and return) the area of each cell.
+ *   This will be necessary for integrations.
+ *
+ */
 #include <math.h>
 
 #include "../functions.hpp"
@@ -8,7 +14,7 @@
 #endif
 
 void compute_areas(
-        double * areas, 
+        double * areas,
         double * longitude, 
         double * latitude, 
         int Nlon, 
@@ -17,7 +23,6 @@ void compute_areas(
     if (DEBUG) {
         fprintf(stdout, "Reached line %d of %s.\n", __LINE__, __FILE__);
     }
-
 
     // For the moment, assume a uniform grid
     double dlat = latitude[ 1] - latitude[ 0];

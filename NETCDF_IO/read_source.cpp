@@ -1,15 +1,18 @@
+/*
+ *
+ * Read source data (from input.nc) for coarse graining.
+ *
+ * Current assumptions:
+ *    Variables to read: uo (as u_lon), vo (as u_lat)
+ *    Dimensions: time, depth, longitude, latitude (in that order)
+ *
+ */
+
 #include "../netcdf_io.hpp"
 
 #ifndef DEBUG
     #define DEBUG false
 #endif
-
-/*
- * Variables to read: uo, vo
- *
- * Dimensions: time, depth, longitude, latitude
- *
- */
 
 
 // Write to netcdf file
@@ -107,7 +110,7 @@ void read_source(
     if ((retval = nc_get_vara_double(ncid, lon_varid, start_lon, count_lon, longitude[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
     if ((retval = nc_get_vara_double(ncid, lat_varid, start_lat, count_lat, latitude[0] ))) { NC_ERR(retval, __LINE__, __FILE__); }
 
-    // Get u, v, and h
+    // Get u_lon (uo) and u_lat (vo)
     size_t start[4], count[4];
     start[0] = 0;
     start[1] = 0;

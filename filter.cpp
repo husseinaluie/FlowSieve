@@ -34,10 +34,15 @@ int main(int argc, char *argv[]) {
     int Nlon, Nlat, Ntime, Ndepth;
 
     // For the time being, hard-code the filter scales
-    const int Nfilt = 4;
-    const double filter_scales [4] = {50e3, 150e3, 250e3, 350e3};
+    //const int Nfilt = 4;
+    //const double filter_scales [4] = {50e3, 150e3, 250e3, 350e3};
+    const int Nfilt = 1;
+    const double filter_scales [4] = {200e3};
 
     // Read in source data / get size information
+    if (debug) {
+        fprintf(stdout, "Reading in source data.\n");
+    }
     read_source(
             Nlon, Nlat, Ntime, Ndepth,
             &longitude, &latitude, 
@@ -56,6 +61,9 @@ int main(int argc, char *argv[]) {
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration
+    if (debug) {
+        fprintf(stdout, "Converting to cell areas.\n");
+    }
     double *areas;
     areas = new double[Nlon * Nlat];
     compute_areas(areas, longitude, latitude, Nlon, Nlat);
@@ -63,6 +71,9 @@ int main(int argc, char *argv[]) {
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
     //     coordinate system)
+    if (debug) {
+        fprintf(stdout, "Converting to Cartesian velocities.\n");
+    }
     double *u_x, *u_y, *u_z;
     u_x = new double[Ntime * Ndepth * Nlon * Nlat];
     u_y = new double[Ntime * Ndepth * Nlon * Nlat];
