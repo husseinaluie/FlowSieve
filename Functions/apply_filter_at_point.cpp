@@ -9,19 +9,26 @@ void apply_filter_at_point(
         const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
         const double * longitude, const double * latitude,
-        const double * dAreas, const double scale) {
+        const double * dAreas, const double scale,
+        const double * mask) {
 
 
     double kA_sum, dist, kern, area;
-    int index;
+    int index, mask_index;
 
     kA_sum  = 0.;
     u_x_tmp = 0.;
     u_y_tmp = 0.;
     u_z_tmp = 0.;
 
-    for (int LAT = std::max(0, Ilat - dlat_N); LAT < Ilat + dlat_N; LAT++) {
-        for (int LON = std::max(0, Ilon - dlon_N); LON < Ilon + dlon_N; LON++) {
+    int LAT_lb = std::max(0,    Ilat - dlat_N);
+    int LAT_ub = std::min(Nlat, Ilat + dlat_N);
+
+    int LON_lb = std::max(0,    Ilon - dlon_N);
+    int LON_ub = std::min(Nlon, Ilon + dlon_N);
+
+    for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
+        for (int LON = LON_lb; LON < LON_ub; LON++) {
 
             dist = distance(longitude[Ilon], latitude[Ilat],
                             longitude[LON],  latitude[LAT]);
@@ -31,12 +38,15 @@ void apply_filter_at_point(
             index = Index(Itime, Idepth, LAT,  LON,
                           Ntime, Ndepth, Nlat, Nlon);
 
-            area    = dAreas[index];
-            kA_sum += kern * area;
+            mask_index = Index(0,     0,      LAT,  LON,
+                               Ntime, Ndepth, Nlat, Nlon);
 
-            u_x_tmp += u_x[index] * kern * area;
-            u_y_tmp += u_y[index] * kern * area;
-            u_z_tmp += u_z[index] * kern * area;
+            area    = dAreas[index];
+            kA_sum += kern * area * mask[mask_index];
+
+            u_x_tmp += u_x[index] * kern * area * mask[mask_index];
+            u_y_tmp += u_y[index] * kern * area * mask[mask_index];
+            u_z_tmp += u_z[index] * kern * area * mask[mask_index];
 
             //fprintf(stdout, "           (u_x, u_y, u_z) = (%.4g, %.4g, %.4g)\n", u_x[index], u_y[index], u_z[index]);
         }

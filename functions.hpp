@@ -33,7 +33,8 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
                const int Ntime, const int Ndepth, const int Nlon, const int Nlat,
                const double * dAreas, 
                const double * time, const double * depth,
-               const double * longitude, const double * latitude);
+               const double * longitude, const double * latitude,
+               const double * mask);
 
 void apply_filter_at_point(
         double & u_x_tmp,   double & u_y_tmp,   double & u_z_tmp,
@@ -42,7 +43,8 @@ void apply_filter_at_point(
         const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
         const double * longitude, const double * latitude,
-        const double * dAreas, const double scale);
+        const double * dAreas, const double scale,
+        const double * mask);
 
 double kernel(const double distance, const double scale);
 

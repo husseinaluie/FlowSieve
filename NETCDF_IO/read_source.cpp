@@ -23,7 +23,8 @@ void read_source(
         int & Ntime,         int & Ndepth,
         double ** longitude, double ** latitude,
         double ** time,      double ** depth,
-        double ** u_r,       double ** u_lon,     double ** u_lat) {
+        double ** u_r,       double ** u_lon,     
+        double ** u_lat,     double ** mask) {
 
     const bool debug = DEBUG;
 
@@ -84,6 +85,8 @@ void read_source(
     u_lon[0] = new double[Ntime * Ndepth * Nlat * Nlon];
     u_lat[0] = new double[Ntime * Ndepth * Nlat * Nlon];
 
+    mask[0]  = new double[                 Nlat * Nlon];
+
     //
     //// Get fields from IC file
     //
@@ -99,6 +102,11 @@ void read_source(
     int ulon_varid, ulat_varid;
     if ((retval = nc_inq_varid(ncid, "uo", &ulon_varid))) { NC_ERR(retval, __LINE__, __FILE__); }
     if ((retval = nc_inq_varid(ncid, "vo", &ulat_varid))) { NC_ERR(retval, __LINE__, __FILE__); }
+
+    // Get the scale factors for the velocities
+    double u_lon_scale, u_lat_scale;
+    if ((retval = nc_get_att_double(ncid, ulon_varid, "scale_factor", &u_lon_scale))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_get_att_double(ncid, ulat_varid, "scale_factor", &u_lat_scale))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Get the coordinate variables
     size_t start_lon[1], count_lon[1],
@@ -128,9 +136,37 @@ void read_source(
     if ((retval = nc_get_vara_double(ncid, ulat_varid, start, count, u_lat[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // At the moment there's no u_r in the data, so just zero it out
+    //     also apply the scale factors to the velocity fields
     for (int index = 0; index < Ntime * Ndepth * Nlat * Nlon; index++) {
         u_r[0][index] = 0;
+        u_lon[0][index] *= u_lon_scale;
+        u_lat[0][index] *= u_lat_scale;
     }
+
+    // Determine the mask (i.e. where land is) by checking
+    //   where velocity is < -1e3
+    //   mask = 0 implies LAND
+    //   mask = 1 implies WATER
+
+    int num_land = 0;
+    int num_water = 0;
+    double bar = -1e4;
+
+    for (int index = 0; index < Nlat * Nlon; index++) {
+        if (    (u_r[  0][index] < bar) 
+             or (u_lon[0][index] < bar * u_lon_scale)
+             or (u_lat[0][index] < bar * u_lat_scale) ) {
+            mask[0][index] = 0;
+            num_land++;
+        } else {
+            mask[0][index] = 1;
+            num_water++;
+        }
+    }
+
+    fprintf(stdout, "Number of land  cells: %d (%.2g %%)\n", num_land, 100 * ( (double) num_land ) / (num_water + num_land));
+    fprintf(stdout, "Number of water cells: %d\n", num_water);
+    fprintf(stdout, "\n");
 
     // Close the file
     if ((retval = nc_close(ncid))) { NC_ERR(retval, __LINE__, __FILE__); }

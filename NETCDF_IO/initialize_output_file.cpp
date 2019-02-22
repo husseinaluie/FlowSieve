@@ -5,7 +5,7 @@ void initialize_output_file(
                          const int Nlat, const int Nscales,
         const double * time,      const double * depth, 
         const double * longitude, const double * latitude, 
-        const double * scales) {
+        const double * scales,    const double * mask) {
 
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_CLOBBER;
@@ -59,6 +59,13 @@ void initialize_output_file(
     if ((retval = nc_def_var(ncid, "u_lat", NC_DOUBLE, ndims, dimids, &u_lat_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
 
+    int mask_dimids[ndims];
+    mask_dimids[0] = lat_dimid;
+    mask_dimids[1] = lon_dimid;
+    int mask_varid;
+    if ((retval = nc_def_var(ncid, "mask", NC_DOUBLE, 2, mask_dimids, &mask_varid)))
+        NC_ERR(retval, __LINE__, __FILE__);
+
     // Write the coordinate variables
     size_t start[1], count[1];
     start[0] = 0;
@@ -80,6 +87,14 @@ void initialize_output_file(
 
     count[0] = Nscales;
     if ((retval = nc_put_vara_double(ncid, scale_varid, start, count, scales)))
+        NC_ERR(retval, __LINE__, __FILE__);
+
+    size_t mask_start[2], mask_count[2];
+    mask_start[0] = 0;
+    mask_start[1] = 0;
+    mask_count[0] = Nlon;
+    mask_count[1] = Nlat;
+    if ((retval = nc_put_vara_double(ncid, mask_varid, mask_start, mask_count, mask)))
         NC_ERR(retval, __LINE__, __FILE__);
 
     // Close the file

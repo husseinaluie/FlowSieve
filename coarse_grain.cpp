@@ -30,12 +30,12 @@ int main(int argc, char *argv[]) {
     //MPI_Init( &argc, &argv);
 
     double *longitude, *latitude, *time, *depth;
-    double *u_r, *u_lon, *u_lat;
+    double *u_r, *u_lon, *u_lat, *mask;
     int Nlon, Nlat, Ntime, Ndepth;
 
     // For the time being, hard-code the filter scales
-    const int Nfilt = 1;
-    const double filter_scales [4] = {200e3};
+    const int Nfilt = 6;
+    const double filter_scales [Nfilt] = {500e3, 400e3, 300e3, 200e3, 100e3, 50e3};
 
     // Read in source data / get size information
     if (debug) {
@@ -45,8 +45,8 @@ int main(int argc, char *argv[]) {
             Nlon, Nlat, Ntime, Ndepth,
             &longitude, &latitude, 
             &time, &depth, 
-            &u_r, &u_lon, &u_lat
-            );
+            &u_r, &u_lon, &u_lat,
+            &mask );
 
     // Convert coordinate to radians
     for (int ii = 0; ii < Nlon; ii++) {
@@ -74,7 +74,8 @@ int main(int argc, char *argv[]) {
               Ntime, Ndepth, Nlon, Nlat,
               areas, 
               time, depth,
-              longitude, latitude);
+              longitude, latitude,
+              mask);
 
     // Done!
     fprintf(stdout, "\n\n");

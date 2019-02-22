@@ -15,7 +15,8 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
                const int Ntime, const int Ndepth, const int Nlon, const int Nlat,
                const double * dAreas, 
                const double * time, const double * depth, 
-               const double * longitude, const double * latitude) {
+               const double * longitude, const double * latitude,
+               const double * mask) {
 
     const bool debug = DEBUG;
 
@@ -30,8 +31,9 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
     u_y = new double[Ntime * Ndepth * Nlon * Nlat];
     u_z = new double[Ntime * Ndepth * Nlon * Nlat];
 
-    int index;
-    for (int Itime = 0; Itime < Ntime; Itime++) {
+    int index, mask_index;
+    //for (int Itime = 0; Itime < Ntime; Itime++) {
+    for (int Itime = 0; Itime < 1; Itime++) {
         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
             for (int Ilat = 0; Ilat < Nlat; Ilat++) {
                 for (int Ilon = 0; Ilon < Nlon; Ilon++) {
@@ -40,11 +42,17 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
                     index = Index(Itime, Idepth, Ilat, Ilon,
                                   Ntime, Ndepth, Nlat, Nlon);
 
-                    // Note that 0 is in place of u_r, since 
-                    // the current datasets don't have u_r
-                    vel_Spher_to_Cart(u_x[index], u_y[index],   u_z[index],
-                                      0.,         u_lon[index], u_lat[index],
-                                      longitude[Ilon], latitude[Ilat]);
+                    mask_index = Index(0,     0,      Ilat, Ilon,
+                                       Ntime, Ndepth, Nlat, Nlon);
+
+                    if (mask[mask_index] == 1) { // Skip land areas
+
+                        // Note that 0 is in place of u_r, since 
+                        // the current datasets don't have u_r
+                        vel_Spher_to_Cart(u_x[index], u_y[index],   u_z[index],
+                                          u_r[index], u_lon[index], u_lat[index],
+                                          longitude[Ilon], latitude[Ilat]);
+                    }
                 }
             }
         }
@@ -55,7 +63,7 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
         fprintf(stdout, "Creating output file.\n");
     }
     initialize_output_file(Ntime, Ndepth, Nlon, Nlat, Nscales,
-            time, depth, longitude, latitude, scales);
+            time, depth, longitude, latitude, scales, mask);
 
     // Now prepare to filter
     double scale,
@@ -76,7 +84,7 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
     //// Begin the main filtering loop
     //
     if (debug) {
-        fprintf(stdout, "Beginning main filtering loop.\n");
+        fprintf(stdout, "Beginning main filtering loop.\n\n");
     }
     for (int Iscale = 0; Iscale < Nscales; Iscale++) {
 
@@ -85,7 +93,7 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
         scale  = scales[Iscale];
 
         // How many latitude cells are needed to span the filter radius
-        dlat_N = ceil( (scale / dlat_m) / 2 );
+        dlat_N = ceil( (1.2*scale / dlat_m) / 2 );
 
         //for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Itime = 0; Itime < 1; Itime++) {
@@ -103,37 +111,40 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
                     dlon_m = dlon 
                         * constants::R_earth 
                         * std::min( cos(latitude[Ilat] + dlat_N * dlat), 
-                                cos(latitude[Ilat] - dlat_N * dlat) ) ;
-                    dlon_N = ceil( (scale / dlon_m) / 2 );
+                                    cos(latitude[Ilat] - dlat_N * dlat) ) ;
+                    dlon_N = ceil( ( 1.2*scale / dlon_m) / 2 );
 
                     for (int Ilon = 0; Ilon < Nlon; Ilon++) {
 
                         // Convert our four-index to a one-index
                         index = Index(Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon);
+                                      Ntime, Ndepth, Nlat, Nlon);
 
-                        // Apply the filter at the point
-                        apply_filter_at_point(
-                                u_x_tmp, u_y_tmp, u_z_tmp,
-                                u_x,     u_y,     u_z,
-                                dlon_N, dlat_N, 
-                                Ntime,  Ndepth, Nlat, Nlon,
-                                Itime,  Idepth, Ilat, Ilon,
-                                longitude, latitude,
-                                dAreas, scale);
+                        mask_index = Index(0,     0,      Ilat, Ilon,
+                                           Ntime, Ndepth, Nlat, Nlon);
 
-                        // Convert the filtered fields back to spherical
-                        vel_Cart_to_Spher(u_r_tmp, u_lon_tmp, u_lat_tmp,
-                                u_x_tmp, u_y_tmp,   u_z_tmp,
-                                longitude[Ilon], latitude[Ilat]);
+                        if (mask[mask_index] == 1) { // Skip land areas
 
-                        coarse_u_r[  index] = u_r_tmp;
-                        coarse_u_lon[index] = u_lon_tmp;
-                        coarse_u_lat[index] = u_lat_tmp;
+                            // Apply the filter at the point
+                            apply_filter_at_point(
+                                    u_x_tmp, u_y_tmp, u_z_tmp,
+                                    u_x,     u_y,     u_z,
+                                    dlon_N, dlat_N, 
+                                    Ntime,  Ndepth, Nlat, Nlon,
+                                    Itime,  Idepth, Ilat, Ilon,
+                                    longitude, latitude,
+                                    dAreas, scale,
+                                    mask);
 
-                        //fprintf(stdout, "(u_r, u_lon, u_lat) = (%.4g, %.4g, %.4g)\n", 
-                        //        u_r_tmp, u_lon_tmp, u_lat_tmp);
+                            // Convert the filtered fields back to spherical
+                            vel_Cart_to_Spher(u_r_tmp, u_lon_tmp, u_lat_tmp,
+                                              u_x_tmp, u_y_tmp,   u_z_tmp,
+                                              longitude[Ilon], latitude[Ilat]);
 
+                            coarse_u_r[  index] = u_r_tmp;
+                            coarse_u_lon[index] = u_lon_tmp;
+                            coarse_u_lat[index] = u_lat_tmp;
+                        }
                     }
                 }
             }
@@ -154,14 +165,19 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
                         // Convert our four-index to a one-index
                         index = Index(Itime, Idepth, Ilat, Ilon,
                                       Ntime, Ndepth, Nlat, Nlon);
+                        mask_index = Index(0,     0,      Ilat, Ilon,
+                                           Ntime, Ndepth, Nlat, Nlon);
 
-                        vel_Spher_to_Cart(u_x_tmp,           u_y_tmp,             u_z_tmp,
-                                          coarse_u_r[index], coarse_u_lon[index], coarse_u_lat[index],
-                                          longitude[Ilon],   latitude[Ilat]);
+                        if (mask[mask_index] == 1) { // Skip land areas
 
-                        u_x[index] = u_x[index] - u_x_tmp;
-                        u_y[index] = u_y[index] - u_y_tmp;
-                        u_z[index] = u_z[index] - u_z_tmp;
+                            vel_Spher_to_Cart(u_x_tmp,           u_y_tmp,             u_z_tmp,
+                                              coarse_u_r[index], coarse_u_lon[index], coarse_u_lat[index],
+                                              longitude[Ilon],   latitude[Ilat]);
+
+                            u_x[index] = u_x[index] - u_x_tmp;
+                            u_y[index] = u_y[index] - u_y_tmp;
+                            u_z[index] = u_z[index] - u_z_tmp;
+                        }
                     }
                 }
             }
@@ -177,20 +193,26 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
 
                     // Convert our four-index to a one-index
                     index = Index(Itime, Idepth, Ilat, Ilon,
-                            Ntime, Ndepth, Nlat, Nlon);
+                                  Ntime, Ndepth, Nlat, Nlon);
+                    mask_index = Index(0,     0,      Ilat, Ilon,
+                                       Ntime, Ndepth, Nlat, Nlon);
 
-                    vel_Cart_to_Spher(
-                            u_r_tmp,    u_lon_tmp,  u_lat_tmp,
-                            u_x[index], u_y[index], u_z[index],
-                            longitude[Ilon],   latitude[Ilat]);
+                    if (mask[mask_index] == 1) { // Skip land areas
 
-                    coarse_u_r[  index] = u_r_tmp;
-                    coarse_u_lon[index] = u_lon_tmp;
-                    coarse_u_lat[index] = u_lat_tmp;
+                        vel_Cart_to_Spher(
+                                u_r_tmp,    u_lon_tmp,  u_lat_tmp,
+                                u_x[index], u_y[index], u_z[index],
+                                longitude[Ilon],   latitude[Ilat]);
+
+                        coarse_u_r[  index] = u_r_tmp;
+                        coarse_u_lon[index] = u_lon_tmp;
+                        coarse_u_lat[index] = u_lat_tmp;
+                    }
                 }
             }
         }
     }
+
     write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
             Nscales, Ntime, Ndepth, Nlat, Nlon);
 
