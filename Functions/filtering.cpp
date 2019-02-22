@@ -5,8 +5,10 @@
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
 
+// If the DEBUG flag hasn't been set,
+//   then use default value of 0 
 #ifndef DEBUG
-    #define DEBUG false
+    #define DEBUG 0
 #endif
 
 void filtering(const double * u_r, const double * u_lon, const double * u_lat,
@@ -18,14 +20,12 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
                const double * longitude, const double * latitude,
                const double * mask) {
 
-    const bool debug = DEBUG;
-
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
     //     coordinate system)
-    if (debug) {
-        fprintf(stdout, "Converting to Cartesian velocities.\n");
-    }
+    #if DEBUG >= 1
+    fprintf(stdout, "Converting to Cartesian velocities.\n");
+    #endif
     double *u_x, *u_y, *u_z;
     u_x = new double[Ntime * Ndepth * Nlon * Nlat];
     u_y = new double[Ntime * Ndepth * Nlon * Nlat];
@@ -59,9 +59,9 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
     }
 
     // Create the output file
-    if (debug) {
-        fprintf(stdout, "Creating output file.\n");
-    }
+    #if DEBUG >= 1
+    fprintf(stdout, "Creating output file.\n");
+    #endif
     initialize_output_file(Ntime, Ndepth, Nlon, Nlat, Nscales,
             time, depth, longitude, latitude, scales, mask);
 
@@ -83,12 +83,14 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
     //
     //// Begin the main filtering loop
     //
-    if (debug) {
-        fprintf(stdout, "Beginning main filtering loop.\n\n");
-    }
+    #if DEBUG>=1 
+    fprintf(stdout, "Beginning main filtering loop.\n\n");
+    #endif
     for (int Iscale = 0; Iscale < Nscales; Iscale++) {
 
+        #if DEBUG >= 0
         fprintf(stdout, "Scale %d of %d\n", Iscale+1, Nscales);
+        #endif
 
         scale  = scales[Iscale];
 
@@ -98,13 +100,21 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
         //for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Itime = 0; Itime < 1; Itime++) {
 
+            #if DEBUG >= 0
             fprintf(stdout, "  Time %d of %d\n", Itime+1, Ntime);
+            #endif
 
             for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
 
+                #if DEBUG >= 0
                 fprintf(stdout, "    Depth %d of %d\n", Idepth+1, Ndepth);
+                #endif
 
                 for (int Ilat = 0; Ilat < Nlat; Ilat++) {
+
+                    #if DEBUG >= 4
+                    fprintf(stdout, "      Ilat %d of %d\n", Ilat+1, Nlat);
+                    #endif
 
                     // Get the (maximum) number of longitude cells that 
                     //   are needed to span the filter radius
@@ -115,6 +125,10 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
                     dlon_N = ceil( ( 1.2*scale / dlon_m) / 2 );
 
                     for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                        #if DEBUG >= 4
+                        fprintf(stdout, "        Ilon %d of %d\n", Ilon+1, Nlon);
+                        #endif
 
                         // Convert our four-index to a one-index
                         index = Index(Itime, Idepth, Ilat, Ilon,

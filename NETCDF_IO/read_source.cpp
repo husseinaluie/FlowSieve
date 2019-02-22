@@ -13,7 +13,7 @@
 #include "../netcdf_io.hpp"
 
 #ifndef DEBUG
-    #define DEBUG false
+    #define DEBUG 0
 #endif
 
 
@@ -25,8 +25,6 @@ void read_source(
         double ** time,      double ** depth,
         double ** u_r,       double ** u_lon,     
         double ** u_lat,     double ** mask) {
-
-    const bool debug = DEBUG;
 
     // Open the NETCDF file
     int FLAG = NC_NETCDF4;
@@ -45,8 +43,8 @@ void read_source(
     size_t Ntime_st, Ndepth_st, Nlon_st, Nlat_st;
     if ((retval = nc_inq_dim(ncid, time_dimid , NULL, &Ntime_st  ))) { NC_ERR(retval, __LINE__, __FILE__); }
     if ((retval = nc_inq_dim(ncid, depth_dimid, NULL, &Ndepth_st ))) { NC_ERR(retval, __LINE__, __FILE__); }
-    if ((retval = nc_inq_dim(ncid, lat_dimid  , NULL, &Nlon_st   ))) { NC_ERR(retval, __LINE__, __FILE__); }
-    if ((retval = nc_inq_dim(ncid, lon_dimid  , NULL, &Nlat_st   ))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_inq_dim(ncid, lat_dimid  , NULL, &Nlat_st   ))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_inq_dim(ncid, lon_dimid  , NULL, &Nlon_st   ))) { NC_ERR(retval, __LINE__, __FILE__); }
 
 
     // Cast the sizes to integers (to resolve some compile errors)
@@ -56,14 +54,15 @@ void read_source(
     Ndepth = static_cast<int>(Ndepth_st);
     Nlon   = static_cast<int>(Nlon_st);
     Nlat   = static_cast<int>(Nlat_st);
-    if (debug) {
-        fprintf(stdout, "\n");
-        fprintf(stdout, "Nlon   = %d\n", Nlon);
-        fprintf(stdout, "Nlat   = %d\n", Nlat);
-        fprintf(stdout, "Ntime  = %d\n", Ntime);
-        fprintf(stdout, "Ndepth = %d\n", Ndepth);
-        fprintf(stdout, "\n");
-    }
+
+    #if DEBUG >= 1
+    fprintf(stdout, "\n");
+    fprintf(stdout, "Nlon   = %d\n", Nlon);
+    fprintf(stdout, "Nlat   = %d\n", Nlat);
+    fprintf(stdout, "Ntime  = %d\n", Ntime);
+    fprintf(stdout, "Ndepth = %d\n", Ndepth);
+    fprintf(stdout, "\n");
+    #endif
 
     // For the moment, as a precaution stop if we hit something too large.
     if ( (Nlon > 1e4) or (Nlat > 1e4) or (Ntime > 1e2) or (Ndepth > 1e2) ) {
@@ -164,9 +163,11 @@ void read_source(
         }
     }
 
+    #if DEBUG >= 1
     fprintf(stdout, "Number of land  cells: %d (%.2g %%)\n", num_land, 100 * ( (double) num_land ) / (num_water + num_land));
     fprintf(stdout, "Number of water cells: %d\n", num_water);
     fprintf(stdout, "\n");
+    #endif
 
     // Close the file
     if ((retval = nc_close(ncid))) { NC_ERR(retval, __LINE__, __FILE__); }

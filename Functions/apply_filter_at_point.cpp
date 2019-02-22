@@ -1,6 +1,12 @@
 #include <algorithm>
 #include "../functions.hpp"
 
+// If the DEBUG flag hasn't been set,
+//   then use default value of 0 
+#ifndef DEBUG
+    #define DEBUG 0
+#endif
+
 
 void apply_filter_at_point(
         double & u_x_tmp, double & u_y_tmp, double & u_z_tmp,
@@ -42,13 +48,12 @@ void apply_filter_at_point(
                                Ntime, Ndepth, Nlat, Nlon);
 
             area    = dAreas[index];
-            kA_sum += kern * area * mask[mask_index];
+            kA_sum += kern * area;// * mask[mask_index];
 
             u_x_tmp += u_x[index] * kern * area * mask[mask_index];
             u_y_tmp += u_y[index] * kern * area * mask[mask_index];
             u_z_tmp += u_z[index] * kern * area * mask[mask_index];
 
-            //fprintf(stdout, "           (u_x, u_y, u_z) = (%.4g, %.4g, %.4g)\n", u_x[index], u_y[index], u_z[index]);
         }
     }
 

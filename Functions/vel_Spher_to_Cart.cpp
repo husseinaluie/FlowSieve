@@ -17,11 +17,21 @@
 #include <math.h>
 #include "../functions.hpp"
 
+// If the DEBUG flag hasn't been set,
+//   then use default value of 0 
+#ifndef DEBUG
+    #define DEBUG 0
+#endif
+
 void vel_Spher_to_Cart(
             double & u_x, double & u_y, double & u_z,
             const double u_r, const double u_lon, const double u_lat,
             const double lon, const double lat
         ) {
+
+    #if DEBUG >= 5
+    fprintf(stdout, "Velocity conversion: Spherical to Cartesian");
+    #endif
 
     u_x =   u_r   * cos(lon) * cos(lat)
           - u_lon * sin(lon)

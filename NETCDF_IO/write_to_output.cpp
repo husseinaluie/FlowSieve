@@ -1,5 +1,9 @@
 #include "../netcdf_io.hpp"
 
+#ifndef DEBUG
+    #define DEBUG 0
+#endif
+
 void write_to_output(
         const double * coarse_u_r, const double * coarse_u_lon, const double * coarse_u_lat, 
         const int Iscale, const int Ntime, const int Ndepth,
@@ -43,4 +47,8 @@ void write_to_output(
 
     // Close the file
     if ((retval = nc_close(ncid))) { NC_ERR(retval, __LINE__, __FILE__); }
+
+    #if DEBUG >= 2
+    fprintf(stdout, "-Output written-\n");
+    #endif
 }

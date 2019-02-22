@@ -10,7 +10,7 @@
 #include "../constants.hpp"
 
 #ifndef DEBUG
-    #define DEBUG false
+    #define DEBUG 0
 #endif
 
 void compute_areas(
@@ -20,9 +20,9 @@ void compute_areas(
         int Nlon, 
         int Nlat) {
 
-    if (DEBUG) {
-        fprintf(stdout, "Reached line %d of %s.\n", __LINE__, __FILE__);
-    }
+    #if DEBUG >= 2
+    fprintf(stdout, "Computing areas (line %d of %s).\n\n", __LINE__, __FILE__);
+    #endif
 
     // For the moment, assume a uniform grid
     double dlat = latitude[ 1] - latitude[ 0];

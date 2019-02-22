@@ -13,6 +13,12 @@
 #include <math.h>    
 #include "../constants.hpp"
 
+// If the DEBUG flag hasn't been set,
+//   then use default value of 0 
+#ifndef DEBUG
+    #define DEBUG 0
+#endif
+
 double distance(const double lon1, const double lat1, const double lon2, const double lat2) {
 
     double Delta_lon, numer, denom, Delta_sigma, distance;
@@ -28,6 +34,11 @@ double distance(const double lon1, const double lat1, const double lon2, const d
     Delta_sigma = atan2(numer, denom);
     
     distance = constants::R_earth * Delta_sigma;
+
+    #if DEBUG >= 5
+    fprintf(stdout, "dist(lon1 = %.5g, lat1 = %.5g, lon2 = %.5g, lat2 = %.5g) = %.5g",
+            lon1, lat1, lon2, lat2, distance);
+    #endif
 
     return distance;
 

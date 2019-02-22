@@ -11,18 +11,16 @@
 #include "functions.hpp"
 
 #ifndef DEBUG
-    #define DEBUG false
+    #define DEBUG 0
 #endif
 
 int main(int argc, char *argv[]) {
 
-    const bool debug = DEBUG;
-
-    if (debug) {
-        fprintf(stdout, "\n\n");
-        fprintf(stdout, "Compiled at %s on %s.\n", __TIME__, __DATE__);
-        fprintf(stdout, "\n\n");
-    }
+    #if DEBUG >= 0
+    fprintf(stdout, "\n\n");
+    fprintf(stdout, "Compiled at %s on %s.\n", __TIME__, __DATE__);
+    fprintf(stdout, "\n\n");
+    #endif
 
     // Enable all floating point exceptions but FE_INEXACT
     //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
@@ -38,9 +36,10 @@ int main(int argc, char *argv[]) {
     const double filter_scales [Nfilt] = {500e3, 400e3, 300e3, 200e3, 100e3, 50e3};
 
     // Read in source data / get size information
-    if (debug) {
-        fprintf(stdout, "Reading in source data.\n");
-    }
+    #if DEBUG >= 1
+    fprintf(stdout, "Reading in source data.\n\n");
+    #endif
+
     read_source(
             Nlon, Nlat, Ntime, Ndepth,
             &longitude, &latitude, 
@@ -60,9 +59,10 @@ int main(int argc, char *argv[]) {
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration
-    if (debug) {
-        fprintf(stdout, "Converting to cell areas.\n");
-    }
+    #if DEBUG >= 1
+    fprintf(stdout, "Computing the cell areas.\n\n");
+    #endif
+
     double *areas;
     areas = new double[Nlon * Nlat];
     compute_areas(areas, longitude, latitude, Nlon, Nlat);
@@ -78,8 +78,10 @@ int main(int argc, char *argv[]) {
               mask);
 
     // Done!
+    #if DEBUG >= 0
     fprintf(stdout, "\n\n");
     fprintf(stdout, "Process completed.\n");
+    #endif
     return 0;
 
 }

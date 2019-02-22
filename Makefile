@@ -3,7 +3,7 @@ MPICXX  ?= mpicxx-openmpi-gcc8
 LINKS:=-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl
 CFLAGS:=-O3 -Wall #-qopenmp -fp-model fast=2
 
-DEBUG_FLAGS:=-g -DDEBUG
+DEBUG_FLAGS:=-g -DDEBUG=1
 DEBUG_LDFLAGS:=-g
 
 EXTRA_OPT_FLAGS:=#-ip -ipo

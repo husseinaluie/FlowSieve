@@ -1,5 +1,9 @@
 #include "../netcdf_io.hpp"
 
+#ifndef DEBUG
+    #define DEBUG 0
+#endif
+
 void initialize_output_file(
         const int Ntime, const int Ndepth, const int Nlon, 
                          const int Nlat, const int Nscales,
@@ -92,12 +96,16 @@ void initialize_output_file(
     size_t mask_start[2], mask_count[2];
     mask_start[0] = 0;
     mask_start[1] = 0;
-    mask_count[0] = Nlon;
-    mask_count[1] = Nlat;
+    mask_count[0] = Nlat;
+    mask_count[1] = Nlon;
     if ((retval = nc_put_vara_double(ncid, mask_varid, mask_start, mask_count, mask)))
         NC_ERR(retval, __LINE__, __FILE__);
 
     // Close the file
     if ((retval = nc_close(ncid))) { NC_ERR(retval, __LINE__, __FILE__); }
+
+    #if DEBUG >= 2
+    fprintf(stdout, "Output file initialized.\n\n");
+    #endif
 
 }
