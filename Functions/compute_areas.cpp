@@ -20,10 +20,6 @@ void compute_areas(
         int Nlon, 
         int Nlat) {
 
-    #if DEBUG >= 2
-    fprintf(stdout, "Computing areas (line %d of %s).\n\n", __LINE__, __FILE__);
-    #endif
-
     // For the moment, assume a uniform grid
     double dlat = latitude[ 1] - latitude[ 0];
     double dlon = longitude[1] - longitude[0];
@@ -38,4 +34,8 @@ void compute_areas(
             areas[ii*Nlon + jj] = pow( R_earth, 2 ) * cos(LAT) * dlat * dlon;
         }
     }
+
+    #if DEBUG >= 2
+    fprintf(stdout, "  finished computing areas.\n\n");
+    #endif
 }

@@ -29,7 +29,7 @@ void vel_Cart_to_Spher(
             const double lon, const double lat
         ) {
 
-    #if DEBUG >= 5
+    #if DEBUG >= 4
     fprintf(stdout, "Velocity conversion: Cartesian to Spherical");
     #endif
 

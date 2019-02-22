@@ -83,7 +83,7 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
     //
     //// Begin the main filtering loop
     //
-    #if DEBUG>=1 
+    #if DEBUG>=2
     fprintf(stdout, "Beginning main filtering loop.\n\n");
     #endif
     for (int Iscale = 0; Iscale < Nscales; Iscale++) {
