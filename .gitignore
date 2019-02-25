@@ -4,3 +4,7 @@
 mpi_backup/*.?pp
 
 *dSYM
+
+*.DS_Store
+
+Documentation/

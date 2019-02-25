@@ -3,13 +3,24 @@ MPICXX  ?= mpicxx-openmpi-gcc8
 LINKS:=-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl
 CFLAGS:=-O3 -Wall #-qopenmp -fp-model fast=2
 
-DEBUG_FLAGS:=-g -DDEBUG=1
+# Debug output level
+CFLAGS:=-DDEBUG=0
+
+# Do you want vorticity computed?
+CFLAGS:=-DCOMP_VORT=true;
+
+# Turn on/off debug flags or additional optimization flags
+DEBUG:=true
+EXTRA_OPT:=false
+
+##
+## Shouldn't need to modify anything beyond this point
+##
+
+DEBUG_FLAGS:=-g
 DEBUG_LDFLAGS:=-g
 
 EXTRA_OPT_FLAGS:=#-ip -ipo
-
-DEBUG:=true
-EXTRA_OPT:=false
 
 LIB_DIRS:=-L /opt/local/lib
 INC_DIRS:=-I /opt/local/include

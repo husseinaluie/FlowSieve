@@ -1,14 +1,3 @@
-/*
- *
- * Read source data (from input.nc) for coarse graining.
- *
- * Current assumptions:
- *    Variables to read: uo (as u_lon), vo (as u_lat)
- *    Dimensions: time, depth, longitude, latitude (in that order)
- *
- * There's no u_r in the current data files, so we'll zero it out.
- *
- */
 
 #include "../netcdf_io.hpp"
 
@@ -19,12 +8,19 @@
 
 // Write to netcdf file
 void read_source(
-        int & Nlon,          int & Nlat,
-        int & Ntime,         int & Ndepth,
-        double ** longitude, double ** latitude,
-        double ** time,      double ** depth,
-        double ** u_r,       double ** u_lon,     
-        double ** u_lat,     double ** mask) {
+        int & Nlon,          /**< [in] Size of longitude dimension*/
+        int & Nlat,          /**< [in] Size of latitude dimension*/
+        int & Ntime,         /**< [in] Size of time dimension*/
+        int & Ndepth,        /**< [in] Size of depth dimension*/
+        double ** longitude, /**< [in] Pointer to longitude array to be created*/
+        double ** latitude,  /**< [in] Pointer to latitude array to be created*/
+        double ** time,      /**< [in] Pointer to time array to be created*/
+        double ** depth,     /**< [in] Pointer to depth array to be created*/
+        double ** u_r,       /**< [in] Pointer to u_r array to be created*/
+        double ** u_lon,     /**< [in] Pointer to u_lon array to be created*/
+        double ** u_lat,     /**< [in] Pointer to u_lat array to be created*/
+        double ** mask       /**< [in] Pointer to mask array to be created*/
+        ) {
 
     // Open the NETCDF file
     int FLAG = NC_NETCDF4;

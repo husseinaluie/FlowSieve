@@ -37,6 +37,8 @@ during runtime. In particular:
   * Prints when finished computing cell areas (compute_areas.cpp)
   * Prints when entering the main filtering loop sequence (filtering.cpp)
   * Prints when the output file is initialized (initialize_output_file.cpp)
+  * Prints when the output is written (write_to_output.cpp)
+  * Prints when the output vorticity is written (write_vorticity.cpp)
 * DEBUG >= 3
   * **[THIS WILL PRINT A LOT]**
   * Prints *every* index conversion (Index.cpp)

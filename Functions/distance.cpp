@@ -1,25 +1,16 @@
-/*
- *
- * This function computes the distance between two points on
- *   a spherical shell along a great circle.
- *   (see https://en.wikipedia.org/wiki/Great-circle_distance)
- * It should avoid floating point issues for the grid scales that
- *   we're considering. Worst case, increase to quads for better
- *   accuracy.
- *
- */
-
-
 #include <math.h>    
 #include "../constants.hpp"
 
-// If the DEBUG flag hasn't been set,
-//   then use default value of 0 
 #ifndef DEBUG
     #define DEBUG 0
 #endif
 
-double distance(const double lon1, const double lat1, const double lon2, const double lat2) {
+double distance(
+        const double lon1, /**< [in] Longitude of first position */
+        const double lat1, /**< [in] Latitude of first position */
+        const double lon2, /**< [in] Longitude of second position */
+        const double lat2  /**< [in] Latitude of second position */
+        ) {
 
     double Delta_lon, numer, denom, Delta_sigma, distance;
 

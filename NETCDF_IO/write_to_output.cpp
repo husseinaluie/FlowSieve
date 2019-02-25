@@ -5,9 +5,15 @@
 #endif
 
 void write_to_output(
-        const double * coarse_u_r, const double * coarse_u_lon, const double * coarse_u_lat, 
-        const int Iscale, const int Ntime, const int Ndepth,
-        const int Nlat,   const int Nlon) {
+        const double * coarse_u_r,   /**< [in] u_r to be written to the file*/
+        const double * coarse_u_lon, /**< [in] u_lon to be written to the file*/
+        const double * coarse_u_lat, /**< [in] u_lat to be written to the file*/
+        const int Iscale,            /**< [in] Index positioning this output in the filter dimension */
+        const int Ntime,             /**< [in] Length of the time dimension */
+        const int Ndepth,            /**< [in] Length of the depth dimension */
+        const int Nlat,              /**< [in] Length of the latitude dimension */
+        const int Nlon               /**< [in] Length of the longitude dimension */
+        ) {
 
     // Open the NETCDF file
     int FLAG = NC_WRITE;

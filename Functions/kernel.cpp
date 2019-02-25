@@ -1,12 +1,13 @@
 #include "../functions.hpp"
 
-// If the DEBUG flag hasn't been set,
-//   then use default value of 0 
 #ifndef DEBUG
     #define DEBUG 0
 #endif
 
-double kernel(const double dist, const double scale) {
+double kernel(
+        const double dist,  /**< [in] Distance as argument to the kernel */
+        const double scale  /**< [in] Filtering scale */
+        ) {
    
     double kern;
 

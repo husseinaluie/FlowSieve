@@ -1,19 +1,19 @@
-/*
- *
- * Index is a function to convert a four-point (physical) index
- *   (Itime, Idepth, Ilat, Ilon) into a one-point (logical) index
- *   to access the double arrays.
- *
- */
-
 #include "../functions.hpp"
 
 #ifndef DEBUG
     #define DEBUG 0
 #endif
 
-int Index( const int Itime, const int Idepth, const int Ilat, const int Ilon,
-           const int Ntime, const int Ndepth, const int Nlat, const int Nlon  ){
+int Index( 
+        const int Itime,  /**< [in] Time index */
+        const int Idepth, /**< [in] Depth index */
+        const int Ilat,   /**< [in] Latitude index */
+        const int Ilon,   /**< [in] Longitude index */
+        const int Ntime,  /**< [in] Length of time dimension */
+        const int Ndepth, /**< [in] Length of depth dimension */
+        const int Nlat,   /**< [in] Length of latitude dimension */
+        const int Nlon    /**< [in] Length of longitude dimension */
+        ){
 
     /*
     int index =   Itime  * ( Ndepth * Nlat * Nlon )

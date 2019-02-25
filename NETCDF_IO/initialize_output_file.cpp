@@ -1,15 +1,27 @@
+
 #include "../netcdf_io.hpp"
 
 #ifndef DEBUG
     #define DEBUG 0
 #endif
 
+#ifndef COMP_VORT
+    #define COMP_VORT true
+#endif
+
 void initialize_output_file(
-        const int Ntime, const int Ndepth, const int Nlon, 
-                         const int Nlat, const int Nscales,
-        const double * time,      const double * depth, 
-        const double * longitude, const double * latitude, 
-        const double * scales,    const double * mask) {
+        const int Ntime,          /**< [in] length of the time dimension */
+        const int Ndepth,         /**< [in] length of the depth dimension */
+        const int Nlon,           /**< [in] length of the longitude dimension */
+        const int Nlat,           /**< [in] length of the latitude dimension */
+        const int Nscales,        /**< [in] number of filtering scales */
+        const double * time,      /**< [in] time vector (1D) */
+        const double * depth,     /**< [in] depth vector (1D) */
+        const double * longitude, /**< [in] longitude vector (1D) */
+        const double * latitude,  /**< [in] longitude vector (1D) */
+        const double * scales,    /**< [in] filter scales (1D) */
+        const double * mask       /**< [in] masking (land vs water, 2D) */
+        ) {
 
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_CLOBBER;
@@ -62,6 +74,16 @@ void initialize_output_file(
         NC_ERR(retval, __LINE__, __FILE__);
     if ((retval = nc_def_var(ncid, "u_lat", NC_DOUBLE, ndims, dimids, &u_lat_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
+
+    #if COMP_VORT
+    int vort_r_varid, vort_lon_varid, vort_lat_varid;
+    if ((retval = nc_def_var(ncid, "vort_r",   NC_DOUBLE, ndims, dimids, &vort_r_varid)))
+        NC_ERR(retval, __LINE__, __FILE__);
+    if ((retval = nc_def_var(ncid, "vort_lon", NC_DOUBLE, ndims, dimids, &vort_lon_varid)))
+        NC_ERR(retval, __LINE__, __FILE__);
+    if ((retval = nc_def_var(ncid, "vort_lat", NC_DOUBLE, ndims, dimids, &vort_lat_varid)))
+        NC_ERR(retval, __LINE__, __FILE__);
+    #endif
 
     int mask_dimids[ndims];
     mask_dimids[0] = lat_dimid;

@@ -1,32 +1,19 @@
-/*
- *
- * Convert Spherical velocities to Cartesian
- *   velocities.
- *
- * Note: we are using linear velocities (m/s),
- *   not angular (rad/s), so 
- *   u_\lambda = r\cos(\phi)\cdot\hat{u}_\lambda
- *   u_\phi    = r\cdot\hat{u}_\phi
- *
- * Note: we are still using a Spherical
- *   coordinate system, we are only converting
- *   the velocity fields.
- *
- */
-
 #include <math.h>
 #include "../functions.hpp"
 
-// If the DEBUG flag hasn't been set,
-//   then use default value of 0 
 #ifndef DEBUG
     #define DEBUG 0
 #endif
 
 void vel_Spher_to_Cart(
-            double & u_x, double & u_y, double & u_z,
-            const double u_r, const double u_lon, const double u_lat,
-            const double lon, const double lat
+            double & u_x,       /**< [in] u_x to be returned */
+            double & u_y,       /**< [in] u_y to be returned */
+            double & u_z,       /**< [in] u_z to be returned */
+            const double u_r,   /**< [in] u_r to convert */
+            const double u_lon, /**< [in] u_lon to convert */
+            const double u_lat, /**< [in] u_lat to convert */
+            const double lon,   /**< [in] longitude of location for conversion */
+            const double lat    /**< [in] latitude of location for conversion */
         ) {
 
     #if DEBUG >= 4

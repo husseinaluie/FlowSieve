@@ -1,24 +1,36 @@
-
 #include <math.h>
 #include <algorithm>
 #include "../functions.hpp"
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
 
-// If the DEBUG flag hasn't been set,
-//   then use default value of 0 
 #ifndef DEBUG
     #define DEBUG 0
 #endif
 
-void filtering(const double * u_r, const double * u_lon, const double * u_lat,
-               const double * scales, const int Nscales,
-               const double dlon, const double dlat,
-               const int Ntime, const int Ndepth, const int Nlon, const int Nlat,
-               const double * dAreas, 
-               const double * time, const double * depth, 
-               const double * longitude, const double * latitude,
-               const double * mask) {
+#ifndef COMP_VORT
+    #define COMP_VORT true
+#endif
+
+void filtering(
+        const double * u_r,       /**< [in] Full u_r velocity array */
+        const double * u_lon,     /**< [in] Full u_lon velocity array */
+        const double * u_lat,     /**< [in] Full u_lat velocity array */
+        const double * scales,    /**< [in] Array of filtering scales */
+        const int Nscales,        /**< [in] Number of filtering scales */
+        const double dlon,        /**< [in] (Constant) longitude spacing */
+        const double dlat,        /**< [in] (Constant) latitude spacing */
+        const int Ntime,          /**< [in] Length of time dimension */
+        const int Ndepth,         /**< [in] Length of depth dimension */
+        const int Nlon,           /**< [in] Length of longitude dimension */
+        const int Nlat,           /**< [in] Length of latitude dimension */
+        const double * dAreas,    /**< [in] Array of cell areas (2D) (compute_areas()) */
+        const double * time,      /**< [in] Time dimension (1D) */
+        const double * depth,     /**< [in] Depth dimension (1D) */
+        const double * longitude, /**< [in] Longitude dimension (1D) */
+        const double * latitude,  /**< [in] Latitude dimension (1D) */
+        const double * mask       /**< [in] Array to distinguish between land and water cells (2D) */
+        ) {
 
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
@@ -32,8 +44,7 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
     u_z = new double[Ntime * Ndepth * Nlon * Nlat];
 
     int index, mask_index;
-    //for (int Itime = 0; Itime < Ntime; Itime++) {
-    for (int Itime = 0; Itime < 1; Itime++) {
+    for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
             for (int Ilat = 0; Ilat < Nlat; Ilat++) {
                 for (int Ilon = 0; Ilon < Nlon; Ilon++) {
@@ -77,6 +88,11 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
     coarse_u_lon = new double[Ntime * Ndepth * Nlat * Nlon];
     coarse_u_lat = new double[Ntime * Ndepth * Nlat * Nlon];
 
+    double *vort_r, *vort_lon, *vort_lat;
+    vort_r   = new double[Ntime * Ndepth * Nlat * Nlon];
+    vort_lon = new double[Ntime * Ndepth * Nlat * Nlon];
+    vort_lat = new double[Ntime * Ndepth * Nlat * Nlon];
+
     // The spacing (in metres) betwee latitude gridpoints
     dlat_m = dlat * constants::R_earth;
 
@@ -97,8 +113,7 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
         // How many latitude cells are needed to span the filter radius
         dlat_N = ceil( (1.2*scale / dlat_m) / 2 );
 
-        //for (int Itime = 0; Itime < Ntime; Itime++) {
-        for (int Itime = 0; Itime < 1; Itime++) {
+        for (int Itime = 0; Itime < Ntime; Itime++) {
 
             #if DEBUG >= 0
             fprintf(stdout, "  Time %d of %d\n", Itime+1, Ntime);
@@ -168,6 +183,17 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
         write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
                 Iscale, Ntime, Ndepth, Nlat, Nlon);
 
+        #if COMP_VORT
+        // Compute and write vorticity
+        compute_vorticity(vort_r, vort_lon, vort_lat,
+                coarse_u_r, coarse_u_lon, coarse_u_lat,
+                Ntime, Ndepth, Nlat, Nlon,
+                Itime, Idepth, Ilat, Ilon,
+                longitude, latitude, mask);
+        write_vorticity(vort_r, vort_lon, vort_lat,
+                Iscale, Ntime, Ndepth, Nlat, Nlon);
+        #endif
+
         // Now that we've filtered at the previous scale, 
         //   subtract the high-pass (large scale) from the full so
         //   that we filter the low-pass (small scale) in the next iteration
@@ -234,6 +260,10 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
     delete[] coarse_u_r;
     delete[] coarse_u_lon;
     delete[] coarse_u_lat;
+
+    delete[] vort_r;
+    delete[] vort_lon;
+    delete[] vort_lat;
     
     delete[] u_x;
     delete[] u_y;

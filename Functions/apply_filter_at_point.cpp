@@ -1,22 +1,33 @@
 #include <algorithm>
 #include "../functions.hpp"
 
-// If the DEBUG flag hasn't been set,
-//   then use default value of 0 
 #ifndef DEBUG
     #define DEBUG 0
 #endif
 
-
 void apply_filter_at_point(
-        double & u_x_tmp, double & u_y_tmp, double & u_z_tmp,
-        const double * u_x, const double * u_y, const double * u_z,
-        const int dlon_N, const int dlat_N, 
-        const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
-        const int Itime,  const int Idepth, const int Ilat, const int Ilon,
-        const double * longitude, const double * latitude,
-        const double * dAreas, const double scale,
-        const double * mask) {
+        double & u_x_tmp,         /**< [in] where to store filtered u_x */
+        double & u_y_tmp,         /**< [in] where to store filtered u_y */
+        double & u_z_tmp,         /**< [in] where to store filtered u_z */
+        const double * u_x,       /**< [in] (full) u_x to filter */
+        const double * u_y,       /**< [in] (full) u_y to filter */
+        const double * u_z,       /**< [in] (full) u_z to filter */
+        const int dlon_N,         /**< [in] Maximum longitudinal width of kernel area in cells */
+        const int dlat_N,         /**< [in] Maximum latitudinal width of kernel area in cells */
+        const int Ntime,          /**< [in] Length of time dimension */
+        const int Ndepth,         /**< [in] Length of depth dimension */
+        const int Nlat,           /**< [in] Length of latitude dimension */
+        const int Nlon,           /**< [in] Length of longitude dimension */
+        const int Itime,          /**< [in] Current position in time dimension */
+        const int Idepth,         /**< [in] Current position in depth dimension */
+        const int Ilat,           /**< [in] Current position in latitude dimension */
+        const int Ilon,           /**< [in] Current position in longitude dimension */
+        const double * longitude, /**< [in] Longitude dimension (1D) */
+        const double * latitude,  /**< [in] Latitude dimension (1D) */
+        const double * dAreas,    /**< [in] Array of cell areas (2D) (compute_areas())*/
+        const double scale,       /**< [in] The filtering scale */
+        const double * mask       /**< [in] Array to distinguish between land and water cells (2D) */
+        ) {
 
 
     double kA_sum, dist, kern, area;
