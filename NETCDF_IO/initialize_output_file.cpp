@@ -111,7 +111,7 @@ void initialize_output_file(
     if ((retval = nc_put_vara_double(ncid, lon_varid,   start, count, longitude)))
         NC_ERR(retval, __LINE__, __FILE__);
 
-    count[0] = Nscales;
+    count[0] = Nscales+1;
     if ((retval = nc_put_vara_double(ncid, scale_varid, start, count, scales)))
         NC_ERR(retval, __LINE__, __FILE__);
 
