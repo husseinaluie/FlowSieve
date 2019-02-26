@@ -162,4 +162,18 @@ void compute_vorticity_at_point(
         const double * longitude, const double * latitude,
         const double * mask);
 
+/*!
+ * \brief Wrapper for computing vorticity
+ *
+ * This wrapper applies compute_vorticity_at_point() at each point in the
+ * grid. If the compiler flag COMP_VORT is set to false, then this procedure
+ * is skipped.
+ */
+void compute_vorticity(
+        double * vort_r,    double * vort_lon,    double * vort_lat,
+        const double * u_r, const double * u_lon, const double * u_lat,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+        const double * longitude, const double * latitude,
+        const double * mask);
+
 #endif

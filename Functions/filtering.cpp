@@ -113,7 +113,8 @@ void filtering(
         // How many latitude cells are needed to span the filter radius
         dlat_N = ceil( (1.2*scale / dlat_m) / 2 );
 
-        for (int Itime = 0; Itime < Ntime; Itime++) {
+        //for (int Itime = 0; Itime < Ntime; Itime++) {
+        for (int Itime = 0; Itime < 1; Itime++) {
 
             #if DEBUG >= 0
             fprintf(stdout, "  Time %d of %d\n", Itime+1, Ntime);
@@ -188,7 +189,6 @@ void filtering(
         compute_vorticity(vort_r, vort_lon, vort_lat,
                 coarse_u_r, coarse_u_lon, coarse_u_lat,
                 Ntime, Ndepth, Nlat, Nlon,
-                Itime, Idepth, Ilat, Ilon,
                 longitude, latitude, mask);
         write_vorticity(vort_r, vort_lon, vort_lat,
                 Iscale, Ntime, Ndepth, Nlat, Nlon);
