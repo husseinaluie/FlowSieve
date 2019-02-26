@@ -104,17 +104,23 @@ void read_source(
     if ((retval = nc_get_att_double(ncid, ulat_varid, "scale_factor", &u_lat_scale))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Get the coordinate variables
-    size_t start_lon[1], count_lon[1],
-           start_lat[1], count_lat[1];
+    size_t start_coord[1], count_coord[1];
 
-    start_lon[0] = 0;
-    count_lon[0] = Nlon;
+    start_coord[0] = 0;
+    count_coord[0] = Nlon;
+    if ((retval = nc_get_vara_double(ncid, lon_varid, start_coord, count_coord, longitude[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
 
-    start_lat[0] = 0;
-    count_lat[0] = Nlat;
+    start_coord[0] = 0;
+    count_coord[0] = Nlat;
+    if ((retval = nc_get_vara_double(ncid, lat_varid, start_coord, count_coord, latitude[0] ))) { NC_ERR(retval, __LINE__, __FILE__); }
 
-    if ((retval = nc_get_vara_double(ncid, lon_varid, start_lon, count_lon, longitude[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
-    if ((retval = nc_get_vara_double(ncid, lat_varid, start_lat, count_lat, latitude[0] ))) { NC_ERR(retval, __LINE__, __FILE__); }
+    start_coord[0] = 0;
+    count_coord[0] = Ntime;
+    if ((retval = nc_get_vara_double(ncid, lat_varid, start_coord, count_coord, time[0] ))) { NC_ERR(retval, __LINE__, __FILE__); }
+
+    start_coord[0] = 0;
+    count_coord[0] = Ndepth;
+    if ((retval = nc_get_vara_double(ncid, lat_varid, start_coord, count_coord, depth[0] ))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Get u_lon (uo) and u_lat (vo)
     size_t start[4], count[4];
