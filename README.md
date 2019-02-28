@@ -1,6 +1,17 @@
+[TOC]
 # Coarse Graining
 
 This repository stores source code for running coarse graining procedures on netcdf files.
+
+
+---
+
+## Function Map
+
+See the function map for [filtering] to get an overview of the function dependencies.
+[filtering]: @ref filtering() "the main filtering function"
+
+---
 
 ## Makefile
 
@@ -8,11 +19,13 @@ This repository stores source code for running coarse graining procedures on net
 * `make clean`
   * This removes all object files (\*.o) in the source tree
 * `make hardclean`
-  * In addition to the `clean` removals, also removes the executables and symbol table (dSYM)
+  * In addition to the `clean` removals, also removes the executables, symbol table (dSYM), and documentation
 * `make all`
   * Makes coarse_grain.x
 * `make coarse_grain.x`
   * Makes coarse_grain.x
+* `make docs`
+  * Makes the doxygen-produced documentation. **Note: `doxygen` and `dot` must be installed and on the path**
 
 ### DEBUG flag
 
@@ -50,3 +63,4 @@ during runtime. In particular:
   * **[THIS WILL PRINT A LOT]**
   * Prints every kernel calculation (kernel.cpp)
   * Prints every distance calculation (distance.cpp)
+
