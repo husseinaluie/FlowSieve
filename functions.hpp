@@ -187,7 +187,7 @@ void compute_vorticity(
  *
  * dArea for integration computed in compute_areas() 
  */
-void apply_filter_at_point_for_transfers(
+void apply_filter_at_point_for_quadratics(
         double & uxux_tmp,   double & uxuy_tmp,   double & uxuz_tmp,
         double & uyuy_tmp,   double & uyuz_tmp,   double & uzuz_tmp,
         const double * u_x, const double * u_y, const double * u_z,

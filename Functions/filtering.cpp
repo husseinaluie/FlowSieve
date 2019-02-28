@@ -17,9 +17,9 @@
 #endif
 
 void filtering(
-        const double * u_r,       /**< [in] Full u_r velocity array */
-        const double * u_lon,     /**< [in] Full u_lon velocity array */
-        const double * u_lat,     /**< [in] Full u_lat velocity array */
+        const double * full_u_r,       /**< [in] Full u_r velocity array */
+        const double * full_u_lon,     /**< [in] Full u_lon velocity array */
+        const double * full_u_lat,     /**< [in] Full u_lat velocity array */
         const double * scales,    /**< [in] Array of filtering scales */
         const int Nscales,        /**< [in] Number of filtering scales */
         const double dlon,        /**< [in] (Constant) longitude spacing */
@@ -44,6 +44,11 @@ void filtering(
     u_y = new double[Ntime * Ndepth * Nlon * Nlat];
     u_z = new double[Ntime * Ndepth * Nlon * Nlat];
 
+    double *coarse_u_r, *coarse_u_lon, *coarse_u_lat;
+    coarse_u_r   = new double[Ntime * Ndepth * Nlat * Nlon];
+    coarse_u_lon = new double[Ntime * Ndepth * Nlat * Nlon];
+    coarse_u_lat = new double[Ntime * Ndepth * Nlat * Nlon];
+
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
     //     coordinate system)
@@ -64,10 +69,15 @@ void filtering(
 
                         // Note that 0 is in place of u_r, since 
                         // the current datasets don't have u_r
-                        vel_Spher_to_Cart(u_x[index], u_y[index],   u_z[index],
-                                          u_r[index], u_lon[index], u_lat[index],
+                        vel_Spher_to_Cart(     u_x[index],      u_y[  index],      u_z[  index],
+                                          full_u_r[index], full_u_lon[index], full_u_lat[index],
                                           longitude[Ilon], latitude[Ilat]);
                     }
+
+                    // Copy the current full u_r into the initial coarse
+                    coarse_u_r[  index] = full_u_r[  index];
+                    coarse_u_lon[index] = full_u_lon[index];
+                    coarse_u_lat[index] = full_u_lat[index];
                 }
             }
         }
@@ -82,22 +92,15 @@ void filtering(
 
     // Now prepare to filter
     double scale,
-           u_x_tmp, u_y_tmp, u_z_tmp,  // The local coarse-graining result
+           u_x_tmp, u_y_tmp,   u_z_tmp,  // The local coarse-graining result
            u_r_tmp, u_lon_tmp, u_lat_tmp,
            dlat_m, dlon_m; // The grid spacings in metres (for lon, at a specific height)
     int dlat_N, dlon_N;    // The number of grid points required to span the filter radius
 
-    double *coarse_u_r, *coarse_u_lon, *coarse_u_lat;
-    coarse_u_r   = new double[Ntime * Ndepth * Nlat * Nlon];
-    coarse_u_lon = new double[Ntime * Ndepth * Nlat * Nlon];
-    coarse_u_lat = new double[Ntime * Ndepth * Nlat * Nlon];
-
-    /*
     double *fine_u_r, *fine_u_lon, *fine_u_lat;
     fine_u_r   = new double[Ntime * Ndepth * Nlat * Nlon];
     fine_u_lon = new double[Ntime * Ndepth * Nlat * Nlon];
     fine_u_lat = new double[Ntime * Ndepth * Nlat * Nlon];
-    */
 
     #if COMP_VORT
     double *vort_r, *vort_lon, *vort_lat;
@@ -208,18 +211,19 @@ void filtering(
                                               u_x_tmp, u_y_tmp,   u_z_tmp,
                                               longitude[Ilon], latitude[Ilat]);
 
+                            // Subtract current coarse from preceeding coarse to
+                            //    get current fine
+                            fine_u_r[  index] = coarse_u_r[  index] - u_r_tmp;
+                            fine_u_lon[index] = coarse_u_lon[index] - u_lon_tmp;
+                            fine_u_lat[index] = coarse_u_lat[index] - u_lat_tmp;
+
+                            // Now pass the new coarse along as the preceeding coarse.
                             coarse_u_r[  index] = u_r_tmp;
                             coarse_u_lon[index] = u_lon_tmp;
                             coarse_u_lat[index] = u_lat_tmp;
 
-                            /*
-                            fine_u_r[  index] = coarse_u_r[  index] - u_r_tmp;
-                            fine_u_lon[index] = coarse_u_lon[index] - u_lon_tmp;
-                            fine_u_lat[index] = coarse_u_lat[index] - u_lat_tmp;
-                            */
-
                             #if COMP_TRANSFERS
-                            apply_filter_at_point_for_transfers(
+                            apply_filter_at_point_for_quadratics(
                                     uxux_tmp, uxuy_tmp, uxuz_tmp,
                                     uyuy_tmp, uyuz_tmp, uzuz_tmp,
                                     u_x,      u_y,      u_z,
@@ -248,15 +252,15 @@ void filtering(
         }
 
         // Write to file
-        write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
-        //write_to_output(fine_u_r, fine_u_lon, fine_u_lat, 
+        //write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
+        write_to_output(fine_u_r, fine_u_lon, fine_u_lat, 
                 Iscale, Ntime, Ndepth, Nlat, Nlon);
 
         #if COMP_VORT
         // Compute and write vorticity
         compute_vorticity(vort_r, vort_lon, vort_lat,
-                coarse_u_r, coarse_u_lon, coarse_u_lat,
-                //fine_u_r, fine_u_lon, fine_u_lat,
+                //coarse_u_r, coarse_u_lon, coarse_u_lat,
+                fine_u_r, fine_u_lon, fine_u_lat,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
         write_vorticity(vort_r, vort_lon, vort_lat,
@@ -275,9 +279,8 @@ void filtering(
         write_energy_transfer(energy_transfer, Iscale, Ntime, Ndepth, Nlat, Nlon);
         #endif
 
-        // Now that we've filtered at the previous scale, 
-        //   subtract the high-pass (large scale) from the full so
-        //   that we filter the low-pass (small scale) in the next iteration
+        // Now that we've filtered at the previous scale,
+        //   just keep the coarse part for the next iteration
         for (int Itime = 0; Itime < Ntime; Itime++) {
             for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
                 for (int Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -295,9 +298,9 @@ void filtering(
                                               coarse_u_r[index], coarse_u_lon[index], coarse_u_lat[index],
                                               longitude[Ilon],   latitude[Ilat]);
 
-                            u_x[index] = u_x[index] - u_x_tmp;
-                            u_y[index] = u_y[index] - u_y_tmp;
-                            u_z[index] = u_z[index] - u_z_tmp;
+                            u_x[index] = u_x_tmp;
+                            u_y[index] = u_y_tmp;
+                            u_z[index] = u_z_tmp;
                         }
                     }
                 }
@@ -334,13 +337,15 @@ void filtering(
         }
     }
 
-    write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
+    //write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
+    write_to_output(fine_u_r, fine_u_lon, fine_u_lat, 
             Nscales, Ntime, Ndepth, Nlat, Nlon);
 
     #if COMP_VORT
     // Compute and write vorticity
     compute_vorticity(vort_r, vort_lon, vort_lat,
-            coarse_u_r, coarse_u_lon, coarse_u_lat,
+            //coarse_u_r, coarse_u_lon, coarse_u_lat,
+            fine_u_r, fine_u_lon, fine_u_lat,
             Ntime, Ndepth, Nlat, Nlon,
             longitude, latitude, mask);
     write_vorticity(vort_r, vort_lon, vort_lat,
@@ -351,6 +356,10 @@ void filtering(
     delete[] coarse_u_r;
     delete[] coarse_u_lon;
     delete[] coarse_u_lat;
+
+    delete[] fine_u_r;
+    delete[] fine_u_lon;
+    delete[] fine_u_lat;
     
     delete[] u_x;
     delete[] u_y;

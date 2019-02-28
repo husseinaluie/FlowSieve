@@ -5,7 +5,7 @@
     #define DEBUG 0
 #endif
 
-void apply_filter_at_point_for_transfers(
+void apply_filter_at_point_for_quadratics(
         double & uxux_tmp,         /**< [in] where to store filtered (u_x)*(u_x) */
         double & uxuy_tmp,         /**< [in] where to store filtered (u_x)*(u_y) */
         double & uxuz_tmp,         /**< [in] where to store filtered (u_x)*(u_z) */

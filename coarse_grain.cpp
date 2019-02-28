@@ -33,8 +33,10 @@ int main(int argc, char *argv[]) {
 
     // For the time being, hard-code the filter scales
     //   add zero as the bottom
+    //const int Nfilt = 6;
+    //const double filter_scales [Nfilt+1] = {1000e3, 500e3, 400e3, 300e3, 200e3, 100e3, 0};
     const int Nfilt = 6;
-    const double filter_scales [Nfilt+1] = {1000e3, 500e3, 400e3, 300e3, 200e3, 100e3, 0};
+    const double filter_scales [Nfilt+1] = {100e3, 200e3, 300e3, 400e3, 500e3, 1000e3, 0};
 
     // Read in source data / get size information
     #if DEBUG >= 1
