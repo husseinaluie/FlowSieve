@@ -23,7 +23,7 @@ void read_source(
         ) {
 
     // Open the NETCDF file
-    int FLAG = NC_NETCDF4;
+    int FLAG = NC_NETCDF4 | NC_NOWRITE;
     int ncid=0, retval;
     char buffer [50];
     snprintf(buffer, 50, "input.nc");

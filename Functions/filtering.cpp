@@ -12,6 +12,10 @@
     #define COMP_VORT true
 #endif
 
+#ifndef COMP_TRANSFERS
+    #define COMP_TRANSFERS true
+#endif
+
 void filtering(
         const double * u_r,       /**< [in] Full u_r velocity array */
         const double * u_lon,     /**< [in] Full u_lon velocity array */
@@ -32,9 +36,6 @@ void filtering(
         const double * mask       /**< [in] Array to distinguish between land and water cells (2D) */
         ) {
 
-    // Now convert the Spherical velocities to Cartesian
-    //   (although we will still be on a spherical
-    //     coordinate system)
     #if DEBUG >= 1
     fprintf(stdout, "Converting to Cartesian velocities.\n");
     #endif
@@ -43,6 +44,9 @@ void filtering(
     u_y = new double[Ntime * Ndepth * Nlon * Nlat];
     u_z = new double[Ntime * Ndepth * Nlon * Nlat];
 
+    // Now convert the Spherical velocities to Cartesian
+    //   (although we will still be on a spherical
+    //     coordinate system)
     int index, mask_index;
     for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
@@ -88,10 +92,43 @@ void filtering(
     coarse_u_lon = new double[Ntime * Ndepth * Nlat * Nlon];
     coarse_u_lat = new double[Ntime * Ndepth * Nlat * Nlon];
 
+    /*
+    double *fine_u_r, *fine_u_lon, *fine_u_lat;
+    fine_u_r   = new double[Ntime * Ndepth * Nlat * Nlon];
+    fine_u_lon = new double[Ntime * Ndepth * Nlat * Nlon];
+    fine_u_lat = new double[Ntime * Ndepth * Nlat * Nlon];
+    */
+
+    #if COMP_VORT
     double *vort_r, *vort_lon, *vort_lat;
     vort_r   = new double[Ntime * Ndepth * Nlat * Nlon];
     vort_lon = new double[Ntime * Ndepth * Nlat * Nlon];
     vort_lat = new double[Ntime * Ndepth * Nlat * Nlon];
+    #endif
+
+    #if COMP_TRANSFERS
+    // If computing energy transfers, we'll need some more arrays
+    double *coarse_uxux, *coarse_uxuy, *coarse_uxuz, 
+           *coarse_uyuy, *coarse_uyuz, *coarse_uzuz;
+    coarse_uxux = new double[Ntime * Ndepth * Nlon * Nlat];
+    coarse_uxuy = new double[Ntime * Ndepth * Nlon * Nlat];
+    coarse_uxuz = new double[Ntime * Ndepth * Nlon * Nlat];
+    coarse_uyuy = new double[Ntime * Ndepth * Nlon * Nlat];
+    coarse_uyuz = new double[Ntime * Ndepth * Nlon * Nlat];
+    coarse_uzuz = new double[Ntime * Ndepth * Nlon * Nlat];
+
+    double uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp;
+
+    // We'll also need to keep the coarse velocities
+    double *coarse_u_x,  *coarse_u_y,  *coarse_u_z;
+    coarse_u_x = new double[Ntime * Ndepth * Nlon * Nlat];
+    coarse_u_y = new double[Ntime * Ndepth * Nlon * Nlat];
+    coarse_u_z = new double[Ntime * Ndepth * Nlon * Nlat];
+
+    // Also an array for the transfer itself
+    double *energy_transfer;
+    energy_transfer = new double[Ntime * Ndepth * Nlon * Nlat];
+    #endif
 
     // The spacing (in metres) betwee latitude gridpoints
     dlat_m = dlat * constants::R_earth;
@@ -174,6 +211,36 @@ void filtering(
                             coarse_u_r[  index] = u_r_tmp;
                             coarse_u_lon[index] = u_lon_tmp;
                             coarse_u_lat[index] = u_lat_tmp;
+
+                            /*
+                            fine_u_r[  index] = coarse_u_r[  index] - u_r_tmp;
+                            fine_u_lon[index] = coarse_u_lon[index] - u_lon_tmp;
+                            fine_u_lat[index] = coarse_u_lat[index] - u_lat_tmp;
+                            */
+
+                            #if COMP_TRANSFERS
+                            apply_filter_at_point_for_transfers(
+                                    uxux_tmp, uxuy_tmp, uxuz_tmp,
+                                    uyuy_tmp, uyuz_tmp, uzuz_tmp,
+                                    u_x,      u_y,      u_z,
+                                    dlon_N, dlat_N, 
+                                    Ntime,  Ndepth, Nlat, Nlon,
+                                    Itime,  Idepth, Ilat, Ilon,
+                                    longitude, latitude,
+                                    dAreas, scale,
+                                    mask);
+
+                            coarse_uxux[index] = uxux_tmp;
+                            coarse_uxuy[index] = uxuy_tmp;
+                            coarse_uxuz[index] = uxuz_tmp;
+                            coarse_uyuy[index] = uyuy_tmp;
+                            coarse_uyuz[index] = uyuz_tmp;
+                            coarse_uzuz[index] = uzuz_tmp;
+
+                            coarse_u_x[index] = u_x_tmp;
+                            coarse_u_y[index] = u_y_tmp;
+                            coarse_u_z[index] = u_z_tmp;
+                            #endif
                         }
                     }
                 }
@@ -182,16 +249,30 @@ void filtering(
 
         // Write to file
         write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
+        //write_to_output(fine_u_r, fine_u_lon, fine_u_lat, 
                 Iscale, Ntime, Ndepth, Nlat, Nlon);
 
         #if COMP_VORT
         // Compute and write vorticity
         compute_vorticity(vort_r, vort_lon, vort_lat,
                 coarse_u_r, coarse_u_lon, coarse_u_lat,
+                //fine_u_r, fine_u_lon, fine_u_lat,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
         write_vorticity(vort_r, vort_lon, vort_lat,
                 Iscale, Ntime, Ndepth, Nlat, Nlon);
+        #endif
+
+        #if COMP_TRANSFERS
+        // Compute the energy transfer through the filter scale
+        compute_energy_transfer_through_scale(
+                energy_transfer, 
+                coarse_u_x,  coarse_u_y,  coarse_u_z,
+                coarse_uxux, coarse_uxuy, coarse_uxuz,
+                coarse_uyuy, coarse_uyuz, coarse_uzuz,
+                Ntime, Ndepth, Nlat, Nlon,
+                longitude, latitude, mask);
+        write_energy_transfer(energy_transfer, Iscale, Ntime, Ndepth, Nlat, Nlon);
         #endif
 
         // Now that we've filtered at the previous scale, 
@@ -256,17 +337,43 @@ void filtering(
     write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
             Nscales, Ntime, Ndepth, Nlat, Nlon);
 
+    #if COMP_VORT
+    // Compute and write vorticity
+    compute_vorticity(vort_r, vort_lon, vort_lat,
+            coarse_u_r, coarse_u_lon, coarse_u_lat,
+            Ntime, Ndepth, Nlat, Nlon,
+            longitude, latitude, mask);
+    write_vorticity(vort_r, vort_lon, vort_lat,
+            Nscales, Ntime, Ndepth, Nlat, Nlon);
+    #endif
+
     // Free up the arrays
     delete[] coarse_u_r;
     delete[] coarse_u_lon;
     delete[] coarse_u_lat;
-
-    delete[] vort_r;
-    delete[] vort_lon;
-    delete[] vort_lat;
     
     delete[] u_x;
     delete[] u_y;
     delete[] u_z;
+
+    #if COMP_VORT
+    delete[] vort_r;
+    delete[] vort_lon;
+    delete[] vort_lat;
+    #endif
+
+    // If we're computing transfers, then we'll need to free those arrays too
+    #if COMP_TRANSFERS
+    delete[] coarse_uxux;
+    delete[] coarse_uxuy;
+    delete[] coarse_uxuz;
+    delete[] coarse_uyuy;
+    delete[] coarse_uyuz;
+    delete[] coarse_uzuz;
+    delete[] energy_transfer;
+    delete[] coarse_u_x;
+    delete[] coarse_u_y;
+    delete[] coarse_u_z;
+    #endif
 
 }

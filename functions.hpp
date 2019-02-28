@@ -109,7 +109,7 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
                const double * mask);
 
 /*!
- * \brief Computed filtered Cartesian velocities at a single point
+ * \brief Compute filtered Cartesian velocities at a single point
  *
  * Computes the integral of each Cartesian velocity with the
  * kernel().
@@ -174,6 +174,112 @@ void compute_vorticity(
         const double * u_r, const double * u_lon, const double * u_lat,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const double * longitude, const double * latitude,
+        const double * mask);
+
+/*!
+ * \brief Compute filtered quadratic velocities at a single point
+ *
+ * Computes the integral of each quadratic Cartesian velocity
+ * with the kernel().
+ *
+ * In particular, the quadratic terms being filtered are:
+ * \$u_xu_x\$, \$u_xu_y\$, \$u_xu_z\$, \$u_yu_y\$, \$u_yu_z\$, \$u_zu_z\$
+ *
+ * dArea for integration computed in compute_areas() 
+ */
+void apply_filter_at_point_for_transfers(
+        double & uxux_tmp,   double & uxuy_tmp,   double & uxuz_tmp,
+        double & uyuy_tmp,   double & uyuz_tmp,   double & uzuz_tmp,
+        const double * u_x, const double * u_y, const double * u_z,
+        const int dlon_N, const int dlat_N, 
+        const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
+        const int Itime,  const int Idepth, const int Ilat, const int Ilon,
+        const double * longitude, const double * latitude,
+        const double * dAreas, const double scale,
+        const double * mask);
+
+/*!
+ * \brief Compute the energy transfer through the current filter scale
+ */
+void compute_energy_transfer_through_scale(
+        double * energy_transfer,
+        const double * ux,   const double * uy,   const double * uz,
+        const double * uxux, const double * uxuy, const double * uxuz,
+        const double * uyuy, const double * uyuz, const double * uzuz,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+        const double * longitude, const double * latitude,
+        const double * mask);
+
+/*!
+ * \brief Compute the large-scale strain tensor S
+ *
+ * Uses Cartesian derivatives of Cartesian velocities on a spherical coordinate system.
+ *
+ * \f[ S = \frac{1}{2}\left( \nabla\overline{u}_l + \nabla\overline{u}_l^T \right) \f]
+ */
+void compute_largescale_strain(
+        double & S_xx, double & S_xy, double & S_xz,
+        double & S_yy, double & S_yz, double & S_zz,
+        const double * u_x, const double * u_y, const double * u_z,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const double * longitude, const double * latitude, const double * mask);
+
+/*!
+ * \brief Computes latitudinal derivative at a specific point.
+ */
+double latitude_derivative_at_point(
+        const double * field, const double * latitude,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+        const double * mask);
+
+/*!
+ * \brief Computes longitudinal derivative at a specific point.
+ */
+double longitude_derivative_at_point(
+        const double * field, const double * longitude,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+        const double * mask);
+
+/*!
+ * \brief Computes Cartesian x derivative at a specific point.
+ *
+ * Computation is done via chain rule on spherical coordinate derivatives.
+ *
+ * Calls latitude_derivative_at_point() and longitude_derivative_at_point()
+ */
+double x_derivative_at_point(
+        const double * field, const double * latitude, const double * longitude,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+        const double * mask);
+
+/*!
+ * \brief Computes Cartesian y derivative at a specific point.
+ *
+ * Computation is done via chain rule on spherical coordinate derivatives.
+ *
+ * Calls latitude_derivative_at_point() and longitude_derivative_at_point()
+ */
+double y_derivative_at_point(
+        const double * field, const double * latitude, const double * longitude,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+        const double * mask);
+
+/*!
+ * \brief Computes Cartesian z derivative at a specific point.
+ *
+ * Computation is done via chain rule on spherical coordinate derivatives.
+ *
+ * Calls latitude_derivative_at_point() and longitude_derivative_at_point()
+ */
+double z_derivative_at_point(
+        const double * field, const double * latitude, const double * longitude,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const double * mask);
 
 #endif

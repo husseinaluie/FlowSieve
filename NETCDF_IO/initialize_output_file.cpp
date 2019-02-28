@@ -85,6 +85,12 @@ void initialize_output_file(
         NC_ERR(retval, __LINE__, __FILE__);
     #endif
 
+    #if COMP_TRANSFERS
+    int ener_transfer_varid;
+    if ((retval = nc_def_var(ncid, "energy_transfer", NC_DOUBLE, ndims, dimids, &ener_transfer_varid)))
+        NC_ERR(retval, __LINE__, __FILE__);
+    #endif
+
     int mask_dimids[ndims];
     mask_dimids[0] = lat_dimid;
     mask_dimids[1] = lon_dimid;

@@ -88,4 +88,15 @@ void write_vorticity(
         const int Iscale, const int Ntime, const int Ndepth, 
         const int Nlat,   const int Nlon);
 
+/*!
+ * \brief Write on scales worth of energy transfers to file
+ *
+ *  Write a single filter-scale worth of energy transfers
+ *  to the previously initialized netcdf file
+ *  "filter_output.nc".
+ */
+void write_energy_transfer(
+        const double * energy_transfer, const int Iscale, 
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon);
+
 #endif
