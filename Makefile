@@ -9,6 +9,9 @@ CFLAGS:=-DDEBUG=0 $(CFLAGS)
 # Do you want vorticity computed?
 CFLAGS:=-DCOMP_VORT=true $(CFLAGS)
 
+# Do you want energy transfers computed?
+CFLAGS:=-DCOMP_TRANSFERS=true $(CFLAGS)
+
 # Turn on/off debug flags or additional optimization flags
 DEBUG:=true
 EXTRA_OPT:=false
@@ -43,12 +46,14 @@ NETCDF_IO_OBJS := $(addprefix NETCDF_IO/,$(notdir $(NETCDF_IO_CPPS:.cpp=.o)))
 FUNCTIONS_CPPS := $(wildcard Functions/*.cpp)
 FUNCTIONS_OBJS := $(addprefix FUNCTIONS/,$(notdir $(FUNCTIONS_CPPS:.cpp=.o)))
 
-.PHONY: clean hardclean
+.PHONY: clean hardclean docs
 clean:
 	rm -f *.o NETCDF_IO/*.o Functions/*.o
 hardclean:
 	rm -f *.o NETCDF_IO/*.o Functions/*.o coarse_grain.x
 	rm -r coarse_grain.x.dSYM
+	rm -r Documentation/html
+	rm -r Documentation/latex
 
 all: coarse_grain.x
 
@@ -57,3 +62,6 @@ all: coarse_grain.x
 
 coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} coarse_grain.o
 	$(MPICXX) $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+docs:
+	doxygen Doxyfile
