@@ -35,6 +35,7 @@ void apply_filter_at_point_for_quadratics(
 
     double kA_sum, dist, kern, area;
     int index, mask_index;
+    int curr_lat, curr_lon;
 
     kA_sum  = 0.;
     uxux_tmp = 0.;
@@ -44,25 +45,44 @@ void apply_filter_at_point_for_quadratics(
     uyuz_tmp = 0.;
     uzuz_tmp = 0.;
 
-    int LAT_lb = std::max(0,    Ilat - dlat_N);
-    int LAT_ub = std::min(Nlat, Ilat + dlat_N);
+    int LAT_lb = std::max( -Nlat,   Ilat - dlat_N);
+    int LAT_ub = std::min(2*Nlat-1, Ilat + dlat_N);
 
-    int LON_lb = std::max(0,    Ilon - dlon_N);
-    int LON_ub = std::min(Nlon, Ilon + dlon_N);
+    int LON_lb = std::max( -Nlon,   Ilon - dlon_N);
+    int LON_ub = std::min(2*Nlon-1, Ilon + dlon_N);
 
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
+
+        // Handle periodicity
+        if (LAT < 0) {
+            curr_lat = LAT + Nlat;
+        } else if (LAT > Nlat) {
+            curr_lat = LAT - Nlat;
+        } else {
+            curr_lat = LAT;
+        }
+
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
-            dist = distance(longitude[Ilon], latitude[Ilat],
-                            longitude[LON],  latitude[LAT]);
+            // Handle periodicity
+            if (LON < 0) {
+                curr_lon = LON + Nlon;
+            } else if (LON > Nlon) {
+                curr_lon = LON - Nlon;
+            } else {
+                curr_lon = LON;
+            }
+
+            dist = distance(longitude[Ilon],     latitude[Ilat],
+                            longitude[curr_lon], latitude[curr_lat]);
 
             kern = kernel(dist, scale);
 
-            index = Index(Itime, Idepth, LAT,  LON,
-                          Ntime, Ndepth, Nlat, Nlon);
+            index = Index(Itime, Idepth, curr_lat, curr_lon,
+                          Ntime, Ndepth, Nlat,     Nlon);
 
-            mask_index = Index(0,     0,      LAT,  LON,
-                               Ntime, Ndepth, Nlat, Nlon);
+            mask_index = Index(0,     0,      curr_lat, curr_lon,
+                               Ntime, Ndepth, Nlat,     Nlon);
 
             area    = dAreas[index];
             kA_sum += kern * area;// * mask[mask_index];
