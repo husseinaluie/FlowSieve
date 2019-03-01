@@ -99,4 +99,15 @@ void write_energy_transfer(
         const double * energy_transfer, const int Iscale, 
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon);
 
+/*!
+ * \brief Write on scales worth of band-filtered KE
+ *
+ *  Write a single filter-scale worth of KE
+ *  to the previously initialized netcdf file
+ *  "filter_output.nc".
+ */
+void write_KE(
+        const double * fine_KE, const int Iscale, 
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon);
+
 #endif
