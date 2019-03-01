@@ -20,19 +20,10 @@ double z_derivative_at_point(
     // Currently assuming ddr = 0
     // ddz = ( cos(lat) / r ) * ddlat
     double lon = longitude[Ilon];
-    //double lat = latitude[Ilat];
     double r = constants::R_earth;
 
-    /*
-    double dfield_dlon = longitude_derivative_at_point(
-                        field, longitude,
-                        Itime, Idepth, Ilat, Ilon,
-                        Ntime, Ndepth, Nlat, Nlon,
-                        mask);
-    */
-
     double dfield_dlat = latitude_derivative_at_point(
-                        field, longitude,
+                        field, latitude,
                         Itime, Idepth, Ilat, Ilon,
                         Ntime, Ndepth, Nlat, Nlon,
                         mask);

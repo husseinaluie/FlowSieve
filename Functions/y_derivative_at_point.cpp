@@ -31,7 +31,7 @@ double y_derivative_at_point(
                         mask);
 
     dfield_dlat = latitude_derivative_at_point(
-                        field, longitude,
+                        field, latitude,
                         Itime, Idepth, Ilat, Ilon,
                         Ntime, Ndepth, Nlat, Nlon,
                         mask);
