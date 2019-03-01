@@ -17,14 +17,14 @@ void compute_largescale_strain(
         const double * u_x,       /**< [in] full (4D) u_x for calculation */
         const double * u_y,       /**< [in] full (4D) u_y for calculation */
         const double * u_z,       /**< [in] full (4D) u_z for calculation */
-        const int Ntime,          /**< [in] Length of time dimension */
-        const int Ndepth,         /**< [in] Length of depth dimension */
-        const int Nlat,           /**< [in] Length of latitude dimension */
-        const int Nlon,           /**< [in] Length of longitude dimension */
         const int Itime,          /**< [in] Current position in time dimension */
         const int Idepth,         /**< [in] Current position in depth dimension */
         const int Ilat,           /**< [in] Current position in latitude dimension */
         const int Ilon,           /**< [in] Current position in longitude dimension */
+        const int Ntime,          /**< [in] Length of time dimension */
+        const int Ndepth,         /**< [in] Length of depth dimension */
+        const int Nlat,           /**< [in] Length of latitude dimension */
+        const int Nlon,           /**< [in] Length of longitude dimension */
         const double * longitude, /**< [in] Longitude dimension (1D) */
         const double * latitude,  /**< [in] Latitude dimension (1D) */
         const double * mask       /**< [in] Mask array (2D) to distinguish land from water*/

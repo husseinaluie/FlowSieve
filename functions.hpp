@@ -221,8 +221,8 @@ void compute_largescale_strain(
         double & S_xx, double & S_xy, double & S_xz,
         double & S_yy, double & S_yz, double & S_zz,
         const double * u_x, const double * u_y, const double * u_z,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const double * longitude, const double * latitude, const double * mask);
 
 /*!
