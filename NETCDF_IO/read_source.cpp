@@ -103,6 +103,10 @@ void read_source(
     if ((retval = nc_get_att_double(ncid, ulon_varid, "scale_factor", &u_lon_scale))) { NC_ERR(retval, __LINE__, __FILE__); }
     if ((retval = nc_get_att_double(ncid, ulat_varid, "scale_factor", &u_lat_scale))) { NC_ERR(retval, __LINE__, __FILE__); }
 
+    double u_lon_fill, u_lat_fill;
+    if ((retval = nc_get_att_double(ncid, ulon_varid, "_FillValue", &u_lon_fill))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_get_att_double(ncid, ulat_varid, "_FillValue", &u_lat_fill))) { NC_ERR(retval, __LINE__, __FILE__); }
+
     // Get the coordinate variables
     size_t start_coord[1], count_coord[1];
 
@@ -145,18 +149,17 @@ void read_source(
     }
 
     // Determine the mask (i.e. where land is) by checking
-    //   where velocity is < -1e3
+    //   where abs(velocity) > 90% of the fill value
     //   mask = 0 implies LAND
     //   mask = 1 implies WATER
 
     int num_land = 0;
     int num_water = 0;
-    double bar = -1e4;
 
     for (int index = 0; index < Nlat * Nlon; index++) {
-        if (    (u_r[  0][index] < bar) 
-             or (u_lon[0][index] < bar * u_lon_scale)
-             or (u_lat[0][index] < bar * u_lat_scale) ) {
+        if (    (abs(u_r[  0][index]) > 0.9 * abs(u_lon_fill              )) 
+             or (abs(u_lon[0][index]) > 0.9 * abs(u_lon_fill * u_lon_scale))
+             or (abs(u_lat[0][index]) > 0.9 * abs(u_lat_fill * u_lat_scale)) ) {
             mask[0][index] = 0;
             num_land++;
         } else {
