@@ -53,14 +53,13 @@ during runtime. In particular:
   * Prints when the output is written (write_to_output.cpp)
   * Prints when the output vorticity is written (write_vorticity.cpp)
 * DEBUG >= 3
-  * **[THIS WILL PRINT A LOT]**
-  * Prints *every* index conversion (Index.cpp)
 * DEBUG >= 4
   * **[THIS WILL PRINT A LOT]**
   * Prints the progress through Latitude and Longitude during filtering (filtering.cpp) 
   * Prints whenever a velocity conversion happens (Spher->Cart and Cart->Spher) 
-* DEBUG >= 5
-  * **[THIS WILL PRINT A LOT]**
   * Prints every kernel calculation (kernel.cpp)
   * Prints every distance calculation (distance.cpp)
+* DEBUG >= 5
+  * **[THIS WILL PRINT A LOT]**
+  * Prints *every* index conversion (Index.cpp)
 

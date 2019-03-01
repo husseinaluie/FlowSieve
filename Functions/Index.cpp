@@ -24,7 +24,7 @@ int Index(
 
     int index =  ( ( Itime * Ndepth + Idepth) * Nlat + Ilat ) * Nlon + Ilon;
 
-    #if DEBUG >= 3
+    #if DEBUG >= 5
     fprintf(stdout, "      Index conversion (%d, %d, %d, %d) -> %d\n ", 
             Itime, Idepth, Ilat, Ilon, index);
     #endif

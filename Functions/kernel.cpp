@@ -17,7 +17,7 @@ double kernel(
         kern =  0.;
     }
 
-    #if DEBUG >= 5
+    #if DEBUG >= 4
     fprintf(stdout, "Kernel(dist=%.4g, scale=%.4g) = %.4g\n",
             dist, scale, kern);
     #endif

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <math.h>    
 #include "../constants.hpp"
 
@@ -26,7 +27,7 @@ double distance(
     
     distance = constants::R_earth * Delta_sigma;
 
-    #if DEBUG >= 5
+    #if DEBUG >= 4
     fprintf(stdout, "dist(lon1 = %.5g, lat1 = %.5g, lon2 = %.5g, lat2 = %.5g) = %.5g",
             lon1, lat1, lon2, lat2, distance);
     #endif
