@@ -51,8 +51,8 @@ void compute_energy_transfer_through_scale(
                         compute_largescale_strain(
                                 S_xx, S_xy, S_xz, S_yy, S_yz, S_zz, 
                                 ux, uy, uz,
-                                Ntime, Ndepth, Nlat, Nlon,
                                 Itime, Idepth, Ilat, Ilon,
+                                Ntime, Ndepth, Nlat, Nlon,
                                 longitude, latitude, mask);
 
                         pi_tmp = -constants::rho0 * 

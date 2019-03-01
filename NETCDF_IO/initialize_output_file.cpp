@@ -86,8 +86,10 @@ void initialize_output_file(
     #endif
 
     #if COMP_TRANSFERS
-    int ener_transfer_varid;
+    int ener_transfer_varid, KE_varid;
     if ((retval = nc_def_var(ncid, "energy_transfer", NC_DOUBLE, ndims, dimids, &ener_transfer_varid)))
+        NC_ERR(retval, __LINE__, __FILE__);
+    if ((retval = nc_def_var(ncid, "KE",              NC_DOUBLE, ndims, dimids, &KE_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
     #endif
 

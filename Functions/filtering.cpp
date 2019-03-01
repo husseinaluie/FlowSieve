@@ -131,10 +131,19 @@ void filtering(
     // Also an array for the transfer itself
     double *energy_transfer;
     energy_transfer = new double[Ntime * Ndepth * Nlon * Nlat];
+
+    // If we're computing transfers, then we already have what
+    //   we need to computed band-filtered KE, so might as well do it
+    double *fine_KE;
+    fine_KE = new double[Ntime * Ndepth * Nlon * Nlat];
     #endif
 
     // The spacing (in metres) betwee latitude gridpoints
     dlat_m = dlat * constants::R_earth;
+
+    #if DEBUG >= 2
+    int perc;
+    #endif
 
     //
     //// Begin the main filtering loop
@@ -151,7 +160,7 @@ void filtering(
         scale  = scales[Iscale];
 
         // How many latitude cells are needed to span the filter radius
-        dlat_N = ceil( (1.2*scale / dlat_m) / 2 );
+        dlat_N = ceil( (1.1*scale / dlat_m) / 2 );
 
         //for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Itime = 0; Itime < 1; Itime++) {
@@ -166,7 +175,19 @@ void filtering(
                 fprintf(stdout, "    Depth %d of %d\n", Idepth+1, Ndepth);
                 #endif
 
+                #if DEBUG >= 2
+                perc = 0;
+                #endif
+
                 for (int Ilat = 0; Ilat < Nlat; Ilat++) {
+
+                    #if DEBUG >= 2
+                    // Every 10 percent, print a dot
+                    if ( ( ((double) Ilat) / Nlat) * 100 > perc ) {
+                        fprintf(stdout, ".");
+                        perc += 10;
+                    }
+                    #endif
 
                     #if DEBUG >= 4
                     fprintf(stdout, "      Ilat %d of %d\n", Ilat+1, Nlat);
@@ -178,7 +199,7 @@ void filtering(
                         * constants::R_earth 
                         * std::min( cos(latitude[Ilat] + dlat_N * dlat), 
                                     cos(latitude[Ilat] - dlat_N * dlat) ) ;
-                    dlon_N = ceil( ( 1.2*scale / dlon_m) / 2 );
+                    dlon_N = ceil( ( 1.1*scale / dlon_m) / 2 );
 
                     for (int Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -244,22 +265,29 @@ void filtering(
                             coarse_u_x[index] = u_x_tmp;
                             coarse_u_y[index] = u_y_tmp;
                             coarse_u_z[index] = u_z_tmp;
+                            
+                            fine_KE[index] = 0.5 * (   
+                                      ( uxux_tmp - u_x_tmp * u_x_tmp )
+                                    + ( uyuy_tmp - u_y_tmp * u_y_tmp )
+                                    + ( uzuz_tmp - u_z_tmp * u_z_tmp )
+                                    );
                             #endif
                         }
                     }
                 }
+                #if DEBUG >= 2
+                fprintf(stdout, "\n");
+                #endif
             }
         }
 
         // Write to file
-        //write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
         write_to_output(fine_u_r, fine_u_lon, fine_u_lat, 
                 Iscale, Ntime, Ndepth, Nlat, Nlon);
 
         #if COMP_VORT
         // Compute and write vorticity
         compute_vorticity(vort_r, vort_lon, vort_lat,
-                //coarse_u_r, coarse_u_lon, coarse_u_lat,
                 fine_u_r, fine_u_lon, fine_u_lat,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
@@ -277,6 +305,7 @@ void filtering(
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
         write_energy_transfer(energy_transfer, Iscale, Ntime, Ndepth, Nlat, Nlon);
+        write_KE(fine_KE, Iscale, Ntime, Ndepth, Nlat, Nlon);
         #endif
 
         // Now that we've filtered at the previous scale,
@@ -337,14 +366,12 @@ void filtering(
         }
     }
 
-    //write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
-    write_to_output(fine_u_r, fine_u_lon, fine_u_lat, 
+    write_to_output(coarse_u_r, coarse_u_lon, coarse_u_lat, 
             Nscales, Ntime, Ndepth, Nlat, Nlon);
 
     #if COMP_VORT
     // Compute and write vorticity
     compute_vorticity(vort_r, vort_lon, vort_lat,
-            //coarse_u_r, coarse_u_lon, coarse_u_lat,
             fine_u_r, fine_u_lon, fine_u_lat,
             Ntime, Ndepth, Nlat, Nlon,
             longitude, latitude, mask);
@@ -352,7 +379,10 @@ void filtering(
             Nscales, Ntime, Ndepth, Nlat, Nlon);
     #endif
 
-    // Free up the arrays
+    //
+    //// Free up the arrays
+    //
+
     delete[] coarse_u_r;
     delete[] coarse_u_lon;
     delete[] coarse_u_lat;
@@ -366,13 +396,14 @@ void filtering(
     delete[] u_z;
 
     #if COMP_VORT
+    // If computing vorticity, we have some additional arrays to free up
     delete[] vort_r;
     delete[] vort_lon;
     delete[] vort_lat;
     #endif
 
-    // If we're computing transfers, then we'll need to free those arrays too
     #if COMP_TRANSFERS
+    // If we're computing transfers, then we'll need to free those arrays too
     delete[] coarse_uxux;
     delete[] coarse_uxuy;
     delete[] coarse_uxuz;
@@ -383,6 +414,7 @@ void filtering(
     delete[] coarse_u_x;
     delete[] coarse_u_y;
     delete[] coarse_u_z;
+    delete[] fine_KE;
     #endif
 
 }
