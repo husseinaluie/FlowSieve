@@ -8,3 +8,5 @@ mpi_backup/*.?pp
 *.DS_Store
 
 Documentation/
+
+*__pycache__*
