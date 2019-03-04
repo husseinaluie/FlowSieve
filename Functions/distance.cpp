@@ -27,8 +27,8 @@ double distance(
     
     distance = constants::R_earth * Delta_sigma;
 
-    #if DEBUG >= 4
-    fprintf(stdout, "dist(lon1 = %.5g, lat1 = %.5g, lon2 = %.5g, lat2 = %.5g) = %.5g",
+    #if DEBUG >= 6
+    fprintf(stdout, "dist(lon1 = %.5g, lat1 = %.5g, lon2 = %.5g, lat2 = %.5g) = %.5g\n",
             lon1, lat1, lon2, lat2, distance);
     #endif
 

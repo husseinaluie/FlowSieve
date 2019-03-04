@@ -57,7 +57,7 @@ void apply_filter_at_point_for_quadratics(
         // Handle periodicity
         if (LAT < 0) {
             curr_lat = LAT + Nlat;
-        } else if (LAT > Nlat) {
+        } else if (LAT >= Nlat) {
             curr_lat = LAT - Nlat;
         } else {
             curr_lat = LAT;
@@ -68,7 +68,7 @@ void apply_filter_at_point_for_quadratics(
             // Handle periodicity
             if (LON < 0) {
                 curr_lon = LON + Nlon;
-            } else if (LON > Nlon) {
+            } else if (LON >= Nlon) {
                 curr_lon = LON - Nlon;
             } else {
                 curr_lon = LON;

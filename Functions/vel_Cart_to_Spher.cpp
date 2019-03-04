@@ -18,10 +18,6 @@ void vel_Cart_to_Spher(
             const double lat  /**< [in] latitude of location for conversion */
         ) {
 
-    #if DEBUG >= 4
-    fprintf(stdout, "Velocity conversion: Cartesian to Spherical");
-    #endif
-
     u_r   =   u_x * cos(lon) * cos(lat)
             + u_y * sin(lon) * cos(lat)
             + u_z            * sin(lat);

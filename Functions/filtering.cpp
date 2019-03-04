@@ -189,7 +189,7 @@ void filtering(
                     }
                     #endif
 
-                    #if DEBUG >= 4
+                    #if DEBUG >= 3
                     fprintf(stdout, "      Ilat %d of %d\n", Ilat+1, Nlat);
                     #endif
 
@@ -203,7 +203,7 @@ void filtering(
 
                     for (int Ilon = 0; Ilon < Nlon; Ilon++) {
 
-                        #if DEBUG >= 4
+                        #if DEBUG >= 3
                         fprintf(stdout, "        Ilon %d of %d\n", Ilon+1, Nlon);
                         #endif
 
@@ -217,6 +217,9 @@ void filtering(
                         if (mask.at(mask_index) == 1) { // Skip land areas
 
                             // Apply the filter at the point
+                            #if DEBUG >= 4
+                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                            #endif
                             apply_filter_at_point(
                                     u_x_tmp, u_y_tmp, u_z_tmp,
                                     u_x,     u_y,     u_z,
@@ -228,22 +231,34 @@ void filtering(
                                     mask);
 
                             // Convert the filtered fields back to spherical
+                            #if DEBUG >= 4
+                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                            #endif
                             vel_Cart_to_Spher(u_r_tmp, u_lon_tmp, u_lat_tmp,
                                               u_x_tmp, u_y_tmp,   u_z_tmp,
                                               longitude.at(Ilon), latitude.at(Ilat));
 
                             // Subtract current coarse from preceeding coarse to
                             //    get current fine
+                            #if DEBUG >= 4
+                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                            #endif
                             fine_u_r.at(  index) = coarse_u_r.at(  index) - u_r_tmp;
                             fine_u_lon.at(index) = coarse_u_lon.at(index) - u_lon_tmp;
                             fine_u_lat.at(index) = coarse_u_lat.at(index) - u_lat_tmp;
 
                             // Now pass the new coarse along as the preceeding coarse.
+                            #if DEBUG >= 4
+                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                            #endif
                             coarse_u_r.at(  index) = u_r_tmp;
                             coarse_u_lon.at(index) = u_lon_tmp;
                             coarse_u_lat.at(index) = u_lat_tmp;
 
                             #if COMP_TRANSFERS
+                            #if DEBUG >= 4
+                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                            #endif
                             apply_filter_at_point_for_quadratics(
                                     uxux_tmp, uxuy_tmp, uxuz_tmp,
                                     uyuy_tmp, uyuz_tmp, uzuz_tmp,
@@ -323,6 +338,9 @@ void filtering(
 
                         if (mask.at(mask_index) == 1) { // Skip land areas
 
+                            #if DEBUG >= 4
+                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                            #endif
                             vel_Spher_to_Cart(u_x_tmp,           u_y_tmp,             u_z_tmp,
                                               coarse_u_r.at(index), coarse_u_lon.at(index), coarse_u_lat.at(index),
                                               longitude.at(Ilon),   latitude.at(Ilat));
