@@ -1,4 +1,5 @@
 
+#include <vector>
 #include "../netcdf_io.hpp"
 
 #ifndef DEBUG
@@ -10,17 +11,12 @@
 #endif
 
 void initialize_output_file(
-        const int Ntime,          /**< [in] length of the time dimension */
-        const int Ndepth,         /**< [in] length of the depth dimension */
-        const int Nlon,           /**< [in] length of the longitude dimension */
-        const int Nlat,           /**< [in] length of the latitude dimension */
-        const int Nscales,        /**< [in] number of filtering scales */
-        const double * time,      /**< [in] time vector (1D) */
-        const double * depth,     /**< [in] depth vector (1D) */
-        const double * longitude, /**< [in] longitude vector (1D) */
-        const double * latitude,  /**< [in] longitude vector (1D) */
-        const double * scales,    /**< [in] filter scales (1D) */
-        const double * mask       /**< [in] masking (land vs water, 2D) */
+        const std::vector<double> & time,      /**< [in] time vector (1D) */
+        const std::vector<double> & depth,     /**< [in] depth vector (1D) */
+        const std::vector<double> & longitude, /**< [in] longitude vector (1D) */
+        const std::vector<double> & latitude,  /**< [in] longitude vector (1D) */
+        const std::vector<double> & scales,    /**< [in] filter scales (1D) */
+        const std::vector<double> & mask       /**< [in] masking (land vs water, 2D) */
         ) {
 
     // Open the NETCDF file
@@ -30,6 +26,13 @@ void initialize_output_file(
     snprintf(buffer, 50, "filter_output.nc");
     if (( retval = nc_create(buffer, FLAG, &ncid) ))
         NC_ERR(retval, __LINE__, __FILE__);
+
+    // Extract dimension sizes
+    const int Nscales = scales.size();
+    const int Ntime   = time.size();
+    const int Ndepth  = depth.size();
+    const int Nlat    = latitude.size();
+    const int Nlon    = longitude.size();
 
     // Define the dimensions
     int scale_dimid, time_dimid, depth_dimid, lat_dimid, lon_dimid;
@@ -104,23 +107,23 @@ void initialize_output_file(
     size_t start[1], count[1];
     start[0] = 0;
     count[0] = Ntime;
-    if ((retval = nc_put_vara_double(ncid, time_varid,  start, count, time)))
+    if ((retval = nc_put_vara_double(ncid, time_varid,  start, count, &time[0])))
         NC_ERR(retval, __LINE__, __FILE__);
 
     count[0] = Ndepth;
-    if ((retval = nc_put_vara_double(ncid, depth_varid, start, count, depth)))
+    if ((retval = nc_put_vara_double(ncid, depth_varid, start, count, &depth[0])))
         NC_ERR(retval, __LINE__, __FILE__);
 
     count[0] = Nlat;
-    if ((retval = nc_put_vara_double(ncid, lat_varid,   start, count, latitude)))
+    if ((retval = nc_put_vara_double(ncid, lat_varid,   start, count, &latitude[0])))
         NC_ERR(retval, __LINE__, __FILE__);
 
     count[0] = Nlon;
-    if ((retval = nc_put_vara_double(ncid, lon_varid,   start, count, longitude)))
+    if ((retval = nc_put_vara_double(ncid, lon_varid,   start, count, &longitude[0])))
         NC_ERR(retval, __LINE__, __FILE__);
 
     count[0] = Nscales+1;
-    if ((retval = nc_put_vara_double(ncid, scale_varid, start, count, scales)))
+    if ((retval = nc_put_vara_double(ncid, scale_varid, start, count, &scales[0])))
         NC_ERR(retval, __LINE__, __FILE__);
 
     size_t mask_start[2], mask_count[2];
@@ -128,7 +131,7 @@ void initialize_output_file(
     mask_start[1] = 0;
     mask_count[0] = Nlat;
     mask_count[1] = Nlon;
-    if ((retval = nc_put_vara_double(ncid, mask_varid, mask_start, mask_count, mask)))
+    if ((retval = nc_put_vara_double(ncid, mask_varid, mask_start, mask_count, &mask[0])))
         NC_ERR(retval, __LINE__, __FILE__);
 
     // Close the file

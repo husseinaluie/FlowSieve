@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <vector>
 #include "../functions.hpp"
 
 #ifndef DEBUG
@@ -6,30 +7,30 @@
 #endif
 
 void apply_filter_at_point_for_quadratics(
-        double & uxux_tmp,         /**< [in] where to store filtered (u_x)*(u_x) */
-        double & uxuy_tmp,         /**< [in] where to store filtered (u_x)*(u_y) */
-        double & uxuz_tmp,         /**< [in] where to store filtered (u_x)*(u_z) */
-        double & uyuy_tmp,         /**< [in] where to store filtered (u_y)*(u_y) */
-        double & uyuz_tmp,         /**< [in] where to store filtered (u_y)*(u_z) */
-        double & uzuz_tmp,         /**< [in] where to store filtered (u_z)*(u_z) */
-        const double * u_x,       /**< [in] (full) u_x to filter */
-        const double * u_y,       /**< [in] (full) u_y to filter */
-        const double * u_z,       /**< [in] (full) u_z to filter */
-        const int dlon_N,         /**< [in] Maximum longitudinal width of kernel area in cells */
-        const int dlat_N,         /**< [in] Maximum latitudinal width of kernel area in cells */
-        const int Ntime,          /**< [in] Length of time dimension */
-        const int Ndepth,         /**< [in] Length of depth dimension */
-        const int Nlat,           /**< [in] Length of latitude dimension */
-        const int Nlon,           /**< [in] Length of longitude dimension */
-        const int Itime,          /**< [in] Current position in time dimension */
-        const int Idepth,         /**< [in] Current position in depth dimension */
-        const int Ilat,           /**< [in] Current position in latitude dimension */
-        const int Ilon,           /**< [in] Current position in longitude dimension */
-        const double * longitude, /**< [in] Longitude dimension (1D) */
-        const double * latitude,  /**< [in] Latitude dimension (1D) */
-        const double * dAreas,    /**< [in] Array of cell areas (2D) (compute_areas())*/
-        const double scale,       /**< [in] The filtering scale */
-        const double * mask       /**< [in] Array to distinguish between land and water cells (2D) */
+        double & uxux_tmp,                      /**< [in] where to store filtered (u_x)*(u_x) */
+        double & uxuy_tmp,                      /**< [in] where to store filtered (u_x)*(u_y) */
+        double & uxuz_tmp,                      /**< [in] where to store filtered (u_x)*(u_z) */
+        double & uyuy_tmp,                      /**< [in] where to store filtered (u_y)*(u_y) */
+        double & uyuz_tmp,                      /**< [in] where to store filtered (u_y)*(u_z) */
+        double & uzuz_tmp,                      /**< [in] where to store filtered (u_z)*(u_z) */
+        const std::vector<double> & u_x,        /**< [in] (full) u_x to filter */
+        const std::vector<double> & u_y,        /**< [in] (full) u_y to filter */
+        const std::vector<double> & u_z,        /**< [in] (full) u_z to filter */
+        const int dlon_N,                       /**< [in] Maximum longitudinal width of kernel area in cells */
+        const int dlat_N,                       /**< [in] Maximum latitudinal width of kernel area in cells */
+        const int Ntime,                        /**< [in] Length of time dimension */
+        const int Ndepth,                       /**< [in] Length of depth dimension */
+        const int Nlat,                         /**< [in] Length of latitude dimension */
+        const int Nlon,                         /**< [in] Length of longitude dimension */
+        const int Itime,                        /**< [in] Current position in time dimension */
+        const int Idepth,                       /**< [in] Current position in depth dimension */
+        const int Ilat,                         /**< [in] Current position in latitude dimension */
+        const int Ilon,                         /**< [in] Current position in longitude dimension */
+        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
+        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
+        const std::vector<double> & dAreas,     /**< [in] Array of cell areas (2D) (compute_areas())*/
+        const double scale,                     /**< [in] The filtering scale */
+        const std::vector<double> & mask        /**< [in] Array to distinguish between land and water cells (2D) */
         ) {
 
 
@@ -73,8 +74,8 @@ void apply_filter_at_point_for_quadratics(
                 curr_lon = LON;
             }
 
-            dist = distance(longitude[Ilon],     latitude[Ilat],
-                            longitude[curr_lon], latitude[curr_lat]);
+            dist = distance(longitude.at(Ilon),     latitude.at(Ilat),
+                            longitude.at(curr_lon), latitude.at(curr_lat));
 
             kern = kernel(dist, scale);
 
@@ -84,15 +85,15 @@ void apply_filter_at_point_for_quadratics(
             mask_index = Index(0,     0,      curr_lat, curr_lon,
                                Ntime, Ndepth, Nlat,     Nlon);
 
-            area    = dAreas[index];
-            kA_sum += kern * area;// * mask[mask_index];
+            area    = dAreas.at(index);
+            kA_sum += kern * area;
 
-            uxux_tmp += u_x[index] * u_x[index] * kern * area * mask[mask_index];
-            uxuy_tmp += u_x[index] * u_y[index] * kern * area * mask[mask_index];
-            uxuz_tmp += u_x[index] * u_z[index] * kern * area * mask[mask_index];
-            uyuy_tmp += u_y[index] * u_y[index] * kern * area * mask[mask_index];
-            uyuz_tmp += u_y[index] * u_z[index] * kern * area * mask[mask_index];
-            uzuz_tmp += u_z[index] * u_z[index] * kern * area * mask[mask_index];
+            uxux_tmp += u_x.at(index) * u_x.at(index) * kern * area * mask.at(mask_index);
+            uxuy_tmp += u_x.at(index) * u_y.at(index) * kern * area * mask.at(mask_index);
+            uxuz_tmp += u_x.at(index) * u_z.at(index) * kern * area * mask.at(mask_index);
+            uyuy_tmp += u_y.at(index) * u_y.at(index) * kern * area * mask.at(mask_index);
+            uyuz_tmp += u_y.at(index) * u_z.at(index) * kern * area * mask.at(mask_index);
+            uzuz_tmp += u_z.at(index) * u_z.at(index) * kern * area * mask.at(mask_index);
 
         }
     }

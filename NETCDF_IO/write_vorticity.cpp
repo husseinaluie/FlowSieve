@@ -1,3 +1,4 @@
+#include <vector>
 #include "../netcdf_io.hpp"
 
 #ifndef DEBUG
@@ -5,14 +6,14 @@
 #endif
 
 void write_vorticity(
-        const double * vort_r,   /**< [in] vort_r to be written to the file*/
-        const double * vort_lon, /**< [in] vort_lon to be written to the file*/
-        const double * vort_lat, /**< [in] vort_lat to be written to the file*/
-        const int Iscale,        /**< [in] Index positioning this output in the filter dimension */
-        const int Ntime,         /**< [in] Length of the time dimension */
-        const int Ndepth,        /**< [in] Length of the depth dimension */
-        const int Nlat,          /**< [in] Length of the latitude dimension */  
-        const int Nlon           /**< [in] Length of the longitude dimension */
+        const std::vector<double> & vort_r,     /**< [in] vort_r to be written to the file*/
+        const std::vector<double> & vort_lon,   /**< [in] vort_lon to be written to the file*/
+        const std::vector<double> & vort_lat,   /**< [in] vort_lat to be written to the file*/
+        const int Iscale,                       /**< [in] Index positioning this output in the filter dimension */
+        const int Ntime,                        /**< [in] Length of the time dimension */
+        const int Ndepth,                       /**< [in] Length of the depth dimension */
+        const int Nlat,                         /**< [in] Length of the latitude dimension */  
+        const int Nlon                          /**< [in] Length of the longitude dimension */
         ) {
 
     // Open the NETCDF file
@@ -44,11 +45,11 @@ void write_vorticity(
     count[3] = Nlat;
     count[4] = Nlon;
 
-    if ((retval = nc_put_vara_double(ncid, vort_r_varid,   start, count, vort_r)))
+    if ((retval = nc_put_vara_double(ncid, vort_r_varid,   start, count, &vort_r[0])))
         NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_put_vara_double(ncid, vort_lon_varid, start, count, vort_lon)))
+    if ((retval = nc_put_vara_double(ncid, vort_lon_varid, start, count, &vort_lon[0])))
         NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_put_vara_double(ncid, vort_lat_varid, start, count, vort_lat)))
+    if ((retval = nc_put_vara_double(ncid, vort_lat_varid, start, count, &vort_lat[0])))
         NC_ERR(retval, __LINE__, __FILE__);
 
     // Close the file

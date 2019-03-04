@@ -1,24 +1,25 @@
+#include <vector>
 #include "../functions.hpp"
 #include "../constants.hpp"
 
 void compute_energy_transfer_through_scale(
-        double * energy_transfer,  /**< [in] where to store the energy transfer */
-        const double * ux,         /**< [in] filtered u_x */
-        const double * uy,         /**< [in] filtered u_y */
-        const double * uz,         /**< [in] filtered u_z */
-        const double * uxux,       /**< [in] filtered u_x * u_x */
-        const double * uxuy,       /**< [in] filtered u_x * u_y */
-        const double * uxuz,       /**< [in] filtered u_x * u_z */
-        const double * uyuy,       /**< [in] filtered u_y * u_y */
-        const double * uyuz,       /**< [in] filtered u_y * u_z */
-        const double * uzuz,       /**< [in] filtered u_z * u_z */
-        const int Ntime,           /**< [in] Length of time dimension */
-        const int Ndepth,          /**< [in] Length of depth dimension */
-        const int Nlat,            /**< [in] Length of latitude dimension */
-        const int Nlon,            /**< [in] Length of longitude dimension */
-        const double * longitude,  /**< [in] Longitude dimension (1D) */
-        const double * latitude,   /**< [in] Latitude dimension (1D) */
-        const double * mask        /**< [in] Mask array (2D) to distinguish land from water */
+        std::vector<double> & energy_transfer,  /**< [in] where to store the energy transfer */
+        const std::vector<double> & ux,         /**< [in] filtered u_x */
+        const std::vector<double> & uy,         /**< [in] filtered u_y */
+        const std::vector<double> & uz,         /**< [in] filtered u_z */
+        const std::vector<double> & uxux,       /**< [in] filtered u_x * u_x */
+        const std::vector<double> & uxuy,       /**< [in] filtered u_x * u_y */
+        const std::vector<double> & uxuz,       /**< [in] filtered u_x * u_z */
+        const std::vector<double> & uyuy,       /**< [in] filtered u_y * u_y */
+        const std::vector<double> & uyuz,       /**< [in] filtered u_y * u_z */
+        const std::vector<double> & uzuz,       /**< [in] filtered u_z * u_z */
+        const int Ntime,                        /**< [in] Length of time dimension */
+        const int Ndepth,                       /**< [in] Length of depth dimension */
+        const int Nlat,                         /**< [in] Length of latitude dimension */
+        const int Nlon,                         /**< [in] Length of longitude dimension */
+        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
+        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
+        const std::vector<double> & mask        /**< [in] Mask array (2D) to distinguish land from water */
         ) {
 
     double tau_xx, tau_xy, tau_xz, tau_yy, tau_yz, tau_zz;
@@ -37,15 +38,15 @@ void compute_energy_transfer_through_scale(
                     mask_index = Index(0,     0,      Ilat, Ilon,
                                        Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask[mask_index] == 1) { // Skip land areas
+                    if (mask.at(mask_index) == 1) { // Skip land areas
 
                         // Compute subfilter-scale stress
-                        tau_xx = uxux[index] - ux[index]*ux[index];
-                        tau_xy = uxuy[index] - ux[index]*uy[index];
-                        tau_xz = uxuz[index] - ux[index]*uz[index];
-                        tau_yy = uyuy[index] - uy[index]*uy[index];
-                        tau_yz = uyuz[index] - uy[index]*uz[index];
-                        tau_zz = uzuz[index] - uz[index]*uz[index];
+                        tau_xx = uxux.at(index) - ux.at(index)*ux.at(index);
+                        tau_xy = uxuy.at(index) - ux.at(index)*uy.at(index);
+                        tau_xz = uxuz.at(index) - ux.at(index)*uz.at(index);
+                        tau_yy = uyuy.at(index) - uy.at(index)*uy.at(index);
+                        tau_yz = uyuz.at(index) - uy.at(index)*uz.at(index);
+                        tau_zz = uzuz.at(index) - uz.at(index)*uz.at(index);
 
                         // Compute large-scale strain
                         compute_largescale_strain(
@@ -64,7 +65,7 @@ void compute_energy_transfer_through_scale(
                         pi_tmp = 0.;
                     }
 
-                    energy_transfer[index] = pi_tmp;
+                    energy_transfer.at(index) = pi_tmp;
                 }
             }
         }

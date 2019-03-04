@@ -1,5 +1,6 @@
 
 #include "../netcdf_io.hpp"
+#include <vector>
 
 #ifndef DEBUG
     #define DEBUG 0
@@ -8,18 +9,14 @@
 
 // Write to netcdf file
 void read_source(
-        int & Nlon,          /**< [in] Size of longitude dimension*/
-        int & Nlat,          /**< [in] Size of latitude dimension*/
-        int & Ntime,         /**< [in] Size of time dimension*/
-        int & Ndepth,        /**< [in] Size of depth dimension*/
-        double ** longitude, /**< [in] Pointer to longitude array to be created*/
-        double ** latitude,  /**< [in] Pointer to latitude array to be created*/
-        double ** time,      /**< [in] Pointer to time array to be created*/
-        double ** depth,     /**< [in] Pointer to depth array to be created*/
-        double ** u_r,       /**< [in] Pointer to u_r array to be created*/
-        double ** u_lon,     /**< [in] Pointer to u_lon array to be created*/
-        double ** u_lat,     /**< [in] Pointer to u_lat array to be created*/
-        double ** mask       /**< [in] Pointer to mask array to be created*/
+        std::vector<double> &longitude,  /**< [in] Pointer to longitude array to be created*/
+        std::vector<double> &latitude,   /**< [in] Pointer to latitude array to be created*/
+        std::vector<double> &time,       /**< [in] Pointer to time array to be created*/
+        std::vector<double> &depth,      /**< [in] Pointer to depth array to be created*/
+        std::vector<double> &u_r,        /**< [in] Pointer to u_r array to be created*/
+        std::vector<double> &u_lon,      /**< [in] Pointer to u_lon array to be created*/
+        std::vector<double> &u_lat,      /**< [in] Pointer to u_lat array to be created*/
+        std::vector<double> &mask        /**< [in] Pointer to mask array to be created*/
         ) {
 
     // Open the NETCDF file
@@ -46,10 +43,10 @@ void read_source(
     // Cast the sizes to integers (to resolve some compile errors)
     //   Unless we're dealing with truly massive grids, this
     //   shouldn't be an issue.
-    Ntime  = static_cast<int>(Ntime_st);
-    Ndepth = static_cast<int>(Ndepth_st);
-    Nlon   = static_cast<int>(Nlon_st);
-    Nlat   = static_cast<int>(Nlat_st);
+    const int Ntime  = static_cast<int>(Ntime_st);
+    const int Ndepth = static_cast<int>(Ndepth_st);
+    const int Nlon   = static_cast<int>(Nlon_st);
+    const int Nlat   = static_cast<int>(Nlat_st);
 
     #if DEBUG >= 1
     fprintf(stdout, "\n");
@@ -71,16 +68,16 @@ void read_source(
     //// Allocate memory for the fields
     //
 
-    time[0]      = new double[Ntime];
-    depth[0]     = new double[Ndepth];
-    longitude[0] = new double[Nlon];
-    latitude[0]  = new double[Nlat];
+    time.resize(Ntime);
+    depth.resize(Ndepth);
+    latitude.resize(Nlat);
+    longitude.resize(Nlon);
 
-    u_r[0]   = new double[Ntime * Ndepth * Nlat * Nlon];
-    u_lon[0] = new double[Ntime * Ndepth * Nlat * Nlon];
-    u_lat[0] = new double[Ntime * Ndepth * Nlat * Nlon];
+    u_r.resize(  Ntime * Ndepth * Nlat * Nlon);
+    u_lon.resize(Ntime * Ndepth * Nlat * Nlon);
+    u_lat.resize(Ntime * Ndepth * Nlat * Nlon);
 
-    mask[0]  = new double[                 Nlat * Nlon];
+    mask.resize(Nlat * Nlon);
 
     //
     //// Get fields from IC file
@@ -112,19 +109,19 @@ void read_source(
 
     start_coord[0] = 0;
     count_coord[0] = Nlon;
-    if ((retval = nc_get_vara_double(ncid, lon_varid, start_coord, count_coord, longitude[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_get_vara_double(ncid, lon_varid,   start_coord, count_coord, &longitude[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     start_coord[0] = 0;
     count_coord[0] = Nlat;
-    if ((retval = nc_get_vara_double(ncid, lat_varid, start_coord, count_coord, latitude[0] ))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_get_vara_double(ncid, lat_varid,   start_coord, count_coord, &latitude[0] ))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     start_coord[0] = 0;
     count_coord[0] = Ntime;
-    if ((retval = nc_get_vara_double(ncid, lat_varid, start_coord, count_coord, time[0] ))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_get_vara_double(ncid, time_varid,  start_coord, count_coord, &time[0]     ))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     start_coord[0] = 0;
     count_coord[0] = Ndepth;
-    if ((retval = nc_get_vara_double(ncid, lat_varid, start_coord, count_coord, depth[0] ))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_get_vara_double(ncid, depth_varid, start_coord, count_coord, &depth[0]    ))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Get u_lon (uo) and u_lat (vo)
     size_t start[4], count[4];
@@ -137,15 +134,15 @@ void read_source(
     count[2] = Nlat;
     count[3] = Nlon;
 
-    if ((retval = nc_get_vara_double(ncid, ulon_varid, start, count, u_lon[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
-    if ((retval = nc_get_vara_double(ncid, ulat_varid, start, count, u_lat[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_get_vara_double(ncid, ulon_varid, start, count, &u_lon[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_get_vara_double(ncid, ulat_varid, start, count, &u_lat[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // At the moment there's no u_r in the data, so just zero it out
     //     also apply the scale factors to the velocity fields
     for (int index = 0; index < Ntime * Ndepth * Nlat * Nlon; index++) {
-        u_r[0][index] = 0;
-        u_lon[0][index] *= u_lon_scale;
-        u_lat[0][index] *= u_lat_scale;
+        u_r.at(index) = 0;
+        u_lon.at(index) *= u_lon_scale;
+        u_lat.at(index) *= u_lat_scale;
     }
 
     // Determine the mask (i.e. where land is) by checking
@@ -157,13 +154,13 @@ void read_source(
     int num_water = 0;
 
     for (int index = 0; index < Nlat * Nlon; index++) {
-        if (    (abs(u_r[  0][index]) > 0.9 * abs(u_lon_fill              )) 
-             or (abs(u_lon[0][index]) > 0.9 * abs(u_lon_fill * u_lon_scale))
-             or (abs(u_lat[0][index]) > 0.9 * abs(u_lat_fill * u_lat_scale)) ) {
-            mask[0][index] = 0;
+        if (    (abs(u_r.at(  index)) > 0.9 * abs(u_lon_fill              )) 
+             or (abs(u_lon.at(index)) > 0.9 * abs(u_lon_fill * u_lon_scale))
+             or (abs(u_lat.at(index)) > 0.9 * abs(u_lat_fill * u_lat_scale)) ) {
+            mask.at(index) = 0;
             num_land++;
         } else {
-            mask[0][index] = 1;
+            mask.at(index) = 1;
             num_water++;
         }
     }

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <math.h>
+#include <vector>
 //#include <mpi.h>
 //#include <omp.h>
 
@@ -27,37 +28,47 @@ int main(int argc, char *argv[]) {
 
     //MPI_Init( &argc, &argv);
 
-    double *longitude, *latitude, *time, *depth;
-    double *u_r, *u_lon, *u_lat, *mask;
-    int Nlon, Nlat, Ntime, Ndepth;
+    std::vector<double> longitude;
+    std::vector<double> latitude;
+    std::vector<double> time;
+    std::vector<double> depth;
+
+    std::vector<double> u_r;
+    std::vector<double> u_lon;
+    std::vector<double> u_lat;
+
+    std::vector<double> mask;
 
     // For the time being, hard-code the filter scales
     //   add zero as the bottom
     const int Nfilt = 10;
-    const double filter_scales [Nfilt+1] = 
-            {100e3, 150e3, 200e3, 250e3, 300e3, 350e3, 400e3, 450e3, 500e3, 750e3, 0};
+    const double scales [Nfilt+1] = 
+            {100e3, 150e3, 200e3, 250e3, 
+                300e3, 350e3, 400e3, 450e3, 
+                500e3, 750e3, 0};
+    std::vector<double> filter_scales;
+    filter_scales.assign(scales, scales + Nfilt);
 
     // Read in source data / get size information
     #if DEBUG >= 1
     fprintf(stdout, "Reading in source data.\n\n");
     #endif
 
-    read_source(
-            Nlon, Nlat, Ntime, Ndepth,
-            &longitude, &latitude, 
-            &time, &depth, 
-            &u_r, &u_lon, &u_lat,
-            &mask );
+    read_source(longitude, latitude, time,  depth, 
+                u_r,       u_lon,    u_lat, mask );
+
+    const int Nlon   = longitude.size();
+    const int Nlat   = latitude.size();
+    //const int Ntime  = time.size();
+    //const int Ndetph = depth.size();
 
     // Convert coordinate to radians
     for (int ii = 0; ii < Nlon; ii++) {
-        longitude[ii] = longitude[ii] * M_PI / 180;
+        longitude.at(ii) = longitude.at(ii) * M_PI / 180;
     }
     for (int ii = 0; ii < Nlat; ii++) {
-        latitude[ii] = latitude[ii] * M_PI / 180;
+        latitude.at(ii) = latitude.at(ii) * M_PI / 180;
     }
-    double dlon = longitude[1] - longitude[0];
-    double dlat = latitude[1]  - latitude[0];
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration
@@ -65,15 +76,12 @@ int main(int argc, char *argv[]) {
     fprintf(stdout, "Computing the cell areas.\n\n");
     #endif
 
-    double *areas;
-    areas = new double[Nlon * Nlat];
-    compute_areas(areas, longitude, latitude, Nlon, Nlat);
+    std::vector<double> areas(Nlon * Nlat);
+    compute_areas(areas, longitude, latitude);
 
     // Now pass the arrays along to the filtering routines
     filtering(u_r, u_lon, u_lat,
-              filter_scales, Nfilt,
-              dlon, dlat,
-              Ntime, Ndepth, Nlon, Nlat,
+              filter_scales,
               areas, 
               time, depth,
               longitude, latitude,

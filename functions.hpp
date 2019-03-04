@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <vector>
 
 /*!
  * \file
@@ -15,11 +16,9 @@
  * Currently assumes spherical coordinates.
  */
 void compute_areas(
-        double * areas, 
-        const double * longitude, 
-        const double * latitude, 
-        const int Nlon, 
-        const int Nlat);
+        std::vector<double> & areas, 
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude);
 
 /*!
  * \brief Convenience tool to convert physical index (time, depth, lat, lon) to a logical index.
@@ -99,14 +98,16 @@ void vel_Cart_to_Spher(
  * loop sequences, calls the other funcations (velocity conversions), and
  * calls the IO functionality.
  */
-void filtering(const double * u_r, const double * u_lon, const double * u_lat,
-               const double * scales, const int Nscales,
-               const double dlon, const double dlat,
-               const int Ntime, const int Ndepth, const int Nlon, const int Nlat,
-               const double * dAreas, 
-               const double * time, const double * depth,
-               const double * longitude, const double * latitude,
-               const double * mask);
+void filtering(const std::vector<double> & u_r, 
+               const std::vector<double> & u_lon, 
+               const std::vector<double> & u_lat,
+               const std::vector<double> & scales, 
+               const std::vector<double> & dAreas, 
+               const std::vector<double> & time, 
+               const std::vector<double> & depth,
+               const std::vector<double> & longitude, 
+               const std::vector<double> & latitude,
+               const std::vector<double> & mask);
 
 /*!
  * \brief Compute filtered Cartesian velocities at a single point
@@ -117,14 +118,21 @@ void filtering(const double * u_r, const double * u_lon, const double * u_lat,
  * dArea for integration computed in compute_areas() 
  */
 void apply_filter_at_point(
-        double & u_x_tmp,   double & u_y_tmp,   double & u_z_tmp,
-        const double * u_x, const double * u_y, const double * u_z,
-        const int dlon_N, const int dlat_N, 
+        double & u_x_tmp,   
+        double & u_y_tmp,   
+        double & u_z_tmp,
+        const std::vector<double> & u_x, 
+        const std::vector<double> & u_y, 
+        const std::vector<double> & u_z,
+        const int dlon_N, 
+        const int dlat_N, 
         const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
-        const double * longitude, const double * latitude,
-        const double * dAreas, const double scale,
-        const double * mask);
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude,
+        const std::vector<double> & dAreas, 
+        const double scale,
+        const std::vector<double> & mask);
 
 /*!
  * \brief Primary kernel function coarse-graining procedure (G in publications)
@@ -141,7 +149,7 @@ double kernel(const double distance, const double scale);
  *
  * The grid need not be centred (to account for coastlines).
  */
-void differentiation_vector(double * diff_array, const double delta, const int index);
+void differentiation_vector(std::vector<double> & diff_array, const double delta, const int index);
 
 /*!
  * \brief Compute the (spherical) vorticity at a given point.
@@ -156,11 +164,14 @@ void differentiation_vector(double * diff_array, const double delta, const int i
  */
 void compute_vorticity_at_point(
         double & vort_r_tmp, double & vort_lon_tmp, double & vort_lat_tmp,
-        const double * u_r, const double * u_lon, const double * u_lat,
+        const std::vector<double> & u_r, 
+        const std::vector<double> & u_lon, 
+        const std::vector<double> & u_lat,
         const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
-        const double * longitude, const double * latitude,
-        const double * mask);
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask);
 
 /*!
  * \brief Wrapper for computing vorticity
@@ -170,11 +181,16 @@ void compute_vorticity_at_point(
  * is skipped.
  */
 void compute_vorticity(
-        double * vort_r,    double * vort_lon,    double * vort_lat,
-        const double * u_r, const double * u_lon, const double * u_lat,
+        std::vector<double> & vort_r,    
+        std::vector<double> & vort_lon,    
+        std::vector<double> & vort_lat,
+        const std::vector<double> & u_r, 
+        const std::vector<double> & u_lon, 
+        const std::vector<double> & u_lat,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const double * longitude, const double * latitude,
-        const double * mask);
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask);
 
 /*!
  * \brief Compute filtered quadratic velocities at a single point
@@ -190,25 +206,37 @@ void compute_vorticity(
 void apply_filter_at_point_for_quadratics(
         double & uxux_tmp,   double & uxuy_tmp,   double & uxuz_tmp,
         double & uyuy_tmp,   double & uyuz_tmp,   double & uzuz_tmp,
-        const double * u_x, const double * u_y, const double * u_z,
-        const int dlon_N, const int dlat_N, 
+        const std::vector<double> & u_x, 
+        const std::vector<double> & u_y, 
+        const std::vector<double> & u_z,
+        const int dlon_N, 
+        const int dlat_N, 
         const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
-        const double * longitude, const double * latitude,
-        const double * dAreas, const double scale,
-        const double * mask);
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude,
+        const std::vector<double> & dAreas, 
+        const double scale,
+        const std::vector<double> & mask);
 
 /*!
  * \brief Compute the energy transfer through the current filter scale
  */
 void compute_energy_transfer_through_scale(
-        double * energy_transfer,
-        const double * ux,   const double * uy,   const double * uz,
-        const double * uxux, const double * uxuy, const double * uxuz,
-        const double * uyuy, const double * uyuz, const double * uzuz,
+        std::vector<double> & energy_transfer,
+        const std::vector<double> & ux,   
+        const std::vector<double> & uy,   
+        const std::vector<double> & uz,
+        const std::vector<double> & uxux, 
+        const std::vector<double> & uxuy, 
+        const std::vector<double> & uxuz,
+        const std::vector<double> & uyuy, 
+        const std::vector<double> & uyuz, 
+        const std::vector<double> & uzuz,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const double * longitude, const double * latitude,
-        const double * mask);
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask);
 
 /*!
  * \brief Compute the large-scale strain tensor S
@@ -220,28 +248,32 @@ void compute_energy_transfer_through_scale(
 void compute_largescale_strain(
         double & S_xx, double & S_xy, double & S_xz,
         double & S_yy, double & S_yz, double & S_zz,
-        const double * u_x, const double * u_y, const double * u_z,
+        const std::vector<double> & u_x, 
+        const std::vector<double> & u_y, 
+        const std::vector<double> & u_z,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const double * longitude, const double * latitude, const double * mask);
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude, 
+        const std::vector<double> & mask);
 
 /*!
  * \brief Computes latitudinal derivative at a specific point.
  */
 double latitude_derivative_at_point(
-        const double * field, const double * latitude,
+        const std::vector<double> & field, const std::vector<double> & latitude,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const double * mask);
+        const std::vector<double> & mask);
 
 /*!
  * \brief Computes longitudinal derivative at a specific point.
  */
 double longitude_derivative_at_point(
-        const double * field, const double * longitude,
+        const std::vector<double> & field, const std::vector<double> & longitude,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const double * mask);
+        const std::vector<double> & mask);
 
 /*!
  * \brief Computes Cartesian x derivative at a specific point.
@@ -251,10 +283,12 @@ double longitude_derivative_at_point(
  * Calls latitude_derivative_at_point() and longitude_derivative_at_point()
  */
 double x_derivative_at_point(
-        const double * field, const double * latitude, const double * longitude,
+        const std::vector<double> & field, 
+        const std::vector<double> & latitude, 
+        const std::vector<double> & longitude,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const double * mask);
+        const std::vector<double> & mask);
 
 /*!
  * \brief Computes Cartesian y derivative at a specific point.
@@ -264,10 +298,12 @@ double x_derivative_at_point(
  * Calls latitude_derivative_at_point() and longitude_derivative_at_point()
  */
 double y_derivative_at_point(
-        const double * field, const double * latitude, const double * longitude,
+        const std::vector<double> & field, 
+        const std::vector<double> & latitude, 
+        const std::vector<double> & longitude,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const double * mask);
+        const std::vector<double> & mask);
 
 /*!
  * \brief Computes Cartesian z derivative at a specific point.
@@ -277,9 +313,11 @@ double y_derivative_at_point(
  * Calls latitude_derivative_at_point() and longitude_derivative_at_point()
  */
 double z_derivative_at_point(
-        const double * field, const double * latitude, const double * longitude,
+        const std::vector<double> & field, 
+        const std::vector<double> & latitude, 
+        const std::vector<double> & longitude,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const double * mask);
+        const std::vector<double> & mask);
 
 #endif

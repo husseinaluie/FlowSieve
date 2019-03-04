@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <vector>
 #include <math.h>
 #include "../functions.hpp"
 #include "../constants.hpp"
@@ -8,26 +9,26 @@
 #endif
 
 void compute_largescale_strain(
-        double & S_xx,            /**< [in] where to store xx component */
-        double & S_xy,            /**< [in] where to store xy component */
-        double & S_xz,            /**< [in] where to store xz component */
-        double & S_yy,            /**< [in] where to store yy component */
-        double & S_yz,            /**< [in] where to store yz component */
-        double & S_zz,            /**< [in] where to store zz component */
-        const double * u_x,       /**< [in] full (4D) u_x for calculation */
-        const double * u_y,       /**< [in] full (4D) u_y for calculation */
-        const double * u_z,       /**< [in] full (4D) u_z for calculation */
-        const int Itime,          /**< [in] Current position in time dimension */
-        const int Idepth,         /**< [in] Current position in depth dimension */
-        const int Ilat,           /**< [in] Current position in latitude dimension */
-        const int Ilon,           /**< [in] Current position in longitude dimension */
-        const int Ntime,          /**< [in] Length of time dimension */
-        const int Ndepth,         /**< [in] Length of depth dimension */
-        const int Nlat,           /**< [in] Length of latitude dimension */
-        const int Nlon,           /**< [in] Length of longitude dimension */
-        const double * longitude, /**< [in] Longitude dimension (1D) */
-        const double * latitude,  /**< [in] Latitude dimension (1D) */
-        const double * mask       /**< [in] Mask array (2D) to distinguish land from water*/
+        double & S_xx,                          /**< [in] where to store xx component */
+        double & S_xy,                          /**< [in] where to store xy component */
+        double & S_xz,                          /**< [in] where to store xz component */
+        double & S_yy,                          /**< [in] where to store yy component */
+        double & S_yz,                          /**< [in] where to store yz component */
+        double & S_zz,                          /**< [in] where to store zz component */
+        const std::vector<double> & u_x,        /**< [in] full (4D) u_x for calculation */
+        const std::vector<double> & u_y,        /**< [in] full (4D) u_y for calculation */
+        const std::vector<double> & u_z,        /**< [in] full (4D) u_z for calculation */
+        const int Itime,                        /**< [in] Current position in time dimension */
+        const int Idepth,                       /**< [in] Current position in depth dimension */
+        const int Ilat,                         /**< [in] Current position in latitude dimension */
+        const int Ilon,                         /**< [in] Current position in longitude dimension */
+        const int Ntime,                        /**< [in] Length of time dimension */
+        const int Ndepth,                       /**< [in] Length of depth dimension */
+        const int Nlat,                         /**< [in] Length of latitude dimension */
+        const int Nlon,                         /**< [in] Length of longitude dimension */
+        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
+        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
+        const std::vector<double> & mask        /**< [in] Mask array (2D) to distinguish land from water*/
         ) {
 
     //// For the sake of convenience, compute all of the derivatives first

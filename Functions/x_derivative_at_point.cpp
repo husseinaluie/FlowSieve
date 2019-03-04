@@ -1,27 +1,28 @@
+#include <vector>
 #include "../functions.hpp"
 #include "../constants.hpp"
 #include <math.h>
 
 double x_derivative_at_point(
-        const double * field,     /**< [in] field to differentiate */
-        const double * latitude,  /**< [in] (1D) latitude array */
-        const double * longitude, /**< [in] (1D) longitude array */
-        const int Itime,          /**< [in] time index at which to differentiate */
-        const int Idepth,         /**< [in] depth index at which to differentiate */
-        const int Ilat,           /**< [in] latitude index at which to differentiate */
-        const int Ilon,           /**< [in] longitude at which to differentiate */
-        const int Ntime,          /**< [in] size of time dimension */
-        const int Ndepth,         /**< [in] size of depth dimension */
-        const int Nlat,           /**< [in] size of latitude dimension */
-        const int Nlon,           /**< [in] size of longitude dimension */
-        const double * mask       /**< [in] (2D) array to distinguish land/water cells */
+        const std::vector<double> & field,      /**< [in] field to differentiate */
+        const std::vector<double> & latitude,   /**< [in] (1D) latitude array */
+        const std::vector<double> & longitude,  /**< [in] (1D) longitude array */
+        const int Itime,                        /**< [in] time index at which to differentiate */
+        const int Idepth,                       /**< [in] depth index at which to differentiate */
+        const int Ilat,                         /**< [in] latitude index at which to differentiate */
+        const int Ilon,                         /**< [in] longitude at which to differentiate */
+        const int Ntime,                        /**< [in] size of time dimension */
+        const int Ndepth,                       /**< [in] size of depth dimension */
+        const int Nlat,                         /**< [in] size of latitude dimension */
+        const int Nlon,                         /**< [in] size of longitude dimension */
+        const std::vector<double> & mask        /**< [in] (2D) array to distinguish land/water cells */
         ) {
 
     // Currently assuming ddr = 0
     // ddx = -( sin(lon) / (r cos(lat)) ) * ddlon   - ( cos(lon) * sin(lat) / r ) * ddlat
     double dfield_dlon, dfield_dlat;
-    double lon = longitude[Ilon];
-    double lat = latitude[Ilat];
+    double lon = longitude.at(Ilon);
+    double lat = latitude.at(Ilat);
     double r = constants::R_earth;
 
     dfield_dlon = longitude_derivative_at_point(

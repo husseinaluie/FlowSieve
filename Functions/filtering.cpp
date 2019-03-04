@@ -1,5 +1,6 @@
 #include <math.h>
 #include <algorithm>
+#include <vector>
 #include "../functions.hpp"
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
@@ -17,37 +18,44 @@
 #endif
 
 void filtering(
-        const double * full_u_r,       /**< [in] Full u_r velocity array */
-        const double * full_u_lon,     /**< [in] Full u_lon velocity array */
-        const double * full_u_lat,     /**< [in] Full u_lat velocity array */
-        const double * scales,    /**< [in] Array of filtering scales */
-        const int Nscales,        /**< [in] Number of filtering scales */
-        const double dlon,        /**< [in] (Constant) longitude spacing */
-        const double dlat,        /**< [in] (Constant) latitude spacing */
-        const int Ntime,          /**< [in] Length of time dimension */
-        const int Ndepth,         /**< [in] Length of depth dimension */
-        const int Nlon,           /**< [in] Length of longitude dimension */
-        const int Nlat,           /**< [in] Length of latitude dimension */
-        const double * dAreas,    /**< [in] Array of cell areas (2D) (compute_areas()) */
-        const double * time,      /**< [in] Time dimension (1D) */
-        const double * depth,     /**< [in] Depth dimension (1D) */
-        const double * longitude, /**< [in] Longitude dimension (1D) */
-        const double * latitude,  /**< [in] Latitude dimension (1D) */
-        const double * mask       /**< [in] Array to distinguish between land and water cells (2D) */
+        const std::vector<double> & full_u_r,       /**< [in] Full u_r velocity array */
+        const std::vector<double> & full_u_lon,     /**< [in] Full u_lon velocity array */
+        const std::vector<double> & full_u_lat,     /**< [in] Full u_lat velocity array */
+        const std::vector<double> & scales,    /**< [in] Array of filtering scales */
+        const std::vector<double> & dAreas,    /**< [in] Array of cell areas (2D) (compute_areas()) */
+        const std::vector<double> & time,      /**< [in] Time dimension (1D) */
+        const std::vector<double> & depth,     /**< [in] Depth dimension (1D) */
+        const std::vector<double> & longitude, /**< [in] Longitude dimension (1D) */
+        const std::vector<double> & latitude,  /**< [in] Latitude dimension (1D) */
+        const std::vector<double> & mask       /**< [in] Array to distinguish between land and water cells (2D) */
         ) {
+
+
+    // Compute grid spacing
+    //   for the moment, assume a uniform grid
+    double dlat = latitude.at( 1) - latitude.at( 0);
+    double dlon = longitude.at(1) - longitude.at(0);
+
+    // Get dimension sizes
+    const int Nscales = scales.size();
+    const int Ntime   = time.size();
+    const int Ndepth  = depth.size();
+    const int Nlat    = latitude.size();
+    const int Nlon    = longitude.size();
+
+    const int num_pts = Ntime * Ndepth * Nlat * Nlon;
 
     #if DEBUG >= 1
     fprintf(stdout, "Converting to Cartesian velocities.\n");
     #endif
-    double *u_x, *u_y, *u_z;
-    u_x = new double[Ntime * Ndepth * Nlon * Nlat];
-    u_y = new double[Ntime * Ndepth * Nlon * Nlat];
-    u_z = new double[Ntime * Ndepth * Nlon * Nlat];
 
-    double *coarse_u_r, *coarse_u_lon, *coarse_u_lat;
-    coarse_u_r   = new double[Ntime * Ndepth * Nlat * Nlon];
-    coarse_u_lon = new double[Ntime * Ndepth * Nlat * Nlon];
-    coarse_u_lat = new double[Ntime * Ndepth * Nlat * Nlon];
+    std::vector<double> u_x(num_pts);
+    std::vector<double> u_y(num_pts);
+    std::vector<double> u_z(num_pts);
+
+    std::vector<double> coarse_u_r(  num_pts);
+    std::vector<double> coarse_u_lon(num_pts);
+    std::vector<double> coarse_u_lat(num_pts);
 
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
@@ -65,19 +73,19 @@ void filtering(
                     mask_index = Index(0,     0,      Ilat, Ilon,
                                        Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask[mask_index] == 1) { // Skip land areas
+                    if (mask.at(mask_index) == 1) { // Skip land areas
 
                         // Note that 0 is in place of u_r, since 
                         // the current datasets don't have u_r
-                        vel_Spher_to_Cart(     u_x[index],      u_y[  index],      u_z[  index],
-                                          full_u_r[index], full_u_lon[index], full_u_lat[index],
-                                          longitude[Ilon], latitude[Ilat]);
+                        vel_Spher_to_Cart(     u_x.at(index),      u_y.at(  index),      u_z.at(  index),
+                                          full_u_r.at(index), full_u_lon.at(index), full_u_lat.at(index),
+                                          longitude.at(Ilon), latitude.at(Ilat));
                     }
 
                     // Copy the current full u_r into the initial coarse
-                    coarse_u_r[  index] = full_u_r[  index];
-                    coarse_u_lon[index] = full_u_lon[index];
-                    coarse_u_lat[index] = full_u_lat[index];
+                    coarse_u_r.at(  index) = full_u_r.at(  index);
+                    coarse_u_lon.at(index) = full_u_lon.at(index);
+                    coarse_u_lat.at(index) = full_u_lat.at(index);
                 }
             }
         }
@@ -87,8 +95,7 @@ void filtering(
     #if DEBUG >= 1
     fprintf(stdout, "Creating output file.\n");
     #endif
-    initialize_output_file(Ntime, Ndepth, Nlon, Nlat, Nscales,
-            time, depth, longitude, latitude, scales, mask);
+    initialize_output_file(time, depth, longitude, latitude, scales, mask);
 
     // Now prepare to filter
     double scale,
@@ -97,45 +104,38 @@ void filtering(
            dlat_m, dlon_m; // The grid spacings in metres (for lon, at a specific height)
     int dlat_N, dlon_N;    // The number of grid points required to span the filter radius
 
-    double *fine_u_r, *fine_u_lon, *fine_u_lat;
-    fine_u_r   = new double[Ntime * Ndepth * Nlat * Nlon];
-    fine_u_lon = new double[Ntime * Ndepth * Nlat * Nlon];
-    fine_u_lat = new double[Ntime * Ndepth * Nlat * Nlon];
+    std::vector<double> fine_u_r(  num_pts);
+    std::vector<double> fine_u_lon(num_pts);
+    std::vector<double> fine_u_lat(num_pts);
 
     #if COMP_VORT
-    double *vort_r, *vort_lon, *vort_lat;
-    vort_r   = new double[Ntime * Ndepth * Nlat * Nlon];
-    vort_lon = new double[Ntime * Ndepth * Nlat * Nlon];
-    vort_lat = new double[Ntime * Ndepth * Nlat * Nlon];
+    std::vector<double> vort_r(  num_pts);
+    std::vector<double> vort_lat(num_pts);
+    std::vector<double> vort_lon(num_pts);
     #endif
 
     #if COMP_TRANSFERS
     // If computing energy transfers, we'll need some more arrays
-    double *coarse_uxux, *coarse_uxuy, *coarse_uxuz, 
-           *coarse_uyuy, *coarse_uyuz, *coarse_uzuz;
-    coarse_uxux = new double[Ntime * Ndepth * Nlon * Nlat];
-    coarse_uxuy = new double[Ntime * Ndepth * Nlon * Nlat];
-    coarse_uxuz = new double[Ntime * Ndepth * Nlon * Nlat];
-    coarse_uyuy = new double[Ntime * Ndepth * Nlon * Nlat];
-    coarse_uyuz = new double[Ntime * Ndepth * Nlon * Nlat];
-    coarse_uzuz = new double[Ntime * Ndepth * Nlon * Nlat];
+    std::vector<double> coarse_uxux(num_pts);
+    std::vector<double> coarse_uxuy(num_pts);
+    std::vector<double> coarse_uxuz(num_pts);
+    std::vector<double> coarse_uyuy(num_pts);
+    std::vector<double> coarse_uyuz(num_pts);
+    std::vector<double> coarse_uzuz(num_pts);
 
     double uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp;
 
     // We'll also need to keep the coarse velocities
-    double *coarse_u_x,  *coarse_u_y,  *coarse_u_z;
-    coarse_u_x = new double[Ntime * Ndepth * Nlon * Nlat];
-    coarse_u_y = new double[Ntime * Ndepth * Nlon * Nlat];
-    coarse_u_z = new double[Ntime * Ndepth * Nlon * Nlat];
+    std::vector<double> coarse_u_x(num_pts);
+    std::vector<double> coarse_u_y(num_pts);
+    std::vector<double> coarse_u_z(num_pts);
 
     // Also an array for the transfer itself
-    double *energy_transfer;
-    energy_transfer = new double[Ntime * Ndepth * Nlon * Nlat];
+    std::vector<double> energy_transfer(num_pts);
 
     // If we're computing transfers, then we already have what
     //   we need to computed band-filtered KE, so might as well do it
-    double *fine_KE;
-    fine_KE = new double[Ntime * Ndepth * Nlon * Nlat];
+    std::vector<double> fine_KE(num_pts);
     #endif
 
     // The spacing (in metres) betwee latitude gridpoints
@@ -157,7 +157,7 @@ void filtering(
         fprintf(stdout, "Scale %d of %d\n", Iscale+1, Nscales);
         #endif
 
-        scale  = scales[Iscale];
+        scale  = scales.at(Iscale);
 
         // How many latitude cells are needed to span the filter radius
         dlat_N = ceil( (1.1*scale / dlat_m) / 2 );
@@ -197,8 +197,8 @@ void filtering(
                     //   are needed to span the filter radius
                     dlon_m = dlon 
                         * constants::R_earth 
-                        * std::min( cos(latitude[Ilat] + dlat_N * dlat), 
-                                    cos(latitude[Ilat] - dlat_N * dlat) ) ;
+                        * std::min( cos(latitude.at(Ilat) + dlat_N * dlat), 
+                                    cos(latitude.at(Ilat) - dlat_N * dlat) ) ;
                     dlon_N = ceil( ( 1.1*scale / dlon_m) / 2 );
 
                     for (int Ilon = 0; Ilon < Nlon; Ilon++) {
@@ -214,7 +214,7 @@ void filtering(
                         mask_index = Index(0,     0,      Ilat, Ilon,
                                            Ntime, Ndepth, Nlat, Nlon);
 
-                        if (mask[mask_index] == 1) { // Skip land areas
+                        if (mask.at(mask_index) == 1) { // Skip land areas
 
                             // Apply the filter at the point
                             apply_filter_at_point(
@@ -230,18 +230,18 @@ void filtering(
                             // Convert the filtered fields back to spherical
                             vel_Cart_to_Spher(u_r_tmp, u_lon_tmp, u_lat_tmp,
                                               u_x_tmp, u_y_tmp,   u_z_tmp,
-                                              longitude[Ilon], latitude[Ilat]);
+                                              longitude.at(Ilon), latitude.at(Ilat));
 
                             // Subtract current coarse from preceeding coarse to
                             //    get current fine
-                            fine_u_r[  index] = coarse_u_r[  index] - u_r_tmp;
-                            fine_u_lon[index] = coarse_u_lon[index] - u_lon_tmp;
-                            fine_u_lat[index] = coarse_u_lat[index] - u_lat_tmp;
+                            fine_u_r.at(  index) = coarse_u_r.at(  index) - u_r_tmp;
+                            fine_u_lon.at(index) = coarse_u_lon.at(index) - u_lon_tmp;
+                            fine_u_lat.at(index) = coarse_u_lat.at(index) - u_lat_tmp;
 
                             // Now pass the new coarse along as the preceeding coarse.
-                            coarse_u_r[  index] = u_r_tmp;
-                            coarse_u_lon[index] = u_lon_tmp;
-                            coarse_u_lat[index] = u_lat_tmp;
+                            coarse_u_r.at(  index) = u_r_tmp;
+                            coarse_u_lon.at(index) = u_lon_tmp;
+                            coarse_u_lat.at(index) = u_lat_tmp;
 
                             #if COMP_TRANSFERS
                             apply_filter_at_point_for_quadratics(
@@ -255,18 +255,18 @@ void filtering(
                                     dAreas, scale,
                                     mask);
 
-                            coarse_uxux[index] = uxux_tmp;
-                            coarse_uxuy[index] = uxuy_tmp;
-                            coarse_uxuz[index] = uxuz_tmp;
-                            coarse_uyuy[index] = uyuy_tmp;
-                            coarse_uyuz[index] = uyuz_tmp;
-                            coarse_uzuz[index] = uzuz_tmp;
+                            coarse_uxux.at(index) = uxux_tmp;
+                            coarse_uxuy.at(index) = uxuy_tmp;
+                            coarse_uxuz.at(index) = uxuz_tmp;
+                            coarse_uyuy.at(index) = uyuy_tmp;
+                            coarse_uyuz.at(index) = uyuz_tmp;
+                            coarse_uzuz.at(index) = uzuz_tmp;
 
-                            coarse_u_x[index] = u_x_tmp;
-                            coarse_u_y[index] = u_y_tmp;
-                            coarse_u_z[index] = u_z_tmp;
+                            coarse_u_x.at(index) = u_x_tmp;
+                            coarse_u_y.at(index) = u_y_tmp;
+                            coarse_u_z.at(index) = u_z_tmp;
                             
-                            fine_KE[index] = 0.5 * (   
+                            fine_KE.at(index) = 0.5 * (   
                                       ( uxux_tmp - u_x_tmp * u_x_tmp )
                                     + ( uyuy_tmp - u_y_tmp * u_y_tmp )
                                     + ( uzuz_tmp - u_z_tmp * u_z_tmp )
@@ -321,15 +321,15 @@ void filtering(
                         mask_index = Index(0,     0,      Ilat, Ilon,
                                            Ntime, Ndepth, Nlat, Nlon);
 
-                        if (mask[mask_index] == 1) { // Skip land areas
+                        if (mask.at(mask_index) == 1) { // Skip land areas
 
                             vel_Spher_to_Cart(u_x_tmp,           u_y_tmp,             u_z_tmp,
-                                              coarse_u_r[index], coarse_u_lon[index], coarse_u_lat[index],
-                                              longitude[Ilon],   latitude[Ilat]);
+                                              coarse_u_r.at(index), coarse_u_lon.at(index), coarse_u_lat.at(index),
+                                              longitude.at(Ilon),   latitude.at(Ilat));
 
-                            u_x[index] = u_x_tmp;
-                            u_y[index] = u_y_tmp;
-                            u_z[index] = u_z_tmp;
+                            u_x.at(index) = u_x_tmp;
+                            u_y.at(index) = u_y_tmp;
+                            u_z.at(index) = u_z_tmp;
                         }
                     }
                 }
@@ -350,16 +350,16 @@ void filtering(
                     mask_index = Index(0,     0,      Ilat, Ilon,
                                        Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask[mask_index] == 1) { // Skip land areas
+                    if (mask.at(mask_index) == 1) { // Skip land areas
 
                         vel_Cart_to_Spher(
                                 u_r_tmp,    u_lon_tmp,  u_lat_tmp,
-                                u_x[index], u_y[index], u_z[index],
-                                longitude[Ilon],   latitude[Ilat]);
+                                u_x.at(index), u_y.at(index), u_z.at(index),
+                                longitude.at(Ilon),   latitude.at(Ilat));
 
-                        coarse_u_r[  index] = u_r_tmp;
-                        coarse_u_lon[index] = u_lon_tmp;
-                        coarse_u_lat[index] = u_lat_tmp;
+                        coarse_u_r.at(  index) = u_r_tmp;
+                        coarse_u_lon.at(index) = u_lon_tmp;
+                        coarse_u_lat.at(index) = u_lat_tmp;
                     }
                 }
             }
@@ -377,44 +377,6 @@ void filtering(
             longitude, latitude, mask);
     write_vorticity(vort_r, vort_lon, vort_lat,
             Nscales, Ntime, Ndepth, Nlat, Nlon);
-    #endif
-
-    //
-    //// Free up the arrays
-    //
-
-    delete[] coarse_u_r;
-    delete[] coarse_u_lon;
-    delete[] coarse_u_lat;
-
-    delete[] fine_u_r;
-    delete[] fine_u_lon;
-    delete[] fine_u_lat;
-    
-    delete[] u_x;
-    delete[] u_y;
-    delete[] u_z;
-
-    #if COMP_VORT
-    // If computing vorticity, we have some additional arrays to free up
-    delete[] vort_r;
-    delete[] vort_lon;
-    delete[] vort_lat;
-    #endif
-
-    #if COMP_TRANSFERS
-    // If we're computing transfers, then we'll need to free those arrays too
-    delete[] coarse_uxux;
-    delete[] coarse_uxuy;
-    delete[] coarse_uxuz;
-    delete[] coarse_uyuy;
-    delete[] coarse_uyuz;
-    delete[] coarse_uzuz;
-    delete[] energy_transfer;
-    delete[] coarse_u_x;
-    delete[] coarse_u_y;
-    delete[] coarse_u_z;
-    delete[] fine_KE;
     #endif
 
 }

@@ -1,3 +1,4 @@
+#include <vector>
 #include "../netcdf_io.hpp"
 
 #ifndef DEBUG
@@ -5,12 +6,12 @@
 #endif
 
 void write_energy_transfer(
-        const double * energy_transfer, /**< [in] vort_lat to be written to the file*/
-        const int Iscale,               /**< [in] Index positioning this output in the filter dimension */
-        const int Ntime,                /**< [in] Length of the time dimension */
-        const int Ndepth,               /**< [in] Length of the depth dimension */
-        const int Nlat,                 /**< [in] Length of the latitude dimension */  
-        const int Nlon                  /**< [in] Length of the longitude dimension */
+        const std::vector<double> & energy_transfer,    /**< [in] vort_lat to be written to the file*/
+        const int Iscale,                               /**< [in] Index positioning this output in the filter dimension */
+        const int Ntime,                                /**< [in] Length of the time dimension */
+        const int Ndepth,                               /**< [in] Length of the depth dimension */
+        const int Nlat,                                 /**< [in] Length of the latitude dimension */  
+        const int Nlon                                  /**< [in] Length of the longitude dimension */
         ) {
 
     // Open the NETCDF file
@@ -40,7 +41,7 @@ void write_energy_transfer(
     count[3] = Nlat;
     count[4] = Nlon;
 
-    if ((retval = nc_put_vara_double(ncid, ener_transfer_varid, start, count, energy_transfer)))
+    if ((retval = nc_put_vara_double(ncid, ener_transfer_varid, start, count, &energy_transfer[0])))
         NC_ERR(retval, __LINE__, __FILE__);
 
     // Close the file

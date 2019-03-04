@@ -1,3 +1,4 @@
+#include <vector>
 #include "../netcdf_io.hpp"
 
 #ifndef DEBUG
@@ -5,7 +6,7 @@
 #endif
 
 void write_KE(
-        const double * fine_KE, /**< [in] vort_lat to be written to the file*/
+        const std::vector<double> & fine_KE, /**< [in] vort_lat to be written to the file*/
         const int Iscale,       /**< [in] Index positioning this output in the filter dimension */
         const int Ntime,        /**< [in] Length of the time dimension */
         const int Ndepth,       /**< [in] Length of the depth dimension */
@@ -40,7 +41,7 @@ void write_KE(
     count[3] = Nlat;
     count[4] = Nlon;
 
-    if ((retval = nc_put_vara_double(ncid, KE_varid, start, count, fine_KE)))
+    if ((retval = nc_put_vara_double(ncid, KE_varid, start, count, &fine_KE[0])))
         NC_ERR(retval, __LINE__, __FILE__);
 
     // Close the file
