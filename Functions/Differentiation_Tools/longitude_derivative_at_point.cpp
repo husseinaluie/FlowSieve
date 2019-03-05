@@ -1,6 +1,7 @@
 #include <vector>
-#include "../functions.hpp"
-#include "../constants.hpp"
+#include "../../differentiation_tools.hpp"
+#include "../../constants.hpp"
+#include "../../functions.hpp"
 
 double longitude_derivative_at_point(
         const std::vector<double> & field,      /**< [in] field to differentiate */

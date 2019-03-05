@@ -1,6 +1,7 @@
 #include <vector>
-#include "../functions.hpp"
-#include "../constants.hpp"
+#include "../../differentiation_tools.hpp"
+#include "../../constants.hpp"
+#include "../../functions.hpp"
 #include <math.h>
 
 double y_derivative_at_point(

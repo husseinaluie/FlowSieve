@@ -40,17 +40,23 @@ endif
 CFLAGS:=$(CFLAGS) $(LIB_DIRS)
 LDFLAGS:=$(LDFLAGS) $(INC_DIRS)
 
+# Get list of netcdf IO cpp files
 NETCDF_IO_CPPS := $(wildcard NETCDF_IO/*.cpp)
 NETCDF_IO_OBJS := $(addprefix NETCDF_IO/,$(notdir $(NETCDF_IO_CPPS:.cpp=.o)))
 
+# Get list of function cpp files
 FUNCTIONS_CPPS := $(wildcard Functions/*.cpp)
 FUNCTIONS_OBJS := $(addprefix Functions/,$(notdir $(FUNCTIONS_CPPS:.cpp=.o)))
 
+# Get list of differentation cpp files
+DIFF_TOOL_CPPS := $(wildcard Functions/Differentiation_Tools/*.cpp)
+DIFF_TOOL_OBJS := $(addprefix Functions/Differentiation_Tools/,$(notdir $(DIFF_TOOL_CPPS:.cpp=.o)))
+
 .PHONY: clean hardclean docs
 clean:
-	rm -f *.o NETCDF_IO/*.o Functions/*.o
+	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o
 hardclean:
-	rm -f *.o NETCDF_IO/*.o Functions/*.o coarse_grain.x
+	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o coarse_grain.x
 	rm -r coarse_grain.x.dSYM
 	rm -r Documentation/html
 	rm -r Documentation/latex
@@ -60,7 +66,7 @@ all: coarse_grain.x
 %.o: %.cpp
 	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
-coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} coarse_grain.o
+coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} coarse_grain.o
 	$(MPICXX) $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 docs:

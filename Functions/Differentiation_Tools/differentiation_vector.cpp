@@ -1,5 +1,6 @@
 #include <vector>
-#include "../functions.hpp"
+#include "../../differentiation_tools.hpp"
+
 // differentaition_vector sets the vector needed to compute 
 //   a fourth-order derivative on a five-point stencil.
 // index specifies the index at which we want the derivative to be computed

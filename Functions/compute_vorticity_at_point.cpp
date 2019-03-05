@@ -2,6 +2,7 @@
 #include <vector>
 #include <math.h>
 #include "../functions.hpp"
+#include "../differentiation_tools.hpp"
 #include "../constants.hpp"
 
 #ifndef DEBUG

@@ -1,9 +1,10 @@
 #include <vector>
-#include "../functions.hpp"
-#include "../constants.hpp"
+#include "../../differentiation_tools.hpp"
+#include "../../constants.hpp"
+#include "../../functions.hpp"
 #include <math.h>
 
-double z_derivative_at_point(
+double x_derivative_at_point(
         const std::vector<double> & field,      /**< [in] field to differentiate */
         const std::vector<double> & latitude,   /**< [in] (1D) latitude array */
         const std::vector<double> & longitude,  /**< [in] (1D) longitude array */
@@ -19,17 +20,26 @@ double z_derivative_at_point(
         ) {
 
     // Currently assuming ddr = 0
-    // ddz = ( cos(lat) / r ) * ddlat
+    // ddx = -( sin(lon) / (r cos(lat)) ) * ddlon   - ( cos(lon) * sin(lat) / r ) * ddlat
+    double dfield_dlon, dfield_dlat;
     double lon = longitude.at(Ilon);
+    double lat = latitude.at(Ilat);
     double r = constants::R_earth;
 
-    double dfield_dlat = latitude_derivative_at_point(
+    dfield_dlon = longitude_derivative_at_point(
+                        field, longitude,
+                        Itime, Idepth, Ilat, Ilon,
+                        Ntime, Ndepth, Nlat, Nlon,
+                        mask);
+
+    dfield_dlat = latitude_derivative_at_point(
                         field, latitude,
                         Itime, Idepth, Ilat, Ilon,
                         Ntime, Ndepth, Nlat, Nlon,
                         mask);
 
-    double deriv_val = ( cos(lon) / r ) * dfield_dlat;
+    double deriv_val = - ( sin(lon) / (r * cos(lat) ) ) * dfield_dlon
+                       - ( cos(lon) * sin(lat) / r )    * dfield_dlat;
 
     return deriv_val;
 }
