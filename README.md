@@ -3,6 +3,14 @@
 
 This repository stores source code for running coarse graining procedures on netcdf files.
 
+---
+
+## Compilation / Installation
+
+1. Copy the appropriate file from `./Systems/` to `./system.mk`
+ * The system directory contains files that declare system compiler information.
+ * You may need to create a new file to correspond to your system
+2. Calling `make all` in the root directory should then build the executable.
 
 ---
 
@@ -26,6 +34,8 @@ See the function map for [filtering] to get an overview of the function dependen
   * Makes coarse_grain.x
 * `make docs`
   * Makes the doxygen-produced documentation. **Note: `doxygen` and `dot` must be installed and on the path**
+* `make cleandocs`
+  * Removes the previous documentation build
 
 ### DEBUG flag
 
@@ -46,6 +56,7 @@ during runtime. In particular:
   * Prints when starting to compute cell areas
   * Prints when starting to convert spherical velocities to Cartesian (filtering.cpp)
   * Prints when creating the output file (filtering.cpp)
+  * Prints a 10-dot sequence showing progress through Lat/Lon points
 * DEBUG >= 2
   * Prints when finished computing cell areas (compute_areas.cpp)
   * Prints when entering the main filtering loop sequence (filtering.cpp)

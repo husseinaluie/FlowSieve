@@ -1,7 +1,8 @@
-CXX     ?= gcc-mp-8
-MPICXX  ?= mpicxx-openmpi-gcc8
-LINKS:=-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl
-CFLAGS:=-O3 -Wall #-qopenmp -fp-model fast=2
+# The "system.mk" file in the current directory will contain
+# system-specific make variables, most notably the
+# C/C++ compiler/linker,
+include system.mk
+include VERSION
 
 # Debug output level
 CFLAGS:=-DDEBUG=1 $(CFLAGS)
@@ -13,6 +14,7 @@ CFLAGS:=-DCOMP_VORT=true $(CFLAGS)
 CFLAGS:=-DCOMP_TRANSFERS=true $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
+OPT:=true
 DEBUG:=true
 EXTRA_OPT:=false
 
@@ -20,17 +22,16 @@ EXTRA_OPT:=false
 ## Shouldn't need to modify anything beyond this point
 ##
 
-DEBUG_FLAGS:=-g
-DEBUG_LDFLAGS:=-g
-
-EXTRA_OPT_FLAGS:=#-ip -ipo
-
-LIB_DIRS:=-L /opt/local/lib
-INC_DIRS:=-I /opt/local/include
+# Flag to pass version info to code
+VERSION:= -DMAJOR_VERSION=${MAJOR_VERSION} -DMINOR_VERSION=${MINOR_VERSION} -DPATCH_VERSION=${PATCH_VERSION}
 
 ifeq ($(DEBUG),true)
 	CFLAGS:=$(CFLAGS) $(DEBUG_FLAGS)
 	LINKS:=$(LINKS) $(DEBUG_LDFLAGS)
+endif
+
+ifeq ($(OPT),true)
+    CFLAGS:=$(CFLAGS) $(OPT_FLAGS)
 endif
 
 ifeq ($(EXTRA_OPT),true)
@@ -52,7 +53,7 @@ FUNCTIONS_OBJS := $(addprefix Functions/,$(notdir $(FUNCTIONS_CPPS:.cpp=.o)))
 DIFF_TOOL_CPPS := $(wildcard Functions/Differentiation_Tools/*.cpp)
 DIFF_TOOL_OBJS := $(addprefix Functions/Differentiation_Tools/,$(notdir $(DIFF_TOOL_CPPS:.cpp=.o)))
 
-.PHONY: clean hardclean docs
+.PHONY: clean hardclean docs cleandocs
 clean:
 	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o
 hardclean:
@@ -60,14 +61,17 @@ hardclean:
 	rm -r coarse_grain.x.dSYM
 	rm -r Documentation/html
 	rm -r Documentation/latex
+cleandocs:
+	rm -r Documentation/html
+	rm -r Documentation/latex
 
 all: coarse_grain.x
 
 %.o: %.cpp
-	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
 coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} coarse_grain.o
-	$(MPICXX) $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(MPICXX) ${VERSION} $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 docs:
 	doxygen Doxyfile

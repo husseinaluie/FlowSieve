@@ -20,6 +20,7 @@ int main(int argc, char *argv[]) {
     #if DEBUG >= 0
     fprintf(stdout, "\n\n");
     fprintf(stdout, "Compiled at %s on %s.\n", __TIME__, __DATE__);
+    fprintf(stdout, "  Version %d.%d.%d \n\n", MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
     fprintf(stdout, "\n\n");
     #endif
 

@@ -10,3 +10,5 @@ mpi_backup/*.?pp
 Documentation/
 
 *__pycache__*
+
+system.mk
