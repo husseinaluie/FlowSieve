@@ -357,6 +357,11 @@ void filtering(
             }
         }
 
+        #if DEBUG >= 0
+        // Flushing stdout is necessary for SLURM outputs.
+        fflush(stdout);
+        #endif
+
     } // end of scale loop
 
     // Now write the remaining small scales
