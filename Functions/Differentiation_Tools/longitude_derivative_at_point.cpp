@@ -40,12 +40,12 @@ double longitude_derivative_at_point(
     }
 
     // We've possibly made too large of a stencil, so now collapse it back down
-    while (RIGHT - LEFT > constants::DiffOrd + 1) {
+    while (RIGHT - LEFT > constants::DiffOrd) {
         if (RIGHT - Ilon > Ilon - LEFT) { RIGHT--; }
         else { LEFT++; }
     }
 
-    if (RIGHT - LEFT > constants::DiffOrd) {
+    if (RIGHT - LEFT >= constants::DiffOrd) {
         // If we have enough cells for differentiation, do it
         differentiation_vector(ddlon, dlon, Ilon-LEFT);
         for (int IND = LEFT; IND < RIGHT; IND++) {

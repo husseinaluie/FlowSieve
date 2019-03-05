@@ -40,12 +40,12 @@ double latitude_derivative_at_point(
     }
 
     // We've possibly made too large of a stencil, so now collapse it back down
-    while (UP - DOWN > constants::DiffOrd + 1) {
+    while (UP - DOWN > constants::DiffOrd) {
         if (UP - Ilat > Ilat - DOWN) { UP--; }
         else { DOWN++; }
     }
 
-    if (UP - DOWN > constants::DiffOrd) {
+    if (UP - DOWN >= constants::DiffOrd) {
         // If we have enough cells for differentiation, do it
         differentiation_vector(ddlat, dlat, Ilat-DOWN);
         for (int IND = DOWN; IND < UP; IND++) {
