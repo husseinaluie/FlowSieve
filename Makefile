@@ -24,6 +24,7 @@ EXTRA_OPT:=false
 
 # Flag to pass version info to code
 VERSION:= -DMAJOR_VERSION=${MAJOR_VERSION} -DMINOR_VERSION=${MINOR_VERSION} -DPATCH_VERSION=${PATCH_VERSION}
+DOXY_VERSION:="${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}"
 
 ifeq ($(DEBUG),true)
 	CFLAGS:=$(CFLAGS) $(DEBUG_FLAGS)
@@ -74,4 +75,4 @@ coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} coarse_gra
 	$(MPICXX) ${VERSION} $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 docs:
-	doxygen Doxyfile
+	DOXY_VERSION=${DOXY_VERSION} doxygen Doxyfile
