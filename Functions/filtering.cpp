@@ -141,7 +141,7 @@ void filtering(
     // The spacing (in metres) betwee latitude gridpoints
     dlat_m = dlat * constants::R_earth;
 
-    #if DEBUG >= 2
+    #if DEBUG >= 1
     int perc;
     #endif
 
@@ -175,16 +175,19 @@ void filtering(
                 fprintf(stdout, "    Depth %d of %d\n", Idepth+1, Ndepth);
                 #endif
 
-                #if DEBUG >= 2
-                perc = 0;
+                #if DEBUG >= 1
+                perc = 10;
+                fprintf(stdout, "      ");
+                fflush(stdout);
                 #endif
 
                 for (int Ilat = 0; Ilat < Nlat; Ilat++) {
 
-                    #if DEBUG >= 2
+                    #if DEBUG >= 1
                     // Every 10 percent, print a dot
-                    if ( ( ((double) Ilat) / Nlat) * 100 > perc ) {
+                    if ( ( ((double) Ilat) / Nlat) * 100 >= perc ) {
                         fprintf(stdout, ".");
+                        fflush(stdout);
                         perc += 10;
                     }
                     #endif
@@ -290,7 +293,7 @@ void filtering(
                         }
                     }
                 }
-                #if DEBUG >= 2
+                #if DEBUG >= 1
                 fprintf(stdout, "\n");
                 #endif
             }
