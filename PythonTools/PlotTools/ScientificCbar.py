@@ -19,9 +19,9 @@ def ScientificCbar(cbar, units='', orientation='vertical'):
         if scale != 0.:
             cbar.ax.set_yticklabels(["{0:.2g}".format(tick/(10**scale)) for tick in ticks])
         cbar.ax.set_ylabel('$\\times10^{' + '{0:d}'.format(int(scale)) + '}$ ' + units,
-                rotation = '-90')
+                rotation = '-90', labelpad=10)
     elif orientation == 'horizontal':
         if scale != 0.:
             cbar.ax.set_xticklabels(["{0:.2g}".format(tick/(10**scale)) for tick in ticks])
         cbar.ax.set_xlabel('$\\times10^{' + '{0:d}'.format(int(scale)) + '}$ ' + units,
-                rotation = '0')
+                rotation = '0', labelpad=10)

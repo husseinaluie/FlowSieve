@@ -85,7 +85,7 @@ for ii in range(num_scales):
             levels = np.array([0, 0.025, 0.1, 0.2]) * np.max(Full_KE * mask),
             cmap='cmo.algae', latlon=True, linewidths=0.2)
         
-    axes[ii].set_title('Through {0:0.1f} km'.format(scales[ii] / 1e3))
+    axes[ii].set_title('Across {0:0.1f} km'.format(scales[ii] / 1e3))
         
     
 plt.savefig('Figures/energy_transfers.png', dpi=500)
