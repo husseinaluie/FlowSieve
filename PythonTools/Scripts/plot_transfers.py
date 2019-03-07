@@ -32,6 +32,8 @@ depth     = results.variables['depth'][:]
 time      = results.variables['time'][:]
 mask      = results.variables['mask'][:]
 transfer  = results.variables['energy_transfer'][:, 0, 0, :, :]
+if 'baroclinic_transfer' in results.variables:
+    bc_transfer = results.variables['baroclinic_transfer'][:, 0, 0, :, :]
 
 uo = source.variables['uo'][0, 0, :, :]
 vo = source.variables['vo'][0, 0, :, :]
@@ -56,8 +58,6 @@ gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.02, right = 0.98, b
 ## Begin Plotting
 ##
 
-## First plot: straight KE binning
-
 # Initialize figure
 fig, axes = plt.subplots(num_scales, 1,
         sharex=True, sharey=True, 
@@ -76,7 +76,7 @@ for ii in range(num_scales):
         PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 3)
 
     # Add coastlines, lat/lon lines, and draw the map
-    m.drawcoastlines(linewidth=0.5)
+    m.drawcoastlines(linewidth=0.1)
     m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='k')
     m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='k')
     m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
@@ -84,7 +84,7 @@ for ii in range(num_scales):
     # Also contour the KE for interests sake
     m.contour(LON*R2D, LAT*R2D, Full_KE, 
             levels = np.array([0, 0.025, 0.1, 0.2]) * np.max(Full_KE * mask),
-            cmap='cmo.algae', latlon=True, linewidths=0.2)
+            cmap='cmo.algae', latlon=True, linewidths=0.1)
         
     axes[ii].set_title('Across {0:0.1f} km'.format(scales[ii] / 1e3))
         
@@ -92,3 +92,42 @@ for ii in range(num_scales):
 plt.savefig('Figures/energy_transfers.png', dpi=500)
 plt.close()
 
+
+# If baroclinic transfers are there, use them.
+if 'baroclinic_transfer' in results.variables:
+    print('   Baroclinic transfers found')
+
+
+    # Initialize figure
+    fig, axes = plt.subplots(num_scales, 1,
+            sharex=True, sharey=True, 
+            gridspec_kw = gridspec_props,
+            figsize=(6, 4*num_scales))
+
+    # Plot each band
+    for ii in range(num_scales):
+    
+        to_plot = bc_transfer[ii,:,:] * 1e6
+        to_plot = np.ma.masked_where(mask==0, to_plot)
+
+        m  = Basemap(ax = axes[ii], **map_settings)
+
+        if np.max(np.abs(to_plot)) > 0:
+            PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 8)
+
+        # Add coastlines, lat/lon lines, and draw the map
+        m.drawcoastlines(linewidth=0.1)
+        m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='k')
+        m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='k')
+        m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
+
+        # Also contour the KE for interests sake
+        m.contour(LON*R2D, LAT*R2D, Full_KE, 
+                levels = np.array([0, 0.025, 0.1, 0.2]) * np.max(Full_KE * mask),
+                cmap='cmo.algae', latlon=True, linewidths=0.1)
+        
+        axes[ii].set_title('Across {0:0.1f} km'.format(scales[ii] / 1e3))
+        
+    
+    plt.savefig('Figures/baroclinic_transfers.png', dpi=1000)
+    plt.close()

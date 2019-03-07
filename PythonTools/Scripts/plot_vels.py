@@ -82,7 +82,7 @@ for ii in range(num_scales):
         PlotTools.ScientificCbar(cbar, units='m/s', orientation='horizontal')
 
         # Add coastlines and lat/lon lines
-        m.drawcoastlines(linewidth=0.5)
+        m.drawcoastlines(linewidth=0.1)
 
         if ii == num_scales - 1:
             m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')

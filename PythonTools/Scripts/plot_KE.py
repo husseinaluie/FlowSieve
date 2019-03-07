@@ -88,7 +88,7 @@ for ii in range(num_scales):
     PlotTools.ScientificCbar(cbar, units='')
 
     # Add coastlines and lat/lon lines
-    m.drawcoastlines(linewidth=0.5)
+    m.drawcoastlines(linewidth=0.1)
     m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
     m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
     m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
@@ -100,8 +100,6 @@ for ii in range(num_scales):
         
     if (ii == 0):
         axes[ii].set_title('Below {0:0.1f} km'.format(scales[0] / 1e3))
-    elif (ii == num_scales-1):
-        axes[ii].set_title('Above {0:0.1f} km'.format(scales[ii-1] / 1e3))
     else:
         axes[ii].set_title('{0:.1f} to {1:0.1f} km'.format(scales[ii-1] / 1e3, scales[ii] / 1e3))
         
@@ -136,7 +134,7 @@ for ii in range(num_scales):
     PlotTools.ScientificCbar(cbar, units='')
 
     # Add coastlines and lat/lon lines
-    m.drawcoastlines(linewidth=0.5)
+    m.drawcoastlines(linewidth=0.1)
     m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
     m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
     m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
@@ -148,8 +146,6 @@ for ii in range(num_scales):
         
     if (ii == 0):
         axes[ii].set_title('Below {0:0.1f} km'.format(scales[0] / 1e3))
-    elif (ii == num_scales-1):
-        axes[ii].set_title('Above {0:0.1f} km'.format(scales[ii-1] / 1e3))
     else:
         axes[ii].set_title('{0:.1f} to {1:0.1f} km'.format(scales[ii-1] / 1e3, scales[ii] / 1e3))
         
@@ -169,8 +165,6 @@ for ii in range(num_scales):
     
     if (ii == 0):
         lab = 'Below {0:0.1f} km'.format(scales[0] / 1e3)
-    elif (ii == num_scales-1):
-        lab = 'Above {0:0.1f} km'.format(scales[ii-1] / 1e3)
     else:
         lab = '{0:.1f} to {1:0.1f} km'.format(scales[ii-1] / 1e3, scales[ii] / 1e3)
     labels += [lab]

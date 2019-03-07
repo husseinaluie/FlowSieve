@@ -62,7 +62,7 @@ cbar = plt.colorbar(qm, ax = ax, **cbar_props)
 PlotTools.ScientificCbar(cbar, units='')
 
 # Add coastlines and lat/lon lines
-m.drawcoastlines(linewidth=0.5)
+m.drawcoastlines(linewidth=0.1)
 m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
 m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
 m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
@@ -87,7 +87,7 @@ cbar = plt.colorbar(qm, ax = ax, **cbar_props)
 PlotTools.ScientificCbar(cbar, units='')
 
 # Add coastlines and lat/lon lines
-m.drawcoastlines(linewidth=0.5)
+m.drawcoastlines(linewidth=0.1)
 m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
 m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
 m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
@@ -112,7 +112,7 @@ cbar = plt.colorbar(qm, ax = ax, **cbar_props)
 PlotTools.ScientificCbar(cbar, units='')
 
 # Add coastlines and lat/lon lines
-m.drawcoastlines(linewidth=0.5)
+m.drawcoastlines(linewidth=0.1)
 m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
 m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
 m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)

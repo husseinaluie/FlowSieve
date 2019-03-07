@@ -22,7 +22,7 @@ scales    = results.variables['scale'][:]
 depth     = results.variables['depth'][:]
 time      = results.variables['time'][:]
 mask      = results.variables['mask'][:]
-transfer  = results.variables['energy_transfer'][:, 0, 0, :, :]
+transfer  = results.variables['energy_transfer'][:, 0, 0, :, :] * 1e6  # unit conversion
 u_r_set   = results.variables['u_r'  ][:, 0, 0, :, :]
 u_lat_set = results.variables['u_lat'][:, 0, 0, :, :]
 u_lon_set = results.variables['u_lon'][:, 0, 0, :, :]
@@ -77,35 +77,31 @@ for ii in range(num_scales):
 
 L = min(L_lon, L_lat)
 k_l = L/scales
-deriv_k_l     = mp.FiniteDiff(         k_l,  1, uniform=False)
-deriv_k_l_log = mp.FiniteDiff(np.log10(k_l), 1, uniform=False)
-
-#cumul_spec *= 1./KE_tot
+deriv_k_l     = mp.FiniteDiff(         k_l,  2, uniform=False)
+deriv_k_l_log = mp.FiniteDiff(np.log10(k_l), 2, uniform=False)
 
 spectrum        = deriv_k_l.dot(cumul_spec)
 spectral_slopes = deriv_k_l_log.dot(np.log10(spectrum))
 
 fig, axes = plt.subplots(4, 1, sharex=True, figsize=(5,8))
 
-axes[0].plot(1./scales, cumul_spec / KE_tot, '-o')
-axes[1].plot(1./scales, spectrum / KE_tot, '-o')
-axes[2].plot(1./scales, net_transfer / KE_tot, '-o')
-axes[3].plot(1./scales, spectral_slopes, '-o')
-axes[3].set_xlabel('Inverse filter scale')
+# For consistency with publications
+horiz_scale = 1e4 / (scales / 1e3)
 
-#axes[0].plot(scales, cumul_spec / KE_tot, '-o' )
-#axes[1].plot(scales, spectrum, '-o' )
-#axes[2].plot(scales, spectral_slopes, '-o')
-#axes[2].set_xlabel('Filter scale')
+axes[0].plot(horiz_scale, cumul_spec / KE_tot, '-o')
+axes[1].plot(horiz_scale, spectrum / KE_tot, '-o')
+axes[2].plot(horiz_scale, net_transfer / KE_tot, '-o')
+axes[3].plot(horiz_scale, spectral_slopes, '-o')
+axes[3].set_xlabel('$10^4\cdot l^{-1} \,(\mathrm{km}^{-1})$')
 
-#for ax in axes:
-#    ax.set_xscale('log')
-#axes[0].set_ylim(0,1)
-#axes[1].set_yscale('log')
+#axes[2].set_ylabel('\Pi/\mathrm{KE}_{\mathrm{total}}\nW \cdot\mathrm{km}^{-2}\cdot\mathrm{m}^{-1}')
+axes[2].plot([horiz_scale[0], horiz_scale[-1]], [0,0], '--k')
+axes[3].plot([horiz_scale[0], horiz_scale[-1]], [0,0], '--k')
 
 for ax in axes:
-    ax.xaxis.get_major_formatter().set_powerlimits((0, 4))
+    #ax.xaxis.get_major_formatter().set_powerlimits((0, 4))
     ax.yaxis.get_major_formatter().set_powerlimits((0, 4))
+    ax.set_xscale('log')
 
 plt.tight_layout(True)
 plt.savefig('Figures/spectra.png', dpi=500)
