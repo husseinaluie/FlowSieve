@@ -13,8 +13,17 @@ This file will outline some of the computational methodologies.
 
 
 \f[
-\Lambda^m = \frac{\overline{\omega}\cdot \left( \nabla \overline{\rho} \times \nabla \overline{P} \right)}{\overline{\rho}}
+\Lambda^m = \frac{\overline{\mathbf{\omega}}\cdot \left( \nabla \overline{\rho} \times \nabla \overline{P} \right)}{\overline{\rho}}
 \f]
+
+In the case that \f$ \vec{\omega}=\left(\omega_r,0,0\right) \f$, then this reduces to
+\f[
+\Lambda^m = \frac{\overline{\omega_r}}{\overline{\rho}r^2\cos(\phi)}\left( \partial_{\lambda}\overline{\rho}\partial_{\phi}\overline{p} - \partial_{\phi}\overline{\rho}\partial_{\lambda}\overline{p} \right)
+\f]
+
+\f{eqnarray}{
+
+\f}
 
 ## Differentiation
 
@@ -83,20 +92,32 @@ then \f$ \partial/\partial r\equiv0  \f$, so this reduced down to
 ### Testing
 
 As of 7 March 2019, the results of the testing suite are below.
-For reasons unknown, the order of convergence (8) is twice the intended (4).
+The measured convergence rate (~4) matches the intended.
 
 ```
 Beginning tests for differentiation routines.
-Mean convergence rates: (lon, lat) = (-8.08, -7.98)
+2-norm
+Mean convergence rates: (lon, lat) = (-4.05, -3.99)
   Lon ( Points  Error )  :  Lat ( Points  Error )   (log2)
-      ( 005    -1.876 )  :      ( 005    -17.29 )
-      ( 006    -8.264 )  :      ( 006    -25.17 )
-      ( 007    -16.95 )  :      ( 007    -33.14 )
-      ( 008    -25.43 )  :      ( 008    -41.13 )
-      ( 009    -33.56 )  :      ( 009    -49.13 )
-      ( 010    -41.59 )  :      ( 010    -57.13 )
-      ( 011    -49.6 )  :      ( 011    -65.13 )
-      ( 012    -57.6 )  :      ( 012    -73.08 )
+      ( 005    -0.9438 )  :      ( 005    -8.705 )
+      ( 006    -4.081 )  :      ( 006    -12.64 )
+      ( 007    -8.456 )  :      ( 007    -16.63 )
+      ( 008    -12.73 )  :      ( 008    -20.62 )
+      ( 009    -16.81 )  :      ( 009    -24.62 )
+      ( 010    -20.83 )  :      ( 010    -28.62 )
+      ( 011    -24.84 )  :      ( 011    -32.62 )
+      ( 012    -28.85 )  :      ( 012    -36.6 )
+inf-norm
+Mean convergence rates: (lon, lat) = (-4.13, -3.97)
+  Lon ( Points  Error )  :  Lat ( Points  Error )   (log2)
+      ( 005    1.492 )  :      ( 005    -7.469 )
+      ( 006    -0.8676 )  :      ( 006    -11.32 )
+      ( 007    -5.067 )  :      ( 007    -15.29 )
+      ( 008    -9.582 )  :      ( 008    -19.29 )
+      ( 009    -13.99 )  :      ( 009    -23.28 )
+      ( 010    -18.23 )  :      ( 010    -27.28 )
+      ( 011    -22.37 )  :      ( 011    -31.28 )
+      ( 012    -26.44 )  :      ( 012    -35.14 )
 ```
 
 [lat-deriv]: @ref latitude_derivative_at_point "latitude derivative"
