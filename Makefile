@@ -63,9 +63,9 @@ TEST_EXES := $(addprefix Tests/,$(notdir $(TEST_CPPS:.cpp=.x)))
 
 .PHONY: clean hardclean docs cleandocs tests all
 clean:
-	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o
+	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o Tests/*.o
 hardclean:
-	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o coarse_grain.x
+	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o coarse_grain.x Tests/*.o Tests/*.x
 	rm -r coarse_grain.x.dSYM
 	rm -r Documentation/html
 	rm -r Documentation/latex

@@ -23,14 +23,12 @@ void compute_areas(
     const int Nlon = longitude.size();
     const int Nlat = latitude.size();
 
-    double R_earth = constants::R_earth;
-    double coeff = pow( R_earth, 2) * dlat * dlon;
+    double coeff = pow( constants::R_earth, 2) * dlat * dlon;
 
     // Compute the area of each cell
     for (int ii = 0; ii < Nlat; ii++) {
-        LAT = latitude.at(ii);
         for (int jj = 0; jj < Nlon; jj++) {
-            areas.at(ii*Nlon + jj) = coeff * cos(LAT);
+            areas.at(ii*Nlon + jj) = coeff * cos(latitude.at(ii));
         }
     }
 
