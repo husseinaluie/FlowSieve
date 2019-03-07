@@ -72,7 +72,8 @@ for ii in range(num_scales):
 
     m  = Basemap(ax = axes[ii], **map_settings)
 
-    PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 3)
+    if np.max(np.abs(to_plot)) > 0:
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 3)
 
     # Add coastlines, lat/lon lines, and draw the map
     m.drawcoastlines(linewidth=0.5)

@@ -74,11 +74,15 @@ for ii in range(num_scales):
 
     m  = Basemap(ax = axes[ii], **map_settings)
 
-    CV  = np.max(np.abs(to_plot))
+    CV  = np.nanmax(np.abs(to_plot))
+    if (CV == 0):
+        CV = 1
     KE_min = np.min(to_plot)
     if (KE_min < 0) :
         print("min(KE) = {0:.4g} < 0!".format(KE_min), ii)
-    qm  = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.amp', vmin = 0, vmax = CV, latlon = True)
+        qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.balance', vmin = -CV, vmax = CV, latlon = True)
+    else:
+        qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.amp', vmin = 0, vmax = CV, latlon = True)
     
     cbar = plt.colorbar(qm, ax = axes[ii], **cbar_props)
     PlotTools.ScientificCbar(cbar, units='')
@@ -123,7 +127,7 @@ for ii in range(num_scales):
 
     m  = Basemap(ax = axes[ii], **map_settings)
 
-    CV  = np.max(np.abs(to_plot))
+    CV  = np.nanmax(np.abs(to_plot))
     if (CV > 1) :
         print("CV = {0:.4g} > 1!".format(CV), ii)
     qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.amp', vmin = 0, vmax = 1, latlon = True)
@@ -153,33 +157,8 @@ for ii in range(num_scales):
 plt.savefig('Figures/KE_band_filter_relative.png', dpi=500)
 plt.close()
 
-    
-## Third plot: full KE
-plt.figure()
-ax = plt.subplot(1,1,1)
 
-to_plot = Full_KE.copy()
-to_plot = np.ma.masked_where(mask==0, to_plot)
-
-m  = Basemap(ax = ax, **map_settings)
-
-CV = np.max(np.abs(to_plot))
-qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.amp', vmin = 0, vmax = CV, latlon = True)
-    
-cbar = plt.colorbar(qm, ax = ax, **cbar_props)
-PlotTools.ScientificCbar(cbar, units='')
-
-# Add coastlines and lat/lon lines
-m.drawcoastlines(linewidth=0.5)
-m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
-m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
-m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
-
-plt.savefig('Figures/KE_full.png', dpi=500)
-plt.close()
-
-
-## Fourth plot: KE distribution
+## Third plot: KE distribution
 
 ## Now create a histogram of the energy in each bin
 Tot_KEs = np.zeros(num_scales)
