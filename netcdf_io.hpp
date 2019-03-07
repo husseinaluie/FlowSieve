@@ -39,10 +39,16 @@ void NC_ERR(const int e, const int line_num, const char* file_name);
  * There's no u_r in the current data files, so we'll zero it out.
  */
 void read_source(
-        std::vector<double> &longitude, std::vector<double> &latitude,
-        std::vector<double> &time,      std::vector<double> &depth,
-        std::vector<double> &u_r,       std::vector<double> &u_lon,
-        std::vector<double> &u_lat,     std::vector<double> &mask);
+        std::vector<double> &longitude,
+        std::vector<double> &latitude,
+        std::vector<double> &time,
+        std::vector<double> &depth,
+        std::vector<double> &u_r,
+        std::vector<double> &u_lon,
+        std::vector<double> &u_lat,
+        std::vector<double> &rho,
+        std::vector<double> &p,
+        std::vector<double> &mask);
 
 /*! 
  * \brief Initialize netcdf output file for filtered fields.
@@ -62,52 +68,16 @@ void initialize_output_file(
         const std::vector<double> &scales,    
         const std::vector<double> &mask);
 
-/*! \brief Write one scale's worth of outputs to file.
- *
- *  Write a single filter-scale worth of filtered velocities
- *  to the previously initialized netcdf file
- *  "filter_output.nc".
- */
-void write_to_output(
-        const std::vector<double> & coarse_u_r, 
-        const std::vector<double> & coarse_u_lon, 
-        const std::vector<double> & coarse_u_lat, 
-        const int Iscale, const int Ntime, const int Ndepth,
-        const int Nlat,   const int Nlon);
-
-/*! \brief Write one scales worth of vorticity to file
- *
- *  Write a single filter-scale worth of filtered vorticity
- *  to the previously initialized netcdf file
- *  "filter_output.nc".
- */
-void write_vorticity(
-        const std::vector<double> & vort_r, 
-        const std::vector<double> & vort_lon, 
-        const std::vector<double> & vort_lat,
-        const int Iscale, const int Ntime, const int Ndepth, 
-        const int Nlat,   const int Nlon);
-
 /*!
- * \brief Write on scales worth of energy transfers to file
+ * \brief Write on scales worth of a single field.
  *
- *  Write a single filter-scale worth of energy transfers
- *  to the previously initialized netcdf file
- *  "filter_output.nc".
+ *  Write a single filter-scale worth of a single field,
+ *  called field_name, to the previously initialized netcdf
+ *  file "filter_output.nc".
  */
-void write_energy_transfer(
-        const std::vector<double> & energy_transfer, const int Iscale, 
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon);
-
-/*!
- * \brief Write on scales worth of band-filtered KE
- *
- *  Write a single filter-scale worth of KE
- *  to the previously initialized netcdf file
- *  "filter_output.nc".
- */
-void write_KE(
-        const std::vector<double> & fine_KE, const int Iscale, 
+void write_field_to_output(
+        const std::vector<double> & field, const char * field_name,
+        const int Iscale,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon);
 
 #endif
