@@ -1,6 +1,8 @@
+#include <math.h>
 #include <algorithm>
 #include <vector>
 #include "../functions.hpp"
+#include "../constants.hpp"
 
 #ifndef DEBUG
     #define DEBUG 0
@@ -13,8 +15,6 @@ void apply_filter_at_point(
         const std::vector<double> & u_x,        /**< [in] (full) u_x to filter */
         const std::vector<double> & u_y,        /**< [in] (full) u_y to filter */
         const std::vector<double> & u_z,        /**< [in] (full) u_z to filter */
-        const int dlon_N,                       /**< [in] Maximum longitudinal width of kernel area in cells */
-        const int dlat_N,                       /**< [in] Maximum latitudinal width of kernel area in cells */
         const int Ntime,                        /**< [in] Length of time dimension */
         const int Ndepth,                       /**< [in] Length of depth dimension */
         const int Nlat,                         /**< [in] Length of latitude dimension */
@@ -33,29 +33,55 @@ void apply_filter_at_point(
 
     double kA_sum, dist, kern, area;
     int index, mask_index;
-    int curr_lat, curr_lon;
+    int curr_lon;
 
     kA_sum  = 0.;
     u_x_tmp = 0.;
     u_y_tmp = 0.;
     u_z_tmp = 0.;
 
-    int LAT_lb = std::max( -Nlat,   Ilat - dlat_N);
-    int LAT_ub = std::min(2*Nlat-1, Ilat + dlat_N);
+    // Grid spacing: assume uniform grid
+    double dlat = latitude.at( 1) - latitude.at( 0);
+    double dlon = longitude.at(1) - longitude.at(0);
 
-    int LON_lb = std::max( -Nlon,   Ilon - dlon_N);
-    int LON_ub = std::min(2*Nlon-1, Ilon + dlon_N);
+    double dlat_m, dlon_m; 
+    int    dlat_N, dlon_N;
+    // The spacing (in metres and points) betwee latitude gridpoints
+    //   The factor of 2 is diameter->radius 
+    dlat_m = dlat * constants::R_earth;
+    dlat_N = ceil( (1.1*scale / dlat_m) / 2 );
 
-    for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
+    int LAT_lb, LAT_ub, LON_lb, LON_ub;
+    // Latitude periodicity is a little different / awkward
+    //   for the moment, hope it doesn't become an issue
+    LAT_lb = std::max(0,      Ilat - dlat_N);
+    LAT_ub = std::min(Nlat-1, Ilat + dlat_N);
 
-        // Handle periodicity
-        if (LAT < 0) {
-            curr_lat = LAT + Nlat;
-        } else if (LAT >= Nlat) {
-            curr_lat = LAT - Nlat;
-        } else {
-            curr_lat = LAT;
-        }
+    double local_scale, delta_lat;
+
+    for (int curr_lat = LAT_lb; curr_lat < LAT_ub; curr_lat++) {
+
+        // Get the longitude grid spacing (in m) at this latitude
+        dlon_m = dlon * constants::R_earth * cos(latitude.at(curr_lat));
+
+        // Next determine how far we need to go (since we're already 
+        //   at a finite distance in latitude, we don't need to go
+        //   the full scale distance in longitude).
+        // Essentially, use circular integration regions, not square
+        //    this will further reduce the number of cells
+        //    required (by up to a factor of 4), which should
+        //    improve performance.
+        //  The abs in local_scale is to handle the 'comfort zone'
+        //    where delta_lat > scale (from the 1.1 factor in dlat_N)
+        delta_lat   = constants::R_earth * abs(   latitude.at(Ilat) 
+                                                - latitude.at(curr_lat));
+        local_scale = sqrt( abs( pow(scale, 2) - pow(delta_lat, 2) ));
+
+        // Now find the appropriate integration region
+        //   The factor of 2 is diameter->radius 
+        dlon_N = ceil( ( 1.1 * local_scale / dlon_m) / 2 );
+        LON_lb = std::max( -Nlon,   Ilon - dlon_N);
+        LON_ub = std::min(2*Nlon-1, Ilon + dlon_N);
 
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
@@ -80,7 +106,7 @@ void apply_filter_at_point(
                                Ntime, Ndepth, Nlat,     Nlon);
 
             area    = dAreas.at(index);
-            kA_sum += kern * area;// * mask[mask_index];
+            kA_sum += kern * area;
 
             u_x_tmp += u_x.at(index) * kern * area * mask.at(mask_index);
             u_y_tmp += u_y.at(index) * kern * area * mask.at(mask_index);

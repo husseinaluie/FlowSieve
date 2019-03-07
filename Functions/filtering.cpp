@@ -31,11 +31,6 @@ void filtering(
         ) {
 
 
-    // Compute grid spacing
-    //   for the moment, assume a uniform grid
-    double dlat = latitude.at( 1) - latitude.at( 0);
-    double dlon = longitude.at(1) - longitude.at(0);
-
     // Get dimension sizes
     const int Nscales = scales.size();
     const int Ntime   = time.size();
@@ -100,9 +95,7 @@ void filtering(
     // Now prepare to filter
     double scale,
            u_x_tmp, u_y_tmp,   u_z_tmp,  // The local coarse-graining result
-           u_r_tmp, u_lon_tmp, u_lat_tmp,
-           dlat_m, dlon_m; // The grid spacings in metres (for lon, at a specific height)
-    int dlat_N, dlon_N;    // The number of grid points required to span the filter radius
+           u_r_tmp, u_lon_tmp, u_lat_tmp;
 
     std::vector<double> fine_u_r(  num_pts);
     std::vector<double> fine_u_lon(num_pts);
@@ -138,9 +131,6 @@ void filtering(
     std::vector<double> fine_KE(num_pts);
     #endif
 
-    // The spacing (in metres) betwee latitude gridpoints
-    dlat_m = dlat * constants::R_earth;
-
     #if DEBUG >= 1
     int perc;
     #endif
@@ -158,9 +148,6 @@ void filtering(
         #endif
 
         scale  = scales.at(Iscale);
-
-        // How many latitude cells are needed to span the filter radius
-        dlat_N = ceil( (1.1*scale / dlat_m) / 2 );
 
         //for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Itime = 0; Itime < 1; Itime++) {
@@ -196,14 +183,6 @@ void filtering(
                     fprintf(stdout, "      Ilat %d of %d\n", Ilat+1, Nlat);
                     #endif
 
-                    // Get the (maximum) number of longitude cells that 
-                    //   are needed to span the filter radius
-                    dlon_m = dlon 
-                        * constants::R_earth 
-                        * std::min( cos(latitude.at(Ilat) + dlat_N * dlat), 
-                                    cos(latitude.at(Ilat) - dlat_N * dlat) ) ;
-                    dlon_N = ceil( ( 1.1*scale / dlon_m) / 2 );
-
                     for (int Ilon = 0; Ilon < Nlon; Ilon++) {
 
                         #if DEBUG >= 3
@@ -226,7 +205,6 @@ void filtering(
                             apply_filter_at_point(
                                     u_x_tmp, u_y_tmp, u_z_tmp,
                                     u_x,     u_y,     u_z,
-                                    dlon_N, dlat_N, 
                                     Ntime,  Ndepth, Nlat, Nlon,
                                     Itime,  Idepth, Ilat, Ilon,
                                     longitude, latitude,
@@ -266,7 +244,6 @@ void filtering(
                                     uxux_tmp, uxuy_tmp, uxuz_tmp,
                                     uyuy_tmp, uyuz_tmp, uzuz_tmp,
                                     u_x,      u_y,      u_z,
-                                    dlon_N, dlat_N, 
                                     Ntime,  Ndepth, Nlat, Nlon,
                                     Itime,  Idepth, Ilat, Ilon,
                                     longitude, latitude,
@@ -398,7 +375,7 @@ void filtering(
     #if COMP_VORT
     // Compute and write vorticity
     compute_vorticity(vort_r, vort_lon, vort_lat,
-            fine_u_r, fine_u_lon, fine_u_lat,
+            coarse_u_r, coarse_u_lon, coarse_u_lat,
             Ntime, Ndepth, Nlat, Nlon,
             longitude, latitude, mask);
     write_vorticity(vort_r, vort_lon, vort_lat,
