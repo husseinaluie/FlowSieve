@@ -16,12 +16,21 @@ double field_func(const double lat, const double lon) {
 
 double mask_func(const double lat, const double lon) {
     double ret_val;
+
     // Make a square island, pi/3 by pi/3
     if ( (abs(lat) < M_PI/6) and (abs(lon) < M_PI/6) ) {
         ret_val = 0.;
     } else {
         ret_val = 1.;
     }
+    
+    // Make a circular island, radius pi/6
+    if ( sqrt( lat*lat + lon*lon ) < M_PI/6 ) {
+        ret_val = 0.;
+    } else {
+        ret_val = 1.;
+    }
+
     return ret_val;
 }
 
@@ -156,6 +165,7 @@ int main(int argc, char *argv[]) {
 
         // Create the field to differentiate
         int index;
+        int num_land = 0;
 
         // cos(long) * exp( - lat**2 )
         for (int Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -163,7 +173,12 @@ int main(int argc, char *argv[]) {
                 index = Ilat * Nlon + Ilon;
                 mask.at(index)  = mask_func( latitude.at(Ilat), longitude.at(Ilon));
                 field.at(index) = field_func(latitude.at(Ilat), longitude.at(Ilon));
+
+                num_land += 1 - mask.at(index);
             }
+        }
+        if (test_ind == num_tests - 1) {
+            fprintf(stdout, "At highest resolution, %.3g%% of tiles were land.", 100 * ( (double) num_land) / (Nlat * Nlon));
         }
 
         apply_test(lon2_err, lat2_err, loninf_err, latinf_err, longitude, latitude, field, dArea, mask, Nlat, Nlon); 
