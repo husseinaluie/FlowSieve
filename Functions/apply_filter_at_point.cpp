@@ -9,12 +9,8 @@
 #endif
 
 void apply_filter_at_point(
-        double & u_x_tmp,                       /**< [in] where to store filtered u_x */
-        double & u_y_tmp,                       /**< [in] where to store filtered u_y */
-        double & u_z_tmp,                       /**< [in] where to store filtered u_z */
-        const std::vector<double> & u_x,        /**< [in] (full) u_x to filter */
-        const std::vector<double> & u_y,        /**< [in] (full) u_y to filter */
-        const std::vector<double> & u_z,        /**< [in] (full) u_z to filter */
+        double & coarse_val,                    /**< [in] where to store filtered value */
+        const std::vector<double> & field,      /**< [in] field to filter */
         const int Ntime,                        /**< [in] Length of time dimension */
         const int Ndepth,                       /**< [in] Length of depth dimension */
         const int Nlat,                         /**< [in] Length of latitude dimension */
@@ -35,10 +31,8 @@ void apply_filter_at_point(
     int index, mask_index;
     int curr_lon;
 
-    kA_sum  = 0.;
-    u_x_tmp = 0.;
-    u_y_tmp = 0.;
-    u_z_tmp = 0.;
+    kA_sum     = 0.;
+    double coarse_val_tmp = 0.;
 
     // Grid spacing: assume uniform grid
     double dlat = latitude.at( 1) - latitude.at( 0);
@@ -108,15 +102,11 @@ void apply_filter_at_point(
             area    = dAreas.at(index);
             kA_sum += kern * area;
 
-            u_x_tmp += u_x.at(index) * kern * area * mask.at(mask_index);
-            u_y_tmp += u_y.at(index) * kern * area * mask.at(mask_index);
-            u_z_tmp += u_z.at(index) * kern * area * mask.at(mask_index);
+            coarse_val_tmp += field.at(index) * kern * area * mask.at(mask_index);
 
         }
     }
 
-    u_x_tmp = u_x_tmp / kA_sum;
-    u_y_tmp = u_y_tmp / kA_sum;
-    u_z_tmp = u_z_tmp / kA_sum;
+    coarse_val = coarse_val_tmp / kA_sum;
 }
 

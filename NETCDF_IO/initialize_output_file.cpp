@@ -10,6 +10,14 @@
     #define COMP_VORT true
 #endif
 
+#ifndef COMP_TRANSFERS
+    #define COMP_TRANSFERS true
+#endif
+
+#ifndef COMP_BC_TRANSFERS
+    #define COMP_BC_TRANSFERS true
+#endif
+
 void initialize_output_file(
         const std::vector<double> & time,      /**< [in] time vector (1D) */
         const std::vector<double> & depth,     /**< [in] depth vector (1D) */
@@ -93,6 +101,12 @@ void initialize_output_file(
     if ((retval = nc_def_var(ncid, "energy_transfer", NC_DOUBLE, ndims, dimids, &ener_transfer_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
     if ((retval = nc_def_var(ncid, "KE",              NC_DOUBLE, ndims, dimids, &KE_varid)))
+        NC_ERR(retval, __LINE__, __FILE__);
+    #endif
+
+    #if COMP_TRANSFERS
+    int baroclinic_transfer_varid;
+    if ((retval = nc_def_var(ncid, "baroclinic_transfer", NC_DOUBLE, ndims, dimids, &baroclinic_transfer_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
     #endif
 

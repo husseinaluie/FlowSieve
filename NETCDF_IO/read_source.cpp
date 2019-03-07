@@ -6,17 +6,22 @@
     #define DEBUG 0
 #endif
 
+#ifndef COMP_BC_TRANSFERS
+    #define COMP_BC_TRANSFERS true
+#endif
 
 // Write to netcdf file
 void read_source(
-        std::vector<double> &longitude,  /**< [in] Pointer to longitude array to be created*/
-        std::vector<double> &latitude,   /**< [in] Pointer to latitude array to be created*/
-        std::vector<double> &time,       /**< [in] Pointer to time array to be created*/
-        std::vector<double> &depth,      /**< [in] Pointer to depth array to be created*/
-        std::vector<double> &u_r,        /**< [in] Pointer to u_r array to be created*/
-        std::vector<double> &u_lon,      /**< [in] Pointer to u_lon array to be created*/
-        std::vector<double> &u_lat,      /**< [in] Pointer to u_lat array to be created*/
-        std::vector<double> &mask        /**< [in] Pointer to mask array to be created*/
+        std::vector<double> &longitude, /**< [in] Pointer to longitude array to be created*/
+        std::vector<double> &latitude,  /**< [in] Pointer to latitude array to be created*/
+        std::vector<double> &time,      /**< [in] Pointer to time array to be created*/
+        std::vector<double> &depth,     /**< [in] Pointer to depth array to be created*/
+        std::vector<double> &u_r,       /**< [in] Pointer to u_r array to be created*/
+        std::vector<double> &u_lon,     /**< [in] Pointer to u_lon array to be created*/
+        std::vector<double> &u_lat,     /**< [in] Pointer to u_lat array to be created*/
+        std::vector<double> &rho,       /**< [in] Pointer to rho array to be created */
+        std::vector<double> &p,         /**< [in] Pointer to rho array to be created */
+        std::vector<double> &mask       /**< [in] Pointer to mask array to be created*/
         ) {
 
     // Open the NETCDF file
@@ -76,6 +81,10 @@ void read_source(
     u_r.resize(  Ntime * Ndepth * Nlat * Nlon);
     u_lon.resize(Ntime * Ndepth * Nlat * Nlon);
     u_lat.resize(Ntime * Ndepth * Nlat * Nlon);
+    #if COMP_BC_TRANSFERS
+    rho.resize(  Ntime * Ndepth * Nlat * Nlon);
+    p.resize(    Ntime * Ndepth * Nlat * Nlon);
+    #endif
 
     mask.resize(Nlat * Nlon);
 
@@ -94,6 +103,11 @@ void read_source(
     int ulon_varid, ulat_varid;
     if ((retval = nc_inq_varid(ncid, "uo", &ulon_varid))) { NC_ERR(retval, __LINE__, __FILE__); }
     if ((retval = nc_inq_varid(ncid, "vo", &ulat_varid))) { NC_ERR(retval, __LINE__, __FILE__); }
+    #if COMP_BC_TRANSFERS
+    int rho_varid, p_varid;
+    if ((retval = nc_inq_varid(ncid, "rho", &rho_varid))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_inq_varid(ncid, "p",   &p_varid  ))) { NC_ERR(retval, __LINE__, __FILE__); }
+    #endif
 
     // Get the scale factors for the velocities
     double u_lon_scale, u_lat_scale;
@@ -136,6 +150,10 @@ void read_source(
 
     if ((retval = nc_get_vara_double(ncid, ulon_varid, start, count, &u_lon[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
     if ((retval = nc_get_vara_double(ncid, ulat_varid, start, count, &u_lat[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
+    #if COMP_BC_TRANSFERS
+    if ((retval = nc_get_vara_double(ncid, rho_varid, start, count, &rho[0]))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ((retval = nc_get_vara_double(ncid, p_varid,   start, count, &p[  0]))) { NC_ERR(retval, __LINE__, __FILE__); }
+    #endif
 
     // At the moment there's no u_r in the data, so just zero it out
     //     also apply the scale factors to the velocity fields

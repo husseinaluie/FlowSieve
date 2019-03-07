@@ -13,6 +13,9 @@ CFLAGS:=-DCOMP_VORT=true $(CFLAGS)
 # Do you want energy transfers computed?
 CFLAGS:=-DCOMP_TRANSFERS=true $(CFLAGS)
 
+# Do you want baroclinic energy transfers computed?
+CFLAGS:=-DCOMP_BC_TRANSFERS=true $(CFLAGS)
+
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
 DEBUG:=false

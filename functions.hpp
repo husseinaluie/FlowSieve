@@ -101,6 +101,8 @@ void vel_Cart_to_Spher(
 void filtering(const std::vector<double> & u_r, 
                const std::vector<double> & u_lon, 
                const std::vector<double> & u_lat,
+               const std::vector<double> & rho,
+               const std::vector<double> & p,
                const std::vector<double> & scales, 
                const std::vector<double> & dAreas, 
                const std::vector<double> & time, 
@@ -110,20 +112,16 @@ void filtering(const std::vector<double> & u_r,
                const std::vector<double> & mask);
 
 /*!
- * \brief Compute filtered Cartesian velocities at a single point
+ * \brief Compute filtered field at a single point
  *
- * Computes the integral of each Cartesian velocity with the
+ * Computes the integral of the provided field with the
  * kernel().
  *
  * dArea for integration computed in compute_areas() 
  */
 void apply_filter_at_point(
-        double & u_x_tmp,   
-        double & u_y_tmp,   
-        double & u_z_tmp,
-        const std::vector<double> & u_x, 
-        const std::vector<double> & u_y, 
-        const std::vector<double> & u_z,
+        double & coarse_val,   
+        const std::vector<double> & field, 
         const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
         const std::vector<double> & longitude, 
@@ -241,4 +239,18 @@ void compute_largescale_strain(
         const std::vector<double> & latitude, 
         const std::vector<double> & mask);
 
+/*!
+ * \brief Compute the baroclinic energy transfer through the current filter scale
+ */
+void compute_baroclinic_transfer(
+    std::vector<double> & baroclinic_transfer,
+    const std::vector<double> & full_vort_r,
+    const std::vector<double> & full_vort_lon,
+    const std::vector<double> & full_vort_lat,
+    const std::vector<double> & coarse_rho,
+    const std::vector<double> & coarse_p,
+    const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+    const std::vector<double> & longitude,
+    const std::vector<double> & latitude,
+    const std::vector<double> & mask);
 #endif

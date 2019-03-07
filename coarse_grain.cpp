@@ -38,15 +38,30 @@ int main(int argc, char *argv[]) {
     std::vector<double> u_lon;
     std::vector<double> u_lat;
 
+    std::vector<double> rho;
+    std::vector<double> p;
+
     std::vector<double> mask;
 
     // For the time being, hard-code the filter scales
     //   add zero as the bottom
-    const int Nfilt = 10;
+    /*
+    const int Nfilt = 15;
     const double scales [Nfilt+1] = 
             {100e3, 150e3, 200e3, 250e3, 
                 300e3, 350e3, 400e3, 450e3, 
-                500e3, 750e3, 0};
+                500e3, 750e3, 1000e3,
+                1250e3, 1500e3, 1750e3, 
+                2000e3, 0};
+    */
+    const int Nfilt = 10;
+    const double scales [Nfilt+1] = {100e3, 150e3, 200e3, 
+        250e3, 300e3, 350e3, 400e3, 450e3, 500e3, 750e3, 0}; 
+    /*
+    const int Nfilt = 5;
+    const double scales [Nfilt+1] = 
+            {1e3, 10e3, 50e3, 100e3, 150e3, 0};
+    */
     std::vector<double> filter_scales;
     filter_scales.assign(scales, scales + Nfilt);
 
@@ -56,7 +71,9 @@ int main(int argc, char *argv[]) {
     #endif
 
     read_source(longitude, latitude, time,  depth, 
-                u_r,       u_lon,    u_lat, mask );
+                u_r, u_lon, u_lat, 
+                rho, p,
+                mask );
 
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
@@ -82,6 +99,7 @@ int main(int argc, char *argv[]) {
 
     // Now pass the arrays along to the filtering routines
     filtering(u_r, u_lon, u_lat,
+              rho, p,
               filter_scales,
               areas, 
               time, depth,
