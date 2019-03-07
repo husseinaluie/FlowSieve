@@ -11,42 +11,36 @@ void differentiation_vector(
         const int index                     /**< [in] at which position in the five-point stencil do we want the derivative */
         ) {
 
-    switch(index) {
-        case 0: {
-                    diff_array.at(0) = -6.25 / 3;
-                    diff_array.at(1) =  4.      ;
-                    diff_array.at(2) = -3.      ;
-                    diff_array.at(3) =  4.   / 3;
-                    diff_array.at(4) = -0.75 / 3;
-                }
-        case 1: {
-                    diff_array.at(0) = -0.75 / 3;
-                    diff_array.at(1) = -2.5  / 3;
-                    diff_array.at(2) =  4.5  / 3;
-                    diff_array.at(3) = -1.5  / 3;
-                    diff_array.at(4) =  0.25 / 3;
-                }
-        case 2: {
-                    diff_array.at(0) =  0.25 / 3;
-                    diff_array.at(1) = -2.   / 3;
-                    diff_array.at(2) =  0.      ;
-                    diff_array.at(3) =  2.   / 3;
-                    diff_array.at(4) = -0.25 / 3;
-                }
-        case 3: {
-                    diff_array.at(0) = -0.25 / 3;
-                    diff_array.at(1) =  1.5  / 3;
-                    diff_array.at(2) = -4.5  / 3;
-                    diff_array.at(3) =  2.5  / 3;
-                    diff_array.at(4) =  0.75 / 3;
-                }
-        case 4: {
-                    diff_array.at(0) =  0.75 / 3;
-                    diff_array.at(1) = -4.   / 3;
-                    diff_array.at(2) =  3.      ;
-                    diff_array.at(3) = -4.      ;
-                    diff_array.at(4) =  6.25 / 3;
-                }
+    if (index == 0) {
+        diff_array.at(0) = -6.25 / 3;
+        diff_array.at(1) =  4.      ;
+        diff_array.at(2) = -3.      ;
+        diff_array.at(3) =  4.   / 3;
+        diff_array.at(4) = -0.75 / 3;
+    } else if (index == 1) {
+        diff_array.at(0) = -0.75 / 3;
+        diff_array.at(1) = -2.5  / 3;
+        diff_array.at(2) =  4.5  / 3;
+        diff_array.at(3) = -1.5  / 3;
+        diff_array.at(4) =  0.25 / 3;
+    } else if (index == 2) {
+        diff_array.at(0) =  0.25 / 3;
+        diff_array.at(1) = -2.   / 3;
+        diff_array.at(2) =  0.      ;
+        diff_array.at(3) =  2.   / 3;
+        diff_array.at(4) = -0.25 / 3;
+    } else if (index == 3) {
+        diff_array.at(0) = -0.25 / 3;
+        diff_array.at(1) =  1.5  / 3;
+        diff_array.at(2) = -4.5  / 3;
+        diff_array.at(3) =  2.5  / 3;
+        diff_array.at(4) =  0.75 / 3;
+    } else if (index == 4) {
+        diff_array.at(0) =  0.75 / 3;
+        diff_array.at(1) = -4.   / 3;
+        diff_array.at(2) =  3.      ;
+        diff_array.at(3) = -4.      ;
+        diff_array.at(4) =  6.25 / 3;
     }
 
     for (int II = 0; II < 5; II++) {

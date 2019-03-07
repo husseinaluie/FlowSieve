@@ -33,7 +33,7 @@ double longitude_derivative_at_point(
         index = Index(0, 0, Ilat, LEFT, Ntime, Ndepth, Nlat, Nlon);
         if (mask.at(index) == 0) { break; }
     }
-    for (RIGHT = Ilon; RIGHT < Nlon; RIGHT++) {
+    for (RIGHT = Ilon; RIGHT < Nlon-1; RIGHT++) {
         if ( (RIGHT - Ilon) > constants::DiffOrd + 2 ) { break; }
         index = Index(0, 0, Ilat, RIGHT, Ntime, Ndepth, Nlat, Nlon);
         if (mask.at(index) == 0) { break; }
@@ -48,7 +48,7 @@ double longitude_derivative_at_point(
     if (RIGHT - LEFT >= constants::DiffOrd) {
         // If we have enough cells for differentiation, do it
         differentiation_vector(ddlon, dlon, Ilon-LEFT);
-        for (int IND = LEFT; IND < RIGHT; IND++) {
+        for (int IND = LEFT; IND <= RIGHT; IND++) {
             index = Index(Itime, Idepth, Ilat, IND, Ntime, Ndepth, Nlat, Nlon);
             deriv_val += ddlon.at(IND-LEFT) * field.at(index);
         }
