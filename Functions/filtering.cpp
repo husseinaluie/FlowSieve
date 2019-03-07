@@ -102,9 +102,9 @@ void filtering(
     std::vector<double> fine_u_lat(num_pts);
 
     #if COMP_VORT
-    std::vector<double> vort_r(  num_pts);
-    std::vector<double> vort_lat(num_pts);
-    std::vector<double> vort_lon(num_pts);
+    std::vector<double> fine_vort_r(  num_pts);
+    std::vector<double> fine_vort_lat(num_pts);
+    std::vector<double> fine_vort_lon(num_pts);
     #endif
 
     #if COMP_TRANSFERS
@@ -132,16 +132,16 @@ void filtering(
     #endif
 
     #if COMP_BC_TRANSFERS
-    std::vector<double> full_vort_r(num_pts);
-    std::vector<double> full_vort_lon(num_pts);
-    std::vector<double> full_vort_lat(num_pts);
+    std::vector<double> coarse_vort_r(num_pts);
+    std::vector<double> coarse_vort_lon(num_pts);
+    std::vector<double> coarse_vort_lat(num_pts);
 
     std::vector<double> coarse_rho(full_rho);
     std::vector<double> coarse_p(full_p);
 
     std::vector<double> baroclinic_transfer(num_pts);
 
-    compute_vorticity(full_vort_r, full_vort_lon, full_vort_lat,
+    compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
             full_u_r, full_u_lon, full_u_lat,
             Ntime, Ndepth, Nlat, Nlon,
             longitude, latitude, mask);
@@ -328,13 +328,13 @@ void filtering(
 
         #if COMP_VORT
         // Compute and write vorticity
-        compute_vorticity(vort_r, vort_lon, vort_lat,
+        compute_vorticity(fine_vort_r, fine_vort_lon, fine_vort_lat,
                 fine_u_r, fine_u_lon, fine_u_lat,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
-        write_field_to_output(vort_r,   "vort_r",   Iscale, Ntime, Ndepth, Nlat, Nlon);
-        write_field_to_output(vort_lon, "vort_lon", Iscale, Ntime, Ndepth, Nlat, Nlon);
-        write_field_to_output(vort_lat, "vort_lat", Iscale, Ntime, Ndepth, Nlat, Nlon);
+        write_field_to_output(fine_vort_r,   "vort_r",   Iscale, Ntime, Ndepth, Nlat, Nlon);
+        write_field_to_output(fine_vort_lon, "vort_lon", Iscale, Ntime, Ndepth, Nlat, Nlon);
+        write_field_to_output(fine_vort_lat, "vort_lat", Iscale, Ntime, Ndepth, Nlat, Nlon);
         #endif
 
         #if COMP_TRANSFERS
@@ -351,8 +351,12 @@ void filtering(
         #endif
 
         #if COMP_BC_TRANSFERS
+        compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
+                coarse_u_r, coarse_u_lon, coarse_u_lat,
+                Ntime, Ndepth, Nlat, Nlon,
+                longitude, latitude, mask);
         compute_baroclinic_transfer(baroclinic_transfer,
-                full_vort_r, full_vort_lon, full_vort_lat,
+                coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
                 coarse_rho, coarse_p,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
@@ -432,13 +436,13 @@ void filtering(
 
     #if COMP_VORT
     // Compute and write vorticity
-    compute_vorticity(vort_r, vort_lon, vort_lat,
+    compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
             coarse_u_r, coarse_u_lon, coarse_u_lat,
             Ntime, Ndepth, Nlat, Nlon,
             longitude, latitude, mask);
-    write_field_to_output(vort_r,   "vort_r",   Nscales, Ntime, Ndepth, Nlat, Nlon);
-    write_field_to_output(vort_lon, "vort_lon", Nscales, Ntime, Ndepth, Nlat, Nlon);
-    write_field_to_output(vort_lat, "vort_lat", Nscales, Ntime, Ndepth, Nlat, Nlon);
+    write_field_to_output(coarse_vort_r,   "vort_r",   Nscales, Ntime, Ndepth, Nlat, Nlon);
+    write_field_to_output(coarse_vort_lon, "vort_lon", Nscales, Ntime, Ndepth, Nlat, Nlon);
+    write_field_to_output(coarse_vort_lat, "vort_lat", Nscales, Ntime, Ndepth, Nlat, Nlon);
     #endif
 
 }

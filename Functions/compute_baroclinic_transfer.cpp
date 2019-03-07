@@ -6,9 +6,9 @@
 
 void  compute_baroclinic_transfer(
     std::vector<double> & baroclinic_transfer,  /**< [in] Where to store the computed values*/
-    const std::vector<double> & full_vort_r,    /**< [in] Full vorticity (r   component) */ 
-    const std::vector<double> & full_vort_lon,  /**< [in] Full vorticity (lon component) */ 
-    const std::vector<double> & full_vort_lat,  /**< [in] Full vorticity (lat component) */
+    const std::vector<double> & coarse_vort_r,  /**< [in] Full vorticity (r   component) */ 
+    const std::vector<double> & coarse_vort_lon,/**< [in] Full vorticity (lon component) */ 
+    const std::vector<double> & coarse_vort_lat,/**< [in] Full vorticity (lat component) */
     const std::vector<double> & coarse_rho,     /**< [in] Coarse density field */ 
     const std::vector<double> & coarse_p,       /**< [in] Coarse pressure field */
     const int Ntime,                            /**< [in] Length of time dimension */
@@ -64,7 +64,7 @@ void  compute_baroclinic_transfer(
                                 mask);
 
                         baroclinic_transfer.at(index) = 
-                              full_vort_r.at(index) * ( drhodlon * dpdlat  -  drhodlat * dpdlon ) 
+                              coarse_vort_r.at(index) * ( drhodlon * dpdlat  -  drhodlat * dpdlon ) 
                             / ( coarse_rho.at(index) * pow(constants::R_earth,2) * cos(latitude.at(Ilat)) );
 
                     }
