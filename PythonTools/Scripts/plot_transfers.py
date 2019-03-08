@@ -156,10 +156,11 @@ if 'baroclinic_transfer' in results.variables:
     y_data = y_data[tiled_mask == 1]
     c_data = tiled_scales[tiled_mask == 1]
 
-    scatter_kws = dict(cmap='cmo.turbid', linewidths=0)
+    scatter_kws = dict(cmap='cmo.matter_r', linewidths=0)
 
     PlotTools.SignedLogScatter(x_data.ravel(), y_data.ravel(), c_data.ravel(), axes,
-            scatter_kws = scatter_kws, force_equal = False)
+            scatter_kws = scatter_kws, force_equal = False,
+            num_ords_x = 16, num_ords_y = 16)
 
     axes[0,0].set_ylabel('Baroclinic Transfer (+ve)')
     axes[1,0].set_ylabel('Baroclinic Transfer (-ve)')
@@ -171,10 +172,18 @@ if 'baroclinic_transfer' in results.variables:
     axes[0,1].set_yticklabels([])
     axes[1,1].set_yticklabels([])
 
-    axes[0,0].set_aspect('equal')
-    axes[0,1].set_aspect('equal')
-    axes[1,0].set_aspect('equal')
-    axes[1,1].set_aspect('equal')
-        
-    plt.savefig('Figures/transfers_comparison_log.png', dpi=500)
+    for ax in axes.ravel():
+        ax.set_aspect('equal')
+
+    for ax in axes.ravel():
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        ax.plot(xlim, [xlim[0]*1e-12, xlim[1]*1e-12],'--r', label='$10^{12}:1$')
+        ax.plot(xlim, xlim,'--c', label='$1:1$')
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+
+    axes[0,1].legend(loc='best')
+
+    plt.savefig('Figures/transfers_comparison_log.png', dpi=600)
     plt.close()
