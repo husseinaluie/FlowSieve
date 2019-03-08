@@ -46,6 +46,9 @@ dlon = longitude[1] - longitude[0]
 LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
 dAreas = R_earth**2 * np.cos(LAT * np.pi / 180) * dlat * dlon
 
+Nlat = len(latitude)
+Nlon = len(longitude)
+
 map_settings = PlotTools.MapSettings(longitude, latitude)
 
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
@@ -57,6 +60,7 @@ gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.02, right = 0.98, b
 ##
 ## Begin Plotting
 ##
+
 
 # Initialize figure
 fig, axes = plt.subplots(num_scales, 1,
@@ -73,7 +77,7 @@ for ii in range(num_scales):
     m  = Basemap(ax = axes[ii], **map_settings)
 
     if np.max(np.abs(to_plot)) > 0:
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 3)
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 5)
 
     # Add coastlines, lat/lon lines, and draw the map
     m.drawcoastlines(linewidth=0.1)
@@ -113,7 +117,7 @@ if 'baroclinic_transfer' in results.variables:
         m  = Basemap(ax = axes[ii], **map_settings)
 
         if np.max(np.abs(to_plot)) > 0:
-            PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 8)
+            PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 5, percentile=98)
 
         # Add coastlines, lat/lon lines, and draw the map
         m.drawcoastlines(linewidth=0.1)
@@ -129,5 +133,48 @@ if 'baroclinic_transfer' in results.variables:
         axes[ii].set_title('Across {0:0.1f} km'.format(scales[ii] / 1e3))
         
     
-    plt.savefig('Figures/baroclinic_transfers.png', dpi=1000)
+    plt.savefig('Figures/baroclinic_transfers.png', dpi=500)
+    plt.close()
+
+# If baroclinic transfers are there, also scatter plot against full transfer
+if 'baroclinic_transfer' in results.variables:
+
+    # Initialize figure
+    fig, axes = plt.subplots(2, 2, 
+            gridspec_kw = dict(left = 0.1, right = 0.95, bottom = 0.1, top = 0.95,
+                hspace=0.02, wspace=0.02),
+            figsize=(7.5, 6) )
+
+    x_data =    transfer[:-1,:,:] * 1e6
+    y_data = bc_transfer[:-1,:,:] * 1e6
+
+    tiled_scales = np.tile(scales[:-1].reshape(num_scales,1,1), (1,Nlat,Nlon))
+
+    tiled_mask = np.tile(mask.reshape(1,Nlat,Nlon), (num_scales,1,1))
+
+    x_data = x_data[tiled_mask == 1]
+    y_data = y_data[tiled_mask == 1]
+    c_data = tiled_scales[tiled_mask == 1]
+
+    scatter_kws = dict(cmap='cmo.turbid', linewidths=0)
+
+    PlotTools.SignedLogScatter(x_data.ravel(), y_data.ravel(), c_data.ravel(), axes,
+            scatter_kws = scatter_kws, force_equal = False)
+
+    axes[0,0].set_ylabel('Baroclinic Transfer (+ve)')
+    axes[1,0].set_ylabel('Baroclinic Transfer (-ve)')
+    axes[1,0].set_xlabel('Energy Transfer (-ve)')
+    axes[1,1].set_xlabel('Energy Transfer (+ve)')
+
+    axes[0,0].set_xticklabels([])
+    axes[0,1].set_xticklabels([])
+    axes[0,1].set_yticklabels([])
+    axes[1,1].set_yticklabels([])
+
+    axes[0,0].set_aspect('equal')
+    axes[0,1].set_aspect('equal')
+    axes[1,0].set_aspect('equal')
+    axes[1,1].set_aspect('equal')
+        
+    plt.savefig('Figures/transfers_comparison_log.png', dpi=500)
     plt.close()
