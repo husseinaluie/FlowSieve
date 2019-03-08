@@ -10,7 +10,9 @@ This repository stores source code for running coarse graining procedures on net
 1. Copy the appropriate file from `./Systems/` to `./system.mk`
  * The system directory contains files that declare system compiler information.
  * You may need to create a new file to correspond to your system
-2. Calling `make all` in the root directory should then build the executable.
+2. Call `make all` in the root directory to build the main executable.
+3. Call `make tests` to compile the unit test routines.
+ * The resulting executables are then stored in `Tests/`
 
 ---
 
@@ -25,17 +27,19 @@ See the function map for [filtering] to get an overview of the function dependen
 
 ### make arguments
 * `make clean`
-  * This removes all object files (\*.o) in the source tree
+ * This removes all object files (\*.o) in the source tree
 * `make hardclean`
-  * In addition to the `clean` removals, also removes the executables, symbol table (dSYM), and documentation
+ * In addition to the `clean` removals, also removes the executables, symbol table (dSYM), and documentation
 * `make all`
-  * Makes coarse_grain.x
+ * Makes coarse_grain.x
 * `make coarse_grain.x`
-  * Makes coarse_grain.x
+ * Makes coarse_grain.x
 * `make docs`
-  * Makes the doxygen-produced documentation. **Note: `doxygen` and `dot` must be installed and on the path**
+ * Makes the doxygen-produced documentation. **Note: `doxygen` and `dot` must be installed and on the path**
 * `make cleandocs`
-  * Removes the previous documentation build
+ * Removes the previous documentation build
+* `make tests`
+ * Compiles the test routines in `Tests/`
 
 ### DEBUG flag
 

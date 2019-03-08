@@ -4,9 +4,7 @@
 - [] Add tests for differentiation tools
  - [x] spherical
  - [] Cartesian
-- [] tests for vorticity tools
- - [] at-point calculator
- - [] driver
+- [x] tests for vorticity tools
 - [] tests for energy transfer tools
  - [] large-scale strain function
  - [] driver

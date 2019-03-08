@@ -7,13 +7,47 @@ This file will outline some of the computational methodologies.
 
 ### Region Selection for Filtering
 
+Suppose that we are computing the filter at longitude \f$\lambda_0\f$ and latitude \f$\phi_0\f$ (at indices \f$I_{\lambda_0}\f$ and \f$I_{\phi_0}\f$ respectively) over length scale \f$L\f$. 
+Further, suppose that we have uniform (spherical) grid spacing \f$\Delta\lambda\f$ and \f$\Delta\phi\f$. 
+Let \f$R_E\f$ be the mean radius of the earth. 
+
+The spacing between latitude bands, in *metres*, is then \f$\Delta\phi_m=\Delta\phi R_E\f$.
+The number of points that we'll include in either latitude side is then \f$\Delta\phi_N=\mathrm{ceil}\left(1.1 (L/2) / \Delta\phi_m\right)\f$
+Note that the 1.1 factor is to take a region slightly larger than the kernel (assuming a compact support kernel).
+
+The outer loop in the integral is then from \f$I_{\phi_0} - \Delta\phi_N\f$ to \f$I_{\phi_0}+\Delta\phi_N\f$.
+Next, at each latitude \f$\phi\f$ within that loop, the same process is applied to compute the bounds for the longitude loop, with
+the spacing between longitude band, in *metres*, given by \f$\Delta\lambda_m=\Delta\lambda R_E \cos(\phi)\f$.
+
 ## Across-scale Energy Transfer
+
+\f[ \Pi_l = -\rho_0 S_{ij}\tau_{ij} = -\frac{\rho_0}{2}\left(\overline{u}_{i,j}+\overline{u}_{j,i}\right)\left(\overline{u_iu_j} - \overline{u_i}\cdot\overline{u_j}\right) \f]
+
+Unit-wise,
+\f[ 
+\left[\rho_0 \right]=\frac{\mathrm{kg}}{\mathrm{m}^3}, \qquad
+\left[S_{ij} \right]= \frac{1}{\mathrm{s}} , \qquad
+\left[\tau_{ij} \right]= \frac{\mathrm{m}^2}{\mathrm{s}^2} , \qquad
+\left[ W \right] = \frac{\mathrm{kg}\cdot\mathrm{m}^2}{\mathrm{s}^3}, \qquad
+\Rightarrow \qquad
+\left[ \Pi\right] = \frac{\mathrm{W}}{\mathrm{m}^3}
+\f]
 
 ## Baroclinic Energy Transfer
 
 
 \f[
-\Lambda^m = \frac{\overline{\mathbf{\omega}}\cdot \left( \nabla \overline{\rho} \times \nabla \overline{P} \right)}{\overline{\rho}}
+\Lambda^m = \frac{\overline{\mathbf{\omega}}\cdot \left( \nabla \overline{\rho} \times \nabla \overline{p} \right)}{\overline{\rho}}
+\f]
+
+Unit-wise, this gives 
+\f[ 
+\left[\omega \right]=\frac{1}{\mathrm{s}}, \qquad
+\left[\nabla \right]= \frac{1}{\mathrm{m}} , \qquad
+\left[ p \right]=\left[g\rho z\right] =  \frac{\mathrm{kg}}{\mathrm{m}\cdot\mathrm{s}^2} , \qquad
+\left[ W \right] = \frac{\mathrm{kg}\cdot\mathrm{m}^2}{\mathrm{s}^3}, \qquad
+\Rightarrow \qquad
+\left[ \Lambda^m \right] = \frac{\mathrm{W}}{\mathrm{m}^5} 
 \f]
 
 In the case that \f$ \vec{\omega}=\left(\omega_r,0,0\right) \f$, then this reduces to
@@ -27,9 +61,10 @@ In the case that \f$ \vec{\omega}=\left(\omega_r,0,0\right) \f$, then this reduc
 
 ## Differentiation
 
-The spherical differentiation methods, [lat-derv], [lon-deriv], use a land-avoiding five-points stencil for fourth-order differentiation.
+The spherical differentiation methods, [lat-deriv], [lon-deriv], use a land-avoiding five-points stencil for fourth-order differentiation.
 Land avoiding is achieved by simply using a non-centred stencil when appropriate. 
-This is done to avoid having to use zero-velocity land cells, as this may introduce artificially steep velocity gradients that would confound derivatives.
+This is done to avoid having to specify field values at land cells, as this may introduce artificially steep velocity gradients that would confound derivatives, particularly with pressure and density, where there's no clear extension.
+
 
 ### Cartesian derivatives
 The secondary differentation tools ([x-deriv], [y-deriv], [z-deriv]) simply apply the chain rule on the spherical differentiation methods.
@@ -88,37 +123,6 @@ then \f$ \partial/\partial r\equiv0  \f$, so this reduced down to
 {\displaystyle \frac{\partial}{\partial \phi} }
 \end{array} \right]
 \f}
-
-### Testing
-
-As of 7 March 2019, the results of the testing suite are below.
-The measured convergence rate (~4) matches the intended.
-
-```
-Beginning tests for differentiation routines.
-2-norm
-Mean convergence rates: (lon, lat) = (-4.05, -3.99)
-  Lon ( Points  Error )  :  Lat ( Points  Error )   (log2)
-      ( 005    -0.9438 )  :      ( 005    -8.705 )
-      ( 006    -4.081 )  :      ( 006    -12.64 )
-      ( 007    -8.456 )  :      ( 007    -16.63 )
-      ( 008    -12.73 )  :      ( 008    -20.62 )
-      ( 009    -16.81 )  :      ( 009    -24.62 )
-      ( 010    -20.83 )  :      ( 010    -28.62 )
-      ( 011    -24.84 )  :      ( 011    -32.62 )
-      ( 012    -28.85 )  :      ( 012    -36.6 )
-inf-norm
-Mean convergence rates: (lon, lat) = (-4.13, -3.97)
-  Lon ( Points  Error )  :  Lat ( Points  Error )   (log2)
-      ( 005    1.492 )  :      ( 005    -7.469 )
-      ( 006    -0.8676 )  :      ( 006    -11.32 )
-      ( 007    -5.067 )  :      ( 007    -15.29 )
-      ( 008    -9.582 )  :      ( 008    -19.29 )
-      ( 009    -13.99 )  :      ( 009    -23.28 )
-      ( 010    -18.23 )  :      ( 010    -27.28 )
-      ( 011    -22.37 )  :      ( 011    -31.28 )
-      ( 012    -26.44 )  :      ( 012    -35.14 )
-```
 
 [lat-deriv]: @ref latitude_derivative_at_point "latitude derivative"
 [lon-deriv]: @ref longitude_derivative_at_point "longitude derivative"
