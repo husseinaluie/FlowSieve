@@ -3,7 +3,7 @@ import cmocean
 import numpy as np
 
 def SignedLogScatter(
-        XX, YY, CC, axes, s = 0.2, cmap = 'cmo.thermal',
+        XX, YY, CC, axes, s = 0.1, cmap = 'cmo.thermal',
         num_ords_x = 12, num_ords_y = 12, force_equal = False,
         scatter_kws = None):
 
@@ -92,16 +92,11 @@ def SignedLogScatter(
     ax.invert_xaxis()
 
     # Add negative signs to ax_nn ticklabels
-    #labels = [st[:14] + '-' + st[14:] for st in 
-    #                [tick.get_text() for tick in 
-    #                    ax_nn.get_yticklabels()]]
-    #print(labels)
-    #ax_nn.set_yticklabels(labels)
-    #labels = [st[:14] + '-' + st[14:] for st in 
-    #                [tick.get_text() for tick in 
-    #                    ax_nn.get_xticklabels()]]
-    #print(labels)
-    #ax_nn.set_xticklabels(labels)
+    labels = ['$-10^{' + '{0:d}'.format(int(np.log10(tickval))) + '}$' for tickval in ax_nn.get_yticks()]
+    ax_nn.set_yticklabels(labels)
+
+    labels = ['$-10^{' + '{0:d}'.format(int(np.log10(tickval))) + '}$' for tickval in ax_nn.get_xticks()]
+    ax_nn.set_xticklabels(labels)
 
 
     # Add colour bar

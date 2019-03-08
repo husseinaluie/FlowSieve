@@ -82,11 +82,8 @@ def SignedLogPlot_onMap(XX, YY, ZZ, ax, fig, proj_map,
     cbar2.solids.set_edgecolor("face")
 
     # Add negative sign to negative side
-    #labels = [st[:14] + '-' + st[14:] for st in 
-    #                [tick.get_text() for tick in 
-    #                    cax2.get_yticklabels()]]
-    #print(labels)
-    #cax2.set_yticklabels(labels)
+    labels = ['$-10^{' + '{0:d}'.format(int(np.log10(tickval))) + '}$' for tickval in cax2.get_yticks()]
+    cax2.set_yticklabels(labels)
 
     cax2.invert_yaxis()
 
