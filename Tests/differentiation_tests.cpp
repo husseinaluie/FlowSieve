@@ -18,11 +18,13 @@ double mask_func(const double lat, const double lon) {
     double ret_val;
 
     // Make a square island, pi/3 by pi/3
+    /*
     if ( (abs(lat) < M_PI/6) and (abs(lon) < M_PI/6) ) {
         ret_val = 0.;
     } else {
         ret_val = 1.;
     }
+    */
     
     // Make a circular island, radius pi/6
     if ( sqrt( lat*lat + lon*lon ) < M_PI/6 ) {
