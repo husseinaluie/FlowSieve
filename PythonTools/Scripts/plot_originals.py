@@ -70,6 +70,7 @@ m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\
 plt.savefig('Figures/KE_full.png', dpi=500)
 plt.close()
 
+
     
 ## Full uo
 plt.figure()
@@ -119,4 +120,59 @@ m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\
 
 plt.savefig('Figures/vo_full.png', dpi=500)
 plt.close()
+
+
+## Rho, if available
+if 'rho' in source.variables:
+    plt.figure()
+    ax = plt.subplot(1,1,1)
+
+    to_plot = source.variables['rho'][0,0,:,:]
+    to_plot = np.ma.masked_where(mask==0, to_plot)
+
+    m  = Basemap(ax = ax, **map_settings)
+
+    mu = np.mean(to_plot)
+    CV = np.max(np.abs(to_plot - mu))
+    qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.balance', vmin = mu-CV, vmax = mu+CV, latlon = True)
+    
+    cbar = plt.colorbar(qm, ax = ax, **cbar_props)
+    PlotTools.ScientificCbar(cbar, units='')
+
+    # Add coastlines and lat/lon lines
+    m.drawcoastlines(linewidth=0.1)
+    m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
+    m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
+    m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
+
+    plt.savefig('Figures/rho_full.png', dpi=500)
+    plt.close()
+
+
+## Pressure, if available
+if 'p' in source.variables:
+    plt.figure()
+    ax = plt.subplot(1,1,1)
+
+    to_plot = source.variables['p'][0,0,:,:]
+    to_plot = np.ma.masked_where(mask==0, to_plot)
+
+    m  = Basemap(ax = ax, **map_settings)
+
+    mu = np.mean(to_plot)
+    CV = np.max(np.abs(to_plot - mu))
+    qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.amp', vmin = mu-CV, vmax = mu+CV, latlon = True)
+    
+    cbar = plt.colorbar(qm, ax = ax, **cbar_props)
+    PlotTools.ScientificCbar(cbar, units='')
+
+    # Add coastlines and lat/lon lines
+    m.drawcoastlines(linewidth=0.1)
+    m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
+    m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
+    m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
+
+    plt.savefig('Figures/p_full.png', dpi=500)
+    plt.close()
+
 
