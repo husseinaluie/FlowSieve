@@ -23,7 +23,8 @@ void apply_filter_at_point(
         const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
         const std::vector<double> & dAreas,     /**< [in] Array of cell areas (2D) (compute_areas())*/
         const double scale,                     /**< [in] The filtering scale */
-        const std::vector<double> & mask        /**< [in] Array to distinguish between land and water cells (2D) */
+        const std::vector<double> & mask,       /**< [in] Array to distinguish between land and water cells (2D) */
+        const bool use_mask                     /**< [in] Whether or not to mask (zero) out land cells when integrating */
         ) {
 
 
@@ -33,6 +34,7 @@ void apply_filter_at_point(
 
     kA_sum     = 0.;
     double coarse_val_tmp = 0.;
+    double mask_val = 0.;
 
     // Grid spacing: assume uniform grid
     double dlat = latitude.at( 1) - latitude.at( 0);
@@ -96,13 +98,18 @@ void apply_filter_at_point(
             index = Index(Itime, Idepth, curr_lat, curr_lon,
                           Ntime, Ndepth, Nlat,     Nlon);
 
-            mask_index = Index(0,     0,      curr_lat, curr_lon,
-                               Ntime, Ndepth, Nlat,     Nlon);
-
             area    = dAreas.at(index);
             kA_sum += kern * area;
 
-            coarse_val_tmp += field.at(index) * kern * area * mask.at(mask_index);
+            if (use_mask) {
+                mask_index = Index(0,     0,      curr_lat, curr_lon,
+                        Ntime, Ndepth, Nlat,     Nlon);
+                mask_val = mask.at(mask_index);
+            } else {
+                mask_val = 1.;
+            }
+
+            coarse_val_tmp += field.at(index) * kern * area * mask_val;
 
         }
     }

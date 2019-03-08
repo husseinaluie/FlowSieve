@@ -225,19 +225,19 @@ void filtering(
                                     Ntime,  Ndepth, Nlat, Nlon,
                                     Itime,  Idepth, Ilat, Ilon,
                                     longitude, latitude,
-                                    dAreas, scale, mask);
+                                    dAreas, scale, mask, true);
                             apply_filter_at_point(
                                     u_y_tmp, u_y,     
                                     Ntime,  Ndepth, Nlat, Nlon,
                                     Itime,  Idepth, Ilat, Ilon,
                                     longitude, latitude,
-                                    dAreas, scale, mask);
+                                    dAreas, scale, mask, true);
                             apply_filter_at_point(
                                     u_z_tmp, u_z,     
                                     Ntime,  Ndepth, Nlat, Nlon,
                                     Itime,  Idepth, Ilat, Ilon,
                                     longitude, latitude,
-                                    dAreas, scale, mask);
+                                    dAreas, scale, mask, true);
 
                             // Convert the filtered fields back to spherical
                             #if DEBUG >= 4
@@ -302,13 +302,13 @@ void filtering(
                                     Ntime,  Ndepth, Nlat, Nlon,
                                     Itime,  Idepth, Ilat, Ilon,
                                     longitude, latitude,
-                                    dAreas, scale, mask);
+                                    dAreas, scale, mask, false);
                             apply_filter_at_point(
                                     p_tmp, full_p,     
                                     Ntime,  Ndepth, Nlat, Nlon,
                                     Itime,  Idepth, Ilat, Ilon,
                                     longitude, latitude,
-                                    dAreas, scale, mask);
+                                    dAreas, scale, mask, false);
                             coarse_rho.at(index) = rho_tmp;
                             coarse_p.at(  index) = p_tmp;
                             #endif

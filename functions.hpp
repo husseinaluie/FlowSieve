@@ -128,7 +128,8 @@ void apply_filter_at_point(
         const std::vector<double> & latitude,
         const std::vector<double> & dAreas, 
         const double scale,
-        const std::vector<double> & mask);
+        const std::vector<double> & mask,
+        const bool use_mask);
 
 /*!
  * \brief Primary kernel function coarse-graining procedure (G in publications)
