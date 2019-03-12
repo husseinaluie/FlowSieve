@@ -17,7 +17,6 @@ void compute_areas(
     // For the moment, assume a uniform grid
     double dlat = latitude.at( 1) - latitude.at( 0);
     double dlon = longitude.at(1) - longitude.at(0);
-    double LAT;
 
     // Get the array sizes
     const int Nlon = longitude.size();

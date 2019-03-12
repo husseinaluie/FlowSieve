@@ -167,8 +167,7 @@ void filtering(
 
         scale  = scales.at(Iscale);
 
-        //for (int Itime = 0; Itime < Ntime; Itime++) {
-        for (int Itime = 0; Itime < 1; Itime++) {
+        for (int Itime = 0; Itime < Ntime; Itime++) {
 
             #if DEBUG >= 0
             fprintf(stdout, "  Time %d of %d\n", Itime+1, Ntime);
@@ -217,7 +216,7 @@ void filtering(
                         if (mask.at(mask_index) == 1) { // Skip land areas
 
                             // Apply the filter at the point
-                            #if DEBUG >= 4
+                            #if DEBUG >= 3
                             fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
                             #endif
                             apply_filter_at_point(
@@ -240,7 +239,7 @@ void filtering(
                                     dAreas, scale, mask, true);
 
                             // Convert the filtered fields back to spherical
-                            #if DEBUG >= 4
+                            #if DEBUG >= 3
                             fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
                             #endif
                             vel_Cart_to_Spher(u_r_tmp, u_lon_tmp, u_lat_tmp,
@@ -249,7 +248,7 @@ void filtering(
 
                             // Subtract current coarse from preceeding coarse to
                             //    get current fine
-                            #if DEBUG >= 4
+                            #if DEBUG >= 3
                             fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
                             #endif
                             fine_u_r.at(  index) = coarse_u_r.at(  index) - u_r_tmp;
@@ -257,7 +256,7 @@ void filtering(
                             fine_u_lat.at(index) = coarse_u_lat.at(index) - u_lat_tmp;
 
                             // Now pass the new coarse along as the preceeding coarse.
-                            #if DEBUG >= 4
+                            #if DEBUG >= 3
                             fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
                             #endif
                             coarse_u_r.at(  index) = u_r_tmp;
@@ -265,7 +264,7 @@ void filtering(
                             coarse_u_lat.at(index) = u_lat_tmp;
 
                             #if COMP_TRANSFERS
-                            #if DEBUG >= 4
+                            #if DEBUG >= 3
                             fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
                             #endif
                             apply_filter_at_point_for_quadratics(
@@ -378,7 +377,7 @@ void filtering(
 
                         if (mask.at(mask_index) == 1) { // Skip land areas
 
-                            #if DEBUG >= 4
+                            #if DEBUG >= 3
                             fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
                             #endif
                             vel_Spher_to_Cart(u_x_tmp,           u_y_tmp,             u_z_tmp,
@@ -436,13 +435,15 @@ void filtering(
 
     #if COMP_VORT
     // Compute and write vorticity
-    compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
+    //    this is actually coarse vort, not fine, but
+    //    COMP_VORT only guarantees that fine_vort variables exist.
+    compute_vorticity(fine_vort_r, fine_vort_lon, fine_vort_lat,
             coarse_u_r, coarse_u_lon, coarse_u_lat,
             Ntime, Ndepth, Nlat, Nlon,
             longitude, latitude, mask);
-    write_field_to_output(coarse_vort_r,   "vort_r",   Nscales, Ntime, Ndepth, Nlat, Nlon);
-    write_field_to_output(coarse_vort_lon, "vort_lon", Nscales, Ntime, Ndepth, Nlat, Nlon);
-    write_field_to_output(coarse_vort_lat, "vort_lat", Nscales, Ntime, Ndepth, Nlat, Nlon);
+    write_field_to_output(fine_vort_r,   "vort_r",   Nscales, Ntime, Ndepth, Nlat, Nlon);
+    write_field_to_output(fine_vort_lon, "vort_lon", Nscales, Ntime, Ndepth, Nlat, Nlon);
+    write_field_to_output(fine_vort_lat, "vort_lat", Nscales, Ntime, Ndepth, Nlat, Nlon);
     #endif
 
 }
