@@ -39,26 +39,26 @@ void  compute_baroclinic_transfer(
                     if (mask.at(mask_index) == 1) { // Skip land areas
 
                         // We need a few derivatives
-                        drhodlat = latitude_derivative_at_point(
-                                coarse_rho, latitude,
+                        drhodlat = spher_derivative_at_point(
+                                coarse_rho, latitude, "lat",
                                 Itime, Idepth, Ilat, Ilon,
                                 Ntime, Ndepth, Nlat, Nlon,
                                 mask);
                         
-                        dpdlat = latitude_derivative_at_point(
-                                coarse_p, latitude,
+                        dpdlat = spher_derivative_at_point(
+                                coarse_p, latitude, "lat",
                                 Itime, Idepth, Ilat, Ilon,
                                 Ntime, Ndepth, Nlat, Nlon,
                                 mask);
                         
-                        drhodlon = longitude_derivative_at_point(
-                                coarse_rho, longitude,
+                        drhodlon = spher_derivative_at_point(
+                                coarse_rho, longitude, "lon",
                                 Itime, Idepth, Ilat, Ilon,
                                 Ntime, Ndepth, Nlat, Nlon,
                                 mask);
 
-                        dpdlon = longitude_derivative_at_point(
-                                coarse_p, longitude,
+                        dpdlon = spher_derivative_at_point(
+                                coarse_p, longitude, "lon",
                                 Itime, Idepth, Ilat, Ilon,
                                 Ntime, Ndepth, Nlat, Nlon,
                                 mask);

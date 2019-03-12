@@ -61,13 +61,13 @@ In the case that \f$ \vec{\omega}=\left(\omega_r,0,0\right) \f$, then this reduc
 
 ## Differentiation
 
-The spherical differentiation methods, [lat-deriv], [lon-deriv], use a land-avoiding five-points stencil for fourth-order differentiation.
+The spherical differentiation methods ([spher-deriv]) use a land-avoiding stencil.
 Land avoiding is achieved by simply using a non-centred stencil when appropriate. 
-This is done to avoid having to specify field values at land cells, as this may introduce artificially steep velocity gradients that would confound derivatives, particularly with pressure and density, where there's no clear extension.
+This is done to avoid having to specify field values at land cells, as this may introduce artificially steep velocity gradients that would confound derivatives, particularly with pressure and density, where there's no clear extension to land.
 
 
 ### Cartesian derivatives
-The secondary differentation tools ([x-deriv], [y-deriv], [z-deriv]) simply apply the chain rule on the spherical differentiation methods.
+The secondary differentation tools ([Cart-deriv]) simply apply the chain rule on the spherical differentiation methods.
 
 \f{eqnarray}{
 \arraycolsep=2.5pt\def\arraystretch{2.5}
@@ -124,8 +124,5 @@ then \f$ \partial/\partial r\equiv0  \f$, so this reduced down to
 \end{array} \right]
 \f}
 
-[lat-deriv]: @ref latitude_derivative_at_point "latitude derivative"
-[lon-deriv]: @ref longitude_derivative_at_point "longitude derivative"
-[x-deriv]: @ref x_derivative_at_point "x derivative"
-[y-deriv]: @ref y_derivative_at_point "y derivative"
-[z-deriv]: @ref z_derivative_at_point "z derivative"
+[spher-deriv]: @ref spher_derivative_at_point "spherical derivatives"
+[cart-deriv]: @ref Cart_derivative_at_point "Cartesian derivatives"

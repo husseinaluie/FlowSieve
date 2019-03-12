@@ -41,8 +41,8 @@ void compute_vorticity_at_point(
 
     // Longitudinal derivative component
     vort_r_tmp += constants::R_earth
-                    * longitude_derivative_at_point(
-                        u_lat, longitude,
+                    * spher_derivative_at_point(
+                        u_lat, longitude, "lon",
                         Itime, Idepth, Ilat, Ilon,
                         Ntime, Ndepth, Nlat, Nlon,
                         mask);
@@ -51,8 +51,8 @@ void compute_vorticity_at_point(
     //  - ddlat ( u_lon * cos(lat) ) = u_lon * sin(lat) - ddlat( u_lon ) * cos(lat)
     vort_r_tmp += constants::R_earth
                     * (   sin(latitude.at(Ilat)) * u_lon.at(index)
-                        - cos(latitude.at(Ilat)) * latitude_derivative_at_point(
-                                                    u_lon, latitude,
+                        - cos(latitude.at(Ilat)) * spher_derivative_at_point(
+                                                    u_lon, latitude, "lat",
                                                     Itime, Idepth, Ilat, Ilon,
                                                     Ntime, Ndepth, Nlat, Nlon,
                                                     mask)

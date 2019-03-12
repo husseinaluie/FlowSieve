@@ -36,45 +36,45 @@ void compute_largescale_strain(
     
     // x derivatives
     double ux_x, uy_x, uz_x;
-    ux_x = x_derivative_at_point(u_x, latitude, longitude, 
+    ux_x = Cart_derivative_at_point(u_x, latitude, longitude, "x",
             Itime, Idepth, Ilat, Ilon,
             Ntime, Ndepth, Nlat, Nlon,
             mask);
-    uy_x = x_derivative_at_point(u_y, latitude, longitude, 
+    uy_x = Cart_derivative_at_point(u_y, latitude, longitude, "x",
             Itime, Idepth, Ilat, Ilon,
             Ntime, Ndepth, Nlat, Nlon,
             mask);
-    uz_x = x_derivative_at_point(u_z, latitude, longitude, 
+    uz_x = Cart_derivative_at_point(u_z, latitude, longitude, "x",
             Itime, Idepth, Ilat, Ilon,
             Ntime, Ndepth, Nlat, Nlon,
             mask);
 
     // y derivatives
     double ux_y, uy_y, uz_y;
-    ux_y = y_derivative_at_point(u_x, latitude, longitude, 
+    ux_y = Cart_derivative_at_point(u_x, latitude, longitude, "y",
             Itime, Idepth, Ilat, Ilon,
             Ntime, Ndepth, Nlat, Nlon,
             mask);
-    uy_y = y_derivative_at_point(u_y, latitude, longitude, 
+    uy_y = Cart_derivative_at_point(u_y, latitude, longitude, "y",
             Itime, Idepth, Ilat, Ilon,
             Ntime, Ndepth, Nlat, Nlon,
             mask);
-    uz_y = y_derivative_at_point(u_z, latitude, longitude, 
+    uz_y = Cart_derivative_at_point(u_z, latitude, longitude, "y",
             Itime, Idepth, Ilat, Ilon,
             Ntime, Ndepth, Nlat, Nlon,
             mask);
 
     // z derivatives
     double ux_z, uy_z, uz_z;
-    ux_z = z_derivative_at_point(u_x, latitude, longitude, 
+    ux_z = Cart_derivative_at_point(u_x, latitude, longitude, "z",
             Itime, Idepth, Ilat, Ilon,
             Ntime, Ndepth, Nlat, Nlon,
             mask);
-    uy_z = z_derivative_at_point(u_y, latitude, longitude, 
+    uy_z = Cart_derivative_at_point(u_y, latitude, longitude, "z",
             Itime, Idepth, Ilat, Ilon,
             Ntime, Ndepth, Nlat, Nlon,
             mask);
-    uz_z = z_derivative_at_point(u_z, latitude, longitude, 
+    uz_z = Cart_derivative_at_point(u_z, latitude, longitude, "z",
             Itime, Idepth, Ilat, Ilon,
             Ntime, Ndepth, Nlat, Nlon,
             mask);

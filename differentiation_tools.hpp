@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <string>
 
 /*!
  * \file
@@ -25,6 +26,17 @@ void differentiation_vector(std::vector<double> & diff_array, const double delta
 /*!
  * \brief Computes latitudinal derivative at a specific point.
  */
+double spher_derivative_at_point(
+        const std::vector<double> & field, 
+        const std::vector<double> & grid,
+        const std::string & dim,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+        const std::vector<double> & mask);
+
+/*!
+ * \brief Computes latitudinal derivative at a specific point.
+ */
 double latitude_derivative_at_point(
         const std::vector<double> & field, const std::vector<double> & latitude,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
@@ -41,46 +53,17 @@ double longitude_derivative_at_point(
         const std::vector<double> & mask);
 
 /*!
- * \brief Computes Cartesian x derivative at a specific point.
+ * \brief Computes specified Cartesian derivative at a specific point.
  *
  * Computation is done via chain rule on spherical coordinate derivatives.
  *
  * Calls latitude_derivative_at_point() and longitude_derivative_at_point()
  */
-double x_derivative_at_point(
+double Cart_derivative_at_point(
         const std::vector<double> & field, 
         const std::vector<double> & latitude, 
         const std::vector<double> & longitude,
-        const int Itime, const int Idepth, const int Ilat, const int Ilon,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & mask);
-
-/*!
- * \brief Computes Cartesian y derivative at a specific point.
- *
- * Computation is done via chain rule on spherical coordinate derivatives.
- *
- * Calls latitude_derivative_at_point() and longitude_derivative_at_point()
- */
-double y_derivative_at_point(
-        const std::vector<double> & field, 
-        const std::vector<double> & latitude, 
-        const std::vector<double> & longitude,
-        const int Itime, const int Idepth, const int Ilat, const int Ilon,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & mask);
-
-/*!
- * \brief Computes Cartesian z derivative at a specific point.
- *
- * Computation is done via chain rule on spherical coordinate derivatives.
- *
- * Calls latitude_derivative_at_point() and longitude_derivative_at_point()
- */
-double z_derivative_at_point(
-        const std::vector<double> & field, 
-        const std::vector<double> & latitude, 
-        const std::vector<double> & longitude,
+        const std::string & dim,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const std::vector<double> & mask);

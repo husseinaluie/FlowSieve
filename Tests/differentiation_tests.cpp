@@ -10,7 +10,7 @@
 
 
 double field_func(const double lat, const double lon) {
-    double ret_val =       cos(8 * lon + 2 * lat) * exp( - pow( lat / (M_PI / 9), 2));
+    double ret_val =       cos(8 * lon + 10 * lat) * exp( - pow( lat / (M_PI / 9), 2));
     return ret_val;
 }
 
@@ -37,13 +37,13 @@ double mask_func(const double lat, const double lon) {
 }
 
 double true_deriv_lon(const double lat, const double lon) {
-    double ret_val = - 8 * sin(8 * lon + 2 * lat) * exp( - pow( lat / (M_PI / 9), 2));
+    double ret_val = - 8 * sin(8 * lon + 10 * lat) * exp( - pow( lat / (M_PI / 9), 2));
     return ret_val;
 }
 
 double true_deriv_lat(const double lat, const double lon) {
-    double ret_val =       cos(8 * lon + 2 * lat) * exp( - pow( lat / (M_PI / 9), 2)) * (- 2 * lat / pow(M_PI/9, 2))
-                     - 2 * sin(8 * lon + 2 * lat) * exp( - pow( lat / (M_PI / 9), 2));
+    double ret_val =        cos(8 * lon + 10 * lat) * exp( - pow( lat / (M_PI / 9), 2)) * (- 2 * lat / pow(M_PI/9, 2))
+                     - 10 * sin(8 * lon + 10 * lat) * exp( - pow( lat / (M_PI / 9), 2));
     return ret_val;
 }
 
@@ -67,11 +67,13 @@ void apply_test(double & err2_lon, double & err2_lat,
             index = Ilat * Nlon + Ilon;
 
             // Compute longitudinal derivative
-            tmp = longitude_derivative_at_point(field, longitude, 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
+            //tmp = longitude_derivative_at_point(field, longitude, 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
+            tmp = spher_derivative_at_point(field, longitude, "lon", 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
             numer_lon_deriv.at(index) = tmp;
 
             // Compute latitudinal derivative
-            tmp = latitude_derivative_at_point(field, latitude, 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
+            //tmp = latitude_derivative_at_point(field, latitude, 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
+            tmp = spher_derivative_at_point(field, latitude, "lat", 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
             numer_lat_deriv.at(index) = tmp;
         }
     }
@@ -180,7 +182,7 @@ int main(int argc, char *argv[]) {
             }
         }
         if (test_ind == num_tests - 1) {
-            fprintf(stdout, "At highest resolution, %.3g%% of tiles were land.", 100 * ( (double) num_land) / (Nlat * Nlon));
+            fprintf(stdout, "At highest resolution, %.3g%% of tiles were land.\n", 100 * ( (double) num_land) / (Nlat * Nlon));
         }
 
         apply_test(lon2_err, lat2_err, loninf_err, latinf_err, longitude, latitude, field, dArea, mask, Nlat, Nlon); 
@@ -236,11 +238,18 @@ int main(int argc, char *argv[]) {
 
     fprintf(stdout, "2-norm\n");
     fprintf(stdout, "Mean convergence rates: (lon, lat) = (%.3g, %.3g)\n", slope_lon, slope_lat);
-    fprintf(stdout, "  Lon ( Points  Error )  :  Lat ( Points  Error )   (log2)\n");
+    fprintf(stdout, "  Lon ( Points  Error  Ord )  :  Lat ( Points  Error  Ord )   ( log2 of pts and err )\n");
+    double ord_lon, ord_lat;
     for (int test_ind = 0; test_ind < num_tests; test_ind++) {
-        fprintf(stdout, "      ( %03d    %.04g )  :      ( %03d    %.04g )\n", 
-            (int)log2(lon_points.at(test_ind)), log2(lon2_errors.at(test_ind)),
-            (int)log2(lat_points.at(test_ind)), log2(lat2_errors.at(test_ind)));
+        if (test_ind < num_tests - 1) {
+            ord_lon =   ( log2(lon2_errors.at(test_ind + 1)) - log2(lon2_errors.at(test_ind)) ) 
+                      / ( log2(lon_points.at( test_ind + 1)) - log2(lon_points.at( test_ind)) );
+            ord_lat =   ( log2(lat2_errors.at(test_ind + 1)) - log2(lat2_errors.at(test_ind)) ) 
+                      / ( log2(lat_points.at( test_ind + 1)) - log2(lat_points.at( test_ind)) );
+        }
+        fprintf(stdout, "      ( %03d    %.04g  %.3g )  :      ( %03d    %.04g  %.3g )\n", 
+            (int)log2(lon_points.at(test_ind)), log2(lon2_errors.at(test_ind)), ord_lon,
+            (int)log2(lat_points.at(test_ind)), log2(lat2_errors.at(test_ind)), ord_lat);
     }
 
     //// Second for the linf
@@ -283,11 +292,17 @@ int main(int argc, char *argv[]) {
 
     fprintf(stdout, "inf-norm\n");
     fprintf(stdout, "Mean convergence rates: (lon, lat) = (%.3g, %.3g)\n", slope_lon, slope_lat);
-    fprintf(stdout, "  Lon ( Points  Error )  :  Lat ( Points  Error )   (log2)\n");
+    fprintf(stdout, "  Lon ( Points  Error  Ord )  :  Lat ( Points  Error  Ord )   ( log2 of pts and err )\n");
     for (int test_ind = 0; test_ind < num_tests; test_ind++) {
-        fprintf(stdout, "      ( %03d    %.04g )  :      ( %03d    %.04g )\n", 
-            (int)log2(lon_points.at(test_ind)), log2(loninf_errors.at(test_ind)),
-            (int)log2(lat_points.at(test_ind)), log2(latinf_errors.at(test_ind)));
+        if (test_ind < num_tests - 1) {
+            ord_lon =   ( log2(loninf_errors.at(test_ind + 1)) - log2(loninf_errors.at(test_ind)) ) 
+                      / ( log2(lon_points.at(   test_ind + 1)) - log2(lon_points.at(   test_ind)) );
+            ord_lat =   ( log2(latinf_errors.at(test_ind + 1)) - log2(latinf_errors.at(test_ind)) ) 
+                      / ( log2(lat_points.at(   test_ind + 1)) - log2(lat_points.at(   test_ind)) );
+        }
+        fprintf(stdout, "      ( %03d    %.04g  %.3g )  :      ( %03d    %.04g  %.3g )\n", 
+            (int)log2(lon_points.at(test_ind)), log2(loninf_errors.at(test_ind)), ord_lon,
+            (int)log2(lat_points.at(test_ind)), log2(latinf_errors.at(test_ind)), ord_lat);
     }
 
     return 0;
