@@ -111,7 +111,7 @@ void apply_filter_at_point_for_quadratics(
             mask_index = Index(0,     0,      curr_lat, curr_lon,
                                Ntime, Ndepth, Nlat,     Nlon);
 
-            area    = dAreas.at(index);
+            area    = dAreas.at(mask_index);
             kA_sum += kern * area;
 
             uxux_tmp += u_x.at(index) * u_x.at(index) * kern * area * mask.at(mask_index);

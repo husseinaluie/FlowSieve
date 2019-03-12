@@ -97,13 +97,13 @@ void apply_filter_at_point(
 
             index = Index(Itime, Idepth, curr_lat, curr_lon,
                           Ntime, Ndepth, Nlat,     Nlon);
+            mask_index = Index(0,     0,      curr_lat, curr_lon,
+                               Ntime, Ndepth, Nlat,     Nlon);
 
-            area    = dAreas.at(index);
+            area    = dAreas.at(mask_index);
             kA_sum += kern * area;
 
             if (use_mask) {
-                mask_index = Index(0,     0,      curr_lat, curr_lon,
-                        Ntime, Ndepth, Nlat,     Nlon);
                 mask_val = mask.at(mask_index);
             } else {
                 mask_val = 1.;
