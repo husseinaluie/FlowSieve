@@ -50,8 +50,8 @@ void apply_filter_at_point(
     int LAT_lb, LAT_ub, LON_lb, LON_ub;
     // Latitude periodicity is a little different / awkward
     //   for the moment, hope it doesn't become an issue
-    LAT_lb = std::max(0,      Ilat - dlat_N);
-    LAT_ub = std::min(Nlat-1, Ilat + dlat_N);
+    LAT_lb = std::max(0,    Ilat - dlat_N);
+    LAT_ub = std::min(Nlat, Ilat + dlat_N);
 
     double local_scale, delta_lat;
 
