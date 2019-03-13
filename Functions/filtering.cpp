@@ -59,6 +59,10 @@ void filtering(
     std::vector<double> coarse_u_lon(full_u_lon);
     std::vector<double> coarse_u_lat(full_u_lat);
 
+    double KE_tmp;
+    std::vector<double> coarse_KE(num_pts);
+    std::vector<double> fine_KE_filt(num_pts);
+
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
     //     coordinate system)
@@ -80,6 +84,11 @@ void filtering(
                         vel_Spher_to_Cart(     u_x.at(index),      u_y.at(  index),      u_z.at(  index),
                                           full_u_r.at(index), full_u_lon.at(index), full_u_lat.at(index),
                                           longitude.at(Ilon), latitude.at(Ilat));
+
+                        coarse_KE.at(index) = 0.5 * ( 
+                                                pow(u_x.at(index), 2) 
+                                              + pow(u_y.at(index), 2) 
+                                              + pow(u_z.at(index), 2) );
                     }
                 }
             }
@@ -246,6 +255,15 @@ void filtering(
                                               u_x_tmp, u_y_tmp,   u_z_tmp,
                                               longitude.at(Ilon), latitude.at(Ilat));
 
+                            // Also filter KE
+                            apply_filter_at_point(
+                                    KE_tmp, coarse_KE,     
+                                    Ntime,  Ndepth, Nlat, Nlon,
+                                    Itime,  Idepth, Ilat, Ilon,
+                                    longitude, latitude,
+                                    dAreas, scale, mask, true);
+                            fine_KE_filt.at(index) = coarse_KE.at(index) - KE_tmp;
+
                             // Subtract current coarse from preceeding coarse to
                             //    get current fine
                             #if DEBUG >= 3
@@ -325,6 +343,8 @@ void filtering(
         write_field_to_output(fine_u_lon, "u_lon", Iscale, Ntime, Ndepth, Nlat, Nlon);
         write_field_to_output(fine_u_lat, "u_lat", Iscale, Ntime, Ndepth, Nlat, Nlon);
 
+        write_field_to_output(fine_KE_filt, "KE_filt", Iscale, Ntime, Ndepth, Nlat, Nlon);
+
         #if COMP_VORT
         // Compute and write vorticity
         compute_vorticity(fine_vort_r, fine_vort_lon, fine_vort_lat,
@@ -388,6 +408,8 @@ void filtering(
                             u_y.at(index) = u_y_tmp;
                             u_z.at(index) = u_z_tmp;
 
+                            coarse_KE.at(index) = coarse_KE.at(index) - fine_KE_filt.at(index);
+
                         }
                     }
                 }
@@ -424,6 +446,17 @@ void filtering(
                         coarse_u_lon.at(index) = u_lon_tmp;
                         coarse_u_lat.at(index) = u_lat_tmp;
                     }
+
+                    #if COMP_TRANSFERS
+                    // Technically the coarse KE, but re-use the variable
+                    // Following Eyink, G. L., & Aluie, H. (2009). 
+                    //     Localness of energy cascade in hydrodynamic turbulence. I. smooth coarse graining. 
+                    //     Physics of Fluids, 21(11), 1–9. 
+                    // This is the KE above the largest filter scale
+                    fine_KE.at(index) = 0.5 * (  pow( u_x.at(index), 2 ) 
+                                               + pow( u_y.at(index), 2 ) 
+                                               + pow( u_z.at(index), 2 ) );
+                    #endif
                 }
             }
         }
@@ -432,6 +465,8 @@ void filtering(
     write_field_to_output(coarse_u_r,   "u_r",   Nscales, Ntime, Ndepth, Nlat, Nlon);
     write_field_to_output(coarse_u_lon, "u_lon", Nscales, Ntime, Ndepth, Nlat, Nlon);
     write_field_to_output(coarse_u_lat, "u_lat", Nscales, Ntime, Ndepth, Nlat, Nlon);
+
+    write_field_to_output(coarse_KE, "KE_filt", Nscales, Ntime, Ndepth, Nlat, Nlon);
 
     #if COMP_VORT
     // Compute and write vorticity
@@ -446,4 +481,7 @@ void filtering(
     write_field_to_output(fine_vort_lat, "vort_lat", Nscales, Ntime, Ndepth, Nlat, Nlon);
     #endif
 
+    #if COMP_TRANSFERS
+    write_field_to_output(fine_KE, "KE", Nscales, Ntime, Ndepth, Nlat, Nlon);
+    #endif
 }

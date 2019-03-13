@@ -86,6 +86,10 @@ void initialize_output_file(
     if ((retval = nc_def_var(ncid, "u_lat", NC_DOUBLE, ndims, dimids, &u_lat_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
 
+    int KE_filt_varid;
+    if ((retval = nc_def_var(ncid, "KE_filt", NC_DOUBLE, ndims, dimids, &KE_filt_varid)))
+        NC_ERR(retval, __LINE__, __FILE__);
+
     #if COMP_VORT
     int vort_r_varid, vort_lon_varid, vort_lat_varid;
     if ((retval = nc_def_var(ncid, "vort_r",   NC_DOUBLE, ndims, dimids, &vort_r_varid)))
