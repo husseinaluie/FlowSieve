@@ -1,5 +1,6 @@
 #include <math.h>
 #include <vector>
+#include <omp.h>
 
 #include "../functions.hpp"
 #include "../constants.hpp"
@@ -25,9 +26,14 @@ void compute_areas(
     double coeff = pow( constants::R_earth, 2) * dlat * dlon;
 
     // Compute the area of each cell
-    for (int ii = 0; ii < Nlat; ii++) {
-        for (int jj = 0; jj < Nlon; jj++) {
-            areas.at(ii*Nlon + jj) = coeff * cos(latitude.at(ii));
+    int ii, jj;
+    #pragma omp parallel default(none) private(ii, jj) shared(areas, coeff, latitude)
+    {
+        #pragma omp for collapse(2) schedule(dynamic)
+        for (ii = 0; ii < Nlat; ii++) {
+            for (jj = 0; jj < Nlon; jj++) {
+                areas.at(ii*Nlon + jj) = coeff * cos(latitude.at(ii));
+            }
         }
     }
 

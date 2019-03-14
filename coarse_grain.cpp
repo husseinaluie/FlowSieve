@@ -6,7 +6,7 @@
 #include <math.h>
 #include <vector>
 //#include <mpi.h>
-//#include <omp.h>
+#include <omp.h>
 
 #include "netcdf_io.hpp"
 #include "functions.hpp"
@@ -28,6 +28,18 @@ int main(int argc, char *argv[]) {
     //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
 
     //MPI_Init( &argc, &argv);
+
+    // Print processor assignments
+    int tid, nthreads;
+    omp_set_num_threads( 2 );
+    #pragma omp parallel default(shared) private(tid, nthreads)
+    {
+        tid = omp_get_thread_num();
+        nthreads = omp_get_num_threads();
+        #if DEBUG >= 1
+        fprintf(stdout, "Hello from thread %d of %d.\n", tid, nthreads);
+        #endif
+    }
 
     std::vector<double> longitude;
     std::vector<double> latitude;
@@ -54,14 +66,15 @@ int main(int argc, char *argv[]) {
                 1250e3, 1500e3, 1750e3, 
                 2000e3, 0};
     */
+    /*
     const int Nfilt = 10;
     const double scales [Nfilt+1] = {100e3, 150e3, 200e3, 
         250e3, 300e3, 350e3, 400e3, 450e3, 500e3, 750e3, 0}; 
-    /*
-    const int Nfilt = 5;
-    const double scales [Nfilt+1] = 
-            {1e3, 10e3, 50e3, 100e3, 150e3, 0};
     */
+    const int Nfilt = 1;
+    const double scales [Nfilt+1] = 
+            {20e3, 0};
+
     std::vector<double> filter_scales;
     filter_scales.assign(scales, scales + Nfilt);
 
@@ -81,11 +94,20 @@ int main(int argc, char *argv[]) {
     //const int Ndetph = depth.size();
 
     // Convert coordinate to radians
-    for (int ii = 0; ii < Nlon; ii++) {
-        longitude.at(ii) = longitude.at(ii) * M_PI / 180;
+    int ii;
+    #pragma omp parallel private(ii)
+    { 
+        #pragma omp for collapse(1) schedule(dynamic)
+        for (ii = 0; ii < Nlon; ii++) {
+            longitude.at(ii) = longitude.at(ii) * M_PI / 180;
+        }
     }
-    for (int ii = 0; ii < Nlat; ii++) {
-        latitude.at(ii) = latitude.at(ii) * M_PI / 180;
+    #pragma omp parallel private(ii)
+    {
+        #pragma omp for collapse(1) schedule(dynamic)
+        for (ii = 0; ii < Nlat; ii++) {
+            latitude.at(ii) = latitude.at(ii) * M_PI / 180;
+        }
     }
 
     // Compute the area of each 'cell'

@@ -1,6 +1,7 @@
 #include <math.h>
 #include <algorithm>
 #include <vector>
+#include <omp.h>
 #include "../functions.hpp"
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
@@ -66,29 +67,33 @@ void filtering(
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
     //     coordinate system)
-    int index, mask_index;
+    int index, mask_index, Ilat, Ilon;
     for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-            for (int Ilat = 0; Ilat < Nlat; Ilat++) {
-                for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+            #pragma omp parallel private(Ilat, Ilon, index, mask_index)
+            {
+                #pragma omp for collapse(2) schedule(dynamic)
+                for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                    for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
-                    // Convert our four-index to a one-index
-                    index = Index(Itime, Idepth, Ilat, Ilon,
-                                  Ntime, Ndepth, Nlat, Nlon);
+                        // Convert our four-index to a one-index
+                        index = Index(Itime, Idepth, Ilat, Ilon,
+                                      Ntime, Ndepth, Nlat, Nlon);
 
-                    mask_index = Index(0,     0,      Ilat, Ilon,
-                                       Ntime, Ndepth, Nlat, Nlon);
+                        mask_index = Index(0,     0,      Ilat, Ilon,
+                                           Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask.at(mask_index) == 1) { // Skip land areas
+                        if (mask.at(mask_index) == 1) { // Skip land areas
 
-                        vel_Spher_to_Cart(     u_x.at(index),      u_y.at(  index),      u_z.at(  index),
-                                          full_u_r.at(index), full_u_lon.at(index), full_u_lat.at(index),
-                                          longitude.at(Ilon), latitude.at(Ilat));
+                            vel_Spher_to_Cart(     u_x.at(index),      u_y.at(  index),      u_z.at(  index),
+                                              full_u_r.at(index), full_u_lon.at(index), full_u_lat.at(index),
+                                              longitude.at(Ilon), latitude.at(Ilat));
 
-                        coarse_KE.at(index) = 0.5 * ( 
-                                                pow(u_x.at(index), 2) 
-                                              + pow(u_y.at(index), 2) 
-                                              + pow(u_z.at(index), 2) );
+                            coarse_KE.at(index) = 0.5 * ( 
+                                    pow(u_x.at(index), 2) 
+                                    + pow(u_y.at(index), 2) 
+                                    + pow(u_z.at(index), 2) );
+                        }
                     }
                 }
             }
@@ -159,7 +164,7 @@ void filtering(
     #endif
 
     #if DEBUG >= 1
-    int perc;
+    //int perc;
     #endif
 
     //
@@ -189,151 +194,231 @@ void filtering(
                 #endif
 
                 #if DEBUG >= 1
-                perc = 10;
+                //perc = 10;
                 fprintf(stdout, "      ");
                 fflush(stdout);
                 #endif
 
-                for (int Ilat = 0; Ilat < Nlat; Ilat++) {
+                #pragma omp parallel \
+                default(none) \
+                shared(Itime, Idepth, mask, u_x, u_y, u_z,\
+                        stdout,\
+                        longitude, latitude, dAreas, scale,\
+                        coarse_KE, fine_KE_filt,\
+                        coarse_u_r, coarse_u_lon, coarse_u_lat,\
+                        fine_u_r, fine_u_lon, fine_u_lat)\
+                private(Ilat, Ilon, index, mask_index,\
+                        u_x_tmp, u_y_tmp, u_z_tmp,\
+                        u_r_tmp, u_lat_tmp, u_lon_tmp,\
+                        KE_tmp)
+                {
+                    #pragma omp for collapse(2) schedule(dynamic)
+                    for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                        for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
+                            #if DEBUG >= 3
+                            // Need to group these together because of pragma collapse syntax
+                            if (Ilon == 0) { fprintf(stdout, "      Ilat %d of %d\n", Ilat+1, Nlat); }
+                            fprintf(stdout, "        Ilon %d of %d\n", Ilon+1, Nlon);
+                            #endif
+
+                            // Convert our four-index to a one-index
+                            index = Index(Itime, Idepth, Ilat, Ilon,
+                                          Ntime, Ndepth, Nlat, Nlon);
+    
+                            mask_index = Index(0,     0,      Ilat, Ilon,
+                                               Ntime, Ndepth, Nlat, Nlon);
+    
+                            if (mask.at(mask_index) == 1) { // Skip land areas
+    
+                                // Apply the filter at the point
+                                #if DEBUG >= 3
+                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                                #endif
+                                apply_filter_at_point(
+                                        u_x_tmp, u_x,     
+                                        Ntime,  Ndepth, Nlat, Nlon,
+                                        Itime,  Idepth, Ilat, Ilon,
+                                        longitude, latitude,
+                                        dAreas, scale, mask, true);
+                                apply_filter_at_point(
+                                        u_y_tmp, u_y,     
+                                        Ntime,  Ndepth, Nlat, Nlon,
+                                        Itime,  Idepth, Ilat, Ilon,
+                                        longitude, latitude,
+                                        dAreas, scale, mask, true);
+                                apply_filter_at_point(
+                                        u_z_tmp, u_z,     
+                                        Ntime,  Ndepth, Nlat, Nlon,
+                                        Itime,  Idepth, Ilat, Ilon,
+                                        longitude, latitude,
+                                        dAreas, scale, mask, true);
+
+                                // Convert the filtered fields back to spherical
+                                #if DEBUG >= 3
+                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                                #endif
+                                vel_Cart_to_Spher(u_r_tmp, u_lon_tmp, u_lat_tmp,
+                                                  u_x_tmp, u_y_tmp,   u_z_tmp,
+                                                  longitude.at(Ilon), latitude.at(Ilat));
+
+                                // Also filter KE
+                                apply_filter_at_point(
+                                        KE_tmp, coarse_KE,     
+                                        Ntime,  Ndepth, Nlat, Nlon,
+                                        Itime,  Idepth, Ilat, Ilon,
+                                        longitude, latitude,
+                                        dAreas, scale, mask, true);
+                                fine_KE_filt.at(index) = coarse_KE.at(index) - KE_tmp;
+
+                                // Subtract current coarse from preceeding coarse to
+                                //    get current fine
+                                #if DEBUG >= 3
+                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                                #endif
+                                fine_u_r.at(  index) = coarse_u_r.at(  index) - u_r_tmp;
+                                fine_u_lon.at(index) = coarse_u_lon.at(index) - u_lon_tmp;
+                                fine_u_lat.at(index) = coarse_u_lat.at(index) - u_lat_tmp;
+
+                                // Now pass the new coarse along as the preceeding coarse.
+                                #if DEBUG >= 3
+                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                                #endif
+                                coarse_u_r.at(  index) = u_r_tmp;
+                                coarse_u_lon.at(index) = u_lon_tmp;
+                                coarse_u_lat.at(index) = u_lat_tmp;
+
+                            }
+                        }
+                    }
                     #if DEBUG >= 1
+                    /*
                     // Every 10 percent, print a dot
-                    if ( ( ((double) Ilat) / Nlat) * 100 >= perc ) {
+                        if ( ( ((double) Ilat) / Nlat) * 100 >= perc ) {
                         fprintf(stdout, ".");
                         fflush(stdout);
                         perc += 10;
                     }
+                    */
                     #endif
-
-                    #if DEBUG >= 3
-                    fprintf(stdout, "      Ilat %d of %d\n", Ilat+1, Nlat);
-                    #endif
-
-                    for (int Ilon = 0; Ilon < Nlon; Ilon++) {
-
-                        #if DEBUG >= 3
-                        fprintf(stdout, "        Ilon %d of %d\n", Ilon+1, Nlon);
-                        #endif
-
-                        // Convert our four-index to a one-index
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                      Ntime, Ndepth, Nlat, Nlon);
-
-                        mask_index = Index(0,     0,      Ilat, Ilon,
-                                           Ntime, Ndepth, Nlat, Nlon);
-
-                        if (mask.at(mask_index) == 1) { // Skip land areas
-
-                            // Apply the filter at the point
-                            #if DEBUG >= 3
-                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
-                            #endif
-                            apply_filter_at_point(
-                                    u_x_tmp, u_x,     
-                                    Ntime,  Ndepth, Nlat, Nlon,
-                                    Itime,  Idepth, Ilat, Ilon,
-                                    longitude, latitude,
-                                    dAreas, scale, mask, true);
-                            apply_filter_at_point(
-                                    u_y_tmp, u_y,     
-                                    Ntime,  Ndepth, Nlat, Nlon,
-                                    Itime,  Idepth, Ilat, Ilon,
-                                    longitude, latitude,
-                                    dAreas, scale, mask, true);
-                            apply_filter_at_point(
-                                    u_z_tmp, u_z,     
-                                    Ntime,  Ndepth, Nlat, Nlon,
-                                    Itime,  Idepth, Ilat, Ilon,
-                                    longitude, latitude,
-                                    dAreas, scale, mask, true);
-
-                            // Convert the filtered fields back to spherical
-                            #if DEBUG >= 3
-                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
-                            #endif
-                            vel_Cart_to_Spher(u_r_tmp, u_lon_tmp, u_lat_tmp,
-                                              u_x_tmp, u_y_tmp,   u_z_tmp,
-                                              longitude.at(Ilon), latitude.at(Ilat));
-
-                            // Also filter KE
-                            apply_filter_at_point(
-                                    KE_tmp, coarse_KE,     
-                                    Ntime,  Ndepth, Nlat, Nlon,
-                                    Itime,  Idepth, Ilat, Ilon,
-                                    longitude, latitude,
-                                    dAreas, scale, mask, true);
-                            fine_KE_filt.at(index) = coarse_KE.at(index) - KE_tmp;
-
-                            // Subtract current coarse from preceeding coarse to
-                            //    get current fine
-                            #if DEBUG >= 3
-                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
-                            #endif
-                            fine_u_r.at(  index) = coarse_u_r.at(  index) - u_r_tmp;
-                            fine_u_lon.at(index) = coarse_u_lon.at(index) - u_lon_tmp;
-                            fine_u_lat.at(index) = coarse_u_lat.at(index) - u_lat_tmp;
-
-                            // Now pass the new coarse along as the preceeding coarse.
-                            #if DEBUG >= 3
-                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
-                            #endif
-                            coarse_u_r.at(  index) = u_r_tmp;
-                            coarse_u_lon.at(index) = u_lon_tmp;
-                            coarse_u_lat.at(index) = u_lat_tmp;
-
-                            #if COMP_TRANSFERS
-                            #if DEBUG >= 3
-                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
-                            #endif
-                            apply_filter_at_point_for_quadratics(
-                                    uxux_tmp, uxuy_tmp, uxuz_tmp,
-                                    uyuy_tmp, uyuz_tmp, uzuz_tmp,
-                                    u_x,      u_y,      u_z,
-                                    Ntime,  Ndepth, Nlat, Nlon,
-                                    Itime,  Idepth, Ilat, Ilon,
-                                    longitude, latitude,
-                                    dAreas, scale,
-                                    mask);
-
-                            coarse_uxux.at(index) = uxux_tmp;
-                            coarse_uxuy.at(index) = uxuy_tmp;
-                            coarse_uxuz.at(index) = uxuz_tmp;
-                            coarse_uyuy.at(index) = uyuy_tmp;
-                            coarse_uyuz.at(index) = uyuz_tmp;
-                            coarse_uzuz.at(index) = uzuz_tmp;
-
-                            coarse_u_x.at(index) = u_x_tmp;
-                            coarse_u_y.at(index) = u_y_tmp;
-                            coarse_u_z.at(index) = u_z_tmp;
-                            
-                            fine_KE.at(index) = 0.5 * (   
-                                      ( uxux_tmp - u_x_tmp * u_x_tmp )
-                                    + ( uyuy_tmp - u_y_tmp * u_y_tmp )
-                                    + ( uzuz_tmp - u_z_tmp * u_z_tmp )
-                                    );
-                            #endif
-
-                            #if COMP_BC_TRANSFERS
-                            apply_filter_at_point(
-                                    rho_tmp, full_rho,     
-                                    Ntime,  Ndepth, Nlat, Nlon,
-                                    Itime,  Idepth, Ilat, Ilon,
-                                    longitude, latitude,
-                                    dAreas, scale, mask, false);
-                            apply_filter_at_point(
-                                    p_tmp, full_p,     
-                                    Ntime,  Ndepth, Nlat, Nlon,
-                                    Itime,  Idepth, Ilat, Ilon,
-                                    longitude, latitude,
-                                    dAreas, scale, mask, false);
-                            coarse_rho.at(index) = rho_tmp;
-                            coarse_p.at(  index) = p_tmp;
-                            #endif
-                        }
-                    }
                 }
                 #if DEBUG >= 1
                 fprintf(stdout, "\n");
+                #endif
+
+
+                #if COMP_TRANSFERS
+                // If we want energy transfers (Pi), then loop through again to do it.
+                //   It needs to be in a separate loop because the list of shared
+                //   variables is dependent on the pre-processor flags
+                #pragma omp parallel \
+                default(none) \
+                shared(Itime, Idepth, mask, stdout,\
+                        longitude, latitude, dAreas, scale,\
+                        coarse_u_r, coarse_u_lat, coarse_u_lon,\
+                        coarse_u_x, coarse_u_y, coarse_u_z,\
+                        coarse_uxux, coarse_uxuy, coarse_uxuz,\
+                        coarse_uyuy, coarse_uyuz, coarse_uzuz,\
+                        u_x, u_y, u_z, fine_KE) \
+                private(Ilat, Ilon, index, mask_index,\
+                        u_x_tmp, u_y_tmp, u_z_tmp,\
+                        uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp)
+                {
+                    #pragma omp for collapse(2) schedule(dynamic)
+                    for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                        for (Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                            // Convert our four-index to a one-index
+                            index = Index(Itime, Idepth, Ilat, Ilon,
+                                          Ntime, Ndepth, Nlat, Nlon);
+    
+                            mask_index = Index(0,     0,      Ilat, Ilon,
+                                               Ntime, Ndepth, Nlat, Nlon);
+
+                            if (mask.at(mask_index) == 1) { // Skip land areas
+                                #if DEBUG >= 3
+                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                                #endif
+                                apply_filter_at_point_for_quadratics(
+                                        uxux_tmp, uxuy_tmp, uxuz_tmp,
+                                        uyuy_tmp, uyuz_tmp, uzuz_tmp,
+                                        u_x,      u_y,      u_z,
+                                        Ntime,  Ndepth, Nlat, Nlon,
+                                        Itime,  Idepth, Ilat, Ilon,
+                                        longitude, latitude,
+                                        dAreas, scale,
+                                        mask);
+
+                                vel_Spher_to_Cart(u_x_tmp, u_y_tmp, u_z_tmp,
+                                                  coarse_u_r.at(index), 
+                                                  coarse_u_lat.at(index),  
+                                                  coarse_u_lon.at(index),
+                                                  longitude.at(Ilon), latitude.at(Ilat));
+
+                                coarse_uxux.at(index) = uxux_tmp;
+                                coarse_uxuy.at(index) = uxuy_tmp;
+                                coarse_uxuz.at(index) = uxuz_tmp;
+                                coarse_uyuy.at(index) = uyuy_tmp;
+                                coarse_uyuz.at(index) = uyuz_tmp;
+                                coarse_uzuz.at(index) = uzuz_tmp;
+
+                                coarse_u_x.at(index) = u_x_tmp;
+                                coarse_u_y.at(index) = u_y_tmp;
+                                coarse_u_z.at(index) = u_z_tmp;
+                            
+                                fine_KE.at(index) = 0.5 * (   
+                                          ( uxux_tmp - u_x_tmp * u_x_tmp )
+                                        + ( uyuy_tmp - u_y_tmp * u_y_tmp )
+                                        + ( uzuz_tmp - u_z_tmp * u_z_tmp )
+                                        );
+                            }
+                        }
+                    }
+                }
+                #endif
+                
+                #if COMP_BC_TRANSFERS
+                // If we want baroclinic transfers, then loop through again
+                // to compute as necessary
+                //   It needs to be in a separate loop because the list of shared
+                //   variables is dependent on the pre-processor flags
+                #pragma omp parallel \
+                default(none) \
+                private(index, mask_index, Ilat, Ilon,\
+                        rho_tmp, p_tmp) \
+                shared(Itime, Idepth, scale, mask, dAreas, \
+                        longitude, latitude, full_rho, full_p,\
+                        coarse_rho, coarse_p)
+                {
+                    for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                        for (Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                            // Convert our four-index to a one-index
+                            index = Index(Itime, Idepth, Ilat, Ilon,
+                                          Ntime, Ndepth, Nlat, Nlon);
+    
+                            mask_index = Index(0,     0,      Ilat, Ilon,
+                                               Ntime, Ndepth, Nlat, Nlon);
+
+                            if (mask.at(mask_index) == 1) { // Skip land areas
+                                apply_filter_at_point(
+                                        rho_tmp, full_rho,     
+                                        Ntime,  Ndepth, Nlat, Nlon,
+                                        Itime,  Idepth, Ilat, Ilon,
+                                        longitude, latitude,
+                                        dAreas, scale, mask, false);
+                                apply_filter_at_point(
+                                        p_tmp, full_p,     
+                                        Ntime,  Ndepth, Nlat, Nlon,
+                                        Itime,  Idepth, Ilat, Ilon,
+                                        longitude, latitude,
+                                        dAreas, scale, mask, false);
+                                coarse_rho.at(index) = rho_tmp;
+                                coarse_p.at(  index) = p_tmp;
+                            }
+                        }
+                    }
+                }
                 #endif
             }
         }
@@ -386,30 +471,39 @@ void filtering(
         //   just keep the coarse part for the next iteration
         for (int Itime = 0; Itime < Ntime; Itime++) {
             for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-                for (int Ilat = 0; Ilat < Nlat; Ilat++) {
-                    for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+                #pragma omp parallel \
+                default(none) \
+                shared(u_x, u_y, u_z, longitude, latitude, coarse_u_r, coarse_u_lon, \
+                        coarse_u_lat, coarse_KE, fine_KE_filt, mask, Itime, Idepth,\
+                        stdout) \
+                private(Ilat, Ilon, index, mask_index, u_x_tmp, u_y_tmp, u_z_tmp)
+                {
+                    #pragma omp for collapse(2) schedule(dynamic)
+                    for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                        for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
-                        // Convert our four-index to a one-index
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                      Ntime, Ndepth, Nlat, Nlon);
-                        mask_index = Index(0,     0,      Ilat, Ilon,
-                                           Ntime, Ndepth, Nlat, Nlon);
+                            // Convert our four-index to a one-index
+                            index = Index(Itime, Idepth, Ilat, Ilon,
+                                          Ntime, Ndepth, Nlat, Nlon);
+                            mask_index = Index(0,     0,      Ilat, Ilon,
+                                               Ntime, Ndepth, Nlat, Nlon);
 
-                        if (mask.at(mask_index) == 1) { // Skip land areas
+                            if (mask.at(mask_index) == 1) { // Skip land areas
 
-                            #if DEBUG >= 3
-                            fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
-                            #endif
-                            vel_Spher_to_Cart(u_x_tmp,           u_y_tmp,             u_z_tmp,
-                                              coarse_u_r.at(index), coarse_u_lon.at(index), coarse_u_lat.at(index),
-                                              longitude.at(Ilon),   latitude.at(Ilat));
+                                #if DEBUG >= 3
+                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                                #endif
+                                vel_Spher_to_Cart(u_x_tmp,           u_y_tmp,             u_z_tmp,
+                                                  coarse_u_r.at(index), coarse_u_lon.at(index), coarse_u_lat.at(index),
+                                                  longitude.at(Ilon),   latitude.at(Ilat));
 
-                            u_x.at(index) = u_x_tmp;
-                            u_y.at(index) = u_y_tmp;
-                            u_z.at(index) = u_z_tmp;
+                                u_x.at(index) = u_x_tmp;
+                                u_y.at(index) = u_y_tmp;
+                                u_z.at(index) = u_z_tmp;
 
-                            coarse_KE.at(index) = coarse_KE.at(index) - fine_KE_filt.at(index);
+                                coarse_KE.at(index) = coarse_KE.at(index) - fine_KE_filt.at(index);
 
+                            }
                         }
                     }
                 }
@@ -426,39 +520,67 @@ void filtering(
     // Now write the remaining small scales
     for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-            for (int Ilat = 0; Ilat < Nlat; Ilat++) {
-                for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+            #pragma omp parallel \
+            default(none) \
+            shared(u_x, u_y, u_z, longitude, latitude, coarse_u_r, coarse_u_lon, \
+                    coarse_u_lat, mask, Itime, Idepth) \
+            private(Ilat, Ilon, index, mask_index, u_r_tmp, u_lon_tmp, u_lat_tmp)
+            {
+                #pragma omp for collapse(2) schedule(dynamic)
+                for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                    for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
-                    // Convert our four-index to a one-index
-                    index = Index(Itime, Idepth, Ilat, Ilon,
-                                  Ntime, Ndepth, Nlat, Nlon);
-                    mask_index = Index(0,     0,      Ilat, Ilon,
-                                       Ntime, Ndepth, Nlat, Nlon);
+                        // Convert our four-index to a one-index
+                        index = Index(Itime, Idepth, Ilat, Ilon,
+                                Ntime, Ndepth, Nlat, Nlon);
+                        mask_index = Index(0,     0,      Ilat, Ilon,
+                                Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask.at(mask_index) == 1) { // Skip land areas
+                        if (mask.at(mask_index) == 1) { // Skip land areas
 
-                        vel_Cart_to_Spher(
-                                u_r_tmp,    u_lon_tmp,  u_lat_tmp,
-                                u_x.at(index), u_y.at(index), u_z.at(index),
-                                longitude.at(Ilon),   latitude.at(Ilat));
+                            vel_Cart_to_Spher(
+                                    u_r_tmp,    u_lon_tmp,  u_lat_tmp,
+                                    u_x.at(index), u_y.at(index), u_z.at(index),
+                                    longitude.at(Ilon),   latitude.at(Ilat));
 
-                        coarse_u_r.at(  index) = u_r_tmp;
-                        coarse_u_lon.at(index) = u_lon_tmp;
-                        coarse_u_lat.at(index) = u_lat_tmp;
+                            coarse_u_r.at(  index) = u_r_tmp;
+                            coarse_u_lon.at(index) = u_lon_tmp;
+                            coarse_u_lat.at(index) = u_lat_tmp;
+                        }
                     }
-
-                    #if COMP_TRANSFERS
-                    // Technically the coarse KE, but re-use the variable
-                    // Following Eyink, G. L., & Aluie, H. (2009). 
-                    //     Localness of energy cascade in hydrodynamic turbulence. I. smooth coarse graining. 
-                    //     Physics of Fluids, 21(11), 1–9. 
-                    // This is the KE above the largest filter scale
-                    fine_KE.at(index) = 0.5 * (  pow( u_x.at(index), 2 ) 
-                                               + pow( u_y.at(index), 2 ) 
-                                               + pow( u_z.at(index), 2 ) );
-                    #endif
                 }
             }
+            #if COMP_TRANSFERS
+            #pragma omp parallel \
+            default(none) \
+            shared(u_x, u_y, u_z, fine_KE, mask, Itime, Idepth) \
+            private(Ilat, Ilon, index, mask_index)
+            {
+                #pragma omp for collapse(2) schedule(dynamic)
+                for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                    for (Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                        // Convert our four-index to a one-index
+                        index = Index(Itime, Idepth, Ilat, Ilon,
+                                      Ntime, Ndepth, Nlat, Nlon);
+                        mask_index = Index(0,     0,      Ilat, Ilon,
+                                           Ntime, Ndepth, Nlat, Nlon);
+
+                        if (mask.at(mask_index) == 1) { // Skip land areas
+
+                            // Technically the coarse KE, but re-use the variable
+                            // Following Eyink, G. L., & Aluie, H. (2009). 
+                            //     Localness of energy cascade in hydrodynamic turbulence. I. smooth coarse graining. 
+                            //     Physics of Fluids, 21(11), 1–9. 
+                            // This is the KE above the largest filter scale
+                            fine_KE.at(index) = 0.5 * (  pow( u_x.at(index), 2 ) 
+                                                       + pow( u_y.at(index), 2 ) 
+                                                       + pow( u_z.at(index), 2 ) );
+                        }
+                    }
+                }
+            }
+            #endif
         }
     }
 

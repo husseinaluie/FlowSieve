@@ -1,4 +1,5 @@
 #include <vector>
+#include <omp.h>
 #include "../functions.hpp"
 
 void compute_vorticity(
@@ -18,37 +19,47 @@ void compute_vorticity(
         ) {
 
     double vort_r_tmp, vort_lon_tmp, vort_lat_tmp;
-    int index, mask_index;
+    int index, mask_index, Ilat, Ilon;
 
     for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-            for (int Ilat = 0; Ilat < Nlat; Ilat++) {
-                for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+            #pragma omp parallel \
+            default(none) \
+            shared(mask, u_r, u_lon, u_lat, longitude, latitude,\
+                    vort_r, vort_lon, vort_lat,\
+                    Idepth, Itime)\
+            private(Ilat, Ilon, index, mask_index, \
+                    vort_r_tmp, vort_lon_tmp, vort_lat_tmp)
+            {
+                #pragma omp for collapse(2) schedule(dynamic)
+                for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                    for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
-                    vort_r_tmp = 0.;
-                    vort_lon_tmp = 0.;
-                    vort_lat_tmp = 0.;
+                        vort_r_tmp = 0.;
+                        vort_lon_tmp = 0.;
+                        vort_lat_tmp = 0.;
 
-                    // Convert our four-index to a one-index
-                    index = Index(Itime, Idepth, Ilat, Ilon,
-                                  Ntime, Ndepth, Nlat, Nlon);
-                    mask_index = Index(0,     0,      Ilat, Ilon,
-                                       Ntime, Ndepth, Nlat, Nlon);
+                        // Convert our four-index to a one-index
+                        index = Index(Itime, Idepth, Ilat, Ilon,
+                                      Ntime, Ndepth, Nlat, Nlon);
+                        mask_index = Index(0,     0,      Ilat, Ilon,
+                                           Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask.at(mask_index) == 1) { // Skip land areas
+                        if (mask.at(mask_index) == 1) { // Skip land areas
 
-                         compute_vorticity_at_point(
-                            vort_r_tmp, vort_lon_tmp, vort_lat_tmp,
-                            u_r,        u_lon,        u_lat,
-                            Ntime, Ndepth, Nlat, Nlon,
-                            Itime, Idepth, Ilat, Ilon,
-                            longitude, latitude,
-                            mask);
+                            compute_vorticity_at_point(
+                                    vort_r_tmp, vort_lon_tmp, vort_lat_tmp,
+                                    u_r,        u_lon,        u_lat,
+                                    Ntime, Ndepth, Nlat, Nlon,
+                                    Itime, Idepth, Ilat, Ilon,
+                                    longitude, latitude,
+                                    mask);
 
+                        }
+                        vort_r.at(  index) = vort_r_tmp;
+                        vort_lon.at(index) = vort_lon_tmp;
+                        vort_lat.at(index) = vort_lat_tmp;
                     }
-                    vort_r.at(  index) = vort_r_tmp;
-                    vort_lon.at(index) = vort_lon_tmp;
-                    vort_lat.at(index) = vort_lat_tmp;
                 }
             }
         }

@@ -1,5 +1,6 @@
 #include <math.h>
 #include <vector>
+#include <omp.h>
 #include "../functions.hpp"
 #include "../constants.hpp"
 #include "../differentiation_tools.hpp"
@@ -22,51 +23,61 @@ void  compute_baroclinic_transfer(
 
     // For the moment, only use vort_r
     double drhodlat, drhodlon, dpdlat, dpdlon;
-    int index, mask_index;
+    int index, mask_index, Ilat, Ilon;
 
 
     for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-            for (int Ilat = 0; Ilat < Nlat; Ilat++) {
-                for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+            #pragma omp parallel \
+            default(none) \
+            shared(Itime, Idepth, mask, latitude, longitude,\
+                    coarse_rho, coarse_p, baroclinic_transfer,\
+                    coarse_vort_r)\
+            private(Ilat, Ilon, index, mask_index,\
+                    drhodlat, dpdlat, drhodlon, dpdlon)
+            {
+                #pragma omp for collapse(2) schedule(dynamic)
+                for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                    for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
-                    // Convert our four-index to a one-index
-                    index = Index(Itime, Idepth, Ilat, Ilon,
-                                  Ntime, Ndepth, Nlat, Nlon);
-                    mask_index = Index(0,     0,      Ilat, Ilon,
-                                       Ntime, Ndepth, Nlat, Nlon);
+                        // Convert our four-index to a one-index
+                        index = Index(Itime, Idepth, Ilat, Ilon,
+                                      Ntime, Ndepth, Nlat, Nlon);
+                        mask_index = Index(0,     0,      Ilat, Ilon,
+                                           Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask.at(mask_index) == 1) { // Skip land areas
+                        if (mask.at(mask_index) == 1) { // Skip land areas
 
-                        // We need a few derivatives
-                        drhodlat = spher_derivative_at_point(
-                                coarse_rho, latitude, "lat",
-                                Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon,
-                                mask);
-                        
-                        dpdlat = spher_derivative_at_point(
-                                coarse_p, latitude, "lat",
-                                Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon,
-                                mask);
-                        
-                        drhodlon = spher_derivative_at_point(
-                                coarse_rho, longitude, "lon",
-                                Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon,
-                                mask);
+                            // We need a few derivatives
+                            drhodlat = spher_derivative_at_point(
+                                    coarse_rho, latitude, "lat",
+                                    Itime, Idepth, Ilat, Ilon,
+                                    Ntime, Ndepth, Nlat, Nlon,
+                                    mask);
 
-                        dpdlon = spher_derivative_at_point(
-                                coarse_p, longitude, "lon",
-                                Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon,
-                                mask);
+                            dpdlat = spher_derivative_at_point(
+                                    coarse_p, latitude, "lat",
+                                    Itime, Idepth, Ilat, Ilon,
+                                    Ntime, Ndepth, Nlat, Nlon,
+                                    mask);
 
-                        baroclinic_transfer.at(index) = 
-                              coarse_vort_r.at(index) * ( drhodlon * dpdlat  -  drhodlat * dpdlon ) 
-                            / ( coarse_rho.at(index) * pow(constants::R_earth,2) * cos(latitude.at(Ilat)) );
+                            drhodlon = spher_derivative_at_point(
+                                    coarse_rho, longitude, "lon",
+                                    Itime, Idepth, Ilat, Ilon,
+                                    Ntime, Ndepth, Nlat, Nlon,
+                                    mask);
 
+                            dpdlon = spher_derivative_at_point(
+                                    coarse_p, longitude, "lon",
+                                    Itime, Idepth, Ilat, Ilon,
+                                    Ntime, Ndepth, Nlat, Nlon,
+                                    mask);
+
+                            baroclinic_transfer.at(index) = 
+                                coarse_vort_r.at(index) * ( drhodlon * dpdlat  -  drhodlat * dpdlon ) 
+                                / ( coarse_rho.at(index) * pow(constants::R_earth,2) * cos(latitude.at(Ilat)) );
+
+                        }
                     }
                 }
             }
