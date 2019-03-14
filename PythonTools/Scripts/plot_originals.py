@@ -26,10 +26,7 @@ mask      = results.variables['mask'][:]
 
 num_scales = len(scales)-1
 
-dlat = latitude[1]  - latitude[0]
-dlon = longitude[1] - longitude[0]
 LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
-dAreas = R_earth**2 * np.cos(LAT * np.pi / 180) * dlat * dlon
 
 uo = source.variables['uo'][0, 0, :, :]
 vo = source.variables['vo'][0, 0, :, :]

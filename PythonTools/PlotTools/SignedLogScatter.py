@@ -5,7 +5,7 @@ import numpy as np
 def SignedLogScatter(
         XX, YY, CC, axes, s = 0.1, cmap = 'cmo.thermal',
         num_ords_x = 12, num_ords_y = 12, force_equal = False,
-        scatter_kws = None):
+        scatter_kws = None, cbar_label=''):
 
     x_cv = np.max(np.abs(XX))
     y_cv = np.max(np.abs(YY))
@@ -24,9 +24,6 @@ def SignedLogScatter(
         x_lb = 10**(np.log10(x_cv) - num_ords_x)
         y_lb = 10**(np.log10(y_cv) - num_ords_y)
 
-    c_min = np.min(CC)
-    c_max = np.max(CC)
-
     ax_pp = axes[0,1]
     ax_nn = axes[1,0]
     ax_np = axes[0,0]
@@ -39,7 +36,7 @@ def SignedLogScatter(
     y_sub = YY[sel == 1]
     c_sub = CC[sel == 1]
 
-    ax.scatter(x_sub, y_sub, s = s, c = c_sub, vmin=c_min, vmax=c_max, **scatter_kws)
+    ax.scatter(x_sub, y_sub, s = s, c = c_sub, **scatter_kws)
     ax.set_xlim(x_lb, x_ub)
     ax.set_ylim(y_lb, y_ub)
     ax.set_xscale('log')
@@ -52,7 +49,7 @@ def SignedLogScatter(
     y_sub = -YY[sel == 1]
     c_sub =  CC[sel == 1]
 
-    ax.scatter(x_sub, y_sub, s = s, c = c_sub, vmin=c_min, vmax=c_max, **scatter_kws)
+    ax.scatter(x_sub, y_sub, s = s, c = c_sub, **scatter_kws)
     ax.set_xlim(x_lb, x_ub)
     ax.set_ylim(y_lb, y_ub)
     ax.set_xscale('log')
@@ -68,7 +65,7 @@ def SignedLogScatter(
     y_sub = -YY[sel == 1]
     c_sub =  CC[sel == 1]
 
-    ax.scatter(x_sub, y_sub, s = s, c = c_sub, vmin=c_min, vmax=c_max, **scatter_kws)
+    ax.scatter(x_sub, y_sub, s = s, c = c_sub, **scatter_kws)
     ax.set_xlim(x_lb, x_ub)
     ax.set_ylim(y_lb, y_ub)
     ax.set_xscale('log')
@@ -83,7 +80,7 @@ def SignedLogScatter(
     y_sub =  YY[sel == 1]
     c_sub =  CC[sel == 1]
 
-    sc = ax.scatter(x_sub, y_sub, s = s, c = c_sub, vmin=c_min, vmax=c_max, **scatter_kws)
+    sc = ax.scatter(x_sub, y_sub, s = s, c = c_sub, **scatter_kws)
     ax.set_xlim(x_lb, x_ub)
     ax.set_ylim(y_lb, y_ub)
     ax.set_xscale('log')
@@ -100,5 +97,6 @@ def SignedLogScatter(
 
 
     # Add colour bar
-    plt.colorbar(sc, ax=axes)
+    cbar = plt.colorbar(sc, ax=axes)
+    cbar.ax.set_ylabel(cbar_label)
 

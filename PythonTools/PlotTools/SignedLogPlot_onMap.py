@@ -6,7 +6,7 @@ import numpy as np
 def SignedLogPlot_onMap(XX, YY, ZZ, ax, fig, proj_map,
         num_ords=6, xscale = 'linear', yscale = 'linear',
         xlabel = '', ylabel = '', title = '',
-        latlon=True, percentile=100):
+        latlon=True, percentile=100, vmax=None):
     # figsize:  size of the figure (passed to figsize flag in matplotlib)
     # num_ords: number of orders of magnitude to show on colour bar
     # dpi:      resolution of output file
@@ -30,7 +30,8 @@ def SignedLogPlot_onMap(XX, YY, ZZ, ax, fig, proj_map,
     blue_map.set_under('w')
 
     ## Plot
-    vmax = np.percentile(np.abs(ZZ), percentile)
+    if vmax == None:
+        vmax = np.percentile(np.abs(ZZ), percentile)
     vmin = 10**(np.ceil(np.log10(vmax)-num_ords)-1.0)
 
     # Plot the positives in red
