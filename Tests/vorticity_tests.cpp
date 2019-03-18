@@ -48,7 +48,7 @@ double mask_func(const double lat, const double lon) {
 
     // Add a square island poking out in the corners
     // Essentially, just don't make the island too smooth
-    if ( (abs(lat) < M_PI/7) and (abs(lon) < M_PI/7) ) {
+    if ( (fabs(lat) < M_PI/7) and (fabs(lon) < M_PI/7) ) {
         ret_val *= 0.;
     }
 
@@ -131,13 +131,13 @@ int main(int argc, char *argv[]) {
 
             if (mask.at(index) == 1) {
                 err_2   += dArea.at(index) * pow(vort_r.at(index) - loc_true_vort, 2);
-                err_inf  = std::max(err_inf, abs(vort_r.at(index) - loc_true_vort));
+                err_inf  = std::max(err_inf, fabs(vort_r.at(index) - loc_true_vort));
 
                 denom_2_t += dArea.at(index) * pow(loc_true_vort, 2); 
                 denom_2_n += dArea.at(index) * pow(vort_r.at(index), 2); 
 
-                denom_inf_t = std::max(denom_inf_t, abs(loc_true_vort));
-                denom_inf_n = std::max(denom_inf_n, abs(vort_r.at(index)));
+                denom_inf_t = std::max(denom_inf_t, fabs(loc_true_vort));
+                denom_inf_n = std::max(denom_inf_n, fabs(vort_r.at(index)));
 
                 tot_area += dArea.at(index);
             }

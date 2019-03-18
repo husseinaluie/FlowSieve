@@ -104,8 +104,8 @@ void apply_test(double & err2_lon, double & err2_lat,
                 err2_lon += dArea.at(index) * pow( lon_true - lon_numer, 2 );
                 err2_lat += dArea.at(index) * pow( lat_true - lat_numer, 2 );
 
-                errinf_lon = std::max(errinf_lon, abs( lon_true - lon_numer ) );
-                errinf_lat = std::max(errinf_lat, abs( lat_true - lat_numer ) );
+                errinf_lon = std::max(errinf_lon, fabs( lon_true - lon_numer ) );
+                errinf_lat = std::max(errinf_lat, fabs( lat_true - lat_numer ) );
             }
         }
     }
