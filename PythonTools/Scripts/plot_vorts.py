@@ -6,13 +6,6 @@ from netCDF4 import Dataset
 from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import ListedColormap
 
-# The purpose of this post-processing script is to read in the results
-#   from a series of filterings and produce images of the
-#   band-filtered kinetic energy.
-# A major underlying assumption is that the grid is unchanged
-#   between the filterings so that subtraction etc.
-#   is trivial.
-
 fp = 'filter_output.nc'
 results = Dataset(fp, 'r')
 
@@ -56,7 +49,7 @@ gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.02, right = 0.98, b
 ## Begin Plotting
 ##
 
-## First plot: straight KE binning
+## Vorticity binning
 
 # Initialize figure
 fig, axes = plt.subplots(1, num_scales,
@@ -122,7 +115,7 @@ plt.savefig('Figures/vorticity_filter_bands.png', dpi=500)
 plt.close()
 
 
-## First plot: straight KE binning
+## Dichotomies
 
 # Initialize figure
 fig, axes = plt.subplots(num_scales-1, 2,

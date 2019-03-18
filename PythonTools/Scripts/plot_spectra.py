@@ -32,8 +32,8 @@ L_lat = R_earth * ( latitude.max() -  latitude.min())
 
 LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
 
-dlat = (latitude[ 1] - latitude[ 0]) * np.pi / 180
-dlon = (longitude[1] - longitude[0]) * np.pi / 180
+dlat = (latitude[ 1] - latitude[ 0]) * D2R
+dlon = (longitude[1] - longitude[0]) * D2R
 dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
 
 scales = scales[:-1]  # get rid of zero

@@ -60,7 +60,7 @@ gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.02, right = 0.98, b
 ## Begin Plotting
 ##
 
-# Pi vs l^2 * Lambda^m, colour by vorticity
+# Pi vs l^2 * Lambda^m
 if True:
 
     # Initialize figure
@@ -71,27 +71,17 @@ if True:
 
     x_data =    transfer[:-1,:,:] * 1e6
     y_data = bc_transfer[:-1,:,:] * 1e6
-    c_data = np.tile(np.sum(vort_r, axis=0).reshape(1,Nlat,Nlon), (num_scales,1,1))
-
-    tiled_scales = np.tile(scales[:-1].reshape(num_scales,1,1), (1,Nlat,Nlon))
 
     tiled_mask = np.tile(mask.reshape(1,Nlat,Nlon), (num_scales,1,1))
 
+    tiled_scales = np.tile(scales[:-1].reshape(num_scales,1,1), (1,Nlat,Nlon))
     y_data = y_data * (tiled_scales**2)
 
     x_data = x_data[tiled_mask == 1]
     y_data = y_data[tiled_mask == 1]
-    c_data = c_data[tiled_mask == 1]
 
-    #CV_c = np.max(np.abs(c_data))
-    CV_c = np.percentile(np.abs(c_data), 90)
-    newcmap = cmocean.tools.crop_by_percent(cmocean.cm.balance, 30, which='both', N=None)
-    scatter_kws = dict(cmap=newcmap, linewidths=0, vmin=-CV_c, vmax=CV_c)
-
-    PlotTools.SignedLogScatter(x_data.ravel(), y_data.ravel(), c_data.ravel(), axes,
-            scatter_kws = scatter_kws, force_equal = True,
-            num_ords_x = 16, num_ords_y = 16,
-            cbar_label = '$\omega_r$ $(\mathrm{s}^{-1})$')
+    PlotTools.SignedLogScatter_hist(x_data.ravel(), y_data.ravel(), axes,
+            force_equal = True, nbins_x = 300, nbins_y = 300)
 
     for II in range(2):
         axes[II,0].set_ylabel('$l^2\Lambda^m$ $(\mathrm{W}\cdot\mathrm{km}^{-2}\cdot\mathrm{m}^{-1})$')
@@ -115,10 +105,10 @@ if True:
 
     axes[0,1].legend(loc='best')
 
-    plt.savefig('Figures/transfers_comparison.png', dpi=600)
+    plt.savefig('Figures/transfers_comparison_hist.png', dpi=600)
     plt.close()
 
-# Pi vs vorticity, colour by Lambda^m
+# Pi vs vorticity
 if True:
 
     # Initialize figure
@@ -131,26 +121,16 @@ if True:
     tiled_mask   = np.tile(mask.reshape(1,Nlat,Nlon), (num_scales,1,1))
     tiled_rho    = np.tile(rho.reshape(1,Nlat,Nlon), (num_scales,1,1))
 
-    x_data = bc_transfer[:-1,:,:] * 1e6 / tiled_rho
+    x_data = bc_transfer[:-1,:,:] / tiled_rho
     #x_data = x_data * (tiled_scales**2)
     y_data = np.tile(np.sum(vort_r, axis=0).reshape(1,Nlat,Nlon), (num_scales,1,1))
 
-    c_data =    transfer[:-1,:,:] * 1e6
-    #c_data = np.ones(x_data.shape)
 
     x_data = x_data[tiled_mask == 1]
     y_data = y_data[tiled_mask == 1]
-    c_data = c_data[tiled_mask == 1]
 
-    #CV_c = np.max(np.abs(c_data))
-    CV_c = np.percentile(np.abs(c_data), 99.9)
-    newcmap = cmocean.tools.crop_by_percent(cmocean.cm.balance, 30, which='both', N=None)
-    scatter_kws = dict(cmap=newcmap, linewidths=0, vmin=-CV_c, vmax=CV_c)
-
-    PlotTools.SignedLogScatter(x_data.ravel(), y_data.ravel(), c_data.ravel(), axes,
-            scatter_kws = scatter_kws, force_equal = True,
-            num_ords_x = 14, num_ords_y = 14,
-            cbar_label = '$\Pi$ $(\mathrm{W}\cdot\mathrm{km}^{-2}\cdot\mathrm{m}^{-1})$')
+    PlotTools.SignedLogScatter_hist(x_data.ravel(), y_data.ravel(), axes,
+            force_equal = True, nbins_x = 300, nbins_y = 300)
 
     for II in range(2):
         #axes[II,0].set_ylabel('$\mathcal{E}$ $(\mathrm{s}^{-2})$')
@@ -175,5 +155,5 @@ if True:
 
     #axes[0,1].legend(loc='best')
 
-    plt.savefig('Figures/transfers_comparison2.png', dpi=600)
+    plt.savefig('Figures/transfers_comparison2_hist.png', dpi=600)
     plt.close()
