@@ -220,7 +220,7 @@ void filtering(
                         longitude, latitude, dAreas, scale,\
                         coarse_KE, fine_KE_filt,\
                         coarse_u_r, coarse_u_lon, coarse_u_lat,\
-                        fine_u_r, fine_u_lon, fine_u_lat)\
+                        fine_u_r, fine_u_lon, fine_u_lat, perc_base)\
                 private(Ilat, Ilon, index, mask_index,\
                         u_x_tmp, u_y_tmp, u_z_tmp,\
                         u_r_tmp, u_lat_tmp, u_lon_tmp,\
