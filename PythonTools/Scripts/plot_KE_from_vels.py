@@ -78,7 +78,7 @@ gridspec_props = dict(wspace = 0.05, hspace = 0.07, left = 0.04, right = 0.96, b
 
 # Initialize figure
 fig, axes = plt.subplots(num_scales+1, 1,
-        sharex=True, sharey=True, 
+        sharex=True, sharey=True, squeeze=False,
         gridspec_kw = gridspec_props,
         figsize=(6,4*(num_scales+1)))
 
@@ -93,7 +93,7 @@ for ii in range(num_scales+1):
         to_plot = KE[ii,:,:]
     to_plot = np.ma.masked_where(mask==0, to_plot)
 
-    m  = Basemap(ax = axes[ii], **map_settings)
+    m  = Basemap(ax = axes[ii,0], **map_settings)
 
     CV  = np.nanmax(np.abs(to_plot))
     if (CV == 0):
@@ -136,7 +136,7 @@ plt.close()
 
 # Initialize figure
 fig, axes = plt.subplots(num_scales-1, 3,
-        sharex=True, sharey=True, 
+        sharex=True, sharey=True, squeeze=False,
         gridspec_kw = gridspec_props,
         figsize=(12, 4*(num_scales-1)))
 

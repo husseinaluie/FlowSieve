@@ -61,7 +61,7 @@ gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.05, right = 0.95, b
 
 # Initialize figure
 fig, axes = plt.subplots(num_scales, 1,
-        sharex=True, sharey=True, 
+        sharex=True, sharey=True, squeeze=False,
         gridspec_kw = gridspec_props,
         figsize=(6, 4*num_scales))
 
@@ -74,7 +74,7 @@ for ii in range(num_scales):
     m  = Basemap(ax = axes[ii], **map_settings)
 
     if np.max(np.abs(to_plot)) > 0:
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 5)
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii,0], fig, m, num_ords = 5)
 
     # Add coastlines, lat/lon lines, and draw the map
     m.drawcoastlines(linewidth=0.1)
@@ -101,7 +101,7 @@ if 'baroclinic_transfer' in results.variables:
 
     # Initialize figure
     fig, axes = plt.subplots(num_scales, 1,
-            sharex=True, sharey=True, 
+            sharex=True, sharey=True, squeeze=False,
             gridspec_kw = gridspec_props,
             figsize=(6, 4*num_scales))
 
