@@ -99,8 +99,8 @@ void read_var_from_file(
  */
 void add_var_to_file(
         const char * var_name,
-        const char * filename,
         const char ** dim_list,
-        const int num_dims);
+        const int num_dims,
+        const char * filename = "filter_output.nc");
 
 #endif

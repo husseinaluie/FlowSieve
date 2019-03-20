@@ -129,6 +129,7 @@ int main(int argc, char *argv[]) {
               longitude, latitude,
               mask);
 
+
     // Done!
     #if DEBUG >= 0
     fprintf(stdout, "\n\n");

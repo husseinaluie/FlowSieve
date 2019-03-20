@@ -103,16 +103,19 @@ void filtering(
         }
     }
 
-    // Create the output file
-    #if DEBUG >= 1
-    fprintf(stdout, "Creating output file.\n");
-    #endif
-    initialize_output_file(time, depth, longitude, latitude, scales, mask);
-
     // Now prepare to filter
     double scale,
            u_x_tmp, u_y_tmp,   u_z_tmp,  // The local coarse-graining result
            u_r_tmp, u_lon_tmp, u_lat_tmp;
+    
+    // Create the output file
+    #if DEBUG >= 1
+    fprintf(stdout, "Creating output file.\n");
+    #endif
+    initialize_output_file(time, depth, longitude, latitude, filter_scales, mask);
+
+    // Add additional files to the output file as necessary
+    const char* dim_names[] = {"scale","time", "depth", "latitude", "longitude"};
 
     std::vector<double> fine_u_r(  num_pts);
     std::vector<double> fine_u_lon(num_pts);
@@ -122,6 +125,10 @@ void filtering(
     std::vector<double> fine_vort_r(  num_pts);
     std::vector<double> fine_vort_lat(num_pts);
     std::vector<double> fine_vort_lon(num_pts);
+
+    add_var_to_file("vort_r", dim_names, 5);
+    add_var_to_file("vort_lon", dim_names, 5);
+    add_var_to_file("vort_lat", dim_names, 5);
     #endif
 
     #if COMP_TRANSFERS
@@ -142,10 +149,12 @@ void filtering(
 
     // Also an array for the transfer itself
     std::vector<double> energy_transfer(num_pts);
+    add_var_to_file("energy_transfer", dim_names, 5);
 
     // If we're computing transfers, then we already have what
     //   we need to computed band-filtered KE, so might as well do it
     std::vector<double> fine_KE(num_pts);
+    add_var_to_file("KE", dim_names, 5);
     #endif
 
     #if COMP_BC_TRANSFERS
@@ -157,6 +166,7 @@ void filtering(
     std::vector<double> coarse_p(full_p);
 
     std::vector<double> baroclinic_transfer(num_pts);
+    add_var_to_file("baroclinic_transfer", dim_names, 5);
 
     compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
             full_u_r, full_u_lon, full_u_lat,
@@ -164,10 +174,16 @@ void filtering(
             longitude, latitude, mask);
 
     double rho_tmp, p_tmp;
+
+    // We also have what we need to compute the PEtoKE term
+    //    rho_bar * g * w_bar
+    std::vector<double> PEtoKE(num_pts);
+    add_var_to_file("PEtoKE", dim_names, 5);
     #endif
 
     #if DEBUG >= 1
-    int perc = 10;
+    int perc_base = 10;
+    int perc;
     #endif
 
     //
@@ -189,12 +205,13 @@ void filtering(
             #if DEBUG >= 0
             fprintf(stdout, "  Time %d of %d\n", Itime+1, Ntime);
             #endif
-
+            
             for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
 
                 #if DEBUG >= 0
                 fprintf(stdout, "    Depth %d of %d\n", Idepth+1, Ndepth);
                 #endif
+                perc = perc_base;
 
                 #pragma omp parallel \
                 default(none) \
@@ -231,11 +248,11 @@ void filtering(
                             tid = omp_get_thread_num();
                             if (tid == 0) {
                                 // Every 10 percent, print a dot, but only the first thread
-                                if ( ((double)(index) / (Nlat*Nlon)) * 100 >= perc ) {
-                                    if (perc == 10) { fprintf(stdout, "      "); }
+                                if ( ((double)(mask_index) / (Nlat*Nlon)) * 100 >= perc ) {
+                                    if (perc == perc_base) { fprintf(stdout, "      "); }
                                     fprintf(stdout, ".");
                                     fflush(stdout);
-                                    perc += 10;
+                                    perc += perc_base;
                                 }
                             }
                             #endif
@@ -392,7 +409,7 @@ void filtering(
                         rho_tmp, p_tmp) \
                 shared(Itime, Idepth, scale, mask, dAreas, \
                         longitude, latitude, full_rho, full_p,\
-                        coarse_rho, coarse_p)
+                        coarse_rho, coarse_p, PEtoKE, coarse_u_r)
                 {
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
@@ -419,6 +436,11 @@ void filtering(
                                         dAreas, scale, mask, false);
                                 coarse_rho.at(index) = rho_tmp;
                                 coarse_p.at(  index) = p_tmp;
+
+                                PEtoKE.at(index) =   coarse_rho.at(index)
+                                                   * constants::g
+                                                   * coarse_u_r.at(index);
+
                             }  // end if(masked) block
                         }  // end for(longitude) block
                     }  // end for(latitude) block
@@ -470,6 +492,7 @@ void filtering(
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
         write_field_to_output(baroclinic_transfer, "baroclinic_transfer", starts, counts);
+        write_field_to_output(PEtoKE, "PEtoKE", starts, counts);
         #endif
 
         // Now that we've filtered at the previous scale,
