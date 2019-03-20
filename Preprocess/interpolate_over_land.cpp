@@ -44,7 +44,7 @@ void interpolate_over_land(
 
     std::vector<double> xyzf_vec(4*num_water_pts);
 
-    int cntr = 0;
+    int cntr;
     double R;
     int index, mask_index, num_seed_points = 0, num_interp_points = 0;
     double perc_base = 10;
@@ -52,7 +52,7 @@ void interpolate_over_land(
 
     double x,y,z;
 
-    const double rbase = 1 * distance(0, 0, 0, latitude.at(1) - latitude.at(0));
+    const double rbase = 10 * distance(0, 0, 0, latitude.at(1) - latitude.at(0));
     const int nlayers = 1;
 
     //for (int Itime = 0; Itime < Ntime; Itime++) {
@@ -68,6 +68,7 @@ void interpolate_over_land(
             #if DEBUG >= 1
             fprintf(stdout, "      Adding seed data to the interpolator object.\n");
             #endif
+            cntr = 0;
             for (int Ilat = 0; Ilat < Nlat; Ilat++) {
                 for (int Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -100,7 +101,7 @@ void interpolate_over_land(
             #if DEBUG >= 1
             fprintf(stdout, "\n");
             #endif
-        
+
             alglib::real_2d_array xyzf;
             xyzf.setlength(num_water_pts, 4);
             xyzf.setcontent(num_water_pts, 4, &xyzf_vec[0]);
