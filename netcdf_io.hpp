@@ -66,7 +66,8 @@ void initialize_output_file(
         const std::vector<double> &longitude, 
         const std::vector<double> &latitude, 
         const std::vector<double> &scales,    
-        const std::vector<double> &mask);
+        const std::vector<double> &mask,
+        const char * filename = "filter_output.nc");
 
 /*!
  * \brief Write on scales worth of a single field.
@@ -76,8 +77,30 @@ void initialize_output_file(
  *  file "filter_output.nc".
  */
 void write_field_to_output(
-        const std::vector<double> & field, const char * field_name,
-        const int Iscale,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon);
+        const std::vector<double> & field, 
+        const char * field_name,
+        const size_t * start, 
+        const size_t * count,
+        const char * filename = "filter_output.nc");
+
+/*!
+ *  \brief Read a specific variable from a specific file.
+ */
+void read_var_from_file(
+        std::vector<double> &var,
+        const char * var_name,
+        const char * filename,
+        std::vector<double> *mask );
+
+/*!
+ *  \brief Add a new variable to a netcdf file
+ *
+ *  Note: this declares a new variable, but doesn't write to it.
+ */
+void add_var_to_file(
+        const char * var_name,
+        const char * filename,
+        const char ** dim_list,
+        const int num_dims);
 
 #endif

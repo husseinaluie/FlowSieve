@@ -24,14 +24,15 @@ void initialize_output_file(
         const std::vector<double> & longitude, /**< [in] longitude vector (1D) */
         const std::vector<double> & latitude,  /**< [in] longitude vector (1D) */
         const std::vector<double> & scales,    /**< [in] filter scales (1D) */
-        const std::vector<double> & mask       /**< [in] masking (land vs water, 2D) */
+        const std::vector<double> & mask,      /**< [in] masking (land vs water, 2D) */
+        const char * filename
         ) {
 
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_CLOBBER;
     int ncid=0, retval;
     char buffer [50];
-    snprintf(buffer, 50, "filter_output.nc");
+    snprintf(buffer, 50, filename);
     if (( retval = nc_create(buffer, FLAG, &ncid) ))
         NC_ERR(retval, __LINE__, __FILE__);
 
