@@ -112,7 +112,7 @@ void filtering(
     #if DEBUG >= 1
     fprintf(stdout, "Creating output file.\n");
     #endif
-    initialize_output_file(time, depth, longitude, latitude, filter_scales, mask);
+    initialize_output_file(time, depth, longitude, latitude, scales, mask);
 
     // Add additional files to the output file as necessary
     const char* dim_names[] = {"scale","time", "depth", "latitude", "longitude"};
