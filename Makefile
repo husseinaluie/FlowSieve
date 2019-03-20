@@ -5,7 +5,7 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=1 $(CFLAGS)
+CFLAGS:=-DDEBUG=2 $(CFLAGS)
 
 # Do you want vorticity computed?
 CFLAGS:=-DCOMP_VORT=true $(CFLAGS)
@@ -57,16 +57,25 @@ FUNCTIONS_OBJS := $(addprefix Functions/,$(notdir $(FUNCTIONS_CPPS:.cpp=.o)))
 DIFF_TOOL_CPPS := $(wildcard Functions/Differentiation_Tools/*.cpp)
 DIFF_TOOL_OBJS := $(addprefix Functions/Differentiation_Tools/,$(notdir $(DIFF_TOOL_CPPS:.cpp=.o)))
 
+# Get list of ALGLIB object files
+ALGLIB_CPPS := $(wildcard ALGLIB/*.cpp)
+ALGLIB_OBJS := $(addprefix ALGLIB/,$(notdir $(ALGLIB_CPPS:.cpp=.o)))
+
+# Get the list of preprocessing  cpp files
+PREPROCESS_CPPS := $(wildcard Preprocess/*.cpp)
+PREPROCESS_OBJS := $(addprefix Preprocess/,$(notdir $(PREPROCESS_CPPS:.cpp=.o)))
+
 # Get list of test executables
 TEST_CPPS := $(wildcard Tests/*.cpp)
 TEST_EXES := $(addprefix Tests/,$(notdir $(TEST_CPPS:.cpp=.x)))
 
-.PHONY: clean hardclean docs cleandocs tests all
+.PHONY: clean hardclean docs cleandocs tests all ALGLIB
 clean:
-	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o Tests/*.o
+	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o Tests/*.o Preprocess/*.o
 hardclean:
 	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o coarse_grain.x Tests/*.o Tests/*.x
 	rm -r coarse_grain.x.dSYM
+	rm ALGLIB/*.o
 	rm -r Documentation/html
 	rm -r Documentation/latex
 cleandocs:
@@ -77,14 +86,46 @@ all: coarse_grain.x
 
 tests: ${TEST_EXES}
 
-%.o: %.cpp
+ALGLIB: ${ALGLIB_OBJS}
+
+# ALGLIB requires a different set of compile flags
+ALGLIB/%.o: ALGLIB/%.cpp
+	$(CXX) -I ./ALGLIB -c -O3 -DAE_CPU=AE_INTEL -o $@ $<
+
+# The core coarse_graining functions use the same compile flags
+Functions/Differentiation_Tools/%.o: Functions/Differentiation_Tools/%.cpp
+	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+
+Functions/%.o: Functions/%.cpp
+	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+
+NETCDF_IO/%.o: NETCDF_IO/%.cpp
+	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+
+Preprocess/%.o: Preprocess/%.cpp
+	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $<
+
+# Building test scripts
+Tests/%.o: Tests/%.cpp
+	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+
+Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
+	$(MPICXX) ${VERSION} $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+# Building coarse_grain executable
+coarse_grain.o: coarse_grain.cpp
 	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
 coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} coarse_grain.o
 	$(MPICXX) ${VERSION} $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
-	$(MPICXX) ${VERSION} $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
+# Interpolator needs to link in ALGLIB
+interpolator.o: interpolator.cpp
+	$(MPICXX) $(LINKS) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $<
 
+interpolator.x: ${NETCDF_IO_OBJS} ${ALGLIB_OBJS} ${PREPROCESS_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} interpolator.o
+	$(MPICXX) $(LINKS) $(CFLAGS) -I ./ALGLIB $(LDFLAGS) -o $@ $^
+
+# Documentation build with Doxygen
 docs:
 	DOXY_VERSION=${DOXY_VERSION} doxygen Doxyfile
