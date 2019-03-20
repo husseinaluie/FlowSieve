@@ -6,18 +6,6 @@
     #define DEBUG 0
 #endif
 
-#ifndef COMP_VORT
-    #define COMP_VORT true
-#endif
-
-#ifndef COMP_TRANSFERS
-    #define COMP_TRANSFERS true
-#endif
-
-#ifndef COMP_BC_TRANSFERS
-    #define COMP_BC_TRANSFERS true
-#endif
-
 void initialize_output_file(
         const std::vector<double> & time,      /**< [in] time vector (1D) */
         const std::vector<double> & depth,     /**< [in] depth vector (1D) */
@@ -25,7 +13,7 @@ void initialize_output_file(
         const std::vector<double> & latitude,  /**< [in] longitude vector (1D) */
         const std::vector<double> & scales,    /**< [in] filter scales (1D) */
         const std::vector<double> & mask,      /**< [in] masking (land vs water, 2D) */
-        const char * filename
+        const char * filename                  /**< [in] name for the output file */
         ) {
 
     // Open the NETCDF file
@@ -90,30 +78,6 @@ void initialize_output_file(
     int KE_filt_varid;
     if ((retval = nc_def_var(ncid, "KE_filt", NC_DOUBLE, ndims, dimids, &KE_filt_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
-
-    #if COMP_VORT
-    int vort_r_varid, vort_lon_varid, vort_lat_varid;
-    if ((retval = nc_def_var(ncid, "vort_r",   NC_DOUBLE, ndims, dimids, &vort_r_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "vort_lon", NC_DOUBLE, ndims, dimids, &vort_lon_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "vort_lat", NC_DOUBLE, ndims, dimids, &vort_lat_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
-    #endif
-
-    #if COMP_TRANSFERS
-    int ener_transfer_varid, KE_varid;
-    if ((retval = nc_def_var(ncid, "energy_transfer", NC_DOUBLE, ndims, dimids, &ener_transfer_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "KE",              NC_DOUBLE, ndims, dimids, &KE_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
-    #endif
-
-    #if COMP_TRANSFERS
-    int baroclinic_transfer_varid;
-    if ((retval = nc_def_var(ncid, "baroclinic_transfer", NC_DOUBLE, ndims, dimids, &baroclinic_transfer_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
-    #endif
 
     int mask_dimids[ndims];
     mask_dimids[0] = lat_dimid;

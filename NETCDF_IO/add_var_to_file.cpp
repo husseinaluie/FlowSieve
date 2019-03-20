@@ -7,10 +7,10 @@
 #endif
 
 void add_var_to_file(
-        const char * var_name,   /**< [in] depth vector (1D) */
-        const char * filename,   /**< [in] longitude vector (1D) */
-        const char ** dim_list,                 /**< [in] list of dimensions (in order!) */
-        const int num_dims                      /**< [in] number of dimensions */
+        const char * var_name,   /**< [in] variable name */
+        const char ** dim_list,  /**< [in] list of dimensions (in order!) */
+        const int num_dims,      /**< [in] number of dimensions */
+        const char * filename    /**< [in] file name */
         ) {
 
     // Open the NETCDF file
