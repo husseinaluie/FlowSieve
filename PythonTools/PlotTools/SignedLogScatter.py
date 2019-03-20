@@ -7,8 +7,8 @@ def SignedLogScatter(
         force_equal = False,
         scatter_kws = None, cbar_label=''):
 
-    x_cv = np.max(np.abs(XX))
-    y_cv = np.max(np.abs(YY))
+    x_max = np.nanmax(np.abs(XX))
+    y_max = np.nanmax(np.abs(YY))
 
     #x_min = np.nanmin(np.abs(XX)[np.abs(XX)>0])
     #y_min = np.nanmin(np.abs(YY)[np.abs(YY)>0])

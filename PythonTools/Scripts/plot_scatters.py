@@ -90,7 +90,6 @@ if True:
 
     PlotTools.SignedLogScatter(x_data.ravel(), y_data.ravel(), c_data.ravel(), axes,
             scatter_kws = scatter_kws, force_equal = True,
-            num_ords_x = 16, num_ords_y = 16,
             cbar_label = '$\omega_r$ $(\mathrm{s}^{-1})$')
 
     for II in range(2):
@@ -149,7 +148,6 @@ if True:
 
     PlotTools.SignedLogScatter(x_data.ravel(), y_data.ravel(), c_data.ravel(), axes,
             scatter_kws = scatter_kws, force_equal = True,
-            num_ords_x = 14, num_ords_y = 14,
             cbar_label = '$\Pi$ $(\mathrm{W}\cdot\mathrm{km}^{-2}\cdot\mathrm{m}^{-1})$')
 
     for II in range(2):

@@ -1,10 +1,35 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import cmocean, sys
+import cmocean, sys, datetime
 from netCDF4 import Dataset
 from mpl_toolkits.basemap import Basemap
-import PlotTools
+import PlotTools, subprocess, shutil, os
+
+try: # Try using mpi
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    num_procs = comm.Get_size()
+except:
+    rank = 0
+    num_procs = 1
+print("Proc {0:d} of {1:d}".format(rank+1,num_procs))
+
+# If the Figures directory doesn't exist, create it.
+# Same with the Figures/tmp
+out_direct = os.getcwd() + '/Videos'
+tmp_direct = out_direct + '/tmp'
+
+if (rank == 0):
+    print("Saving outputs to " + out_direct)
+    print("  will use temporary directory " + tmp_direct)
+
+    if not(os.path.exists(out_direct)):
+        os.makedirs(out_direct)
+
+    if not(os.path.exists(tmp_direct)):
+        os.makedirs(tmp_direct)
 
 source = Dataset('input.nc', 'r')
 
@@ -21,15 +46,23 @@ latitude  = results.variables['latitude'][:] * R2D
 longitude = results.variables['longitude'][:] * R2D
 scales    = results.variables['scale'][:]
 depth     = results.variables['depth'][:]
-time      = results.variables['time'][:]
+time      = results.variables['time'][:] * (60*60) # convert hours to second
 mask      = results.variables['mask'][:]
 
+# Do some time handling tp adjust the epochs
+# appropriately
+epoch = datetime.datetime(1950,1,1)   # the epoch of the time dimension
+dt_epoch = datetime.datetime.fromtimestamp(0)  # the epoch used by datetime
+epoch_delta = dt_epoch - epoch  # difference
+time = time - epoch_delta.total_seconds()  # shift
+
 num_scales = len(scales)-1
+Ntime = len(time)
 
 LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
 
-uo = source.variables['uo'][0, 0, :, :]
-vo = source.variables['vo'][0, 0, :, :]
+uo = source.variables['uo'][:, 0, :, :]
+vo = source.variables['vo'][:, 0, :, :]
 Full_KE = 0.5 * (uo**2 + vo**2)
 
 
@@ -42,134 +75,130 @@ parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
 cbar_props = dict(pad = 0.1, shrink = 0.85, orientation = 'vertical')
 gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.02, right = 0.98, bottom = 0.02, top = 0.98)
 
-    
-## Full KE
-plt.figure()
-ax = plt.subplot(1,1,1)
+def plot(LON, LAT, to_plot, filename, 
+        one_sided=False, vmin=None, vmax=None, units='',
+        cmap=None, title=None):
 
-to_plot = Full_KE.copy()
-to_plot = np.ma.masked_where(mask==0, to_plot)
-
-m  = Basemap(ax = ax, **map_settings)
-
-CV = np.max(np.abs(to_plot))
-qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.amp', vmin = 0, vmax = CV, latlon = True)
-    
-cbar = plt.colorbar(qm, ax = ax, **cbar_props)
-PlotTools.ScientificCbar(cbar, units='')
-
-# Add coastlines and lat/lon lines
-m.drawcoastlines(linewidth=0.1)
-m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
-m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
-m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
-
-plt.savefig('Figures/KE_full.png', dpi=500)
-plt.close()
-
-
-    
-## Full uo
-plt.figure()
-ax = plt.subplot(1,1,1)
-
-to_plot = uo.copy()
-to_plot = np.ma.masked_where(mask==0, to_plot)
-
-m  = Basemap(ax = ax, **map_settings)
-
-CV = np.max(np.abs(to_plot))
-qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.balance', vmin = -CV, vmax = CV, latlon = True)
-    
-cbar = plt.colorbar(qm, ax = ax, **cbar_props)
-PlotTools.ScientificCbar(cbar, units='')
-
-# Add coastlines and lat/lon lines
-m.drawcoastlines(linewidth=0.1)
-m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
-m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
-m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
-
-plt.savefig('Figures/uo_full.png', dpi=500)
-plt.close()
-
-    
-## Full vo
-plt.figure()
-ax = plt.subplot(1,1,1)
-
-to_plot = vo.copy()
-to_plot = np.ma.masked_where(mask==0, to_plot)
-
-m  = Basemap(ax = ax, **map_settings)
-
-CV = np.max(np.abs(to_plot))
-qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.balance', vmin = -CV, vmax = CV, latlon = True)
-    
-cbar = plt.colorbar(qm, ax = ax, **cbar_props)
-PlotTools.ScientificCbar(cbar, units='')
-
-# Add coastlines and lat/lon lines
-m.drawcoastlines(linewidth=0.1)
-m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
-m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
-m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
-
-plt.savefig('Figures/vo_full.png', dpi=500)
-plt.close()
-
-
-## Rho, if available
-if 'rho' in source.variables:
     plt.figure()
     ax = plt.subplot(1,1,1)
-
-    to_plot = source.variables['rho'][0,0,:,:]
-    to_plot = np.ma.masked_where(mask==0, to_plot)
-
+    
     m  = Basemap(ax = ax, **map_settings)
 
-    mu = np.mean(to_plot)
-    CV = np.max(np.abs(to_plot - mu))
-    qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.balance', vmin = mu-CV, vmax = mu+CV, latlon = True)
+    if cmap == None:
+        if one_sided:
+            cmap = 'cmo.amp'
+        else:
+            cmap = 'cmo.balance'
     
-    cbar = plt.colorbar(qm, ax = ax, **cbar_props)
-    PlotTools.ScientificCbar(cbar, units='')
+    if (vmin == None) or (vmax == None):
+        if one_sided:
+            vmax = np.nanmax(to_plot)
+            vmin = np.nanmin(to_plot)
+        else:
+            vmax = np.nanmax(np.abs(to_plot))
+            vmin = -vmax
 
+    qm = m.pcolormesh(LON, LAT, to_plot, cmap=cmap, vmin = vmin, vmax = vmax, latlon = True)
+        
+    cbar = plt.colorbar(qm, ax = ax, **cbar_props)
+    PlotTools.ScientificCbar(cbar, units=units)
+    
     # Add coastlines and lat/lon lines
     m.drawcoastlines(linewidth=0.1)
     m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
-    m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
-    m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
+    m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,1], color='g')
+    #m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
 
-    plt.savefig('Figures/rho_full.png', dpi=500)
+    if not(title == None):
+        ax.set_title(title)
+    
+    plt.savefig(filename, dpi=500)
     plt.close()
 
+for Itime in range(rank, Ntime, num_procs):    
 
-## Pressure, if available
-if 'p' in source.variables:
-    plt.figure()
-    ax = plt.subplot(1,1,1)
+    timestamp = datetime.datetime.fromtimestamp(time[Itime])
+    sup_title = "{0:02d} - {1:02d} - {2:04d} ( {3:02d}:{4:02d} )".format(
+            timestamp.day, timestamp.month, timestamp.year, 
+            timestamp.hour, timestamp.minute)
 
-    to_plot = source.variables['p'][0,0,:,:]
+    # Plot KE
+    to_plot = Full_KE[Itime,:,:]
     to_plot = np.ma.masked_where(mask==0, to_plot)
 
-    m  = Basemap(ax = ax, **map_settings)
+    CV = np.max(np.abs(Full_KE))
 
-    mu = np.mean(to_plot)
-    CV = np.max(np.abs(to_plot - mu))
-    qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.amp', vmin = mu-CV, vmax = mu+CV, latlon = True)
+    plot(LON*R2D, LAT*R2D, to_plot, tmp_direct + '/KE_{0:04d}.png'.format(Itime),
+            one_sided=True, vmin = 0, vmax = CV, cmap='cmo.dense', title=sup_title)
     
-    cbar = plt.colorbar(qm, ax = ax, **cbar_props)
-    PlotTools.ScientificCbar(cbar, units='')
+    ## Full uo
+    to_plot = uo[Itime,:,:]
+    to_plot = np.ma.masked_where(mask==0, to_plot)
 
-    # Add coastlines and lat/lon lines
-    m.drawcoastlines(linewidth=0.1)
-    m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
-    m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,1,0], color='g')
-    m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
+    CV = np.max(np.abs(uo))
 
-    plt.savefig('Figures/p_full.png', dpi=500)
-    plt.close()
+    plot(LON*R2D, LAT*R2D, to_plot, tmp_direct + '/u_lon_{0:04d}.png'.format(Itime),
+            one_sided=False, vmin = -CV, vmax = CV, title=sup_title)
+        
+    ## Full vo
+    to_plot = vo[Itime,:,:]
+    to_plot = np.ma.masked_where(mask==0, to_plot)
 
+    CV = np.max(np.abs(vo))
 
+    plot(LON*R2D, LAT*R2D, to_plot, tmp_direct + '/u_lat_{0:04d}.png'.format(Itime),
+            one_sided=False, vmin = -CV, vmax = CV, title=sup_title)
+    
+    ## Rho, if available
+    if 'rho' in source.variables:
+        to_plot = source.variables['rho'][Itime,0,:,:]
+        to_plot = np.ma.masked_where(mask==0, to_plot)
+
+        mu = np.mean(source.variables['rho'][:,0,:,:])
+        CV = np.max(np.abs(source.variables['rho'][:,0,:,:] - mu))
+
+        plot(LON*R2D, LAT*R2D, to_plot-mu, tmp_direct + '/rho_{0:04d}.png'.format(Itime),
+                one_sided=False, vmin=-CV, vmax=CV, title=sup_title, units=' + {0:.4g}'.format(mu))
+    
+    ## Pressure, if available
+    if 'p' in source.variables:
+        to_plot = source.variables['p'][Itime,0,:,:]
+        to_plot = np.ma.masked_where(mask==0, to_plot)
+
+        mu = np.mean(source.variables['p'][:,0,:,:])
+        CV = np.max(np.abs(source.variables['p'][:,0,:,:] - mu))
+
+        plot(LON*R2D, LAT*R2D, to_plot, tmp_direct + '/pressure_{0:04d}.png'.format(Itime), 
+                one_sided=True, vmin=mu-CV, vmax=mu+CV, cmap='cmo.thermal', title=sup_title)
+    
+
+# If more than one time point, create mp4s
+if Ntime > 1:
+    PlotTools.merge_to_mp4(tmp_direct + '/KE_%04d.png',    
+            out_direct + '/KE.mp4',    fps=12)
+    PlotTools.merge_to_mp4(tmp_direct + '/u_lon_%04d.png', 
+            out_direct + '/u_lon.mp4', fps=12)
+    PlotTools.merge_to_mp4(tmp_direct + '/u_lat_%04d.png', 
+            out_direct + '/u_lat.mp4', fps=12)
+    if 'rho' in source.variables:
+        PlotTools.merge_to_mp4(tmp_direct + '/rho_%04d.png', 
+                out_direct + '/rho.mp4', fps=12)
+    if 'p' in source.variables:
+        PlotTools.merge_to_mp4(tmp_direct + '/pressure_%04d.png', 
+                out_direct + '/pressure.mp4', fps=12)
+else:
+    shutil.move(tmp_direct + '/KE_0000.png',    
+            out_direct + '/KE.png')
+    shutil.move(tmp_direct + '/u_lon_0000.png', 
+            out_direct + '/u_lon.png')
+    shutil.move(tmp_direct + '/u_lat_0000.png', 
+            out_direct + '/u_lat.png')
+    if 'rho' in source.variables:
+        shutil.move(tmp_direct + '/rho_0000.png', 
+                out_direct + '/rho.png')
+    if 'p' in source.variables:
+        shutil.move(tmp_direct + '/pressure_0000.png', 
+                out_direct + '/pressure.png')
+
+# Now delete the frames
+shutil.rmtree(tmp_direct)
