@@ -47,6 +47,9 @@ void filtering(
 
     const int num_pts = Ntime * Ndepth * Nlat * Nlon;
 
+    size_t starts[] = {0, 0, 0, 0, 0};
+    size_t counts[] = {1, (size_t)Ntime, (size_t)Ndepth, (size_t)Nlat, (size_t)Nlon};
+
     #if DEBUG >= 1
     fprintf(stdout, "Converting to Cartesian velocities.\n");
     #endif
@@ -67,7 +70,7 @@ void filtering(
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
     //     coordinate system)
-    int index, mask_index, Ilat, Ilon;
+    int index, mask_index, Ilat, Ilon, tid;
     for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
             #pragma omp parallel private(Ilat, Ilon, index, mask_index)
@@ -164,7 +167,7 @@ void filtering(
     #endif
 
     #if DEBUG >= 1
-    //int perc;
+    int perc = 10;
     #endif
 
     //
@@ -193,12 +196,6 @@ void filtering(
                 fprintf(stdout, "    Depth %d of %d\n", Idepth+1, Ndepth);
                 #endif
 
-                #if DEBUG >= 1
-                //perc = 10;
-                fprintf(stdout, "      ");
-                fflush(stdout);
-                #endif
-
                 #pragma omp parallel \
                 default(none) \
                 shared(Itime, Idepth, mask, u_x, u_y, u_z,\
@@ -210,7 +207,8 @@ void filtering(
                 private(Ilat, Ilon, index, mask_index,\
                         u_x_tmp, u_y_tmp, u_z_tmp,\
                         u_r_tmp, u_lat_tmp, u_lon_tmp,\
-                        KE_tmp)
+                        KE_tmp, tid) \
+                firstprivate(perc)
                 {
                     #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -228,6 +226,19 @@ void filtering(
     
                             mask_index = Index(0,     0,      Ilat, Ilon,
                                                Ntime, Ndepth, Nlat, Nlon);
+
+                            #if DEBUG >= 1
+                            tid = omp_get_thread_num();
+                            if (tid == 0) {
+                                // Every 10 percent, print a dot, but only the first thread
+                                if ( ((double)(index) / (Nlat*Nlon)) * 100 >= perc ) {
+                                    if (perc == 10) { fprintf(stdout, "      "); }
+                                    fprintf(stdout, ".");
+                                    fflush(stdout);
+                                    perc += 10;
+                                }
+                            }
+                            #endif
     
                             if (mask.at(mask_index) == 1) { // Skip land areas
     
@@ -288,22 +299,15 @@ void filtering(
                                 coarse_u_lon.at(index) = u_lon_tmp;
                                 coarse_u_lat.at(index) = u_lat_tmp;
 
-                            }
-                        }
-                    }
-                    #if DEBUG >= 1
-                    /*
-                    // Every 10 percent, print a dot
-                        if ( ( ((double) Ilat) / Nlat) * 100 >= perc ) {
-                        fprintf(stdout, ".");
-                        fflush(stdout);
-                        perc += 10;
-                    }
-                    */
-                    #endif
-                }
+                            }  // end if(masked) block
+                        }  // end for(longitude) block
+                    }  // end for(latitude) block
+                }  // end pragma parallel block
                 #if DEBUG >= 1
-                fprintf(stdout, "\n");
+                #pragma omp master
+                {
+                    fprintf(stdout, "\n");
+                }
                 #endif
 
 
@@ -371,10 +375,10 @@ void filtering(
                                         + ( uyuy_tmp - u_y_tmp * u_y_tmp )
                                         + ( uzuz_tmp - u_z_tmp * u_z_tmp )
                                         );
-                            }
-                        }
-                    }
-                }
+                            }  // end if(masked) block
+                        }  // end for(longitude) block
+                    }  // end for(latitude) block
+                } // end pragma parallel block
                 #endif
                 
                 #if COMP_BC_TRANSFERS
@@ -415,20 +419,21 @@ void filtering(
                                         dAreas, scale, mask, false);
                                 coarse_rho.at(index) = rho_tmp;
                                 coarse_p.at(  index) = p_tmp;
-                            }
-                        }
-                    }
-                }
+                            }  // end if(masked) block
+                        }  // end for(longitude) block
+                    }  // end for(latitude) block
+                }  // end pragma parallel block
                 #endif
-            }
-        }
+            }  // end for(depth) block
+        }  // end for(time) block
 
         // Write to file
-        write_field_to_output(fine_u_r,   "u_r",   Iscale, Ntime, Ndepth, Nlat, Nlon);
-        write_field_to_output(fine_u_lon, "u_lon", Iscale, Ntime, Ndepth, Nlat, Nlon);
-        write_field_to_output(fine_u_lat, "u_lat", Iscale, Ntime, Ndepth, Nlat, Nlon);
+        starts[0] = Iscale;
+        write_field_to_output(fine_u_r,   "u_r",   starts, counts);
+        write_field_to_output(fine_u_lon, "u_lon", starts, counts);
+        write_field_to_output(fine_u_lat, "u_lat", starts, counts);
 
-        write_field_to_output(fine_KE_filt, "KE_filt", Iscale, Ntime, Ndepth, Nlat, Nlon);
+        write_field_to_output(fine_KE_filt, "KE_filt", starts, counts);
 
         #if COMP_VORT
         // Compute and write vorticity
@@ -436,9 +441,9 @@ void filtering(
                 fine_u_r, fine_u_lon, fine_u_lat,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
-        write_field_to_output(fine_vort_r,   "vort_r",   Iscale, Ntime, Ndepth, Nlat, Nlon);
-        write_field_to_output(fine_vort_lon, "vort_lon", Iscale, Ntime, Ndepth, Nlat, Nlon);
-        write_field_to_output(fine_vort_lat, "vort_lat", Iscale, Ntime, Ndepth, Nlat, Nlon);
+        write_field_to_output(fine_vort_r,   "vort_r",   starts, counts);
+        write_field_to_output(fine_vort_lon, "vort_lon", starts, counts);
+        write_field_to_output(fine_vort_lat, "vort_lat", starts, counts);
         #endif
 
         #if COMP_TRANSFERS
@@ -450,8 +455,8 @@ void filtering(
                 coarse_uyuy, coarse_uyuz, coarse_uzuz,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
-        write_field_to_output(energy_transfer, "energy_transfer", Iscale, Ntime, Ndepth, Nlat, Nlon);
-        write_field_to_output(fine_KE, "KE", Iscale, Ntime, Ndepth, Nlat, Nlon);
+        write_field_to_output(energy_transfer, "energy_transfer", starts, counts);
+        write_field_to_output(fine_KE, "KE", starts, counts);
         #endif
 
         #if COMP_BC_TRANSFERS
@@ -464,7 +469,7 @@ void filtering(
                 coarse_rho, coarse_p,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
-        write_field_to_output(baroclinic_transfer, "baroclinic_transfer", Iscale, Ntime, Ndepth, Nlat, Nlon);
+        write_field_to_output(baroclinic_transfer, "baroclinic_transfer", starts, counts);
         #endif
 
         // Now that we've filtered at the previous scale,
@@ -503,19 +508,19 @@ void filtering(
 
                                 coarse_KE.at(index) = coarse_KE.at(index) - fine_KE_filt.at(index);
 
-                            }
-                        }
-                    }
-                }
-            }
-        }
+                            }  // end if(masked) block
+                        }  // end for(longitude) block
+                    }  // end for(latitude) block
+                }  // end pragma parallel block
+            }  // end for(depth) block
+        }  // end for(time) block
 
         #if DEBUG >= 0
         // Flushing stdout is necessary for SLURM outputs.
         fflush(stdout);
         #endif
 
-    } // end of scale loop
+    }  // end for(scale) block
 
     // Now write the remaining small scales
     for (int Itime = 0; Itime < Ntime; Itime++) {
@@ -546,10 +551,10 @@ void filtering(
                             coarse_u_r.at(  index) = u_r_tmp;
                             coarse_u_lon.at(index) = u_lon_tmp;
                             coarse_u_lat.at(index) = u_lat_tmp;
-                        }
-                    }
-                }
-            }
+                        }  // end if(masked) block
+                    }  // end for(longitude) block
+                }  // end for(latitude) block
+            }  // end pragma parallel block
             #if COMP_TRANSFERS
             #pragma omp parallel \
             default(none) \
@@ -570,25 +575,27 @@ void filtering(
 
                             // Technically the coarse KE, but re-use the variable
                             // Following Eyink, G. L., & Aluie, H. (2009). 
-                            //     Localness of energy cascade in hydrodynamic turbulence. I. smooth coarse graining. 
+                            //     Localness of energy cascade in hydrodynamic turbulence. 
+                            //         I. smooth coarse graining. 
                             //     Physics of Fluids, 21(11), 1–9. 
                             // This is the KE above the largest filter scale
                             fine_KE.at(index) = 0.5 * (  pow( u_x.at(index), 2 ) 
                                                        + pow( u_y.at(index), 2 ) 
                                                        + pow( u_z.at(index), 2 ) );
-                        }
-                    }
-                }
-            }
+                        }  // end if(masked) block
+                    }  // end for(longitude) block
+                }  // end for(latitude) block
+            }  // end pragma parallel block
             #endif
-        }
-    }
+        }  // end for(depth) block
+    }  // end for(time) block
 
-    write_field_to_output(coarse_u_r,   "u_r",   Nscales, Ntime, Ndepth, Nlat, Nlon);
-    write_field_to_output(coarse_u_lon, "u_lon", Nscales, Ntime, Ndepth, Nlat, Nlon);
-    write_field_to_output(coarse_u_lat, "u_lat", Nscales, Ntime, Ndepth, Nlat, Nlon);
+    starts[0] = Nscales;
+    write_field_to_output(coarse_u_r,   "u_r",   starts, counts);
+    write_field_to_output(coarse_u_lon, "u_lon", starts, counts);
+    write_field_to_output(coarse_u_lat, "u_lat", starts, counts);
 
-    write_field_to_output(coarse_KE, "KE_filt", Nscales, Ntime, Ndepth, Nlat, Nlon);
+    write_field_to_output(coarse_KE, "KE_filt",  starts, counts);
 
     #if COMP_VORT
     // Compute and write vorticity
@@ -598,12 +605,12 @@ void filtering(
             coarse_u_r, coarse_u_lon, coarse_u_lat,
             Ntime, Ndepth, Nlat, Nlon,
             longitude, latitude, mask);
-    write_field_to_output(fine_vort_r,   "vort_r",   Nscales, Ntime, Ndepth, Nlat, Nlon);
-    write_field_to_output(fine_vort_lon, "vort_lon", Nscales, Ntime, Ndepth, Nlat, Nlon);
-    write_field_to_output(fine_vort_lat, "vort_lat", Nscales, Ntime, Ndepth, Nlat, Nlon);
+    write_field_to_output(fine_vort_r,   "vort_r",    starts, counts);
+    write_field_to_output(fine_vort_lon, "vort_lon",  starts, counts);
+    write_field_to_output(fine_vort_lat, "vort_lat",  starts, counts);
     #endif
 
     #if COMP_TRANSFERS
-    write_field_to_output(fine_KE, "KE", Nscales, Ntime, Ndepth, Nlat, Nlon);
+    write_field_to_output(fine_KE, "KE", starts, counts);
     #endif
 }

@@ -254,4 +254,16 @@ void compute_baroclinic_transfer(
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
     const std::vector<double> & mask);
+
+/*!
+ *  \brief Interpolate the given field over the land cells
+ */
+void interpolate_over_land(
+        std::vector<double> &field,
+        const std::vector<double> &time,
+        const std::vector<double> &depth,
+        const std::vector<double> &latitude,
+        const std::vector<double> &longitude,
+        const std::vector<double> &mask);
+
 #endif

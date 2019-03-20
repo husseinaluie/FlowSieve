@@ -31,8 +31,9 @@ int main(int argc, char *argv[]) {
 
     // Print processor assignments
     int tid, nthreads;
-    omp_set_num_threads( 2 );
-    #pragma omp parallel default(shared) private(tid, nthreads)
+    const int max_threads = omp_get_max_threads();
+    omp_set_num_threads( max_threads );
+    #pragma omp parallel default(none) private(tid, nthreads) shared(stdout)
     {
         tid = omp_get_thread_num();
         nthreads = omp_get_num_threads();
@@ -73,7 +74,7 @@ int main(int argc, char *argv[]) {
     */
     const int Nfilt = 1;
     const double scales [Nfilt+1] = 
-            {20e3, 0};
+            {100e3, 0};
 
     std::vector<double> filter_scales;
     filter_scales.assign(scales, scales + Nfilt);
@@ -95,14 +96,14 @@ int main(int argc, char *argv[]) {
 
     // Convert coordinate to radians
     int ii;
-    #pragma omp parallel private(ii)
+    #pragma omp parallel default(none) private(ii) shared(longitude)
     { 
         #pragma omp for collapse(1) schedule(dynamic)
         for (ii = 0; ii < Nlon; ii++) {
             longitude.at(ii) = longitude.at(ii) * M_PI / 180;
         }
     }
-    #pragma omp parallel private(ii)
+    #pragma omp parallel default(none) private(ii) shared(latitude)
     {
         #pragma omp for collapse(1) schedule(dynamic)
         for (ii = 0; ii < Nlat; ii++) {
