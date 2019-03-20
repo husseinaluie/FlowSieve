@@ -266,4 +266,19 @@ void interpolate_over_land(
         const std::vector<double> &longitude,
         const std::vector<double> &mask);
 
+/*!
+ *  \brief Convert potential temperature to actual temperature
+ */
+double depotential_temperature( 
+        const double p, 
+        const double theta);
+
+/*!
+ * \brief UNESCO equation of state
+ */
+double equation_of_state(
+        const double T,
+        const double S,
+        const double p);
+
 #endif
