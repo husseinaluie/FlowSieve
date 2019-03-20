@@ -43,6 +43,13 @@ namespace constants
     const double rho0 = 1e3;
 
     /*!
+     * \param g
+     * \brief (constant) acceleration due to gravity
+     * @ingroup constants
+     */
+    const double g = 9.81;
+
+    /*!
      * \param DiffOrd
      * \brief Differentiation order for finite differencing (currently must be 4)
      * @ingroup constants
