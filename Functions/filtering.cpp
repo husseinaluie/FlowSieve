@@ -164,6 +164,10 @@ void filtering(
 
     std::vector<double> coarse_rho(full_rho);
     std::vector<double> coarse_p(full_p);
+    std::vector<double> fine_rho(full_rho);
+    std::vector<double> fine_p(full_p);
+    add_var_to_file("rho", dim_names, 5);
+    add_var_to_file("p", dim_names, 5);
 
     std::vector<double> baroclinic_transfer(num_pts);
     add_var_to_file("baroclinic_transfer", dim_names, 5);
@@ -409,7 +413,8 @@ void filtering(
                         rho_tmp, p_tmp) \
                 shared(Itime, Idepth, scale, mask, dAreas, \
                         longitude, latitude, full_rho, full_p,\
-                        coarse_rho, coarse_p, PEtoKE, coarse_u_r)
+                        coarse_rho, coarse_p, fine_rho, fine_p, \
+                        PEtoKE, coarse_u_r)
                 {
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
@@ -437,8 +442,11 @@ void filtering(
                                 coarse_rho.at(index) = rho_tmp;
                                 coarse_p.at(  index) = p_tmp;
 
+                                fine_rho.at(index) = full_rho.at(index) - coarse_rho.at(index);
+                                fine_p.at(index)   = full_p.at(  index) - coarse_p.at(  index);
+
                                 PEtoKE.at(index) =   coarse_rho.at(index)
-                                                   * constants::g
+                                                   * (-constants::g)
                                                    * coarse_u_r.at(index);
 
                             }  // end if(masked) block
@@ -493,6 +501,8 @@ void filtering(
                 longitude, latitude, mask);
         write_field_to_output(baroclinic_transfer, "baroclinic_transfer", starts, counts);
         write_field_to_output(PEtoKE, "PEtoKE", starts, counts);
+        write_field_to_output(fine_rho, "rho", starts, counts);
+        write_field_to_output(fine_p,   "p", starts, counts);
         #endif
 
         // Now that we've filtered at the previous scale,
@@ -635,5 +645,10 @@ void filtering(
 
     #if COMP_TRANSFERS
     write_field_to_output(fine_KE, "KE", starts, counts);
+    #endif
+
+    #if COMP_BC_TRANSFERS
+    write_field_to_output(coarse_rho, "rho", starts, counts);
+    write_field_to_output(coarse_p,   "p", starts, counts);
     #endif
 }

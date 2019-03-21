@@ -30,19 +30,30 @@ void interpolate_over_land(
     int Nlat   = (int)latitude.size();
     int Nlon   = (int)longitude.size();
 
+    const bool cast_to_sphere = false;
+
     interp_field.resize(field.size());
 
     //
     // Step 1: RBF model creation
     //
     alglib::rbfmodel model;
-    alglib::rbfcreate(3, 1, model);
+    if (cast_to_sphere) { 
+        alglib::rbfcreate(3, 1, model);
+    } else {
+        alglib::rbfcreate(2, 1, model);
+    }
 
     //
     // Step 2: we add dataset of known points
     //
 
-    std::vector<double> xyzf_vec(4*num_water_pts);
+    std::vector<double> xyzf_vec;
+    if (cast_to_sphere) { 
+        xyzf_vec.resize(4*num_water_pts);
+    } else {
+        xyzf_vec.resize(3*num_water_pts);
+    }
 
     int cntr;
     double R;
@@ -50,10 +61,21 @@ void interpolate_over_land(
     double perc_base = 10;
     double perc = perc_base;
 
-    double x,y,z;
+    double x, y, z, lat, lon;
 
-    const double rbase = 10 * distance(0, 0, 0, latitude.at(1) - latitude.at(0));
+    double rbase;
     const int nlayers = 1;
+    if (cast_to_sphere) { 
+        rbase = 3 * distance(0, 0, 0, latitude.at(1) - latitude.at(0));
+        #if DEBUG >= 2
+        fprintf(stdout, " Using rbase = %.3gkm and nlayers = %d\n", rbase, nlayers);
+        #endif
+    } else {
+        rbase = 3 * fabs(latitude.at(1) - latitude.at(0));
+        #if DEBUG >= 2
+        fprintf(stdout, " Using rbase = %.3grad and nlayers = %d\n", rbase, nlayers);
+        #endif
+    }
 
     //for (int Itime = 0; Itime < Ntime; Itime++) {
     for (int Itime = 0; Itime < 1; Itime++) {
@@ -78,10 +100,16 @@ void interpolate_over_land(
                                        Ntime, Ndepth, Nlat, Nlon);
 
                     if (mask.at(mask_index) == 1) {
-                        xyzf_vec.at(4*cntr + 0) = R * cos(latitude.at(Ilat)) * cos(longitude.at(Ilon));
-                        xyzf_vec.at(4*cntr + 1) = R * cos(latitude.at(Ilat)) * sin(longitude.at(Ilon));
-                        xyzf_vec.at(4*cntr + 2) = R * sin(latitude.at(Ilat));
-                        xyzf_vec.at(4*cntr + 3) = field.at(index);
+                        if (cast_to_sphere) { 
+                            xyzf_vec.at(4*cntr + 0) = R * cos(latitude.at(Ilat)) * cos(longitude.at(Ilon));
+                            xyzf_vec.at(4*cntr + 1) = R * cos(latitude.at(Ilat)) * sin(longitude.at(Ilon));
+                            xyzf_vec.at(4*cntr + 2) = R * sin(latitude.at(Ilat));
+                            xyzf_vec.at(4*cntr + 3) = field.at(index);
+                        } else {
+                            xyzf_vec.at(3*cntr + 0) = longitude.at(Ilon);
+                            xyzf_vec.at(3*cntr + 1) = latitude.at(Ilat);
+                            xyzf_vec.at(3*cntr + 2) = field.at(index);
+                        }
 
                         num_seed_points++;
                         cntr++;
@@ -103,8 +131,13 @@ void interpolate_over_land(
             #endif
 
             alglib::real_2d_array xyzf;
-            xyzf.setlength(num_water_pts, 4);
-            xyzf.setcontent(num_water_pts, 4, &xyzf_vec[0]);
+            if (cast_to_sphere) { 
+                xyzf.setlength(num_water_pts, 4);
+                xyzf.setcontent(num_water_pts, 4, &xyzf_vec[0]);
+            } else {
+                xyzf.setlength(num_water_pts, 3);
+                xyzf.setcontent(num_water_pts, 3, &xyzf_vec[0]);
+            }
         
             alglib::rbfsetpoints(model, xyzf);
         
@@ -124,9 +157,7 @@ void interpolate_over_land(
             fprintf(stdout, "      Building the interpolator object.\n");
             #endif
             alglib::rbfreport rep;
-            #if DEBUG >= 2
-            fprintf(stdout, "        Using rbase = %.4g and nlayers = %d\n", rbase, nlayers);
-            #endif
+            fflush(stdout);
             alglib::rbfsetalgohierarchical(model, rbase, nlayers, 0.0);
             alglib::rbfbuildmodel(model, rep);
         
@@ -149,10 +180,16 @@ void interpolate_over_land(
 
                     if (mask.at(mask_index) == 0) {
                         // If we're on a land cell, then use the interpolator
-                        x = R * cos(latitude.at(Ilat)) * cos(longitude.at(Ilon));
-                        y = R * cos(latitude.at(Ilat)) * sin(longitude.at(Ilon));
-                        z = R * sin(latitude.at(Ilat));
-                        interp_field.at(index) = alglib::rbfcalc3(model, x, y, z);
+                        if (cast_to_sphere) { 
+                            x = R * cos(latitude.at(Ilat)) * cos(longitude.at(Ilon));
+                            y = R * cos(latitude.at(Ilat)) * sin(longitude.at(Ilon));
+                            z = R * sin(latitude.at(Ilat));
+                            interp_field.at(index) = alglib::rbfcalc3(model, x, y, z);
+                        } else {
+                            lon = longitude.at(Ilon);
+                            lat = latitude.at(Ilat);
+                            interp_field.at(index) = alglib::rbfcalc2(model, lon, lat);
+                        }
 
                         num_interp_points++;
                     } else {
