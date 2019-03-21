@@ -40,7 +40,7 @@ void read_var_from_file(
 
     // Get information about the variable
     if ((retval = nc_inq_var(ncid, var_id, NULL, NULL, &num_dims, dim_ids, NULL ))) { NC_ERR(retval, __LINE__, __FILE__); }
-    #if DEBUG >= 1
+    #if DEBUG >= 2
     if (num_dims == 1) {
         fprintf(stdout, "  has %d dimension of size ", num_dims);
     } else {
@@ -54,12 +54,12 @@ void read_var_from_file(
     for (int II = 0; II < num_dims; II++) {
         start[II] = 0;
         if ((retval = nc_inq_dim(ncid, dim_ids[II] , NULL, &count[II]  ))) { NC_ERR(retval, __LINE__, __FILE__); }
-        #if DEBUG >= 1
+        #if DEBUG >= 2
         fprintf(stdout, "%zu ", count[II]);
         #endif
         num_pts *= count[II];
     }
-    #if DEBUG >= 1
+    #if DEBUG >= 2
     fprintf(stdout, "\n");
     #endif
 

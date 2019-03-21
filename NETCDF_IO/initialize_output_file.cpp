@@ -79,6 +79,12 @@ void initialize_output_file(
     if ((retval = nc_def_var(ncid, "KE_filt", NC_DOUBLE, ndims, dimids, &KE_filt_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
 
+    double fill_value = -32767;
+    nc_put_att_double(ncid, u_r_varid,     "_FillValue", NC_DOUBLE, 1, &fill_value);
+    nc_put_att_double(ncid, u_lon_varid,   "_FillValue", NC_DOUBLE, 1, &fill_value);
+    nc_put_att_double(ncid, u_lat_varid,   "_FillValue", NC_DOUBLE, 1, &fill_value);
+    nc_put_att_double(ncid, KE_filt_varid, "_FillValue", NC_DOUBLE, 1, &fill_value);
+
     int mask_dimids[ndims];
     mask_dimids[0] = lat_dimid;
     mask_dimids[1] = lon_dimid;

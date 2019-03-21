@@ -59,26 +59,27 @@ void interpolate_over_land(
     double R;
     int index, mask_index, num_seed_points = 0, num_interp_points = 0;
     double perc_base = 10;
-    double perc = perc_base;
+    double perc;
 
     double x, y, z, lat, lon;
+    const double D2R = M_PI / 180;
 
     double rbase;
-    const int nlayers = 1;
+    const int nlayers = 4;
     if (cast_to_sphere) { 
-        rbase = 3 * distance(0, 0, 0, latitude.at(1) - latitude.at(0));
+        rbase = 10 * distance(0, 0, 0, latitude.at(1) - latitude.at(0));
         #if DEBUG >= 2
         fprintf(stdout, " Using rbase = %.3gkm and nlayers = %d\n", rbase, nlayers);
         #endif
     } else {
-        rbase = 3 * fabs(latitude.at(1) - latitude.at(0));
+        rbase = 10 * fabs(latitude.at(1) - latitude.at(0));
         #if DEBUG >= 2
         fprintf(stdout, " Using rbase = %.3grad and nlayers = %d\n", rbase, nlayers);
         #endif
     }
 
-    //for (int Itime = 0; Itime < Ntime; Itime++) {
-    for (int Itime = 0; Itime < 1; Itime++) {
+    //for (int Itime = 0; Itime < 1; Itime++) {
+    for (int Itime = 0; Itime < Ntime; Itime++) {
     #if DEBUG >= 1
     fprintf(stdout, "  Itime = %d of %d\n", Itime + 1, Ntime);
     #endif
@@ -90,9 +91,12 @@ void interpolate_over_land(
             #if DEBUG >= 1
             fprintf(stdout, "      Adding seed data to the interpolator object.\n");
             #endif
+            perc = perc_base;
             cntr = 0;
             for (int Ilat = 0; Ilat < Nlat; Ilat++) {
+                lat = latitude.at(Ilat);
                 for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+                    lon = longitude.at(Ilon);
 
                     index = Index(Itime, Idepth, Ilat, Ilon,
                                   Ntime, Ndepth, Nlat, Nlon);
@@ -101,13 +105,13 @@ void interpolate_over_land(
 
                     if (mask.at(mask_index) == 1) {
                         if (cast_to_sphere) { 
-                            xyzf_vec.at(4*cntr + 0) = R * cos(latitude.at(Ilat)) * cos(longitude.at(Ilon));
-                            xyzf_vec.at(4*cntr + 1) = R * cos(latitude.at(Ilat)) * sin(longitude.at(Ilon));
-                            xyzf_vec.at(4*cntr + 2) = R * sin(latitude.at(Ilat));
+                            xyzf_vec.at(4*cntr + 0) = R * cos(lat * D2R) * cos(lon * D2R);
+                            xyzf_vec.at(4*cntr + 1) = R * cos(lat * D2R) * sin(lon * D2R);
+                            xyzf_vec.at(4*cntr + 2) = R * sin(lat * D2R);
                             xyzf_vec.at(4*cntr + 3) = field.at(index);
                         } else {
-                            xyzf_vec.at(3*cntr + 0) = longitude.at(Ilon);
-                            xyzf_vec.at(3*cntr + 1) = latitude.at(Ilat);
+                            xyzf_vec.at(3*cntr + 0) = lon;
+                            xyzf_vec.at(3*cntr + 1) = lat;
                             xyzf_vec.at(3*cntr + 2) = field.at(index);
                         }
 
@@ -171,7 +175,9 @@ void interpolate_over_land(
             perc = perc_base;
 
             for (int Ilat = 0; Ilat < Nlat; Ilat++) {
+                lat = latitude.at(Ilat);
                 for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+                    lon = longitude.at(Ilon);
 
                     index = Index(Itime, Idepth, Ilat, Ilon,
                                   Ntime, Ndepth, Nlat, Nlon);
@@ -181,13 +187,11 @@ void interpolate_over_land(
                     if (mask.at(mask_index) == 0) {
                         // If we're on a land cell, then use the interpolator
                         if (cast_to_sphere) { 
-                            x = R * cos(latitude.at(Ilat)) * cos(longitude.at(Ilon));
-                            y = R * cos(latitude.at(Ilat)) * sin(longitude.at(Ilon));
-                            z = R * sin(latitude.at(Ilat));
+                            x = R * cos(lat * D2R) * cos(lon * D2R);
+                            y = R * cos(lat * D2R) * sin(lon * D2R);
+                            z = R * sin(lat * D2R);
                             interp_field.at(index) = alglib::rbfcalc3(model, x, y, z);
                         } else {
-                            lon = longitude.at(Ilon);
-                            lat = latitude.at(Ilat);
                             interp_field.at(index) = alglib::rbfcalc2(model, lon, lat);
                         }
 

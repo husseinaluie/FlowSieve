@@ -5,6 +5,7 @@
 #include "netcdf_io.hpp"
 #include "preprocess.hpp"
 #include "constants.hpp"
+#include "functions.hpp"
 
 #ifndef DEBUG
     #define DEBUG 0
@@ -27,10 +28,6 @@ int main(int argc, char **argv)
     std::vector<double> sal;
     std::vector<double> ssh;
 
-    std::vector<double> thetao_interp;
-    std::vector<double> sal_interp;
-    std::vector<double> ssh_interp;
-
     std::vector<double> mask;
 
     read_var_from_file(longitude, "longitude", "source.nc", NULL);
@@ -38,35 +35,72 @@ int main(int argc, char **argv)
     read_var_from_file(time,      "time",      "source.nc", NULL);
     read_var_from_file(depth,     "depth",     "source.nc", NULL);
 
+    int Ntime = time.size();
+    int Ndepth = depth.size();
+    int Nlat = latitude.size();
+    int Nlon = longitude.size();
+
     read_var_from_file(u_lat, "vo", "source.nc", &mask);
 
     read_var_from_file(thetao, "thetao", "source.nc", NULL);
     read_var_from_file(sal ,   "so",     "source.nc", NULL);
     read_var_from_file(ssh,    "zos",    "source.nc", NULL);
 
-    // Convert to radians
-    for (size_t Ilat = 0; Ilat < latitude.size(); Ilat++) {
-        latitude.at(Ilat) = latitude.at(Ilat) * M_PI / 180.;
-    }
-    for (size_t Ilon = 0; Ilon < longitude.size(); Ilon++) {
-        longitude.at(Ilon) = longitude.at(Ilon) * M_PI / 180.;
+    // Compute the density and pressure at each land point
+    //    by converting first, it means that we only need
+    //    to interpolate two fields instead of three, which
+    //    saves us a bit.
+    std::vector<double> pressure(sal.size());
+    std::vector<double> density(sal.size());
+
+    std::vector<double> pressure_interp(sal.size());
+    std::vector<double> density_interp(sal.size());
+
+    double temp;
+    int index, mask_index;
+    #if DEBUG >= 0
+    fprintf(stdout, "Computing density and pressure at water points before interpolating.\n");
+    #endif
+    for (int Itime = 0; Itime < Ntime; Itime++) {
+        for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
+            for (int Ilat = 0; Ilat < Nlat; Ilat++) {
+                for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                    index = Index(Itime, Idepth, Ilat, Ilon,
+                                  Ntime, Ndepth, Nlat, Nlon);
+                    mask_index = Index(0,     0,      Ilat, Ilon,
+                                       Ntime, Ndepth, Nlat, Nlon);
+
+                    if (mask.at(mask_index) == 1) {
+                        // Compute pressure (geostrophic)
+                        pressure.at(index) = constants::rho0 * constants::g * ssh.at(index);
+
+                        // Convert potential temp to actual temp
+                        temp = depotential_temperature(pressure.at(index), thetao.at(index));
+
+                        // Compute density from UNESCO equation of state
+                        density.at(index) = equation_of_state(
+                                temp, 
+                                sal.at(index), 
+                                pressure.at(index) / 1e5); // takes pressure in bar = 100 kPa = 1e5 Pa
+                    }
+                }
+            }
+        }
     }
 
+    // Apply interpolation
     #if DEBUG >= 0
-    fprintf(stdout, "Interpolating potential temperature (thetao)\n");
+    fprintf(stdout, "Interpolating density\n");
     #endif
-    interpolate_over_land(thetao_interp, thetao, time, depth, latitude, longitude, mask);
-    
+    interpolate_over_land(density_interp, density, time, depth, latitude, longitude, mask);
+
     #if DEBUG >= 0
-    fprintf(stdout, "Interpolating salinity (so)\n");
+    fprintf(stdout, "Interpolating pressure\n");
     #endif
-    interpolate_over_land(sal_interp, sal, time, depth, latitude, longitude, mask);
-    
-    #if DEBUG >= 0
-    fprintf(stdout, "Interpolating sea surface height (zos)\n");
-    #endif
-    interpolate_over_land(ssh_interp, ssh, time, depth, latitude, longitude, mask);
-    
+    interpolate_over_land(pressure_interp, pressure, time, depth, latitude, longitude, mask);
+
+    // Now output to interp.nc
     #if DEBUG >= 0
     fprintf(stdout, "Creating output\n");
     #endif
@@ -76,13 +110,11 @@ int main(int argc, char **argv)
     fprintf(stdout, "Adding appropraite variables to source.nc\n");
     #endif
     const char* dim_names[] = {"time", "depth", "latitude", "longitude"};
-    add_var_to_file("thetao_orig", dim_names, 4, "interp.nc");
-    add_var_to_file("sal_orig",    dim_names, 4, "interp.nc");
-    add_var_to_file("ssh_orig",    dim_names, 4, "interp.nc");
+    add_var_to_file("pressure_orig", dim_names, 4, "interp.nc");
+    add_var_to_file("density_orig",  dim_names, 4, "interp.nc");
 
-    add_var_to_file("thetao_interp", dim_names, 4, "interp.nc");
-    add_var_to_file("sal_interp",    dim_names, 4, "interp.nc");
-    add_var_to_file("ssh_interp",    dim_names, 4, "interp.nc");
+    add_var_to_file("pressure_interp", dim_names, 4, "interp.nc");
+    add_var_to_file("density_interp",    dim_names, 4, "interp.nc");
 
     size_t starts[] = {0, 0, 0, 0};
     size_t counts[] = {time.size(),
@@ -94,40 +126,11 @@ int main(int argc, char **argv)
     #if DEBUG >= 0
     fprintf(stdout, "Writing appropriate variables to source.nc\n");
     #endif
-    write_field_to_output(thetao, "thetao_orig", starts, counts, "interp.nc");
-    write_field_to_output(sal,    "sal_orig",    starts, counts, "interp.nc");
-    write_field_to_output(ssh,    "ssh_orig",    starts, counts, "interp.nc");
+    write_field_to_output(pressure, "pressure_orig", starts, counts, "interp.nc");
+    write_field_to_output(density,  "density_orig",  starts, counts, "interp.nc");
 
-    write_field_to_output(thetao_interp, "thetao_interp", starts, counts, "interp.nc");
-    write_field_to_output(sal_interp,    "sal_interp",    starts, counts, "interp.nc");
-    write_field_to_output(ssh_interp,    "ssh_interp",    starts, counts, "interp.nc");
-    
-
-    /*
-    // Now that we've interpolated them, let's compute the density and pressure at each point
-    std::vector<double> pressure(sal.size());
-    std::vector<double> density(sal.size());
-
-    double temp;
-    for (size_t II = 0; II < sal.size();, II++) {
-        // Compute pressure (geostrophic)
-        pressure.at(II) = constants::rho0 * constants::g * ssh_interp.at(II);
-
-        // Convert potential temp to actual temp
-        temp = depotential_temperature(pressure.at(II), thetao.at(II));
-
-        // Compute density from UNESCO equation of state
-        density.at(II) = equation_of_state(temp, 
-                sal_interp.at(II), 
-                pressure.at(II) / 1e5); // takes pressure in bar = 100 kPa = 1e5 Pa
-    }
-
-    add_var_to_file("pressure", dim_names, 4, "interp.nc");
-    add_var_to_file("density",  dim_names, 4, "interp.nc");
-
-    write_field_to_output(pressure, "pressure", starts, counts, "interp.nc");
-    write_field_to_output(density,  "density",  starts, counts, "interp.nc");
-    */
+    write_field_to_output(pressure_interp, "pressure_interp", starts, counts, "interp.nc");
+    write_field_to_output(density_interp,  "density_interp",  starts, counts, "interp.nc");
 
     return 0;
 }
