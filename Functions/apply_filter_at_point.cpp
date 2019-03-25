@@ -32,13 +32,13 @@ void apply_filter_at_point(
     int index, mask_index;
     int curr_lon;
 
-    kA_sum     = 0.;
+    kA_sum = 0.;
     double coarse_val_tmp = 0.;
     double mask_val = 0.;
 
     // Grid spacing: assume uniform grid
-    double dlat = latitude.at( 1) - latitude.at( 0);
-    double dlon = longitude.at(1) - longitude.at(0);
+    const double dlat = latitude.at( 1) - latitude.at( 0);
+    const double dlon = longitude.at(1) - longitude.at(0);
 
     double dlat_m, dlon_m; 
     int    dlat_N, dlon_N;
@@ -54,24 +54,26 @@ void apply_filter_at_point(
     LAT_ub = std::min(Nlat, Ilat + dlat_N);
 
     double local_scale, delta_lat;
+    double lat_at_curr, lat_at_ilat;
+    lat_at_ilat = latitude.at(Ilat);
 
     for (int curr_lat = LAT_lb; curr_lat < LAT_ub; curr_lat++) {
+        lat_at_curr = latitude.at(curr_lat);
 
         // Get the longitude grid spacing (in m) at this latitude
-        dlon_m = dlon * constants::R_earth * cos(latitude.at(curr_lat));
+        dlon_m = dlon * constants::R_earth * cos(lat_at_curr);
 
         // Next determine how far we need to go (since we're already 
         //   at a finite distance in latitude, we don't need to go
         //   the full scale distance in longitude).
-        // Essentially, use circular integration regions, not square
+        // Essentially, use 'circular' integration regions, not square
         //    this will further reduce the number of cells
         //    required (by up to a factor of 4), which should
         //    improve performance.
         //  The abs in local_scale is to handle the 'comfort zone'
         //    where delta_lat > scale (from the 1.1 factor in dlat_N)
-        delta_lat   = constants::R_earth * abs(   latitude.at(Ilat) 
-                                                - latitude.at(curr_lat));
-        local_scale = sqrt( abs( pow(scale, 2) - pow(delta_lat, 2) ));
+        delta_lat   = constants::R_earth * ( lat_at_ilat - lat_at_curr );
+        local_scale = sqrt( fabs( scale*scale - delta_lat*delta_lat ));
 
         // Now find the appropriate integration region
         //   The factor of 2 is diameter->radius 
@@ -90,8 +92,8 @@ void apply_filter_at_point(
                 curr_lon = LON;
             }
 
-            dist = distance(longitude.at(Ilon),     latitude.at(Ilat),
-                            longitude.at(curr_lon), latitude.at(curr_lat));
+            dist = distance(longitude.at(Ilon),     lat_at_ilat,
+                            longitude.at(curr_lon), lat_at_curr);
 
             kern = kernel(dist, scale);
 

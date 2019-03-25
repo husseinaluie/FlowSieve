@@ -13,15 +13,28 @@ double distance(
         const double lat2  /**< [in] Latitude of second position */
         ) {
 
-    double Delta_lon, numer, denom, Delta_sigma, distance;
+    double numer, denom, Delta_sigma, distance;
 
-    Delta_lon = lon2 - lon1;
+    const double Delta_lon = lon2 - lon1;
+    const double cos_lat2 = cos(lat2);
+    const double sin_lat2 = sin(lat2);
+    const double cos_lat1 = cos(lat1);
+    const double sin_lat1 = sin(lat1);
+    const double cos_Delta_lon = cos(Delta_lon);
+
+    /*
+    numer =   pow(                                              cos(lat2) * sin(Delta_lon), 2 ) 
+                   + pow( cos(lat1) * sin(lat2)  -  sin(lat1) * cos(lat2) * cos(Delta_lon), 2 );
+    numer =  sqrt(numer);
+                
+    denom =        sin(lat1) * sin(lat2)  +  cos(lat1) * cos(lat2) * cos(Delta_lon);
+    */
     
-    numer =   pow(                                       cos(lat2) * sin(Delta_lon), 2 ) 
-            + pow( cos(lat1) * sin(lat2)  -  sin(lat1) * cos(lat2) * cos(Delta_lon), 2 );
+    numer =   pow(                                    cos_lat2 * sin(Delta_lon), 2 ) 
+            + pow( cos_lat1 * sin_lat2  -  sin_lat1 * cos_lat2 * cos_Delta_lon , 2 );
     numer =  sqrt(numer);
     
-    denom =        sin(lat1) * sin(lat2)  +  cos(lat1) * cos(lat2) * cos(Delta_lon);
+    denom =        sin_lat1 * sin_lat2  +  cos_lat1 * cos_lat2 * cos_Delta_lon ;
 
     Delta_sigma = atan2(numer, denom);
     

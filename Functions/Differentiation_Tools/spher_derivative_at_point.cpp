@@ -22,9 +22,11 @@ double spher_derivative_at_point(
     int index, Iref;
     double deriv_val = 0.;
     const int Nref = grid.size();
+    const bool do_lat = (dim == "lat");
+    const bool do_lon = (dim == "lon");
 
-    if      (dim == "lon") { Iref = Ilon; }
-    else if (dim == "lat") { Iref = Ilat; }
+    if      (do_lon) { Iref = Ilon; }
+    else if (do_lat) { Iref = Ilat; }
     else { 
         fprintf(stderr, "Illegal dimensions provided! %s given to %s\n", dim.c_str(), __FILE__);
         Iref = 0;
@@ -44,8 +46,8 @@ double spher_derivative_at_point(
     while (LB > 0) {
         if ( (Iref - LB) > constants::DiffOrd ) { break; }
        
-        if      (dim == "lon") { index = Index(0, 0, Ilat, LB,   Ntime, Ndepth, Nlat, Nlon); }
-        else if (dim == "lat") { index = Index(0, 0, LB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        if      (do_lon) { index = Index(0, 0, Ilat, LB,   Ntime, Ndepth, Nlat, Nlon); }
+        else if (do_lat) { index = Index(0, 0, LB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
         
         if (mask.at(index) == 0) { LB++; break; }
 
@@ -55,8 +57,8 @@ double spher_derivative_at_point(
     while (UB < Nref-1) {
         if ( (UB - Iref) > constants::DiffOrd ) { break; }
        
-        if      (dim == "lon") { index = Index(0, 0, Ilat, UB,   Ntime, Ndepth, Nlat, Nlon); }
-        else if (dim == "lat") { index = Index(0, 0, UB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        if      (do_lon) { index = Index(0, 0, Ilat, UB,   Ntime, Ndepth, Nlat, Nlon); }
+        else if (do_lat) { index = Index(0, 0, UB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
         if (mask.at(index) == 0) { UB--; break; }
 
@@ -74,8 +76,8 @@ double spher_derivative_at_point(
         differentiation_vector(ddl, dl, Iref - LB);
         for (int IND = LB; IND <= UB; IND++) {
 
-            if      (dim == "lon") { index = Index(Itime, Idepth, Ilat, IND,  Ntime, Ndepth, Nlat, Nlon); }
-            else if (dim == "lat") { index = Index(Itime, Idepth, IND,  Ilon, Ntime, Ndepth, Nlat, Nlon); }
+            if      (do_lon) { index = Index(Itime, Idepth, Ilat, IND,  Ntime, Ndepth, Nlat, Nlon); }
+            else if (do_lat) { index = Index(Itime, Idepth, IND,  Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
             deriv_val +=  field.at(index) * ddl.at(IND - LB);
         }
