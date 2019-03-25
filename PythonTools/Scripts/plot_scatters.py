@@ -6,12 +6,7 @@ from netCDF4 import Dataset
 from mpl_toolkits.basemap import Basemap
 import PlotTools
 
-# The purpose of this post-processing script is to read in the results
-#   from a series of filterings and produce images of the
-#   band-filtered kinetic energy.
-# A major underlying assumption is that the grid is unchanged
-#   between the filterings so that subtraction etc.
-#   is trivial.
+dpi = PlotTools.dpi
 
 fp = 'filter_output.nc'
 results = Dataset(fp, 'r')
@@ -114,7 +109,7 @@ if True:
 
     axes[0,1].legend(loc='best')
 
-    plt.savefig('Figures/transfers_comparison.png', dpi=600)
+    plt.savefig('Figures/transfers_comparison.png', dpi=dpi)
     plt.close()
 
 # Pi vs vorticity, colour by Lambda^m
@@ -173,5 +168,5 @@ if True:
 
     #axes[0,1].legend(loc='best')
 
-    plt.savefig('Figures/transfers_comparison2.png', dpi=600)
+    plt.savefig('Figures/transfers_comparison2.png', dpi=dpi)
     plt.close()

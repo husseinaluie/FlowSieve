@@ -6,6 +6,8 @@ import PlotTools, cmocean
 import matpy as mp
 import sys, os, shutil, datetime
 
+dpi = PlotTools.dpi
+
 try: # Try using mpi
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -50,6 +52,10 @@ mask      = results.variables['mask'][:]
 v_r       = results.variables['vort_r'  ][:]
 v_lon     = results.variables['vort_lon'][:]
 v_lat     = results.variables['vort_lat'][:]
+
+if not('baroclinic_transfer' in results.variables):
+    sys.exit()
+
 Lambda    = results.variables['baroclinic_transfer'][:]
 
 Lambda = Lambda[:-1,:,:,:,:]
@@ -63,6 +69,10 @@ time = time - epoch_delta.total_seconds()  # shift
 
 Nscales, Ntime, Ndepth, Nlat, Nlon = v_r.shape
 
+if (Ntime == 1):
+    print("Not enough time points to do enstrophy flux")
+    sys.exit()
+
 dlat = (latitude[1]  - latitude[0] ) * D2R
 dlon = (longitude[1] - longitude[0]) * D2R
 LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
@@ -74,7 +84,7 @@ mask  = np.tile(mask.reshape(1,Nlat,Nlon), (Ndepth, 1, 1))
 if Ntime >= 5:
     order = 4
 else:
-    order = Ntime - 1
+    order = max(1, Ntime - 2)
 Dt = mp.FiniteDiff(time, order, spb=False)
 
 net_EN_flux = np.zeros((Ntime, Nscales-1))
@@ -132,7 +142,7 @@ for iS in range(Nscales - 1):
 
         fig.suptitle(sup_title)
         
-        plt.savefig(tmp_direct + '/EN_fluxes_{0:.3g}km_{1:04d}.png'.format(scales[iS]/1e3,iT), dpi=500)
+        plt.savefig(tmp_direct + '/EN_fluxes_{0:.3g}km_{1:04d}.png'.format(scales[iS]/1e3,iT), dpi=dpi)
         plt.close()
     
 # Now plot the space-integrated version
@@ -141,8 +151,8 @@ fig, axes = plt.subplots(2, 1,
         gridspec_kw = dict(left = 0.15, right = 0.95, bottom = 0.1, top = 0.95,
         hspace=0.1))
 for iS in range(Nscales-1):
-    l1, = axes[0].plot(time, net_EN_flux, '-', color=colours[iS])
-    l2, = axes[0].plot(time, net_lambda, '--', color=colours[iS])
+    l1 = axes[0].plot(time, net_EN_flux[:,iS], '-', color=colours[iS])
+    l2 = axes[0].plot(time, net_lambda[:,iS], '--', color=colours[iS])
 
     axes[1].plot([iS+0.25,iS+0.75], [0.5, 0.5], '-',  color = colours[iS])
     axes[1].plot([iS+0.25,iS+0.75], [1.5, 1.5], '--', color = colours[iS])

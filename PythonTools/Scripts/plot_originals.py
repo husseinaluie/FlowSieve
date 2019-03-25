@@ -6,6 +6,8 @@ from netCDF4 import Dataset
 from mpl_toolkits.basemap import Basemap
 import PlotTools, subprocess, shutil, os
 
+dpi = PlotTools.dpi
+
 try: # Try using mpi
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -112,7 +114,7 @@ def plot(LON, LAT, to_plot, filename,
     if not(title == None):
         ax.set_title(title)
     
-    plt.savefig(filename, dpi=500)
+    plt.savefig(filename, dpi=dpi)
     plt.close()
 
 for Itime in range(rank, Ntime, num_procs):    

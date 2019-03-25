@@ -1,4 +1,5 @@
 import numpy as np
+from mpl_toolkits.basemap import Basemap
 
 def MapSettings(longitude, latitude, R_earth = 6371e3):
 
@@ -9,34 +10,36 @@ def MapSettings(longitude, latitude, R_earth = 6371e3):
     lat_0 = np.mean(latitude)
 
     # Set the projection
-    if np.abs(longitude.max() - longitude.min()) > 75.:
+    if np.abs(longitude.max() - longitude.min()) > 120.:
         print("Using Eckert IV Projection")
         map_settings = dict(
             projection = 'eck4',
-            lon_0 = -50,#lon_0, 
+            lon_0 = lon_0,
             resolution = 'l')  
     else:
         print("Using Gnomonic Projection")
 
-        height = 1.2 * R_earth * (latitude.max()  - latitude.min() )
-        width  = 1.2 * R_earth * (longitude.max() - longitude.min())
+        tmp_map = Basemap(projection = 'gnom',
+            lon_0 = lon_0,
+            lat_0 = lat_0,
+            width = 20,
+            height = 20,
+            resolution = 'c')  
 
-        ll_corner_lon = np.min(longitude)
-        ll_corner_lat = np.min(latitude)
+        LON, LAT = np.meshgrid(longitude, latitude)
+        X, Y = tmp_map(LON, LAT, inverse=False)
 
-        ur_corner_lon = np.max(longitude)
-        ur_corner_lat = np.max(latitude)
+        ll_lon, ll_lat = tmp_map(X.min(), Y.min(), inverse=True)
+        ur_lon, ur_lat = tmp_map(X.max(), Y.max(), inverse=True)
 
         map_settings = dict(
             projection = 'gnom',
             lon_0 = lon_0,
             lat_0 = lat_0,
-            llcrnrlon = ll_corner_lon,
-            llcrnrlat = ll_corner_lat - 5,
-            urcrnrlon = ur_corner_lon + 15,
-            urcrnrlat = ur_corner_lat,
-            #height = height,
-            #width  = width,
+            llcrnrlon = ll_lon,
+            llcrnrlat = ll_lat,
+            urcrnrlon = ur_lon,
+            urcrnrlat = ur_lat,
             resolution = 'l')  
 
     return map_settings

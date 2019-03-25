@@ -1,10 +1,12 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import cmocean, sys, PlotTools, os, shutil
+import cmocean, sys, PlotTools, os, shutil, datetime
 from netCDF4 import Dataset
 from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import ListedColormap
+
+dpi = PlotTools.dpi
 
 try: # Try using mpi
     from mpi4py import MPI
@@ -50,11 +52,18 @@ latitude  = results.variables['latitude'][:] * R2D
 longitude = results.variables['longitude'][:] * R2D
 scales    = results.variables['scale'][:]
 depth     = results.variables['depth'][:]
-time      = results.variables['time'][:]
+time      = results.variables['time'][:] * (60*60) # convert hours to second
 vort_r    = results.variables['vort_r'  ][:, :, 0, :, :]
 vort_lat  = results.variables['vort_lat'][:, :, 0, :, :]
 vort_lon  = results.variables['vort_lon'][:, :, 0, :, :]
 mask      = results.variables['mask'][:]
+
+# Do some time handling tp adjust the epochs
+# appropriately
+epoch = datetime.datetime(1950,1,1)   # the epoch of the time dimension
+dt_epoch = datetime.datetime.fromtimestamp(0)  # the epoch used by datetime
+epoch_delta = dt_epoch - epoch  # difference
+time = time - epoch_delta.total_seconds()  # shift
 
 num_scales = len(scales)
 Ntime = len(time)
@@ -77,12 +86,19 @@ gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.05, right = 0.95, b
 
 ## Vorticity binning
 for Itime in range(rank, Ntime, num_procs):    
+
+    timestamp = datetime.datetime.fromtimestamp(time[Itime])
+    sup_title = "{0:02d} - {1:02d} - {2:04d} ( {3:02d}:{4:02d} )".format(
+            timestamp.day, timestamp.month, timestamp.year, 
+            timestamp.hour, timestamp.minute)
     
     # Initialize figure
     fig, axes = plt.subplots(1, num_scales,
             sharex=True, sharey=True, squeeze=False,
             gridspec_kw = gridspec_props,
             figsize=(4*num_scales, 14/3.))
+
+    fig.suptitle(sup_title)
     
     # Plot each band
     for ii in range(num_scales):
@@ -146,17 +162,25 @@ for Itime in range(rank, Ntime, num_procs):
             axes[0,ii].set_title('{0:.1f} to {1:0.1f} km'.format(scales[ii-1] / 1e3, scales[ii] / 1e3))
         
     
-    plt.savefig(tmp_direct + '/vorticity_bands_{0:04d}.png'.format(Itime), dpi=500)
+    plt.savefig(tmp_direct + '/vorticity_bands_{0:04d}.png'.format(Itime), dpi=dpi)
     plt.close()
 
 
 ## Dichotomies
 for Itime in range(rank, Ntime, num_procs):    
+
+    timestamp = datetime.datetime.fromtimestamp(time[Itime])
+    sup_title = "{0:02d} - {1:02d} - {2:04d} ( {3:02d}:{4:02d} )".format(
+            timestamp.day, timestamp.month, timestamp.year, 
+            timestamp.hour, timestamp.minute)
+
     # Initialize figure
     fig, axes = plt.subplots(num_scales-1, 2,
             sharex=True, sharey=True, squeeze=False,
             gridspec_kw = gridspec_props,
             figsize=(10, 4*num_scales-1))
+
+    fig.suptitle(sup_title)
     
     # Plot each band
     for ii in range(num_scales-1):
@@ -167,18 +191,25 @@ for Itime in range(rank, Ntime, num_procs):
         to_plot_below = np.ma.masked_where(mask==0, to_plot_below)
         to_plot_above = np.ma.masked_where(mask==0, to_plot_above)
     
-        m_a = Basemap(ax = axes[ii,1], **map_settings)
-        m_b = Basemap(ax = axes[ii,0], **map_settings)
+        m_a = Basemap(ax = axes[ii,0], **map_settings)
+        m_b = Basemap(ax = axes[ii,1], **map_settings)
     
         CV_a = np.nanpercentile(np.abs(to_plot_above), 99)
         CV_b = np.nanpercentile(np.abs(to_plot_below), 99)
     
         vmax = max(CV_a, CV_b)
     
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_above, 
-                axes[ii,1], fig, m_a, num_ords = 2, vmax=vmax)
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_below, 
-                axes[ii,0], fig, m_b, num_ords = 2, vmax=vmax)
+        qm_a  = m_a.pcolormesh(LON*R2D, LAT*R2D, to_plot_above, 
+                    cmap='cmo.balance', 
+                    vmin = -CV_a, vmax = CV_a, latlon = True)
+        qm_b  = m_b.pcolormesh(LON*R2D, LAT*R2D, to_plot_below, 
+                    cmap='cmo.balance', 
+                    vmin = -CV_b, vmax = CV_b, latlon = True)
+
+        cbar_a = plt.colorbar(qm_a, ax = axes[ii,0], **cbar_props)
+        cbar_b = plt.colorbar(qm_b, ax = axes[ii,1], **cbar_props)
+        PlotTools.ScientificCbar(cbar_a, units='$\mathrm{s}^{-1}$', orientation='horizontal')
+        PlotTools.ScientificCbar(cbar_b, units='$\mathrm{s}^{-1}$', orientation='horizontal')
     
         # Add coastlines and lat/lon lines
         for m in [m_a, m_b]:
@@ -189,10 +220,10 @@ for Itime in range(rank, Ntime, num_procs):
         
         axes[ii,0].set_ylabel('{0:.1f} km'.format(scales[ii] / 1e3))
     
-    axes[0,0].set_title('Fine $(<l)$')
-    axes[0,1].set_title('Coarse $(>l)$')
+    axes[0,0].set_title('Coarse $(>l)$')
+    axes[0,1].set_title('Fine $(<l)$')
         
-    plt.savefig(tmp_direct + '/vorticity_dichotomies_{0:04d}.png'.format(Itime), dpi=500)
+    plt.savefig(tmp_direct + '/vorticity_dichotomies_{0:04d}.png'.format(Itime), dpi=dpi)
     plt.close()
 
 

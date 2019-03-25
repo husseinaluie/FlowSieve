@@ -6,6 +6,8 @@ import PlotTools, cmocean
 import matpy as mp
 import sys, os, shutil, datetime
 
+dpi = PlotTools.dpi
+
 try: # Try using mpi
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
@@ -51,8 +53,10 @@ u_r       = results.variables['u_r'  ][:]
 u_lon     = results.variables['u_lon'][:]
 u_lat     = results.variables['u_lat'][:]
 Pi        = results.variables['energy_transfer'][:]
+PEtoKE    = results.variables['PEtoKE'][:]
 
 Pi = Pi[:-1,:,:,:,:]
+PEtoKE = PEtoKE[:-1,:,:,:,:]
 
 # Do some time handling tp adjust the epochs
 # appropriately
@@ -62,6 +66,10 @@ epoch_delta = dt_epoch - epoch  # difference
 time = time - epoch_delta.total_seconds()  # shift
 
 Nscales, Ntime, Ndepth, Nlat, Nlon = u_r.shape
+
+if (Ntime == 1):
+    print("Not enough time points to plot KE flux")
+    sys.exit()
 
 dlat = (latitude[1]  - latitude[0] ) * D2R
 dlon = (longitude[1] - longitude[0]) * D2R
@@ -74,11 +82,12 @@ mask  = np.tile(mask.reshape(1,Nlat,Nlon), (Ndepth, 1, 1))
 if Ntime >= 5:
     order = 4
 else:
-    order = Ntime - 1
+    order = max(1, Ntime - 2)
 Dt = mp.FiniteDiff(time, order, spb=False)
 
 net_KE_flux = np.zeros((Ntime, Nscales-1))
 net_Pi      = np.zeros((Ntime, Nscales-1))
+net_PEtoKE  = np.zeros((Ntime, Nscales-1))
 
 for iS in range(Nscales-1):
     # First, process data
@@ -95,8 +104,9 @@ for iS in range(Nscales-1):
                 timestamp.day, timestamp.month, timestamp.year, 
                 timestamp.hour, timestamp.minute)
 
-        net_KE_flux[iT,iS] = np.sum(KE_flux[iT,:] * dArea.ravel() * mask.ravel())
-        net_Pi[     iT,iS] = np.sum(- Pi[iS,iT,:] * dArea         * mask)
+        net_KE_flux[iT,iS] = np.sum(KE_flux[  iT,:] * dArea.ravel() * mask.ravel())
+        net_Pi[     iT,iS] = np.sum(- Pi[  iS,iT,:] * dArea         * mask)
+        net_PEtoKE[ iT,iS] = np.sum(PEtoKE[iS,iT,:] * dArea         * mask)
     
         KE_sel =  KE_flux[iT,:].ravel()[mask.ravel() == 1]
         Pi_sel = -Pi[iS,iT,:,:,:].ravel()[mask.ravel() == 1]
@@ -131,34 +141,41 @@ for iS in range(Nscales-1):
 
         fig.suptitle(sup_title)
         
-        plt.savefig(tmp_direct + '/KE_fluxes_{0:.3g}km_{1:04d}.png'.format(scales[iS]/1e3,iT), dpi=500)
+        plt.savefig(tmp_direct + '/KE_fluxes_{0:.3g}km_{1:04d}.png'.format(scales[iS]/1e3,iT), dpi=dpi)
         plt.close()
 
     
-# Now plot the space-integrated version
-colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
-fig, axes = plt.subplots(2, 1,
-        gridspec_kw = dict(left = 0.15, right = 0.95, bottom = 0.1, top = 0.95,
-        hspace=0.1))
-cmap=cmocean.cm.thermal
-for iS in range(Nscales-1):
-    l1, = axes[0].plot(time, net_KE_flux, '-',  color=colours[iS])
-    l2, = axes[0].plot(time, net_Pi,      '--', color=colours[iS])
+    # Now plot the space-integrated version
+    colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    fig, axes = plt.subplots(1, 1, squeeze=False,
+            gridspec_kw = dict(left = 0.15, right = 0.95, bottom = 0.1, top = 0.95,
+            hspace=0.1))
+    l1 = axes[0,0].plot(time, net_KE_flux[:,iS], color=colours[0], 
+            label='$\int_{\Omega}\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$')
+    l2 = axes[0,0].plot(time, net_Pi[:,iS],      color=colours[1], 
+            label='$-\int_{\Omega}\Pi\mathrm{dA}$')
+    l3 = axes[0,0].plot(time, net_PEtoKE[:,iS],  color=colours[2], 
+            label='$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$')
 
-    axes[1].plot([iS+0.25,iS+0.75], [0.5, 0.5], '-',  color = colours[iS])
-    axes[1].plot([iS+0.25,iS+0.75], [1.5, 1.5], '--', color = colours[iS])
+    '''
+    axes[1,0].plot([0.25,0.75], [0.5, 0.5], color = colours[0])
+    axes[1,0].plot([0.25,0.75], [1.5, 1.5], color = colours[1])
+    axes[1,0].plot([0.25,0.75], [2.5, 2.5], color = colours[2])
 
-axes[1].set_xlim(0,Nscales-1)
-axes[1].set_ylim(0,2)
-axes[1].set_xticks(np.arange(Nscales-1)+0.5)
-axes[1].set_yticks([0.5, 1.5])
-axes[1].set_xticklabels(["{0:.3g}km".format(sc/1e3) for sc in scales[:-1]])
-axes[1].set_yticklabels(['$\int_{\Omega}\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)$',
-    '$-\int_{\Omega}\Pi$'])
+    axes[1,0].set_xlim(0,Nscales-1)
+    axes[1,0].set_ylim(0,3)
+    axes[1,0].set_xticks(np.arange(Nscales-1)+0.5)
+    axes[1,0].set_yticks([0.5, 1.5, 2.5])
+    axes[1,0].set_xticklabels(["{0:.3g}km".format(sc/1e3) for sc in scales[:-1]])
+    axes[1,0].set_yticklabels(['$\int_{\Omega}\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$',
+        '$-\int_{\Omega}\Pi\mathrm{dA}$',
+        '$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'])
+    '''
 
-axes[0].set_ylabel('$\mathrm{W}$')
-plt.savefig('Figures/KE_fluxes_net.pdf')
-plt.close()
+    axes[0,0].legend(loc='best')
+    axes[0,0].set_ylabel('$\mathrm{W}$')
+    plt.savefig(out_direct + '/KE_fluxes_net_{0:.3g}km.pdf'.format(scales[iS]/1e3))
+    plt.close()
 
 # If more than one time point, create mp4s
 if Ntime > 1:

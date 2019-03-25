@@ -6,6 +6,8 @@ from netCDF4 import Dataset
 from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import ListedColormap
 
+dpi = PlotTools.dpi
+
 fp = 'filter_output.nc'
 results = Dataset(fp, 'r')
 source = Dataset('input.nc', 'r')
@@ -153,6 +155,6 @@ for jj in range(3):
         axes[jj,ii+1].set_title('orig - bandsum')
 
     
-plt.savefig('Figures/velocity_filter_bands.png', dpi=500)
+plt.savefig('Videos/velocity_filter_bands.png', dpi=dpi)
 plt.close()
 
