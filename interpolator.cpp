@@ -93,12 +93,14 @@ int main(int argc, char **argv)
     #if DEBUG >= 0
     fprintf(stdout, "Interpolating density\n");
     #endif
-    interpolate_over_land(density_interp, density, time, depth, latitude, longitude, mask);
+    //interpolate_over_land(density_interp, density, time, depth, latitude, longitude, mask);
+    interpolate_over_land_from_coast(density_interp, density, time, depth, latitude, longitude, mask);
 
     #if DEBUG >= 0
     fprintf(stdout, "Interpolating pressure\n");
     #endif
-    interpolate_over_land(pressure_interp, pressure, time, depth, latitude, longitude, mask);
+    //interpolate_over_land(pressure_interp, pressure, time, depth, latitude, longitude, mask);
+    interpolate_over_land_from_coast(pressure_interp, pressure, time, depth, latitude, longitude, mask);
 
     // Now output to interp.nc
     #if DEBUG >= 0
@@ -114,7 +116,7 @@ int main(int argc, char **argv)
     add_var_to_file("density_orig",  dim_names, 4, "interp.nc");
 
     add_var_to_file("pressure_interp", dim_names, 4, "interp.nc");
-    add_var_to_file("density_interp",    dim_names, 4, "interp.nc");
+    add_var_to_file("density_interp",  dim_names, 4, "interp.nc");
 
     size_t starts[] = {0, 0, 0, 0};
     size_t counts[] = {time.size(),
