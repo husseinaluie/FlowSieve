@@ -10,7 +10,7 @@ def MapSettings(longitude, latitude, R_earth = 6371e3):
     lat_0 = np.mean(latitude)
 
     # Set the projection
-    if np.abs(longitude.max() - longitude.min()) > 120.:
+    if np.abs(longitude.max() - longitude.min()) > 0.:
         print("Using Eckert IV Projection")
         map_settings = dict(
             projection = 'eck4',
