@@ -76,12 +76,16 @@ dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
 
 # Some parameters for plotting
 map_settings = PlotTools.MapSettings(longitude, latitude)
+plt.figure()
+ax = plt.gca()
+proj = Basemap(ax = ax, **map_settings)
+Xp, Yp = proj(LON * R2D, LAT * R2D, inverse=False)
 
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
 parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
 
-cbar_props = dict(pad = 0.1, shrink = 0.85, orientation = 'vertical')
-gridspec_props = dict(wspace = 0.05, hspace = 0.07, left = 0.04, right = 0.96, bottom = 0.04, top = 0.94)
+cbar_props = dict(pad = 0.1, orientation = 'vertical')
+gridspec_props = dict(wspace = 0.05, hspace = 0.07, left = 0.1, right = 0.9, bottom = 0.1, top = 0.9)
 
 
 ##
@@ -125,26 +129,23 @@ for Itime in range(rank, Ntime, num_procs):
             to_plot = KE[ii,:,:]
         to_plot = np.ma.masked_where(mask==0, to_plot)
     
-        m  = Basemap(ax = axes[ii,0], **map_settings)
-    
         CV  = np.nanmax(np.abs(to_plot))
         if (CV == 0):
             CV = 1
         KE_min = np.min(to_plot)
         if (KE_min < -1e-15) :
             print("min(KE) = {0:.4g} < 1e-16!".format(KE_min), ii)
-            qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.balance', vmin = -CV, vmax = CV, latlon = True)
+            qm = axes[ii,0].pcolormesh(Xp, Yp, to_plot, cmap='cmo.balance', vmin = -CV, vmax = CV)
         else:
-            qm = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, cmap='cmo.amp', vmin = 0, vmax = CV, latlon = True)
+            qm = axes[ii,0].pcolormesh(Xp, Yp, to_plot, cmap='cmo.amp', vmin = 0, vmax = CV)
         
         cbar = plt.colorbar(qm, ax = axes[ii,0], **cbar_props)
         PlotTools.ScientificCbar(cbar, units='')
     
         # Add coastlines and lat/lon lines
-        m.drawcoastlines(linewidth=0.1)
-        m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
-        m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
-        m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+        axes[ii,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+        PlotTools.AddParallels_and_Meridians(axes[ii,0], proj, 
+            parallels, meridians, latitude, longitude, label_meridians=(ii==num_scales))
     
         if (ii == 0):
             axes[ii,0].set_ylabel('Below {0:0.1f} km'.format(scales[0] / 1e3))
@@ -154,8 +155,7 @@ for Itime in range(rank, Ntime, num_procs):
             axes[ii,0].set_ylabel('Above {0:0.1f} km'.format(scales[ii-1] / 1e3))
         else:
             axes[ii,0].set_ylabel('{0:.1f} to {1:0.1f} km'.format(scales[ii-1] / 1e3, scales[ii] / 1e3))
-            
-        
+
     plt.savefig(tmp_direct + '/KE_bands_from_vels_{0:04d}.png'.format(Itime), dpi=dpi)
     plt.close()
     
@@ -177,16 +177,16 @@ for Itime in range(rank, Ntime, num_procs):
     vo = source.variables['vo'][Itime, 0, :, :]
     Full_KE = 0.5 * (uo**2 + vo**2)
     
-    # Initialize figure
-    fig, axes = plt.subplots(num_scales-1, 3,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(12, 4*(num_scales-1)))
-
-    fig.suptitle(sup_title)
-    
     # Plot each band
     for ii in range(num_scales-1):
+    
+        # Initialize figure
+        fig, axes = plt.subplots(3, 1,
+            sharex=True, sharey=True, squeeze=False,
+            gridspec_kw = gridspec_props,
+            figsize=(10, 15))
+
+        fig.suptitle(sup_title)
         
         to_plot_below = 0.5 * (   np.sum(u_r[  :ii+1, :,:], axis=0)**2 
                                 + np.sum(u_lat[:ii+1, :,:], axis=0)**2 
@@ -200,10 +200,6 @@ for Itime in range(rank, Ntime, num_procs):
         to_plot_above = np.ma.masked_where(mask==0, to_plot_above)
         missing       = np.ma.masked_where(mask==0, missing)
     
-        m_a = Basemap(ax = axes[ii,0], **map_settings)
-        m_b = Basemap(ax = axes[ii,1], **map_settings)
-        m_m = Basemap(ax = axes[ii,2], **map_settings)
-    
         CV_a = np.nanmax(np.abs(to_plot_above))
         CV_b = np.nanmax(np.abs(to_plot_below))
         CV_m = np.nanmax(np.abs(missing))
@@ -211,45 +207,40 @@ for Itime in range(rank, Ntime, num_procs):
         vmax = max(CV_a, CV_b, CV_m)
         vmin = 10**(np.log10(vmax) - 3)
     
+        qm_a = axes[0,0].pcolormesh(Xp, Yp, to_plot_above, cmap='cmo.amp',
+                norm=LogNorm(vmin=vmin, vmax=vmax))
     
-        qm_a = m_a.pcolormesh(LON*R2D, LAT*R2D, to_plot_above, cmap='cmo.amp', 
-                latlon = True, norm=LogNorm(vmin=vmin, vmax=vmax))
+        qm_b = axes[1,0].pcolormesh(Xp, Yp, to_plot_below, cmap='cmo.amp',
+                norm=LogNorm(vmin=vmin, vmax=vmax))
     
-        qm_b = m_b.pcolormesh(LON*R2D, LAT*R2D, to_plot_below, cmap='cmo.amp', 
-                latlon = True, norm=LogNorm(vmin=vmin, vmax=vmax))
+        qm_m = axes[2,0].pcolormesh(Xp, Yp, missing, cmap='cmo.amp',
+                norm=LogNorm(vmin=vmin, vmax=vmax))
     
-        qm_m = m_m.pcolormesh(LON*R2D, LAT*R2D, missing, cmap='cmo.amp', 
-                latlon = True, norm=LogNorm(vmin=vmin, vmax=vmax))
-    
-        cbar = plt.colorbar(qm_b, ax = axes[ii,:], **cbar_props)
+        cbar = plt.colorbar(qm_b, ax = axes[:,0], **cbar_props)
         #PlotTools.ScientificCbar(cbar_b, units='')
     
         # Add coastlines and lat/lon lines
-        for m in [m_a, m_b, m_m]:
-            m.drawcoastlines(linewidth=0.1)
-            m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
-            m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
-            m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+        for ax in axes[:,0]:
+            ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+            PlotTools.AddParallels_and_Meridians(ax, proj, 
+                parallels, meridians, latitude, longitude, label_meridians=(ax==axes[2,0]))
     
-        axes[ii,0].set_ylabel('{0:.1f} km'.format(scales[ii] / 1e3))
-            
-    axes[0,0].set_title('Coarse $(>l)$')
-    axes[0,1].set_title('Fine $(<l)$')
-    axes[0,2].set_title('Missing')
-    
-    plt.savefig(tmp_direct + '/KE_dichotomies_from_vels_{0:04d}.png'.format(Itime), dpi=dpi)
-    plt.close()
+        axes[0,0].set_ylabel('Coarse $(>l)$')
+        axes[1,0].set_ylabel('Fine $(<l)$')
+        axes[2,0].set_ylabel('Missing')
+
+        plt.savefig(tmp_direct + '/{0:.4g}_KE_dichotomies_from_vels_{1:04d}.png'.format(scales[ii]/1e3,Itime), dpi=dpi)
+        plt.close()
     
 
 # If more than one time point, create mp4s
 if Ntime > 1:
     PlotTools.merge_to_mp4(tmp_direct + '/KE_bands_from_vels_%04d.png',    
             out_direct + '/KE_bands_from_vels.mp4', fps=12)
-    PlotTools.merge_to_mp4(tmp_direct + '/KE_dichotomies_from_vels_%04d.png',    
-            out_direct + '/KE_dichotomies_from_vels.mp4', fps=12)
+    for ii in range(num_scales-1):
+        PlotTools.merge_to_mp4(tmp_direct + '/{0:.4g}_KE_dichotomies_from_vels_%04d.png'.format(scales[ii]/1e3),    
+                out_direct + '/{0:.4g}km/KE_dichotomies_from_vels.mp4'.format(scales[ii]/1e3), fps=12)
 
-    # Now delete the frames
-    shutil.rmtree(tmp_direct)
     
 else:
     shutil.move(tmp_direct + '/KE_bands_from_vels_0000.png',
@@ -257,6 +248,8 @@ else:
     shutil.move(tmp_direct + '/KE_dichotomies_from_vels_0000.png',
             out_direct + '/KE_dichotomies_from_vels.png')
 
+# Now delete the frames
+shutil.rmtree(tmp_direct)
 
 ## If Ntime > 1, then also plot time means
 
@@ -271,16 +264,16 @@ if Ntime > 1:
     vo = source.variables['vo'][:, 0, :, :]
     Full_KE = np.mean(0.5 * (uo**2 + vo**2), axis=0)
     
-    # Initialize figure
-    fig, axes = plt.subplots(num_scales-1, 3,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(12, 4*(num_scales-1)))
-
-    fig.suptitle('Time Averaged')
-    
     # Plot each band
     for ii in range(num_scales-1):
+    
+        # Initialize figure
+        fig, axes = plt.subplots(3, 1,
+            sharex=True, sharey=True, squeeze=False,
+            gridspec_kw = gridspec_props,
+            figsize=(10, 15))
+
+        fig.suptitle('Time Averaged')
         
         to_plot_below = 0.5 * (   np.sum(u_r[  :ii+1, :,:], axis=0)**2 
                                 + np.sum(u_lat[:ii+1, :,:], axis=0)**2 
@@ -297,10 +290,6 @@ if Ntime > 1:
         to_plot_above = np.ma.masked_where(mask==0, to_plot_above)
         missing       = np.ma.masked_where(mask==0, missing)
     
-        m_a = Basemap(ax = axes[ii,0], **map_settings)
-        m_b = Basemap(ax = axes[ii,1], **map_settings)
-        m_m = Basemap(ax = axes[ii,2], **map_settings)
-    
         CV_a = np.nanmax(np.abs(to_plot_above))
         CV_b = np.nanmax(np.abs(to_plot_below))
         CV_m = np.nanmax(np.abs(missing))
@@ -308,32 +297,28 @@ if Ntime > 1:
         vmax = max(CV_a, CV_b, CV_m)
         vmin = 10**(np.log10(vmax) - 3)
     
+        qm_a = axes[0,0].pcolormesh(Xp, Yp, to_plot_above, cmap='cmo.amp',
+                norm=LogNorm(vmin=vmin, vmax=vmax))
     
-        qm_a = m_a.pcolormesh(LON*R2D, LAT*R2D, to_plot_above, cmap='cmo.amp', 
-                latlon = True, norm=LogNorm(vmin=vmin, vmax=vmax))
+        qm_b = axes[1,0].pcolormesh(Xp, Yp, to_plot_below, cmap='cmo.amp',
+                norm=LogNorm(vmin=vmin, vmax=vmax))
     
-        qm_b = m_b.pcolormesh(LON*R2D, LAT*R2D, to_plot_below, cmap='cmo.amp', 
-                latlon = True, norm=LogNorm(vmin=vmin, vmax=vmax))
+        qm_m = axes[2,0].pcolormesh(Xp, Yp, missing, cmap='cmo.amp',
+                norm=LogNorm(vmin=vmin, vmax=vmax))
     
-        qm_m = m_m.pcolormesh(LON*R2D, LAT*R2D, missing, cmap='cmo.amp', 
-                latlon = True, norm=LogNorm(vmin=vmin, vmax=vmax))
-    
-        cbar = plt.colorbar(qm_b, ax = axes[ii,:], **cbar_props)
+        cbar = plt.colorbar(qm_b, ax = axes[:,0], **cbar_props)
     
         # Add coastlines and lat/lon lines
-        for m in [m_a, m_b, m_m]:
-            m.drawcoastlines(linewidth=0.1)
-            m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
-            m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
-            m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+        for ax in axes[:,0]:
+            ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+            PlotTools.AddParallels_and_Meridians(ax, proj, 
+                parallels, meridians, latitude, longitude, label_meridians=(ax==axes[2,0]))
+
+        axes[0,0].set_ylabel('Coarse $(>l)$')
+        axes[1,0].set_ylabel('Fine $(<l)$')
+        axes[2,0].set_ylabel('Missing')
     
-        axes[ii,0].set_ylabel('{0:.1f} km'.format(scales[ii] / 1e3))
-            
-    axes[0,0].set_title('Coarse $(>l)$')
-    axes[0,1].set_title('Fine $(<l)$')
-    axes[0,2].set_title('Missing')
-    
-    plt.savefig(out_direct + '/AVE_KE_dichotomies_from_vels.png', dpi=dpi)
-    plt.close()
+        plt.savefig(out_direct + '/{0:.4g}km/AVE_KE_dichotomies_from_vels.png'.format(scales[ii]/1e3), dpi=dpi)
+        plt.close()
     
 

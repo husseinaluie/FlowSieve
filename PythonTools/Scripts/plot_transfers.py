@@ -78,12 +78,16 @@ Nlat = len(latitude)
 Nlon = len(longitude)
 
 map_settings = PlotTools.MapSettings(longitude, latitude)
+plt.figure()
+ax = plt.gca()
+proj = Basemap(ax = ax, **map_settings)
+Xp, Yp = proj(LON*R2D, LAT*R2D)
 
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
 parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
 
 cbar_props     = dict(pad = 0.1, shrink = 0.85, orientation = 'vertical')
-gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.05, right = 0.95, bottom = 0.05, top = 0.95)
+gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.1, right = 0.9, bottom = 0.1, top = 0.9)
 
 ##
 ## Begin Plotting
@@ -96,36 +100,30 @@ for Itime in range(rank, Ntime, num_procs):
             timestamp.day, timestamp.month, timestamp.year, 
             timestamp.hour, timestamp.minute)
     
-    # Initialize figure
-    fig, axes = plt.subplots(num_scales, 1,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(6, 4*num_scales))
-
-    fig.suptitle(sup_title)
-    
     # Plot each band
     for ii in range(num_scales):
+    
+        # Initialize figure
+        fig, axes = plt.subplots(1, 1,
+            sharex=True, sharey=True, squeeze=False,
+            gridspec_kw = gridspec_props,
+            figsize=(6, 4))
+
+        fig.suptitle(sup_title)
         
         to_plot = transfer[ii,Itime,:,:] * 1e6
         to_plot = np.ma.masked_where(mask==0, to_plot)
     
-        m  = Basemap(ax = axes[ii,0], **map_settings)
-    
         if np.max(np.abs(to_plot)) > 0:
-            PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii,0], fig, m, num_ords = 5)
+            PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[0,0], fig, proj, num_ords = 5)
     
         # Add coastlines, lat/lon lines, and draw the map
-        m.drawcoastlines(linewidth=0.1)
-        m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='k')
-        m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='k')
-        m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+        axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+        PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
+            parallels, meridians, latitude, longitude)
             
-        axes[ii,0].set_title('Across {0:0.1f} km'.format(scales[ii] / 1e3))
-            
-        
-    plt.savefig(tmp_direct + '/Pi_{0:04d}.png'.format(Itime), dpi=dpi)
-    plt.close()
+        plt.savefig(tmp_direct + '/{0:.4g}_Pi_{1:04d}.png'.format(scales[ii]/1e3,Itime), dpi=dpi)
+        plt.close()
     
     
 # If baroclinic transfers are there, use them.
@@ -137,51 +135,47 @@ if 'baroclinic_transfer' in results.variables:
             timestamp.day, timestamp.month, timestamp.year, 
             timestamp.hour, timestamp.minute)
     
-        # Initialize figure
-        fig, axes = plt.subplots(num_scales, 1,
-                sharex=True, sharey=True, squeeze=False,
-                gridspec_kw = gridspec_props,
-                figsize=(6, 4*num_scales))
-
-        fig.suptitle(sup_title)
-    
         # Plot each band
         for ii in range(num_scales):
+    
+            # Initialize figure
+            fig, axes = plt.subplots(1, 1,
+                sharex=True, sharey=True, squeeze=False,
+                gridspec_kw = gridspec_props,
+                figsize=(6, 4))
+
+            fig.suptitle(sup_title)
         
             to_plot = bc_transfer[ii,Itime,:,:] * 1e6
             to_plot = np.ma.masked_where(mask==0, to_plot)
     
-            m  = Basemap(ax = axes[ii,0], **map_settings)
-    
             if np.max(np.abs(to_plot)) > 0:
-                PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii,0], fig, m, num_ords = 4, percentile=99.99)
+                PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[0,0], fig, proj, num_ords = 4, percentile=99.99)
     
             # Add coastlines, lat/lon lines, and draw the map
-            m.drawcoastlines(linewidth=0.1)
-            m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='k')
-            m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='k')
-            m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+            Xp, Yp = proj(LON*R2D, LAT*R2D)
+            axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+            PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
+                parallels, meridians, latitude, longitude)
             
-            axes[ii,0].set_title('Across {0:0.1f} km'.format(scales[ii] / 1e3))
-            
-        
-        plt.savefig(tmp_direct + '/Lambda_m_{0:04d}.png'.format(Itime), dpi=dpi)
-        plt.close()
+            plt.savefig(tmp_direct + '/{0:.4g}_Lambda_m_{1:04d}.png'.format(scales[ii]/1e3,Itime), dpi=dpi)
+            plt.close()
 
 
 # If more than one time point, create mp4s
-if Ntime > 1:
-    PlotTools.merge_to_mp4(tmp_direct + '/Pi_%04d.png',    
-            out_direct + '/Pi.mp4',    fps=12)
-    if 'baroclinic_transfer' in source.variables:
-        PlotTools.merge_to_mp4(tmp_direct + '/Lambda_m_%04d.png', 
-                out_direct + '/Lambda_m.mp4', fps=12)
-else:
-    shutil.move(tmp_direct + '/Pi_0000.png', 
-            out_direct + '/Pi.png')
-    if 'p' in source.variables:
-        shutil.move(tmp_direct + '/Lambda_m_0000.png', 
-                out_direct + '/Lambda_m.png')
+for ii in range(num_scales):
+    if Ntime > 1:
+        PlotTools.merge_to_mp4(tmp_direct + '/{0:.4g}_Pi_%04d.png'.format(scales[ii]/1e3),    
+                out_direct + '/{0:.4g}km/Pi.mp4'.format(scales[ii]/1e3),    fps=12)
+        if 'baroclinic_transfer' in results.variables:
+            PlotTools.merge_to_mp4(tmp_direct + '/{0:.4g}_Lambda_m_%04d.png'.format(scales[ii]/1e3), 
+                    out_direct + '/{0:.4g}km/Lambda_m.mp4'.format(scales[ii]/1e3), fps=12)
+    else:
+        shutil.move(tmp_direct + '/{0:.4g}_Pi_0000.png'.format(scales[ii]/1e3), 
+                out_direct + '/{0:.4g}km/Pi.png'.format(scales[ii]/1e3))
+        if 'p' in source.variables:
+            shutil.move(tmp_direct + '/{0:.4g}_Lambda_m_0000.png'.format(scales[ii]/1e3), 
+                    out_direct + '/{0:.4g}km/Lambda_m.png'.format(scales[ii]/1e3))
 
 # Now delete the frames
 shutil.rmtree(tmp_direct)
@@ -189,68 +183,57 @@ shutil.rmtree(tmp_direct)
 ## Plot time averages if Ntime > 1
 
 if (Ntime > 1):
-
-    # Initialize figure
-    fig, axes = plt.subplots(num_scales, 1,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(6, 4*num_scales))
-
-    fig.suptitle('Time average')
     
     # Plot each band
     for ii in range(num_scales):
+
+        # Initialize figure
+        fig, axes = plt.subplots(1, 1,
+            sharex=True, sharey=True, squeeze=False,
+            gridspec_kw = gridspec_props,
+            figsize=(6, 4))
+
+        fig.suptitle('Time average')
         
         to_plot = np.mean(transfer[ii,:,:,:] * 1e6, axis=0)
         to_plot = np.ma.masked_where(mask==0, to_plot)
     
-        m  = Basemap(ax = axes[ii,0], **map_settings)
-    
         if np.max(np.abs(to_plot)) > 0:
-            PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii,0], fig, m, num_ords = 5)
+            PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[0,0], fig, proj, num_ords = 5)
     
         # Add coastlines, lat/lon lines, and draw the map
-        m.drawcoastlines(linewidth=0.1)
-        m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='k')
-        m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='k')
-        m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+        axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+        PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
+            parallels, meridians, latitude, longitude)
             
-        axes[ii,0].set_title('Across {0:0.1f} km'.format(scales[ii] / 1e3))
-            
-        
-    plt.savefig(out_direct + '/AVE_Pi.png', dpi=dpi)
-    plt.close()
+        plt.savefig(out_direct + '/{0:.4g}km/AVE_Pi.png'.format(scales[ii]/1e3), dpi=dpi)
+        plt.close()
     
     
 if 'baroclinic_transfer' in results.variables:
     if (Ntime > 1):
-
-        # Initialize figure
-        fig, axes = plt.subplots(num_scales, 1,
-                sharex=True, sharey=True, squeeze=False,
-                gridspec_kw = gridspec_props,
-                figsize=(6, 4*num_scales))
-
-        fig.suptitle('Time average')
     
         # Plot each band
         for ii in range(num_scales):
+
+            # Initialize figure
+            fig, axes = plt.subplots(1, 1,
+                sharex=True, sharey=True, squeeze=False,
+                gridspec_kw = gridspec_props,
+                figsize=(6, 4))
+
+            fig.suptitle('Time average')
         
             to_plot = np.mean(bc_transfer[ii,:,:,:] * 1e6, axis=0)
             to_plot = np.ma.masked_where(mask==0, to_plot)
     
-            m  = Basemap(ax = axes[ii,0], **map_settings)
-    
             if np.max(np.abs(to_plot)) > 0:
-                PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii,0], fig, m, num_ords = 4, percentile=99.99)
+                PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[0,0], fig, proj, num_ords = 4, percentile=99.99)
     
             # Add coastlines, lat/lon lines, and draw the map
-            m.drawcoastlines(linewidth=0.1)
-            m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='k')
-            m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='k')
-            m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
-            
-            axes[ii,0].set_title('Across {0:0.1f} km'.format(scales[ii] / 1e3))
+            axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+            PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
+                parallels, meridians, latitude, longitude)
         
-        plt.savefig(out_direct + '/AVE_Lambda_m.png', dpi=dpi)
-        plt.close()
+            plt.savefig(out_direct + '/{0:.4g}km/AVE_Lambda_m.png'.format(scales[ii]/1e3), dpi=dpi)
+            plt.close()

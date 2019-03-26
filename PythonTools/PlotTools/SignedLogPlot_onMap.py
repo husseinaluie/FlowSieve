@@ -12,6 +12,9 @@ def SignedLogPlot_onMap(XX, YY, ZZ, ax, fig, proj_map,
     # dpi:      resolution of output file
     # xlabel, ylabel, title: corresponding matplotlib labels
 
+    # Project onto map
+    Xp, Yp = proj_map(XX, YY, inverse=False)
+
     ## Extract nice colour maps from cmocean 'balance'
     Np = 256
     bal = cmocean.tools.get_dict(cmocean.cm.balance, N=Np)
@@ -35,16 +38,12 @@ def SignedLogPlot_onMap(XX, YY, ZZ, ax, fig, proj_map,
     vmin = 10**(np.ceil(np.log10(vmax)-num_ords)-1.0)
 
     # Plot the positives in red
-    q1 = proj_map.pcolormesh(XX, YY, np.abs(ZZ)*(ZZ > 0), cmap=red_map, \
-            norm=LogNorm(vmin=vmin, vmax=vmax), linewidth=0, rasterized=True,
-            latlon=latlon)
+    q1 = ax.pcolormesh(Xp, Yp, np.abs(ZZ)*(ZZ > 0), cmap=red_map, \
+            norm=LogNorm(vmin=vmin, vmax=vmax), linewidth=0, rasterized=True)
 
     # Plot the negatives in blue
-    q2 = proj_map.pcolormesh(XX, YY, np.abs(ZZ)*(ZZ < 0), cmap=blue_map, \
-            norm=LogNorm(vmin=vmin, vmax=vmax), linewidth=0, rasterized=True,
-            latlon=latlon)
-
-    ax.yaxis.get_major_formatter().set_powerlimits((0, 4))
+    q2 = ax.pcolormesh(Xp, Yp, np.abs(ZZ)*(ZZ < 0), cmap=blue_map, \
+            norm=LogNorm(vmin=vmin, vmax=vmax), linewidth=0, rasterized=True)
 
     # Set axis labels
     ax.set_xlabel(xlabel)

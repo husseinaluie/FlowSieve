@@ -121,10 +121,6 @@ for iS in range(Nscales-1):
         PlotTools.SignedLogScatter_hist(Pi_sel, KE_sel, axes,
                 force_equal = True, nbins_x = 200, nbins_y = 200)
         
-        for II in range(2):
-            axes[II,0].set_ylabel('$\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)$ $(\mathrm{W}\cdot\mathrm{m}^{-3})$')
-            axes[1,II].set_xlabel('$-\Pi$ $(\mathrm{W}\cdot\mathrm{m}^{-3})$')
-        
         for ax in axes.ravel():
             xlim = ax.get_xlim()
             ylim = ax.get_ylim()
@@ -140,8 +136,18 @@ for iS in range(Nscales-1):
         axes[1,1].set_yticklabels([])
 
         fig.suptitle(sup_title)
+
+        # xlabel
+        mid_x = 0.5 * ( axes[0,0].get_position().x0 + axes[1,1].get_position().x1 )
+        plt.figtext(mid_x, 0.05, '$-\Pi$ $(\mathrm{W}\cdot\mathrm{m}^{-3})$',
+             horizontalalignment='center', verticalalignment='top', rotation='horizontal', fontsize=16)
+
+        # ylabel
+        mid_y = 0.5 * ( axes[0,0].get_position().y0 + axes[1,1].get_position().y1 )
+        plt.figtext(0.05, mid_y, '$\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)$ $(\mathrm{W}\cdot\mathrm{m}^{-3})$',
+           horizontalalignment='right', verticalalignment='center', rotation='vertical', fontsize=16)
         
-        plt.savefig(tmp_direct + '/KE_fluxes_{0:.3g}km_{1:04d}.png'.format(scales[iS]/1e3,iT), dpi=dpi)
+        plt.savefig(tmp_direct + '/{0:.4g}_KE_fluxes_{1:04d}.png'.format(scales[iS]/1e3,iT), dpi=dpi)
         plt.close()
 
     
@@ -150,44 +156,39 @@ for iS in range(Nscales-1):
     fig, axes = plt.subplots(1, 1, squeeze=False,
             gridspec_kw = dict(left = 0.15, right = 0.95, bottom = 0.1, top = 0.95,
             hspace=0.1))
-    l1 = axes[0,0].plot(time, net_KE_flux[:,iS], color=colours[0], 
-            label='$\int_{\Omega}\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$')
-    l2 = axes[0,0].plot(time, net_Pi[:,iS],      color=colours[1], 
-            label='$-\int_{\Omega}\Pi\mathrm{dA}$')
-    l3 = axes[0,0].plot(time, net_PEtoKE[:,iS],  color=colours[2], 
-            label='$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$')
 
-    '''
-    axes[1,0].plot([0.25,0.75], [0.5, 0.5], color = colours[0])
-    axes[1,0].plot([0.25,0.75], [1.5, 1.5], color = colours[1])
-    axes[1,0].plot([0.25,0.75], [2.5, 2.5], color = colours[2])
+    to_plot = net_KE_flux[:,iS] 
+    label='$\int_{\Omega}\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$'
+    axes[0,0].plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[0], label=label)
+    axes[0,0].plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[0])#, label=label)
 
-    axes[1,0].set_xlim(0,Nscales-1)
-    axes[1,0].set_ylim(0,3)
-    axes[1,0].set_xticks(np.arange(Nscales-1)+0.5)
-    axes[1,0].set_yticks([0.5, 1.5, 2.5])
-    axes[1,0].set_xticklabels(["{0:.3g}km".format(sc/1e3) for sc in scales[:-1]])
-    axes[1,0].set_yticklabels(['$\int_{\Omega}\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$',
-        '$-\int_{\Omega}\Pi\mathrm{dA}$',
-        '$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'])
-    '''
+    to_plot = net_Pi[:,iS] 
+    label='$-\int_{\Omega}\Pi\mathrm{dA}$'
+    axes[0,0].plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[1], label=label)
+    axes[0,0].plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[1])#, label=label)
 
+    to_plot = net_PEtoKE[:,iS]
+    label='$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'
+    axes[0,0].plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[2], label=label)
+    axes[0,0].plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[2])#, label=label)
+
+    axes[0,0].set_yscale('log')
     axes[0,0].legend(loc='best')
     axes[0,0].set_ylabel('$\mathrm{W}$')
-    plt.savefig(out_direct + '/KE_fluxes_net_{0:.3g}km.pdf'.format(scales[iS]/1e3))
+    plt.savefig(out_direct + '/{0:.4g}km/KE_fluxes_net.pdf'.format(scales[iS]/1e3))
     plt.close()
 
 # If more than one time point, create mp4s
 if Ntime > 1:
     for iS in range(Nscales-1):
         PlotTools.merge_to_mp4(
-                tmp_direct + '/KE_fluxes_{0:.3g}km_%04d.png'.format(scales[iS]/1e3),
-                out_direct + '/KE_fluxes_{0:.3g}km.mp4'.format(scales[iS]/1e3),
+                tmp_direct + '/{0:.4g}_KE_fluxes_%04d.png'.format(scales[iS]/1e3),
+                out_direct + '/{0:.4g}km/KE_fluxes.mp4'.format(scales[iS]/1e3),
                 fps=12)
 else:
     for iS in range(Nscales-1):
-        shutilmove(tmp_direct + '/KE_fluxes_{0:.3g}km_%04d.png'.format(scales[iS]/1e3),
-                out_direct + '/KE_fluxes_{0:.3g}km.mp4'.format(scales[iS]/1e3))
+        shutilmove(tmp_direct + '/{0:.4g}_KE_fluxes_%04d.png'.format(scales[iS]/1e3),
+                out_direct + '/{0:.4g}km/KE_fluxes.mp4'.format(scales[iS]/1e3))
 
 # Now delete the frames
 shutil.rmtree(tmp_direct)

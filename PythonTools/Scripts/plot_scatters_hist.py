@@ -78,10 +78,6 @@ if True:
     PlotTools.SignedLogScatter_hist(x_data.ravel(), y_data.ravel(), axes,
             force_equal = True, nbins_x = 300, nbins_y = 300)
 
-    for II in range(2):
-        axes[II,0].set_ylabel('$l^2\Lambda^m$ $(\mathrm{W}\cdot\mathrm{km}^{-2}\cdot\mathrm{m}^{-1})$')
-        axes[1,II].set_xlabel('$\Pi$ $(\mathrm{W}\cdot\mathrm{km}^{-2}\cdot\mathrm{m}^{-1})$')
-
     axes[0,0].set_xticklabels([])
     axes[0,1].set_xticklabels([])
     axes[0,1].set_yticklabels([])
@@ -99,6 +95,16 @@ if True:
         ax.set_ylim(ylim)
 
     axes[0,1].legend(loc='best')
+
+    # xlabel
+    mid_x = 0.5 * ( axes[0,0].get_position().x0 + axes[1,1].get_position().x1 )
+    plt.figtext(mid_x, 0.025, '$\Pi$ $(\mathrm{W}\cdot\mathrm{km}^{-2}\cdot\mathrm{m}^{-1})$',
+             horizontalalignment='center', verticalalignment='top', rotation='horizontal', fontsize=16)
+
+    # ylabel
+    mid_y = 0.5 * ( axes[0,0].get_position().y0 + axes[1,1].get_position().y1 )
+    plt.figtext(0.025, mid_y, '$l^2\Lambda^m$ $(\mathrm{W}\cdot\mathrm{km}^{-2}\cdot\mathrm{m}^{-1})$',
+           horizontalalignment='right', verticalalignment='center', rotation='vertical', fontsize=16)
 
     plt.savefig('Figures/transfers_comparison_hist.png', dpi=dpi)
     plt.close()
@@ -127,11 +133,6 @@ if 'baroclinic_transfer' in results.variables:
     PlotTools.SignedLogScatter_hist(x_data.ravel(), y_data.ravel(), axes,
             force_equal = True, nbins_x = 300, nbins_y = 300)
 
-    for II in range(2):
-        #axes[II,0].set_ylabel('$\mathcal{E}$ $(\mathrm{s}^{-2})$')
-        axes[II,0].set_ylabel('$\omega_r$ $(\mathrm{s}^{-1})$')
-        axes[1,II].set_xlabel('$\Lambda^m/\\rho$ $(\mathrm{s}^{-3})$')
-
     axes[0,0].set_xticklabels([])
     axes[0,1].set_xticklabels([])
     axes[0,1].set_yticklabels([])
@@ -149,6 +150,16 @@ if 'baroclinic_transfer' in results.variables:
         ax.set_ylim(ylim)
 
     #axes[0,1].legend(loc='best')
+
+    # xlabel
+    mid_x = 0.5 * ( axes[0,0].get_position().x0 + axes[1,1].get_position().x1 )
+    plt.figtext(mid_x, 0.025, '$\Lambda^m/\\rho$ $(\mathrm{s}^{-3})$',
+             horizontalalignment='center', verticalalignment='top', rotation='horizontal', fontsize=16)
+
+    # ylabel
+    mid_y = 0.5 * ( axes[0,0].get_position().y0 + axes[1,1].get_position().y1 )
+    plt.figtext(0.025, mid_y, '$\omega_r$ $(\mathrm{s}^{-1})$',
+           horizontalalignment='right', verticalalignment='center', rotation='vertical', fontsize=16)
 
     plt.savefig('Figures/transfers_comparison2_hist.png', dpi=dpi)
     plt.close()

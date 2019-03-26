@@ -1,9 +1,13 @@
+#!/bin/sh
 COL='\033[1;37m'
 NC='\033[0m' # No Color
 
-echo -e "${COL}Plotting original fields${NC}"
-python $PythonPlotScripts/plot_originals.py
-echo -e "${COL}    done plotting original fields${NC}"
+echo -e "${COL}Preparing output directories${NC}"
+python $PythonPlotScripts/prepare_directories.py
+
+#echo -e "${COL}Plotting original fields${NC}"
+#python $PythonPlotScripts/plot_originals.py
+#echo -e "${COL}    done plotting original fields${NC}"
 
 echo -e "${COL}Plotting velocities${NC}"
 python $PythonPlotScripts/plot_vels.py

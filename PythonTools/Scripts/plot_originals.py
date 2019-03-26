@@ -5,6 +5,7 @@ import cmocean, sys, datetime
 from netCDF4 import Dataset
 from mpl_toolkits.basemap import Basemap
 import PlotTools, subprocess, shutil, os
+from matplotlib.colors import ListedColormap
 
 dpi = PlotTools.dpi
 
@@ -43,6 +44,12 @@ D2R     = np.pi / 180
 R2D     = 180 / np.pi
 eps     = 1e-10
 
+# Create cmap for mask data
+ref_cmap = cmocean.cm.gray
+mask_cmap = ref_cmap(np.arange(ref_cmap.N))
+mask_cmap[:,-1] = np.linspace(1, 0, ref_cmap.N)
+mask_cmap = ListedColormap(mask_cmap)
+
 # Get the grid from the first filter
 latitude  = results.variables['latitude'][:] * R2D
 longitude = results.variables['longitude'][:] * R2D
@@ -70,12 +77,16 @@ Full_KE = 0.5 * (uo**2 + vo**2)
 
 # Some parameters for plotting
 map_settings = PlotTools.MapSettings(longitude, latitude)
+plt.figure()
+ax = plt.gca()
+proj = Basemap(ax = ax, **map_settings)
+Xp, Yp = proj(LON * R2D, LAT * R2D, inverse=False)
 
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
 parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
 
 cbar_props = dict(pad = 0.1, shrink = 0.85, orientation = 'vertical')
-gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.02, right = 0.98, bottom = 0.02, top = 0.98)
+gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.1, right = 0.9, bottom = 0.1, top = 0.9)
 
 def plot(LON, LAT, to_plot, filename, 
         one_sided=False, vmin=None, vmax=None, units='',
@@ -84,8 +95,6 @@ def plot(LON, LAT, to_plot, filename,
     plt.figure()
     ax = plt.subplot(1,1,1)
     
-    m  = Basemap(ax = ax, **map_settings)
-
     if cmap == None:
         if one_sided:
             cmap = 'cmo.amp'
@@ -100,16 +109,15 @@ def plot(LON, LAT, to_plot, filename,
             vmax = np.nanmax(np.abs(to_plot))
             vmin = -vmax
 
-    qm = m.pcolormesh(LON, LAT, to_plot, cmap=cmap, vmin = vmin, vmax = vmax, latlon = True)
+    qm = ax.pcolormesh(Xp, Yp, to_plot, cmap=cmap, vmin = vmin, vmax = vmax)
         
     cbar = plt.colorbar(qm, ax = ax, **cbar_props)
     PlotTools.ScientificCbar(cbar, units=units)
     
     # Add coastlines and lat/lon lines
-    m.drawcoastlines(linewidth=0.1)
-    m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
-    m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,1], color='g')
-    #m.contourf(LON*R2D, LAT*R2D, mask, [-0.5, 0.5], colors='gray', hatches=['','///\\\\\\'], latlon=True)
+    ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+    PlotTools.AddParallels_and_Meridians(ax, proj, 
+            parallels, meridians, latitude, longitude)
 
     if not(title == None):
         ax.set_title(title)

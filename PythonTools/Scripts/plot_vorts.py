@@ -72,12 +72,17 @@ LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
 
 # Some parameters for plotting
 map_settings = PlotTools.MapSettings(longitude, latitude)
+plt.figure()
+ax = plt.gca()
+proj = Basemap(ax = ax, **map_settings)
+
+Xp, Yp = proj(LON*R2D, LAT*R2D, inverse=False)
 
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
 parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
 
-cbar_props     = dict(pad = 0.1, shrink = 0.85, orientation = 'horizontal')
-gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.05, right = 0.95, bottom = 0.05, top = 0.95)
+cbar_props     = dict(pad = 0.1, shrink = 0.85)
+gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.1, right = 0.9, bottom = 0.1, top = 0.9)
 
 
 ##
@@ -121,29 +126,16 @@ for Itime in range(rank, Ntime, num_procs):
 
             to_plot = np.ma.masked_where(mask==0, to_plot)
         
-            m  = Basemap(ax = axes[jj,ii], **map_settings)
-    
-            qm  = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, 
-                    cmap='cmo.balance', 
-                    vmin = -CV, vmax = CV, latlon = True)
+            qm = axes[jj,ii].pcolormesh(Xp, Yp, to_plot, cmap='cmo.balance', 
+                    vmin = -CV, vmax = CV)
         
-            cbar = plt.colorbar(qm, ax = axes[jj,ii], **cbar_props)
+            cbar = plt.colorbar(qm, ax = axes[jj,ii], orientation='horizontal', **cbar_props)
             PlotTools.ScientificCbar(cbar, units='$\mathrm{s}^{-1}$', orientation='horizontal')
     
             # Add coastlines and lat/lon lines
-            m.drawcoastlines(linewidth=0.1)
-    
-            if ii == num_scales - 1:
-                m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
-            else:
-                m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
-            if jj == 2:
-                m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,1], color='g')
-            else:
-                m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
-        
-            # Draw the mask back on
-            m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+            axes[jj,ii].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+            PlotTools.AddParallels_and_Meridians(axes[jj,ii], proj, 
+                parallels, meridians, latitude, longitude)
     
             if (ii == 0):
                 if (jj == 0):
@@ -173,17 +165,17 @@ for Itime in range(rank, Ntime, num_procs):
     sup_title = "{0:02d} - {1:02d} - {2:04d} ( {3:02d}:{4:02d} )".format(
             timestamp.day, timestamp.month, timestamp.year, 
             timestamp.hour, timestamp.minute)
-
-    # Initialize figure
-    fig, axes = plt.subplots(num_scales-1, 2,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(10, 4*num_scales-1))
-
-    fig.suptitle(sup_title)
     
     # Plot each band
     for ii in range(num_scales-1):
+
+        # Initialize figure
+        fig, axes = plt.subplots(2, 1,
+            sharex=True, sharey=True, squeeze=False,
+            gridspec_kw = gridspec_props,
+            figsize=(10, 10))
+
+        fig.suptitle(sup_title)
         
         to_plot_below = np.sum(vort_r[:ii+1, Itime,:,:], axis=0)
         to_plot_above = np.sum(vort_r[ ii+1:,Itime,:,:], axis=0)
@@ -191,55 +183,46 @@ for Itime in range(rank, Ntime, num_procs):
         to_plot_below = np.ma.masked_where(mask==0, to_plot_below)
         to_plot_above = np.ma.masked_where(mask==0, to_plot_above)
     
-        m_a = Basemap(ax = axes[ii,0], **map_settings)
-        m_b = Basemap(ax = axes[ii,1], **map_settings)
-    
         CV_a = np.nanpercentile(np.abs(to_plot_above), 99)
         CV_b = np.nanpercentile(np.abs(to_plot_below), 99)
     
-        vmax = max(CV_a, CV_b)
-    
-        qm_a  = m_a.pcolormesh(LON*R2D, LAT*R2D, to_plot_above, 
-                    cmap='cmo.balance', 
-                    vmin = -CV_a, vmax = CV_a, latlon = True)
-        qm_b  = m_b.pcolormesh(LON*R2D, LAT*R2D, to_plot_below, 
-                    cmap='cmo.balance', 
-                    vmin = -CV_b, vmax = CV_b, latlon = True)
+        qm_a  = axes[0,0].pcolormesh(Xp, Yp, to_plot_above, 
+                    cmap='cmo.balance', vmin = -CV_a, vmax = CV_a)
+        qm_b  = axes[1,0].pcolormesh(Xp, Yp, to_plot_below, 
+                    cmap='cmo.balance', vmin = -CV_b, vmax = CV_b)
 
-        cbar_a = plt.colorbar(qm_a, ax = axes[ii,0], **cbar_props)
-        cbar_b = plt.colorbar(qm_b, ax = axes[ii,1], **cbar_props)
+        cbar_a = plt.colorbar(qm_a, ax = axes[0,0], **cbar_props)
+        cbar_b = plt.colorbar(qm_b, ax = axes[1,0], **cbar_props)
         PlotTools.ScientificCbar(cbar_a, units='$\mathrm{s}^{-1}$', orientation='horizontal')
         PlotTools.ScientificCbar(cbar_b, units='$\mathrm{s}^{-1}$', orientation='horizontal')
     
         # Add coastlines and lat/lon lines
-        for m in [m_a, m_b]:
-            m.drawcoastlines(linewidth=0.1)
-            m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
-            m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
-            m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+        for ax in axes[:,0]:
+            ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+            PlotTools.AddParallels_and_Meridians(ax, proj, 
+                parallels, meridians, latitude, longitude)
         
-        axes[ii,0].set_ylabel('{0:.1f} km'.format(scales[ii] / 1e3))
-    
-    axes[0,0].set_title('Coarse $(>l)$')
-    axes[0,1].set_title('Fine $(<l)$')
+        axes[0,0].set_ylabel('Coarse $(>l)$')
+        axes[1,0].set_ylabel('Fine $(<l)$')
         
-    plt.savefig(tmp_direct + '/vorticity_dichotomies_{0:04d}.png'.format(Itime), dpi=dpi)
-    plt.close()
-
+        plt.savefig(tmp_direct + '/{0:.4g}_vorticity_dichotomies_{1:04d}.png'.format(scales[ii]/1e3, Itime), dpi=dpi)
+        plt.close()
 
 
 # If more than one time point, create mp4s
 if Ntime > 1:
     PlotTools.merge_to_mp4(tmp_direct + '/vorticity_bands_%04d.png',    
             out_direct + '/vorticity_bands.mp4', fps=12)
-    PlotTools.merge_to_mp4(tmp_direct + '/vorticity_dichotomies_%04d.png',    
-            out_direct + '/vorticity_dichotomies.mp4', fps=12)
-
-    # Now delete the frames
-    shutil.rmtree(tmp_direct)
+    for ii in range(num_scales-1):
+        PlotTools.merge_to_mp4(tmp_direct + '/{0:.04g}_vorticity_dichotomies_%04d.png'.format(scales[ii]/1e3),    
+                out_direct + '/{0:.04g}km/vorticity_dichotomies.mp4'.format(scales[ii]/1e3), fps=12)
     
 else:
     shutil.move(tmp_direct + '/vorticity_bands_0000.png',
             out_direct + '/vorticity_bands.png')
-    shutil.move(tmp_direct + '/vorticity_dichotomies_0000.png',
-            out_direct + '/vorticity_dichotomies.png')
+    for ii in range(num_scales-1):
+        shutil.move(tmp_direct + '/{0:.04g}_vorticity_dichotomies_0000.png'.format(scales[ii]/1e3),
+                out_direct + '/{0:.04g}km/vorticity_dichotomies.png'.format(scales[ii]/1e3))
+
+# Now delete the frames
+shutil.rmtree(tmp_direct)

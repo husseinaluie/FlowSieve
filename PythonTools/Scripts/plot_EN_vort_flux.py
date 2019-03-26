@@ -122,10 +122,6 @@ for iS in range(Nscales - 1):
         PlotTools.SignedLogScatter_hist(Lambda_sel, EN_sel, axes,
                 force_equal = True, nbins_x = 200, nbins_y = 200)
         
-        for II in range(2):
-            axes[II,0].set_ylabel('$\\frac{d}{dt}\left(\\frac{1}{2}\overline{\omega}\cdot\overline{\omega}\\right)$ $(\mathrm{W}^{\omega}\cdot\mathrm{m}^{-3})$')
-            axes[1,II].set_xlabel('$\Lambda^m$ $(\mathrm{W}^{\omega}\cdot\mathrm{m}^{-3})$')
-        
         for ax in axes.ravel():
             xlim = ax.get_xlim()
             ylim = ax.get_ylim()
@@ -141,46 +137,53 @@ for iS in range(Nscales - 1):
         axes[1,1].set_yticklabels([])
 
         fig.suptitle(sup_title)
+
+        # xlabel
+        mid_x = 0.5 * ( axes[0,0].get_position().x0 + axes[1,1].get_position().x1 )
+        plt.figtext(mid_x, 0.05, '$\Lambda^m$ $(\mathrm{W}^{\omega}\cdot\mathrm{m}^{-3})$',
+             horizontalalignment='center', verticalalignment='top', rotation='horizontal', fontsize=16)
+
+        # ylabel
+        mid_y = 0.5 * ( axes[0,0].get_position().y0 + axes[1,1].get_position().y1 )
+        plt.figtext(0.05, mid_y, '$\\frac{d}{dt}\left(\\frac{1}{2}\overline{\omega}\cdot\overline{\omega}\\right)$ $(\mathrm{W}^{\omega}\cdot\mathrm{m}^{-3})$',
+           horizontalalignment='right', verticalalignment='center', rotation='vertical', fontsize=16)
         
-        plt.savefig(tmp_direct + '/EN_fluxes_{0:.3g}km_{1:04d}.png'.format(scales[iS]/1e3,iT), dpi=dpi)
+        plt.savefig(tmp_direct + '/{0:.4g}_EN_fluxes_{1:04d}.png'.format(scales[iS]/1e3,iT), dpi=dpi)
         plt.close()
     
-# Now plot the space-integrated version
-colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
-fig, axes = plt.subplots(2, 1,
-        gridspec_kw = dict(left = 0.15, right = 0.95, bottom = 0.1, top = 0.95,
-        hspace=0.1))
-for iS in range(Nscales-1):
-    l1 = axes[0].plot(time, net_EN_flux[:,iS], '-', color=colours[iS])
-    l2 = axes[0].plot(time, net_lambda[:,iS], '--', color=colours[iS])
+    # Now plot the space-integrated version
+    colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    fig, axes = plt.subplots(1, 1, squeeze=False,
+            gridspec_kw = dict(left = 0.15, right = 0.95, bottom = 0.1, top = 0.95,
+            hspace=0.1))
 
-    axes[1].plot([iS+0.25,iS+0.75], [0.5, 0.5], '-',  color = colours[iS])
-    axes[1].plot([iS+0.25,iS+0.75], [1.5, 1.5], '--', color = colours[iS])
+    to_plot = net_EN_flux[:,iS] 
+    label='$\int_{\Omega}\\frac{d}{dt}\left(\\frac{1}{2}\overline{\omega}\cdot\overline{\omega}\\right)$'
+    axes[0,0].plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[0], label=label)
+    axes[0,0].plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[0])#, label=label)
 
-axes[1].set_xlim(0,Nscales-1)
-axes[1].set_ylim(0,2)
-axes[1].set_xticks(np.arange(Nscales-1)+0.5)
-axes[1].set_yticks([0.5, 1.5])
-axes[1].set_xticklabels(["{0:.3g}km".format(sc/1e3) for sc in scales[:-1]])
-axes[1].set_yticklabels([
-    '$\int_{\Omega}\\frac{d}{dt}\left(\\frac{1}{2}\overline{\omega}\cdot\overline{\omega}\\right)$',
-   '$\int_{\Omega}\Lambda^m$'], rotation=0, verticalalignment='center')
+    to_plot = net_lambda[:,iS] 
+    label='$\int_{\Omega}\Lambda^m$'
+    axes[0,0].plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[1], label=label)
+    axes[0,0].plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[1])#, label=label)
 
-axes[0].set_ylabel('$\mathrm{W}^{\omega}$')
-plt.savefig('Figures/EN_fluxes_net.pdf')
-plt.close()
+    axes[0,0].set_yscale('log')
+    axes[0,0].legend(loc='best')
+    axes[0,0].set_ylabel('$\mathrm{W}^{\omega}$')
+    plt.savefig(out_direct + '/{0:.4g}km/EN_fluxes_net.pdf'.format(scales[iS]/1e3))
+    plt.close()
 
 # If more than one time point, create mp4s
 if Ntime > 1:
     for iS in range(Nscales-1):
         PlotTools.merge_to_mp4(
-                tmp_direct + '/EN_fluxes_{0:.3g}km_%04d.png'.format(scales[iS]/1e3),
-                out_direct + '/EN_fluxes_{0:.3g}km.mp4'.format(scales[iS]/1e3),
+                tmp_direct + '/{0:.4g}_EN_fluxes_%04d.png'.format(scales[iS]/1e3),
+                out_direct + '/{0:.4g}km/EN_fluxes.mp4'.format(scales[iS]/1e3),
                 fps=12)
 else:
     for iS in range(Nscales-1):
-        shutilmove(tmp_direct + '/EN_fluxes_{0:.3g}km_%04d.png'.format(scales[iS]/1e3),
-                out_direct + '/EN_fluxes_{0:.3g}km.mp4'.format(scales[iS]/1e3))
+        shutilmove(tmp_direct + '/{0:.4g}_EN_fluxes_%04d.png'.format(scales[iS]/1e3),
+                out_direct + '/{0:.4g}km/EN_fluxes.mp4'.format(scales[iS]/1e3))
 
 # Now delete the frames
 shutil.rmtree(tmp_direct)

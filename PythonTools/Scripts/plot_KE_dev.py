@@ -76,12 +76,15 @@ dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
 
 # Some parameters for plotting
 map_settings = PlotTools.MapSettings(longitude, latitude)
+plt.figure()
+ax = plt.gca()
+proj = Basemap(ax = ax, **map_settings)
 
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
 parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
 
 cbar_props = dict(pad = 0.1, shrink = 0.85, orientation = 'vertical')
-gridspec_props = dict(wspace = 0.05, hspace = 0.07, left = 0.04, right = 0.96, bottom = 0.04, top = 0.94)
+gridspec_props = dict(wspace = 0.05, hspace = 0.07, left = 0.1, right = 0.9, bottom = 0.1, top = 0.9)
 
 
 ##
@@ -124,16 +127,14 @@ for Itime in range(rank, Ntime, num_procs):
         
         to_plot = np.ma.masked_where(mask==0, to_plot)
     
-        m  = Basemap(ax = axes[ii], **map_settings)
-    
         CV  = np.nanmax(np.abs(to_plot))
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 3)
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, proj, num_ords = 3)
     
         # Add coastlines and lat/lon lines
-        m.drawcoastlines(linewidth=0.1)
-        m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
-        m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
-        m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+        Xp, Yp = proj(LON*R2D, LAT*R2D)
+        axes[ii].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+        PlotTools.AddParallels_and_Meridians(axes[ii], proj, 
+            parallels, meridians, latitude, longitude, label_meridians=(ii==num_scales))
     
         if (ii == 0):
             axes[ii].set_ylabel('Below {0:0.1f} km'.format(scales[0] / 1e3))
@@ -162,16 +163,16 @@ for Itime in range(rank, Ntime, num_procs):
     vo = source.variables[ 'vo'     ][   Itime, 0, :, :]
     Full_KE = 0.5 * (uo**2 + vo**2)
     
-    # Initialize figure
-    fig, axes = plt.subplots(num_scales-1, 3,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(16, 4*(num_scales-1)))
-
-    fig.suptitle(sup_title)
-    
     # Plot each band
     for ii in range(num_scales-1):
+    
+        # Initialize figure
+        fig, axes = plt.subplots(3, 1,
+            sharex=True, sharey=True, squeeze=False,
+            gridspec_kw = gridspec_props,
+            figsize=(10, 15))
+
+        fig.suptitle(sup_title)
         
         to_plot_below = np.sum(KE[:ii+1,:,:], axis=0)
         to_plot_above = np.sum(KE[ii+1:,:,:], axis=0) - mean_KE
@@ -181,10 +182,6 @@ for Itime in range(rank, Ntime, num_procs):
         to_plot_above = np.ma.masked_where(mask==0, to_plot_above)
         missing       = np.ma.masked_where(mask==0, missing)
     
-        m_a = Basemap(ax = axes[ii,0], **map_settings)
-        m_b = Basemap(ax = axes[ii,1], **map_settings)
-        m_m = Basemap(ax = axes[ii,2], **map_settings)
-    
         CV_a = np.nanmax(np.abs(to_plot_above))
         CV_b = np.nanmax(np.abs(to_plot_below))
         CV_m = np.nanmax(np.abs(missing))
@@ -192,43 +189,41 @@ for Itime in range(rank, Ntime, num_procs):
         vmax = max(CV_a, CV_b, CV_m)
         vmin = 10**(np.log10(vmax) - 3)
     
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_above, axes[ii,0], fig, m_a, num_ords = 3)
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_below, axes[ii,1], fig, m_b, num_ords = 3)
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, missing, axes[ii,2], fig, m_m, num_ords = 3)
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_above, axes[0,0], fig, proj, num_ords = 3)
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_below, axes[1,0], fig, proj, num_ords = 3)
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, missing, axes[2,0], fig, proj, num_ords = 3)
     
         # Add coastlines and lat/lon lines
-        for m in [m_a, m_b, m_m]:
-            m.drawcoastlines(linewidth=0.1)
-            m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
-            m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
-            m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+        for ax in axes[:,0]:
+            Xp, Yp = proj(LON*R2D, LAT*R2D)
+            ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+            PlotTools.AddParallels_and_Meridians(ax, proj, 
+                parallels, meridians, latitude, longitude, label_meridians=(ax==axes[2,0]))
     
-        axes[ii,0].set_ylabel('{0:.1f} km'.format(scales[ii] / 1e3))
-            
-    axes[0,0].set_title('Coarse $(>l)$')
-    axes[0,1].set_title('Fine $(<l)$')
-    axes[0,2].set_title('Missing')
+        axes[0,0].set_ylabel('Coarse $(>l)$')
+        axes[1,0].set_ylabel('Fine $(<l)$')
+        axes[2,0].set_ylabel('Missing')
     
-    plt.savefig(tmp_direct + '/KE_dev_dichotomies_{0:04d}.png'.format(Itime), dpi=dpi)
-    plt.close()
+        plt.savefig(tmp_direct + '/{0:.4g}_KE_dev_dichotomies_{1:04d}.png'.format(scales[ii]/1e3, Itime), dpi=dpi)
+        plt.close()
     
 
 # If more than one time point, create mp4s
 if Ntime > 1:
     PlotTools.merge_to_mp4(tmp_direct + '/KE_dev_bands_%04d.png',    
             out_direct + '/KE_dev_bands.mp4', fps=12)
-    PlotTools.merge_to_mp4(tmp_direct + '/KE_dev_dichotomies_%04d.png',    
-            out_direct + '/KE_dev_dichotomies.mp4', fps=12)
-
-    # Now delete the frames
-    shutil.rmtree(tmp_direct)
-    
+    for ii in range(num_scales-1):
+        PlotTools.merge_to_mp4(tmp_direct + '/{0:.4g}_KE_dev_dichotomies_%04d.png'.format(scales[ii]/1e3),    
+                out_direct + '/{0:.4g}km/KE_dev_dichotomies.mp4'.format(scales[ii]/1e3), fps=12)
 else:
     shutil.move(tmp_direct + '/KE_dev_bands_0000.png',
             out_direct + '/KE_dev_bands.png')
-    shutil.move(tmp_direct + '/KE_dev_dichotomies_0000.png',
-            out_direct + '/KE_dev_dichotomies.png')
+    for ii in range(num_scales-1):
+        shutil.move(tmp_direct + '/{0:.4g}_KE_dev_dichotomies_0000.png'.format(scales[ii]/1e3),
+                out_direct + '/{0:.4g}km/KE_dev_dichotomies.png'.format(scales[ii]/1e3))
 
+# Now delete the frames
+shutil.rmtree(tmp_direct)
 
 
 
@@ -265,16 +260,14 @@ if (Ntime > 1):
         
         to_plot = np.ma.masked_where(mask==0, to_plot)
     
-        m  = Basemap(ax = axes[ii], **map_settings)
-    
         CV  = np.nanmax(np.abs(to_plot))
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, m, num_ords = 3)
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, proj, num_ords = 3)
     
         # Add coastlines and lat/lon lines
-        m.drawcoastlines(linewidth=0.1)
-        m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
-        m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
-        m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+        Xp, Yp = proj(LON*R2D, LAT*R2D)
+        axes[ii].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+        PlotTools.AddParallels_and_Meridians(axes[ii], proj, 
+            parallels, meridians, latitude, longitude, label_meridians=(ii==num_scales))
     
         if (ii == 0):
             axes[ii].set_ylabel('Below {0:0.1f} km'.format(scales[0] / 1e3))
@@ -298,16 +291,16 @@ if (Ntime > 1):
     vo = np.mean(source.variables[ 'vo'     ][   :, 0, :, :], axis=0)
     Full_KE = 0.5 * (uo**2 + vo**2)
     
-    # Initialize figure
-    fig, axes = plt.subplots(num_scales-1, 3,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(16, 4*(num_scales-1)))
-
-    fig.suptitle('Time average')
-    
     # Plot each band
     for ii in range(num_scales-1):
+    
+        # Initialize figure
+        fig, axes = plt.subplots(3, 1,
+            sharex=True, sharey=True, squeeze=False,
+            gridspec_kw = gridspec_props,
+            figsize=(10, 15))
+
+        fig.suptitle('Time average')
         
         to_plot_below = np.sum(KE[:ii+1,:,:], axis=0)
         to_plot_above = np.sum(KE[ii+1:,:,:], axis=0) - mean_KE
@@ -317,10 +310,6 @@ if (Ntime > 1):
         to_plot_above = np.ma.masked_where(mask==0, to_plot_above)
         missing       = np.ma.masked_where(mask==0, missing)
     
-        m_a = Basemap(ax = axes[ii,0], **map_settings)
-        m_b = Basemap(ax = axes[ii,1], **map_settings)
-        m_m = Basemap(ax = axes[ii,2], **map_settings)
-    
         CV_a = np.nanmax(np.abs(to_plot_above))
         CV_b = np.nanmax(np.abs(to_plot_below))
         CV_m = np.nanmax(np.abs(missing))
@@ -328,22 +317,20 @@ if (Ntime > 1):
         vmax = max(CV_a, CV_b, CV_m)
         vmin = 10**(np.log10(vmax) - 3)
     
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_above, axes[ii,0], fig, m_a, num_ords = 3)
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_below, axes[ii,1], fig, m_b, num_ords = 3)
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, missing, axes[ii,2], fig, m_m, num_ords = 3)
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_above, axes[0,0], fig, proj, num_ords = 3)
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_below, axes[1,0], fig, proj, num_ords = 3)
+        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, missing, axes[2,0], fig, proj, num_ords = 3)
     
         # Add coastlines and lat/lon lines
-        for m in [m_a, m_b, m_m]:
-            m.drawcoastlines(linewidth=0.1)
-            m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
-            m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
-            m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
+        for ax in axes[:,0]:
+            Xp, Yp = proj(LON*R2D, LAT*R2D)
+            ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+            PlotTools.AddParallels_and_Meridians(ax, proj, 
+                parallels, meridians, latitude, longitude, label_meridians=(ax==axes[2,0]))
     
-        axes[ii,0].set_ylabel('{0:.1f} km'.format(scales[ii] / 1e3))
-            
-    axes[0,0].set_title('Coarse $(>l)$')
-    axes[0,1].set_title('Fine $(<l)$')
-    axes[0,2].set_title('Missing')
+        axes[0,0].set_ylabel('Coarse $(>l)$')
+        axes[1,0].set_ylabel('Fine $(<l)$')
+        axes[2,0].set_ylabel('Missing')
     
-    plt.savefig(out_direct + '/AVE_KE_dev_dichotomies.png', dpi=dpi)
-    plt.close()
+        plt.savefig(out_direct + '/{0:.4g}km/AVE_KE_dev_dichotomies.png'.format(scales[ii]/1e3), dpi=dpi)
+        plt.close()
