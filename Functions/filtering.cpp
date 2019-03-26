@@ -252,7 +252,7 @@ void filtering(
                             tid = omp_get_thread_num();
                             if (tid == 0) {
                                 // Every 10 percent, print a dot, but only the first thread
-                                if ( ((double)(mask_index) / (Nlat*Nlon)) * 100 >= perc ) {
+                                if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
                                     if (perc == perc_base) { fprintf(stdout, "      "); }
                                     fprintf(stdout, ".");
                                     fflush(stdout);
@@ -333,6 +333,7 @@ void filtering(
 
 
                 #if COMP_TRANSFERS
+                perc = perc_base;
                 // If we want energy transfers (Pi), then loop through again to do it.
                 //   It needs to be in a separate loop because the list of shared
                 //   variables is dependent on the pre-processor flags
@@ -344,10 +345,12 @@ void filtering(
                         coarse_u_x, coarse_u_y, coarse_u_z,\
                         coarse_uxux, coarse_uxuy, coarse_uxuz,\
                         coarse_uyuy, coarse_uyuz, coarse_uzuz,\
-                        u_x, u_y, u_z, fine_KE) \
+                        u_x, u_y, u_z, fine_KE, perc_base) \
                 private(Ilat, Ilon, index, mask_index,\
                         u_x_tmp, u_y_tmp, u_z_tmp,\
-                        uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp)
+                        uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,\
+                        tid)\
+                firstprivate(perc)
                 {
                     #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -359,6 +362,19 @@ void filtering(
     
                             mask_index = Index(0,     0,      Ilat, Ilon,
                                                Ntime, Ndepth, Nlat, Nlon);
+
+                            #if DEBUG >= 1
+                            tid = omp_get_thread_num();
+                            if (tid == 0) {
+                                // Every 10 percent, print a dot, but only the first thread
+                                if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
+                                    if (perc == perc_base) { fprintf(stdout, "      "); }
+                                    fprintf(stdout, ".");
+                                    fflush(stdout);
+                                    perc += perc_base;
+                                }
+                            }
+                            #endif
 
                             if (mask.at(mask_index) == 1) { // Skip land areas
                                 #if DEBUG >= 3
@@ -400,6 +416,12 @@ void filtering(
                         }  // end for(longitude) block
                     }  // end for(latitude) block
                 } // end pragma parallel block
+                #if DEBUG >= 1
+                #pragma omp master
+                {
+                    fprintf(stdout, "\n");
+                }
+                #endif
                 #endif
                 
                 #if COMP_BC_TRANSFERS
@@ -414,8 +436,11 @@ void filtering(
                 shared(Itime, Idepth, scale, mask, dAreas, \
                         longitude, latitude, full_rho, full_p,\
                         coarse_rho, coarse_p, fine_rho, fine_p, \
-                        PEtoKE, coarse_u_r)
+                        PEtoKE, coarse_u_r,\
+                        perc_base, tid, stdout)\
+                firstprivate(perc)
                 {
+                    #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -425,6 +450,19 @@ void filtering(
     
                             mask_index = Index(0,     0,      Ilat, Ilon,
                                                Ntime, Ndepth, Nlat, Nlon);
+
+                            #if DEBUG >= 1
+                            tid = omp_get_thread_num();
+                            if (tid == 0) {
+                                // Every 10 percent, print a dot, but only the first thread
+                                if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
+                                    if (perc == perc_base) { fprintf(stdout, "      "); }
+                                    fprintf(stdout, ".");
+                                    fflush(stdout);
+                                    perc += perc_base;
+                                }
+                            }
+                            #endif
 
                             if (mask.at(mask_index) == 1) { // Skip land areas
                                 apply_filter_at_point(
@@ -453,6 +491,12 @@ void filtering(
                         }  // end for(longitude) block
                     }  // end for(latitude) block
                 }  // end pragma parallel block
+                #if DEBUG >= 1
+                #pragma omp master
+                {
+                    fprintf(stdout, "\n");
+                }
+                #endif
                 #endif
             }  // end for(depth) block
         }  // end for(time) block

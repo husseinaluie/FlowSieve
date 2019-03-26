@@ -54,7 +54,7 @@ namespace constants
      * \brief Differentiation order for finite differencing (currently must be 4)
      * @ingroup constants
      */
-    const int DiffOrd = 6;
+    const int DiffOrd = 4;
 
 }
 /*! @} End of Doxygen Groups*/
