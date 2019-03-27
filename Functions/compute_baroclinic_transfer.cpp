@@ -36,7 +36,7 @@ void  compute_baroclinic_transfer(
             private(Ilat, Ilon, index, mask_index,\
                     drhodlat, dpdlat, drhodlon, dpdlon)
             {
-                #pragma omp for collapse(2) schedule(dynamic)
+                #pragma omp for collapse(2) schedule(guided)
                 for (Ilat = 0; Ilat < Nlat; Ilat++) {
                     for (Ilon = 0; Ilon < Nlon; Ilon++) {
 

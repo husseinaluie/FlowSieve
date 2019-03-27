@@ -5,10 +5,6 @@
 #include "../differentiation_tools.hpp"
 #include "../constants.hpp"
 
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
 void compute_largescale_strain(
         double & S_xx,                          /**< [in] where to store xx component */
         double & S_xy,                          /**< [in] where to store xy component */
