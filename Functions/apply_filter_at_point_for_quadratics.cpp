@@ -4,10 +4,6 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
 void apply_filter_at_point_for_quadratics(
         double & uxux_tmp,                      /**< [in] where to store filtered (u_x)*(u_x) */
         double & uxuy_tmp,                      /**< [in] where to store filtered (u_x)*(u_y) */
@@ -34,9 +30,10 @@ void apply_filter_at_point_for_quadratics(
         ) {
 
 
-    double kA_sum, dist, kern, area;
+    double kA_sum, dist, kern, area, mask_val;
+    double u_x_loc, u_y_loc, u_z_loc;
     int index, mask_index;
-    int curr_lon;
+    int curr_lon, curr_lat;
 
     kA_sum  = 0.;
     uxux_tmp = 0.;
@@ -54,21 +51,46 @@ void apply_filter_at_point_for_quadratics(
     int    dlat_N, dlon_N;
     // The spacing (in metres and points) betwee latitude gridpoints
     //   The factor of 2 is diameter->radius 
+    #if CARTESIAN
+    dlat_m = dlat;
+    #elif not(CARTESIAN)
     dlat_m = dlat * constants::R_earth;
+    #endif
     dlat_N = ceil( (1.1*scale / dlat_m) / 2 );
 
     int LAT_lb, LAT_ub, LON_lb, LON_ub;
     // Latitude periodicity is a little different / awkward
     //   for the moment, hope it doesn't become an issue
+    #if PERIODIC_Y
+    LAT_lb = Ilat - dlat_N;
+    LAT_ub = Ilat + dlat_N;
+    #else
     LAT_lb = std::max(0,    Ilat - dlat_N);
     LAT_ub = std::min(Nlat, Ilat + dlat_N);
+    #endif
 
     double local_scale, delta_lat;
+    double lat_at_curr, lat_at_ilat;
+    lat_at_ilat = latitude.at(Ilat);
 
-    for (int curr_lat = LAT_lb; curr_lat < LAT_ub; curr_lat++) {
+    for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
+
+        #if PERIODIC_Y
+        // Handle periodicity
+        if      (LAT <  0   ) { curr_lat = LAT + Nlat; } 
+        else if (LAT >= Nlat) { curr_lat = LAT - Nlat; }
+        else                  { curr_lat = LAT; }
+        #else
+        curr_lat = LAT;
+        #endif
+        lat_at_curr = latitude.at(curr_lat);
 
         // Get the longitude grid spacing (in m) at this latitude
-        dlon_m = dlon * constants::R_earth * cos(latitude.at(curr_lat));
+        #if CARTESIAN
+        dlon_m = dlon;
+        #elif not(CARTESIAN)
+        dlon_m = dlon * constants::R_earth * cos(lat_at_curr);
+        #endif 
 
         // Next determine how far we need to go (since we're already 
         //   at a finite distance in latitude, we don't need to go
@@ -79,9 +101,12 @@ void apply_filter_at_point_for_quadratics(
         //    improve performance.
         //  The abs in local_scale is to handle the 'comfort zone'
         //    where delta_lat > scale (from the 1.1 factor in dlat_N)
-        delta_lat   = constants::R_earth * abs(   latitude.at(Ilat) 
-                                                - latitude.at(curr_lat));
-        local_scale = sqrt( abs( pow(scale, 2) - pow(delta_lat, 2) ));
+        #if CARTESIAN
+        delta_lat   = lat_at_ilat - lat_at_curr;
+        #elif not(CARTESIAN)
+        delta_lat   = constants::R_earth * ( lat_at_ilat - lat_at_curr );
+        #endif
+        local_scale = sqrt( fabs( scale*scale - delta_lat*delta_lat ));
 
         // Now find the appropriate integration region
         //   The factor of 2 is diameter->radius 
@@ -91,17 +116,17 @@ void apply_filter_at_point_for_quadratics(
 
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
+            #if PERIODIC_X
             // Handle periodicity
-            if (LON < 0) {
-                curr_lon = LON + Nlon;
-            } else if (LON >= Nlon) {
-                curr_lon = LON - Nlon;
-            } else {
-                curr_lon = LON;
-            }
+            if      (LON <  0   ) { curr_lon = LON + Nlon; }
+            else if (LON >= Nlon) { curr_lon = LON - Nlon; }
+            else                  { curr_lon = LON; }
+            #else
+            curr_lon = LON;
+            #endif
 
-            dist = distance(longitude.at(Ilon),     latitude.at(Ilat),
-                            longitude.at(curr_lon), latitude.at(curr_lat));
+            dist = distance(longitude.at(Ilon),     lat_at_ilat,
+                            longitude.at(curr_lon), lat_at_curr);
 
             kern = kernel(dist, scale);
 
@@ -111,15 +136,20 @@ void apply_filter_at_point_for_quadratics(
             mask_index = Index(0,     0,      curr_lat, curr_lon,
                                Ntime, Ndepth, Nlat,     Nlon);
 
-            area    = dAreas.at(mask_index);
-            kA_sum += kern * area;
+            area     = dAreas.at(mask_index);
+            kA_sum  += kern * area;
+            mask_val = mask.at(mask_index);
 
-            uxux_tmp += u_x.at(index) * u_x.at(index) * kern * area * mask.at(mask_index);
-            uxuy_tmp += u_x.at(index) * u_y.at(index) * kern * area * mask.at(mask_index);
-            uxuz_tmp += u_x.at(index) * u_z.at(index) * kern * area * mask.at(mask_index);
-            uyuy_tmp += u_y.at(index) * u_y.at(index) * kern * area * mask.at(mask_index);
-            uyuz_tmp += u_y.at(index) * u_z.at(index) * kern * area * mask.at(mask_index);
-            uzuz_tmp += u_z.at(index) * u_z.at(index) * kern * area * mask.at(mask_index);
+            u_x_loc = u_x.at(index);
+            u_y_loc = u_y.at(index);
+            u_z_loc = u_z.at(index);
+
+            uxux_tmp += u_x_loc * u_x_loc * kern * area * mask_val;
+            uxuy_tmp += u_x_loc * u_y_loc * kern * area * mask_val;
+            uxuz_tmp += u_x_loc * u_z_loc * kern * area * mask_val;
+            uyuy_tmp += u_y_loc * u_y_loc * kern * area * mask_val;
+            uyuz_tmp += u_y_loc * u_z_loc * kern * area * mask_val;
+            uzuz_tmp += u_z_loc * u_z_loc * kern * area * mask_val;
 
         }
     }

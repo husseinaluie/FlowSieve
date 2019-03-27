@@ -4,10 +4,6 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
 void apply_filter_at_point(
         double & coarse_val,                    /**< [in] where to store filtered value */
         const std::vector<double> & field,      /**< [in] field to filter */
@@ -30,7 +26,7 @@ void apply_filter_at_point(
 
     double kA_sum, dist, kern, area;
     int index, mask_index;
-    int curr_lon;
+    int curr_lon, curr_lat;
 
     kA_sum = 0.;
     double coarse_val_tmp = 0.;
@@ -44,24 +40,46 @@ void apply_filter_at_point(
     int    dlat_N, dlon_N;
     // The spacing (in metres and points) betwee latitude gridpoints
     //   The factor of 2 is diameter->radius 
+    #if CARTESIAN
+    dlat_m = dlat;
+    #elif not(CARTESIAN)
     dlat_m = dlat * constants::R_earth;
+    #endif
     dlat_N = ceil( (1.1*scale / dlat_m) / 2 );
 
     int LAT_lb, LAT_ub, LON_lb, LON_ub;
     // Latitude periodicity is a little different / awkward
     //   for the moment, hope it doesn't become an issue
+    #if PERIODIC_Y
+    LAT_lb = Ilat - dlat_N;
+    LAT_ub = Ilat + dlat_N;
+    #else
     LAT_lb = std::max(0,    Ilat - dlat_N);
     LAT_ub = std::min(Nlat, Ilat + dlat_N);
+    #endif
 
     double local_scale, delta_lat;
     double lat_at_curr, lat_at_ilat;
     lat_at_ilat = latitude.at(Ilat);
 
-    for (int curr_lat = LAT_lb; curr_lat < LAT_ub; curr_lat++) {
+    for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
+
+        #if PERIODIC_Y
+        // Handle periodicity
+        if      (LAT <  0   ) { curr_lat = LAT + Nlat; } 
+        else if (LAT >= Nlat) { curr_lat = LAT - Nlat; }
+        else                  { curr_lat = LAT; }
+        #else
+        curr_lat = LAT;
+        #endif
         lat_at_curr = latitude.at(curr_lat);
 
         // Get the longitude grid spacing (in m) at this latitude
+        #if CARTESIAN
+        dlon_m = dlon;
+        #elif not(CARTESIAN)
         dlon_m = dlon * constants::R_earth * cos(lat_at_curr);
+        #endif 
 
         // Next determine how far we need to go (since we're already 
         //   at a finite distance in latitude, we don't need to go
@@ -72,28 +90,43 @@ void apply_filter_at_point(
         //    improve performance.
         //  The abs in local_scale is to handle the 'comfort zone'
         //    where delta_lat > scale (from the 1.1 factor in dlat_N)
+        #if CARTESIAN
+        delta_lat   = lat_at_ilat - lat_at_curr;
+        #elif not(CARTESIAN)
         delta_lat   = constants::R_earth * ( lat_at_ilat - lat_at_curr );
+        #endif
         local_scale = sqrt( fabs( scale*scale - delta_lat*delta_lat ));
 
         // Now find the appropriate integration region
         //   The factor of 2 is diameter->radius 
         dlon_N = ceil( ( 1.1 * local_scale / dlon_m) / 2 );
+        #if PERIODIC_X
         LON_lb = std::max( -Nlon,   Ilon - dlon_N);
         LON_ub = std::min(2*Nlon-1, Ilon + dlon_N);
+        #else
+        LON_lb = std::max(0,    Ilon - dlon_N);
+        LON_ub = std::min(Nlon, Ilon + dlon_N);
+        #endif
 
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
+            #if PERIODIC_X
             // Handle periodicity
-            if (LON < 0) {
-                curr_lon = LON + Nlon;
-            } else if (LON >= Nlon) {
-                curr_lon = LON - Nlon;
-            } else {
-                curr_lon = LON;
-            }
+            if      (LON <  0   ) { curr_lon = LON + Nlon; }
+            else if (LON >= Nlon) { curr_lon = LON - Nlon; }
+            else                  { curr_lon = LON; }
+            #else
+            curr_lon = LON;
+            #endif
 
+            #if CARTESIAN
+            dist = distance(longitude.at(Ilon),     lat_at_ilat,
+                            longitude.at(curr_lon), lat_at_curr,
+                            dlon_m * Nlon, dlat_m * Nlat);
+            #elif not(CARTESIAN)
             dist = distance(longitude.at(Ilon),     lat_at_ilat,
                             longitude.at(curr_lon), lat_at_curr);
+            #endif
 
             kern = kernel(dist, scale);
 
