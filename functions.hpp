@@ -41,9 +41,15 @@ int Index( const int Itime, const int Idepth, const int Ilat, const int Ilon,
  * It should avoid floating point issues for the grid scales that
  *   we're considering. Worst case, increase to quads for better
  *   accuracy.
+ *
+ * The last two arguments (Llon and Llat) give the physical 
+ *   length of the two dimensions. This is used in the case
+ *   of periodic Cartesian grids. They are otherwise unused.
+ *
  */
-double distance(const double lon1, const double lat1, 
-                const double lon2, const double lat2);
+double distance(const double lon1,     const double lat1, 
+                const double lon2,     const double lat2,
+                const double Llon = 0, const double Llat = 0);
 
 /*!
  * \brief Convert single spherical velocity to Cartesian velocity
