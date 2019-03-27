@@ -3,7 +3,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cmocean, sys, PlotTools
 from netCDF4 import Dataset
-from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import ListedColormap
 
 dpi = PlotTools.dpi
@@ -43,7 +42,9 @@ num_scales = len(scales)
 LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
 
 # Some parameters for plotting
-map_settings = PlotTools.MapSettings(longitude, latitude)
+proj = PlotTools.MapProjection(longitude, latitude)
+Xp, Yp = proj(LON*R2D, LAT*R2D, inverse=False)
+
 cbar_props     = dict(pad = 0.1, shrink = 0.85, orientation = 'horizontal')
 gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.05, right = 0.95, bottom = 0.05, top = 0.95)
 
@@ -60,7 +61,7 @@ parallels = np.round(np.linspace(latitude.min(),  latitude.max(), 5))
 ## First plot: straight KE binning
 
 # Initialize figure
-fig, axes = plt.subplots(3, num_scales+1,
+fig, axes = plt.subplots(3, num_scales,
         sharex=True, sharey=True, 
         gridspec_kw = gridspec_props,
         figsize=(4*num_scales, 14))
@@ -77,27 +78,17 @@ for ii in range(num_scales):
             to_plot = u_lat[ii,:,:]
         to_plot = np.ma.masked_where(mask==0, to_plot)
 
-        m  = Basemap(ax = axes[jj,ii], **map_settings)
-
         CV  = np.max(np.abs(to_plot))
-        qm  = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, 
-                cmap='cmo.balance', 
-                vmin = -CV, vmax = CV, latlon = True)
+        qm  = axes[jj,ii].pcolormesh(Xp, Yp, to_plot, 
+                cmap='cmo.balance', vmin = -CV, vmax = CV)
     
         cbar = plt.colorbar(qm, ax = axes[jj,ii], **cbar_props)
         PlotTools.ScientificCbar(cbar, units='m/s', orientation='horizontal')
 
         # Add coastlines and lat/lon lines
-        m.drawcoastlines(linewidth=0.1)
-    
-        # Draw the mask on
-        m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
-
-        m.drawparallels(parallels, linewidth=0.5, labels=[0,0,0,0], color='g')
-        if jj == 2:
-            m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,1], color='g')
-        else:
-            m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
+        axes[jj,ii].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+        PlotTools.AddParallels_and_Meridians(axes[jj,ii], proj, 
+            parallels, meridians, latitude, longitude)
         
         if (ii == 0):
             if (jj == 0):
@@ -115,45 +106,6 @@ for ii in range(num_scales):
     else:
         axes[0,ii].set_title('{0:.1f} to {1:0.1f} km'.format(scales[ii-1] / 1e3, scales[ii] / 1e3))
         
-# Also plot the difference between the band sums and the original
-u_r_del   =    - np.sum(u_r,   axis=0)
-u_lon_del = uo - np.sum(u_lon, axis=0)
-u_lat_del = vo - np.sum(u_lat, axis=0)
-for jj in range(3):
-
-    if jj == 0:
-        to_plot = u_r_del
-    if jj == 1:
-        to_plot = u_lon_del
-    if jj == 2:
-        to_plot = u_lat_del
-    to_plot = np.ma.masked_where(mask==0, to_plot)
-
-    m  = Basemap(ax = axes[jj,ii+1], **map_settings)
-
-    CV  = np.max(np.abs(to_plot))
-    qm  = m.pcolormesh(LON*R2D, LAT*R2D, to_plot, 
-            cmap='cmo.balance', 
-            vmin = -CV, vmax = CV, latlon = True)
-
-    cbar = plt.colorbar(qm, ax = axes[jj,ii+1], **cbar_props)
-    PlotTools.ScientificCbar(cbar, units='m/s', orientation='horizontal')
-
-    # Add coastlines and lat/lon lines
-    m.drawcoastlines(linewidth=0.1)
-
-    # Draw the mask on
-    m.pcolormesh(LON*R2D, LAT*R2D, mask, vmin=-1, vmax=1, cmap=mask_cmap, latlon=True)
-
-    m.drawparallels(parallels, linewidth=0.5, labels=[0,1,0,0], color='g')
-    if jj == 2:
-        m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,1], color='g')
-    else:
-        m.drawmeridians(meridians, linewidth=0.5, labels=[0,0,0,0], color='g')
-
-    if jj == 0:
-        axes[jj,ii+1].set_title('orig - bandsum')
-
     
 plt.savefig('Videos/velocity_filter_bands.png', dpi=dpi)
 plt.close()

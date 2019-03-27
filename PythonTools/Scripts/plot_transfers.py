@@ -3,7 +3,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cmocean, sys
 from netCDF4 import Dataset
-from mpl_toolkits.basemap import Basemap
 import PlotTools, shutil, os, datetime
 from matplotlib.colors import ListedColormap
 
@@ -77,10 +76,7 @@ LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
 Nlat = len(latitude)
 Nlon = len(longitude)
 
-map_settings = PlotTools.MapSettings(longitude, latitude)
-plt.figure()
-ax = plt.gca()
-proj = Basemap(ax = ax, **map_settings)
+proj = PlotTools.MapProjection(longitude, latitude)
 Xp, Yp = proj(LON*R2D, LAT*R2D)
 
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))

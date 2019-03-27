@@ -35,6 +35,7 @@ if (rank == 0):
 
 fp = 'filter_output.nc'
 results = Dataset(fp, 'r')
+source  = Dataset('input.nc', 'r')
 
 R_earth = 6371e3
 rho0    = 1e3
@@ -53,10 +54,15 @@ u_r       = results.variables['u_r'  ][:]
 u_lon     = results.variables['u_lon'][:]
 u_lat     = results.variables['u_lat'][:]
 Pi        = results.variables['energy_transfer'][:]
-PEtoKE    = results.variables['PEtoKE'][:]
+if 'PEtoKE' in results.variables:
+    do_PEtoKE = True
+    PEtoKE    = results.variables['PEtoKE'][:]
+else:
+    do_PEtoKE = False
 
 Pi = Pi[:-1,:,:,:,:]
-PEtoKE = PEtoKE[:-1,:,:,:,:]
+if do_PEtoKE:
+    PEtoKE = PEtoKE[:-1,:,:,:,:]
 
 # Do some time handling tp adjust the epochs
 # appropriately
@@ -74,7 +80,10 @@ if (Ntime == 1):
 dlat = (latitude[1]  - latitude[0] ) * D2R
 dlon = (longitude[1] - longitude[0]) * D2R
 LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
-dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
+if source.variables['latitude'].units == 'm':
+    dAreas = dlat * dlon * np.ones(LAT.shape)
+else:
+    dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
 
 dArea = np.tile((mask*dAreas).reshape(1,Nlat,Nlon), (Ndepth,1,1)) 
 mask  = np.tile(mask.reshape(1,Nlat,Nlon), (Ndepth, 1, 1))
@@ -87,7 +96,8 @@ Dt = mp.FiniteDiff(time, order, spb=False)
 
 net_KE_flux = np.zeros((Ntime, Nscales-1))
 net_Pi      = np.zeros((Ntime, Nscales-1))
-net_PEtoKE  = np.zeros((Ntime, Nscales-1))
+if do_PEtoKE:
+    net_PEtoKE  = np.zeros((Ntime, Nscales-1))
 
 for iS in range(Nscales-1):
     # First, process data
@@ -95,7 +105,8 @@ for iS in range(Nscales-1):
                                 + np.sum(u_lat[iS+1:,:,:,:,:], axis=0)**2 
                                 + np.sum(u_lon[iS+1:,:,:,:,:], axis=0)**2 )
     KE_from_vel = KE_from_vel.reshape(Ntime, Ndepth*Nlat*Nlon)
-    KE_flux = np.matmul(Dt, KE_from_vel)
+    #KE_flux = np.matmul(Dt, KE_from_vel)
+    KE_flux = np.dot(Dt, KE_from_vel)
 
     for iT in range(Ntime):
 
@@ -106,7 +117,8 @@ for iS in range(Nscales-1):
 
         net_KE_flux[iT,iS] = np.sum(KE_flux[  iT,:] * dArea.ravel() * mask.ravel())
         net_Pi[     iT,iS] = np.sum(- Pi[  iS,iT,:] * dArea         * mask)
-        net_PEtoKE[ iT,iS] = np.sum(PEtoKE[iS,iT,:] * dArea         * mask)
+        if do_PEtoKE:
+            net_PEtoKE[ iT,iS] = np.sum(PEtoKE[iS,iT,:] * dArea         * mask)
     
         KE_sel =  KE_flux[iT,:].ravel()[mask.ravel() == 1]
         Pi_sel = -Pi[iS,iT,:,:,:].ravel()[mask.ravel() == 1]
@@ -167,10 +179,11 @@ for iS in range(Nscales-1):
     axes[0,0].plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[1], label=label)
     axes[0,0].plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[1])#, label=label)
 
-    to_plot = net_PEtoKE[:,iS]
-    label='$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'
-    axes[0,0].plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[2], label=label)
-    axes[0,0].plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[2])#, label=label)
+    if do_PEtoKE:
+        to_plot = net_PEtoKE[:,iS]
+        label='$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'
+        axes[0,0].plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[2], label=label)
+        axes[0,0].plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[2])#, label=label)
 
     axes[0,0].set_yscale('log')
     axes[0,0].legend(loc='best')

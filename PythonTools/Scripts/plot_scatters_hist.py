@@ -3,7 +3,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cmocean, sys
 from netCDF4 import Dataset
-from mpl_toolkits.basemap import Basemap
 import PlotTools
 
 dpi = PlotTools.dpi
@@ -43,8 +42,6 @@ LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
 Nlat = len(latitude)
 Nlon = len(longitude)
 
-map_settings = PlotTools.MapSettings(longitude, latitude)
-
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
 parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
 
@@ -56,7 +53,7 @@ gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.02, right = 0.98, b
 ##
 
 # Pi vs l^2 * Lambda^m
-if True:
+if 'baroclinic_transfer' in results.variables:
 
     # Initialize figure
     fig, axes = plt.subplots(2, 2, 

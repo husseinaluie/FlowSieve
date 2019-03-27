@@ -3,7 +3,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cmocean, sys
 from netCDF4 import Dataset
-from mpl_toolkits.basemap import Basemap
 import PlotTools
 
 dpi = PlotTools.dpi
@@ -43,8 +42,6 @@ LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
 Nlat = len(latitude)
 Nlon = len(longitude)
 
-map_settings = PlotTools.MapSettings(longitude, latitude)
-
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
 parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
 
@@ -56,7 +53,7 @@ gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.02, right = 0.98, b
 ##
 
 # Pi vs l^2 * Lambda^m, colour by vorticity
-if True:
+if 'baroclinic_transfer' in results.variables:
 
     # Initialize figure
     fig, axes = plt.subplots(2, 2, 
@@ -109,11 +106,11 @@ if True:
 
     axes[0,1].legend(loc='best')
 
-    plt.savefig('Figures/transfers_comparison.png', dpi=dpi)
+    plt.savefig('Videos/transfers_comparison.png', dpi=dpi)
     plt.close()
 
 # Pi vs vorticity, colour by Lambda^m
-if True:
+if 'baroclinic_transfer' in results.variables:
 
     # Initialize figure
     fig, axes = plt.subplots(2, 2, 
@@ -146,7 +143,6 @@ if True:
             cbar_label = '$\Pi$ $(\mathrm{W}\cdot\mathrm{km}^{-2}\cdot\mathrm{m}^{-1})$')
 
     for II in range(2):
-        #axes[II,0].set_ylabel('$\mathcal{E}$ $(\mathrm{s}^{-2})$')
         axes[II,0].set_ylabel('$\omega_r$ $(\mathrm{s}^{-1})$')
         axes[1,II].set_xlabel('$\Lambda^m/\\rho$ $(\mathrm{s}^{-3})$')
 
@@ -162,11 +158,8 @@ if True:
     for ax in axes.ravel():
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
-        #ax.plot(xlim, xlim,'--c', label='$1:1$')
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
 
-    #axes[0,1].legend(loc='best')
-
-    plt.savefig('Figures/transfers_comparison2.png', dpi=dpi)
+    plt.savefig('Videos/transfers_comparison2.png', dpi=dpi)
     plt.close()

@@ -3,7 +3,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cmocean, sys, PlotTools, os, shutil, datetime
 from netCDF4 import Dataset
-from mpl_toolkits.basemap import Basemap
 from matplotlib.colors import ListedColormap
 
 dpi = PlotTools.dpi
@@ -71,11 +70,7 @@ Ntime = len(time)
 LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
 
 # Some parameters for plotting
-map_settings = PlotTools.MapSettings(longitude, latitude)
-plt.figure()
-ax = plt.gca()
-proj = Basemap(ax = ax, **map_settings)
-
+proj = PlotTools.MapProjection(longitude, latitude)
 Xp, Yp = proj(LON*R2D, LAT*R2D, inverse=False)
 
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
@@ -177,8 +172,8 @@ for Itime in range(rank, Ntime, num_procs):
 
         fig.suptitle(sup_title)
         
-        to_plot_below = np.sum(vort_r[:ii+1, Itime,:,:], axis=0)
-        to_plot_above = np.sum(vort_r[ ii+1:,Itime,:,:], axis=0)
+        to_plot_below = np.sum(vort_r[:ii+1 , Itime, :, :], axis=0)
+        to_plot_above = np.sum(vort_r[ ii+1:, Itime, :, :], axis=0)
     
         to_plot_below = np.ma.masked_where(mask==0, to_plot_below)
         to_plot_above = np.ma.masked_where(mask==0, to_plot_above)

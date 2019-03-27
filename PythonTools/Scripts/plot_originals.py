@@ -3,7 +3,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cmocean, sys, datetime
 from netCDF4 import Dataset
-from mpl_toolkits.basemap import Basemap
 import PlotTools, subprocess, shutil, os
 from matplotlib.colors import ListedColormap
 
@@ -76,10 +75,7 @@ Full_KE = 0.5 * (uo**2 + vo**2)
 
 
 # Some parameters for plotting
-map_settings = PlotTools.MapSettings(longitude, latitude)
-plt.figure()
-ax = plt.gca()
-proj = Basemap(ax = ax, **map_settings)
+proj = PlotTools.MapProjection(longitude, latitude)
 Xp, Yp = proj(LON * R2D, LAT * R2D, inverse=False)
 
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))

@@ -76,7 +76,10 @@ if (Ntime == 1):
 dlat = (latitude[1]  - latitude[0] ) * D2R
 dlon = (longitude[1] - longitude[0]) * D2R
 LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
-dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
+if source.variables['latitude'].units == 'm':
+    dAreas = dlat * dlon * np.ones(LAT.shape)
+else:
+    dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
 
 dArea = np.tile((mask*dAreas).reshape(1,Nlat,Nlon), (Ndepth,1,1)) 
 mask  = np.tile(mask.reshape(1,Nlat,Nlon), (Ndepth, 1, 1))
