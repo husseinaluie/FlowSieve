@@ -1,15 +1,19 @@
+# Compiler products
 *.o
 *.x
-*.nc
-
-mpi_backup/*.?pp
-
 *dSYM
 
+# Don't keep data files
+*.nc
+
+# Some nonesense that comes up on OS X
 *.DS_Store
 
-Documentation/
+# Ignore the documentation
+docs/
 
+# Python 'compile' products
 *__pycache__*
 
+# Ignore the *local* system.mk. The Systems directory, however, is included.
 system.mk
