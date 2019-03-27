@@ -31,7 +31,7 @@ void compute_vorticity(
             private(Ilat, Ilon, index, mask_index, \
                     vort_r_tmp, vort_lon_tmp, vort_lat_tmp)
             {
-                #pragma omp for collapse(2) schedule(dynamic)
+                #pragma omp for collapse(2) schedule(guided)
                 for (Ilat = 0; Ilat < Nlat; Ilat++) {
                     for (Ilon = 0; Ilon < Nlon; Ilon++) {
 

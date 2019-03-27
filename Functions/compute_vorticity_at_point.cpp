@@ -5,10 +5,6 @@
 #include "../differentiation_tools.hpp"
 #include "../constants.hpp"
 
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
 void compute_vorticity_at_point(
         double & vort_r_tmp,                    /**< [in] where to store vort_r */
         double & vort_lon_tmp,                  /**< [in] where to store vort_lon */
@@ -29,16 +25,24 @@ void compute_vorticity_at_point(
         const std::vector<double> & mask        /**< [in] Mask array (2D) to distinguish land from water*/
         ) {
 
-
+    // For the moment, only compute vort_r
     vort_r_tmp   = 0.;
     vort_lon_tmp = 0.;
     vort_lat_tmp = 0.;
 
-    int index = Index(Itime, Idepth, Ilat, Ilon,
-                      Ntime, Ndepth, Nlat, Nlon);
 
-    // For the moment, only compute vort_r
-
+    #if CARTESIAN
+    vort_r_tmp += Cart_derivative_at_point(
+            u_lat, latitude, longitude, "x",
+            Itime, Idepth, Ilat, Ilon,
+            Ntime, Ndepth, Nlat, Nlon,
+            mask);
+    vort_r_tmp -= Cart_derivative_at_point(
+            u_lon, latitude, longitude, "y",
+            Itime, Idepth, Ilat, Ilon,
+            Ntime, Ndepth, Nlat, Nlon,
+            mask);
+    #elif not(CARTESIAN)
     // Longitudinal derivative component
     vort_r_tmp += constants::R_earth
                     * spher_derivative_at_point(
@@ -49,6 +53,9 @@ void compute_vorticity_at_point(
 
     // Latitudinal derivative component
     //  - ddlat ( u_lon * cos(lat) ) = u_lon * sin(lat) - ddlat( u_lon ) * cos(lat)
+    int index = Index(Itime, Idepth, Ilat, Ilon,
+                      Ntime, Ndepth, Nlat, Nlon);
+
     vort_r_tmp += constants::R_earth
                     * (   sin(latitude.at(Ilat)) * u_lon.at(index)
                         - cos(latitude.at(Ilat)) * spher_derivative_at_point(
@@ -60,6 +67,6 @@ void compute_vorticity_at_point(
 
     // Scale
     vort_r_tmp *= 1. / ( pow(constants::R_earth, 2) * cos(latitude.at(Ilat)) );
-
+    #endif
 }
 
