@@ -28,7 +28,7 @@ double spher_derivative_at_point(
     if      (do_lon) { Iref = Ilon; }
     else if (do_lat) { Iref = Ilat; }
     else { 
-        fprintf(stderr, "Illegal dimensions provided! %s given to %s\n", dim.c_str(), __FILE__);
+        fprintf(stderr, "Illegal dimension provided! %s given to %s\n", dim.c_str(), __FILE__);
         Iref = 0;
         index = 0;
     }
