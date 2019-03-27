@@ -1,6 +1,34 @@
 #ifndef CONSTANTS_HPP
 #define CONSTANTS_HPP 1
 
+#ifndef DEBUG
+    #define DEBUG 0
+#endif
+
+#ifndef CARTESIAN
+    #define CARTESIAN true
+#endif
+
+#ifndef PERIODIC_X
+    #define PERIODIC_X true
+#endif
+
+#ifndef PERIODIC_Y
+    #define PERIODIC_Y true
+#endif
+
+#ifndef COMP_VORT
+    #define COMP_VORT true
+#endif
+
+#ifndef COMP_TRANSFERS
+    #define COMP_TRANSFERS true
+#endif
+
+#ifndef COMP_BC_TRANSFERS
+    #define COMP_BC_TRANSFERS true
+#endif
+
 /*!
  * \file
  * \brief Provide namespace for global constants (physical and computational).
