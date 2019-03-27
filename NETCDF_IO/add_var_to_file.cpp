@@ -1,10 +1,7 @@
 
 #include <vector>
 #include "../netcdf_io.hpp"
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
+#include "../constants.hpp"
 
 void add_var_to_file(
         const char * var_name,   /**< [in] variable name */

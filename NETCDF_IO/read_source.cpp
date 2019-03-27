@@ -1,14 +1,7 @@
 
 #include "../netcdf_io.hpp"
+#include "../constants.hpp"
 #include <vector>
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
-#ifndef COMP_BC_TRANSFERS
-    #define COMP_BC_TRANSFERS true
-#endif
 
 // Write to netcdf file
 void read_source(
@@ -62,12 +55,14 @@ void read_source(
     fprintf(stdout, "\n");
     #endif
 
+    /*
     // For the moment, as a precaution stop if we hit something too large.
     if ( (Nlon > 1e4) or (Nlat > 1e4) or (Ntime > 1e2) or (Ndepth > 1e2) ) {
         if ((retval = nc_close(ncid))) { NC_ERR(retval, __LINE__, __FILE__); }
         fprintf(stdout, "Data dimensions too large to continue. (Line %d of %s)\n", __LINE__, __FILE__);
         return;
     }
+    */
 
     //
     //// Allocate memory for the fields

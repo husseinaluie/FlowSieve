@@ -1,14 +1,7 @@
 
 #include "../netcdf_io.hpp"
+#include "../constants.hpp"
 #include <vector>
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
-#ifndef COMP_BC_TRANSFERS
-    #define COMP_BC_TRANSFERS true
-#endif
 
 // Write to netcdf file
 void read_var_from_file(

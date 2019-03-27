@@ -1,10 +1,7 @@
 
 #include "../netcdf_io.hpp"
 #include <string.h>
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
+#include "../constants.hpp"
 
 void NC_ERR(
         const int e,          /**< [in] Error code provided by netcdf function */

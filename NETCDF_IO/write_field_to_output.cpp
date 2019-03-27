@@ -1,9 +1,6 @@
 #include <vector>
 #include "../netcdf_io.hpp"
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
+#include "../constants.hpp"
 
 void write_field_to_output(
         const std::vector<double> & field,  /**< [in] transfer to be written to the file*/

@@ -1,10 +1,7 @@
 
 #include <vector>
 #include "../netcdf_io.hpp"
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
+#include "../constants.hpp"
 
 void initialize_output_file(
         const std::vector<double> & time,      /**< [in] time vector (1D) */
