@@ -1,9 +1,6 @@
 #include <math.h>
 #include "../functions.hpp"
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
+#include "../constants.hpp"
 
 void vel_Spher_to_Cart(
             double & u_x,       /**< [in] u_x to be returned */
@@ -16,15 +13,25 @@ void vel_Spher_to_Cart(
             const double lat    /**< [in] latitude of location for conversion */
         ) {
 
-    u_x =   u_r   * cos(lon) * cos(lat)
-          - u_lon * sin(lon)
-          - u_lat * cos(lon) * sin(lat);
+    #if CARTESIAN
+    u_x = u_lon;
+    u_y = u_lat;
+    u_z = u_r;
+    #elif not(CARTESIAN)
+    const double cos_lon = cos(lon);
+    const double cos_lat = cos(lat);
+    const double sin_lon = sin(lon);
+    const double sin_lat = sin(lat);
+    u_x =   u_r   * cos_lon * cos_lat
+          - u_lon * sin_lon
+          - u_lat * cos_lon * sin_lat;
         
-    u_y =   u_r   * sin(lon) * cos(lat)
-          + u_lon * cos(lon)
-          - u_lat * sin(lon) * sin(lat);
+    u_y =   u_r   * sin_lon * cos_lat
+          + u_lon * cos_lon
+          - u_lat * sin_lon * sin_lat;
                      
-    u_z =   u_r   * sin(lat)
-          + u_lat * cos(lat);
+    u_z =   u_r             * sin_lat
+          + u_lat           * cos_lat;
+    #endif
 
 }

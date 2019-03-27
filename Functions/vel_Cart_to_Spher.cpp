@@ -1,11 +1,6 @@
 #include <math.h>
 #include "../functions.hpp"
-
-// If the DEBUG flag hasn't been set,
-//   then use default value of 0 
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
+#include "../constants.hpp"
 
 void vel_Cart_to_Spher(
             double & u_r,     /**< [in] u_r to be returned */
@@ -18,15 +13,25 @@ void vel_Cart_to_Spher(
             const double lat  /**< [in] latitude of location for conversion */
         ) {
 
-    u_r   =   u_x * cos(lon) * cos(lat)
-            + u_y * sin(lon) * cos(lat)
-            + u_z            * sin(lat);
+    #if CARTESIAN
+    u_lon = u_x;
+    u_lat = u_y;
+    u_r   = u_z;
+    #elif not(CARTESIAN)
+    const double cos_lon = cos(lon);
+    const double cos_lat = cos(lat);
+    const double sin_lon = sin(lon);
+    const double sin_lat = sin(lat);
+    u_r   =   u_x * cos_lon * cos_lat
+            + u_y * sin_lon * cos_lat
+            + u_z           * sin_lat;
     
-    u_lon = - u_x * sin(lon)
-            + u_y * cos(lon);
+    u_lon = - u_x * sin_lon
+            + u_y * cos_lon;
     
-    u_lat = - u_x * cos(lon) * sin(lat)
-            - u_y * sin(lon) * sin(lat)
-            + u_z            * cos(lat);
+    u_lat = - u_x * cos_lon * sin_lat
+            - u_y * sin_lon * sin_lat
+            + u_z           * cos_lat;
+    #endif
 
 }
