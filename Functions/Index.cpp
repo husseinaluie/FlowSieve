@@ -1,8 +1,5 @@
 #include "../functions.hpp"
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
+#include "../constants.hpp"
 
 int Index( 
         const int Itime,  /**< [in] Time index */

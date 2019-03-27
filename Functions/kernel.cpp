@@ -1,8 +1,5 @@
 #include "../functions.hpp"
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
+#include "../constants.hpp"
 
 double kernel(
         const double dist,  /**< [in] Distance as argument to the kernel */

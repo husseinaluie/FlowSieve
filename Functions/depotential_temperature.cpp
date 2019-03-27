@@ -1,3 +1,5 @@
+#include "../functions.hpp"
+
 double depotential_temperature(
         const double p,     /**< [in] pressure at point  */
         const double theta  /**< [in] potential temperature at point */

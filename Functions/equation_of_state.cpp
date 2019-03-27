@@ -1,4 +1,5 @@
 #include <math.h>
+#include "../functions.hpp"
 
 double equation_of_state(
         const double T, /**< [in] temperature (degrees C) */
