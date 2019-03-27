@@ -6,22 +6,6 @@
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
 
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
-#ifndef COMP_VORT
-    #define COMP_VORT true
-#endif
-
-#ifndef COMP_TRANSFERS
-    #define COMP_TRANSFERS true
-#endif
-
-#ifndef COMP_BC_TRANSFERS
-    #define COMP_BC_TRANSFERS true
-#endif
-
 void filtering(
         const std::vector<double> & full_u_r,       /**< [in] Full u_r velocity array */
         const std::vector<double> & full_u_lon,     /**< [in] Full u_lon velocity array */
@@ -75,7 +59,7 @@ void filtering(
         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
             #pragma omp parallel private(Ilat, Ilon, index, mask_index)
             {
-                #pragma omp for collapse(2) schedule(dynamic)
+                #pragma omp for collapse(2) schedule(guided)
                 for (Ilat = 0; Ilat < Nlat; Ilat++) {
                     for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -231,7 +215,7 @@ void filtering(
                         KE_tmp, tid) \
                 firstprivate(perc)
                 {
-                    #pragma omp for collapse(2) schedule(dynamic)
+                    #pragma omp for collapse(2) schedule(guided)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -352,7 +336,7 @@ void filtering(
                         tid)\
                 firstprivate(perc)
                 {
-                    #pragma omp for collapse(2) schedule(dynamic)
+                    #pragma omp for collapse(2) schedule(guided)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -440,7 +424,7 @@ void filtering(
                         perc_base, tid, stdout)\
                 firstprivate(perc)
                 {
-                    #pragma omp for collapse(2) schedule(dynamic)
+                    #pragma omp for collapse(2) schedule(guided)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -560,7 +544,7 @@ void filtering(
                         stdout) \
                 private(Ilat, Ilon, index, mask_index, u_x_tmp, u_y_tmp, u_z_tmp)
                 {
-                    #pragma omp for collapse(2) schedule(dynamic)
+                    #pragma omp for collapse(2) schedule(guided)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -608,7 +592,7 @@ void filtering(
                     coarse_u_lat, mask, Itime, Idepth) \
             private(Ilat, Ilon, index, mask_index, u_r_tmp, u_lon_tmp, u_lat_tmp)
             {
-                #pragma omp for collapse(2) schedule(dynamic)
+                #pragma omp for collapse(2) schedule(guided)
                 for (Ilat = 0; Ilat < Nlat; Ilat++) {
                     for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -638,7 +622,7 @@ void filtering(
             shared(u_x, u_y, u_z, fine_KE, mask, Itime, Idepth) \
             private(Ilat, Ilon, index, mask_index)
             {
-                #pragma omp for collapse(2) schedule(dynamic)
+                #pragma omp for collapse(2) schedule(guided)
                 for (Ilat = 0; Ilat < Nlat; Ilat++) {
                     for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
