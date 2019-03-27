@@ -76,11 +76,11 @@ hardclean:
 	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o coarse_grain.x Tests/*.o Tests/*.x
 	rm -r coarse_grain.x.dSYM
 	rm ALGLIB/*.o
-	rm -r Documentation/html
-	rm -r Documentation/latex
+	rm -r docs/html
+	rm -r docs/latex
 cleandocs:
-	rm -r Documentation/html
-	rm -r Documentation/latex
+	rm -r docs/html
+	rm -r docs/latex
 
 all: coarse_grain.x
 
