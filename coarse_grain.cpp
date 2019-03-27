@@ -10,18 +10,23 @@
 
 #include "netcdf_io.hpp"
 #include "functions.hpp"
-
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
+#include "constants.hpp"
 
 int main(int argc, char *argv[]) {
 
     #if DEBUG >= 0
     fprintf(stdout, "\n\n");
     fprintf(stdout, "Compiled at %s on %s.\n", __TIME__, __DATE__);
-    fprintf(stdout, "  Version %d.%d.%d \n\n", MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
-    fprintf(stdout, "\n\n");
+    fprintf(stdout, "  Version %d.%d.%d \n", MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
+    fprintf(stdout, "\n");
+    #endif
+
+    #if DEBUG >= 0
+    #if not(CARTESIAN)
+    fprintf(stdout, "Using spherical coordinates.\n");
+    #elif CARTESIAN
+    fprintf(stdout, "Using Cartesian coordinates.\n");
+    #endif
     #endif
 
     // Enable all floating point exceptions but FE_INEXACT
@@ -31,6 +36,7 @@ int main(int argc, char *argv[]) {
 
     // Print processor assignments
     int tid, nthreads;
+    size_t II;
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
     #pragma omp parallel default(none) private(tid, nthreads) shared(stdout)
@@ -57,24 +63,12 @@ int main(int argc, char *argv[]) {
     std::vector<double> mask;
 
     // For the time being, hard-code the filter scales
-    //   add zero as the bottom
-    /*
-    const int Nfilt = 15;
-    const double scales [Nfilt+1] = 
-            {100e3, 150e3, 200e3, 250e3, 
-                300e3, 350e3, 400e3, 450e3, 
-                500e3, 750e3, 1000e3,
-                1250e3, 1500e3, 1750e3, 
-                2000e3, 0};
-    */
-    /*
-    const int Nfilt = 10;
-    const double scales [Nfilt+1] = {100e3, 150e3, 200e3, 
-        250e3, 300e3, 350e3, 400e3, 450e3, 500e3, 750e3, 0}; 
-    */
+    //   add zero as the end for padding
+    // Scale must be increasing (ignoring the end)
+    // A zero scale will cause everything to nan out (again ignoring the end)
     const int Nfilt = 1;
     const double scales [Nfilt+1] = 
-            {100e3, 0};
+            {200e3, 0};
 
     std::vector<double> filter_scales;
     filter_scales.assign(scales, scales + Nfilt);
@@ -84,32 +78,56 @@ int main(int argc, char *argv[]) {
     fprintf(stdout, "Reading in source data.\n\n");
     #endif
 
-    read_source(longitude, latitude, time,  depth, 
-                u_r, u_lon, u_lat, 
-                rho, p,
-                mask );
+    // Read in the grid coordinates
+    read_var_from_file(longitude, "longitude", "input.nc", NULL);
+    read_var_from_file(latitude,  "latitude",  "input.nc", NULL);
+    read_var_from_file(time,      "time",      "input.nc", NULL);
+    read_var_from_file(depth,     "depth",     "input.nc", NULL);
+
+    // Read in the velocity fields
+    read_var_from_file(u_lon, "uo", "input.nc", &mask);
+    read_var_from_file(u_lat, "vo", "input.nc", NULL);
+
+    // No u_r in inputs, so initialize as zero
+    u_r.resize(u_lon.size());
+    #pragma omp parallel default(none) private(II) shared(u_r)
+    { 
+        #pragma omp for collapse(1) schedule(static)
+        for (II = 0; II < u_r.size(); II++) {
+            u_r.at(II) = 0.;
+        }
+    }
+
+
+    #if COMP_BC_TRANSFERS
+    // If desired, read in rho and p
+    read_var_from_file(rho, "rho", "input.nc", NULL);
+    read_var_from_file(p,   "p",   "input.nc", NULL);
+    #endif
 
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
     //const int Ntime  = time.size();
     //const int Ndetph = depth.size();
 
+    #if not(CARTESIAN)
     // Convert coordinate to radians
     int ii;
     #pragma omp parallel default(none) private(ii) shared(longitude)
     { 
-        #pragma omp for collapse(1) schedule(dynamic)
+        #pragma omp for collapse(1) schedule(static)
         for (ii = 0; ii < Nlon; ii++) {
             longitude.at(ii) = longitude.at(ii) * M_PI / 180;
         }
     }
     #pragma omp parallel default(none) private(ii) shared(latitude)
     {
-        #pragma omp for collapse(1) schedule(dynamic)
+        #pragma omp for collapse(1) schedule(static)
         for (ii = 0; ii < Nlat; ii++) {
             latitude.at(ii) = latitude.at(ii) * M_PI / 180;
         }
     }
+    #endif
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration
