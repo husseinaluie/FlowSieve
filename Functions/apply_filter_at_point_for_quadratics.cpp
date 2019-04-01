@@ -64,6 +64,7 @@ void apply_filter_at_point_for_quadratics(
     #if PERIODIC_Y
     LAT_lb = Ilat - dlat_N;
     LAT_ub = Ilat + dlat_N;
+    if (LAT_lb + Nlat < LAT_ub) { LAT_ub = LAT_lb + Nlat; }
     #else
     LAT_lb = std::max(0,    Ilat - dlat_N);
     LAT_ub = std::min(Nlat, Ilat + dlat_N);
@@ -111,8 +112,14 @@ void apply_filter_at_point_for_quadratics(
         // Now find the appropriate integration region
         //   The factor of 2 is diameter->radius 
         dlon_N = ceil( ( 1.1 * local_scale / dlon_m) / 2 );
-        LON_lb = std::max( -Nlon,   Ilon - dlon_N);
-        LON_ub = std::min(2*Nlon-1, Ilon + dlon_N);
+        #if PERIODIC_X
+        LON_lb = Ilon - dlon_N;
+        LON_ub = Ilon + dlon_N;
+        if (LON_lb + Nlon < LON_ub) { LON_ub = LON_lb + Nlon; }
+        #else
+        LON_lb = std::max(0,    Ilon - dlon_N);
+        LON_ub = std::min(Nlon, Ilon + dlon_N);
+        #endif
 
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
@@ -125,8 +132,14 @@ void apply_filter_at_point_for_quadratics(
             curr_lon = LON;
             #endif
 
+            #if CARTESIAN
+            dist = distance(longitude.at(Ilon),     lat_at_ilat,
+                            longitude.at(curr_lon), lat_at_curr,
+                            dlon_m * Nlon, dlat_m * Nlat);
+            #elif not(CARTESIAN)
             dist = distance(longitude.at(Ilon),     lat_at_ilat,
                             longitude.at(curr_lon), lat_at_curr);
+            #endif
 
             kern = kernel(dist, scale);
 

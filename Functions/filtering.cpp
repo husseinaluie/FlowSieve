@@ -77,7 +77,7 @@ void filtering(
                                               longitude.at(Ilon), latitude.at(Ilat));
 
                             coarse_KE.at(index) = 0.5 * ( 
-                                    pow(u_x.at(index), 2) 
+                                      pow(u_x.at(index), 2) 
                                     + pow(u_y.at(index), 2) 
                                     + pow(u_z.at(index), 2) );
                         }
