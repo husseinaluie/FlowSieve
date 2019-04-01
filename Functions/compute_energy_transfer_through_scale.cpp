@@ -30,7 +30,7 @@ void compute_energy_transfer_through_scale(
     int index, mask_index, Ilat, Ilon;
 
     for (int Itime = 0; Itime < Ntime; Itime++) {
-         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
+        for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
             #pragma omp parallel \
             default(none) \
             shared(Itime, Idepth, mask,\
@@ -86,6 +86,6 @@ void compute_energy_transfer_through_scale(
                     }
                 }
             }
-         }
+        }
     }
 }

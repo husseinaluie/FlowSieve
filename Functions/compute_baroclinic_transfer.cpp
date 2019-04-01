@@ -83,5 +83,4 @@ void  compute_baroclinic_transfer(
             }
         }
     }
-
 }
