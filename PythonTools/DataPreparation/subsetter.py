@@ -12,10 +12,12 @@ depth     = source.variables['depth'][:]
 longitude = source.variables['longitude'][:]
 latitude  = source.variables['latitude' ][:]
 
-dims = source.variables['uo'].dimensions
+dims  = source.variables['uo'].dimensions
+dtype = source.variables['uo'].datatype
 
-time_lb = 0
-time_ub = 2
+time_lb   = 0
+time_ub   = len(time)
+time_step = 1
 
 #lon_lb = np.argmin(np.abs(longitude - (-90)))
 #lon_ub = np.argmin(np.abs(longitude - ( 60)))
@@ -37,16 +39,16 @@ with Dataset(outfile, 'w', format='NETCDF4') as fp:
         elif dim == 'latitude':
             shape = len(latitude[lat_lb:lat_ub])
         elif dim == 'time':
-            shape = len(time[time_lb:time_ub])
+            shape = len(time[time_lb:time_ub:time_step])
         else:
             shape = len(source.variables[dim])
         dim_var = fp.createDimension(dim, shape)
 
     for var in source.variables:
         if var in dims:
-            var_var = fp.createVariable(var, np.float64, source.variables[var].dimensions)
+            var_var = fp.createVariable(var, dtype, source.variables[var].dimensions)
         else:
-            var_var = fp.createVariable(var, np.float64, source.variables[var].dimensions,
+            var_var = fp.createVariable(var, dtype, source.variables[var].dimensions,
                     fill_value = -32767, contiguous = True)
             var_var.scale_factor = 1.
 
@@ -55,12 +57,12 @@ with Dataset(outfile, 'w', format='NETCDF4') as fp:
         elif var == 'latitude':
             var_var[:] = latitude[lat_lb:lat_ub]
         elif var == 'time':
-            var_var[:] = time[time_lb:time_ub]
+            var_var[:] = time[time_lb:time_ub:time_step]
         elif var == 'depth':
             var_var[:] = depth
         else:
             var_var[:] = source.variables[var][
-                    time_lb:time_ub,
+                    time_lb:time_ub:time_step,
                     :,
                     lat_lb:lat_ub,
                     lon_lb:lon_ub]
