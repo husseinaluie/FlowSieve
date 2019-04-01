@@ -2,6 +2,7 @@
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
 #include <vector>
+#include <math.h>
 
 // Write to netcdf file
 void read_var_from_file(
@@ -66,13 +67,30 @@ void read_var_from_file(
     double scale = 1.;
     if ((retval = nc_get_att_double(ncid, var_id, "scale_factor", &scale))) { NC_ERR(retval, __LINE__, __FILE__); }
     if (scale != 1.) {
-        for (size_t II = 0; II > num_pts; II++) {
+        #if DEBUG >= 2
+        fprintf(stdout, "  scale factor = %g\n", scale);
+        #endif
+        for (size_t II = 0; II < num_pts; II++) {
             var.at(II) = var.at(II) * scale;
+        }
+    }
+
+    // Apply offset if appropriate
+    double offset = 0.;
+    if ((retval = nc_get_att_double(ncid, var_id, "add_offset", &offset))) { NC_ERR(retval, __LINE__, __FILE__); }
+    if (offset != 0.) {
+        #if DEBUG >= 2
+        fprintf(stdout, "  additive offset = %g\n", offset);
+        #endif
+        for (size_t II = 0; II < num_pts; II++) {
+            var.at(II) = var.at(II) + offset;
         }
     }
 
     // Determine masking, if desired
     double fill_val = 1e100;
+    int num_land = 0;
+    int num_water = 0;
     size_t Nlat, Nlon;
     if ( (mask != NULL) and (num_dims == 4) ) {
         // Assuming CF dimension order: time - depth - lat - lon
@@ -80,13 +98,20 @@ void read_var_from_file(
         Nlon = count[3];
         mask->resize(Nlat*Nlon);
         if ((retval = nc_get_att_double(ncid, var_id, "_FillValue", &fill_val))) { NC_ERR(retval, __LINE__, __FILE__); }
+        #if DEBUG >= 2
+        fprintf(stdout, "  fill value = %g\n", fill_val);
+        #endif
         for (size_t II = 0; II < Nlat * Nlon; II++) {
-            if (abs(var.at(II)) > 0.95 * abs(fill_val)) {
+            if (fabs(var.at(II)) > 0.95 * fabs(fill_val*scale)) {
                 mask->at(II) = 0;
+                num_land++;
             } else {
                 mask->at(II) = 1;
+                num_water++;
             }
         }
+        #if DEBUG >= 1
+        fprintf(stdout, "  Land cover = %.4g%%\n", 100 * ((double)num_land) / (num_land + num_water));
+        #endif
     }
-
 }

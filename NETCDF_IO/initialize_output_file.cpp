@@ -43,15 +43,15 @@ void initialize_output_file(
 
     // Define coordinate variables
     int scale_varid, time_varid, depth_varid, lat_varid, lon_varid;
-    if ((retval = nc_def_var(ncid, "scale",     NC_DOUBLE, 1, &scale_dimid, &scale_varid)))
+    if ((retval = nc_def_var(ncid, "scale",     NC_FLOAT, 1, &scale_dimid, &scale_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "time",      NC_DOUBLE, 1, &time_dimid,  &time_varid)))
+    if ((retval = nc_def_var(ncid, "time",      NC_FLOAT, 1, &time_dimid,  &time_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "depth",     NC_DOUBLE, 1, &depth_dimid, &depth_varid)))
+    if ((retval = nc_def_var(ncid, "depth",     NC_FLOAT, 1, &depth_dimid, &depth_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "latitude",  NC_DOUBLE, 1, &lat_dimid,   &lat_varid)))
+    if ((retval = nc_def_var(ncid, "latitude",  NC_FLOAT, 1, &lat_dimid,   &lat_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "longitude", NC_DOUBLE, 1, &lon_dimid,   &lon_varid)))
+    if ((retval = nc_def_var(ncid, "longitude", NC_FLOAT, 1, &lon_dimid,   &lon_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
 
     // CF ordering (with scale added at the beginning)
@@ -65,28 +65,28 @@ void initialize_output_file(
 
     // Declare variables
     int u_r_varid, u_lon_varid, u_lat_varid;
-    if ((retval = nc_def_var(ncid, "u_r",   NC_DOUBLE, ndims, dimids, &u_r_varid)))
+    if ((retval = nc_def_var(ncid, "u_r",   NC_FLOAT, ndims, dimids, &u_r_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "u_lon", NC_DOUBLE, ndims, dimids, &u_lon_varid)))
+    if ((retval = nc_def_var(ncid, "u_lon", NC_FLOAT, ndims, dimids, &u_lon_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "u_lat", NC_DOUBLE, ndims, dimids, &u_lat_varid)))
+    if ((retval = nc_def_var(ncid, "u_lat", NC_FLOAT, ndims, dimids, &u_lat_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
 
     int KE_filt_varid;
-    if ((retval = nc_def_var(ncid, "KE_filt", NC_DOUBLE, ndims, dimids, &KE_filt_varid)))
+    if ((retval = nc_def_var(ncid, "KE_filt", NC_FLOAT, ndims, dimids, &KE_filt_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
 
     double fill_value = -32767;
-    nc_put_att_double(ncid, u_r_varid,     "_FillValue", NC_DOUBLE, 1, &fill_value);
-    nc_put_att_double(ncid, u_lon_varid,   "_FillValue", NC_DOUBLE, 1, &fill_value);
-    nc_put_att_double(ncid, u_lat_varid,   "_FillValue", NC_DOUBLE, 1, &fill_value);
-    nc_put_att_double(ncid, KE_filt_varid, "_FillValue", NC_DOUBLE, 1, &fill_value);
+    nc_put_att_double(ncid, u_r_varid,     "_FillValue", NC_FLOAT, 1, &fill_value);
+    nc_put_att_double(ncid, u_lon_varid,   "_FillValue", NC_FLOAT, 1, &fill_value);
+    nc_put_att_double(ncid, u_lat_varid,   "_FillValue", NC_FLOAT, 1, &fill_value);
+    nc_put_att_double(ncid, KE_filt_varid, "_FillValue", NC_FLOAT, 1, &fill_value);
 
     int mask_dimids[ndims];
     mask_dimids[0] = lat_dimid;
     mask_dimids[1] = lon_dimid;
     int mask_varid;
-    if ((retval = nc_def_var(ncid, "mask", NC_DOUBLE, 2, mask_dimids, &mask_varid)))
+    if ((retval = nc_def_var(ncid, "mask", NC_FLOAT, 2, mask_dimids, &mask_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
 
     // Write the coordinate variables

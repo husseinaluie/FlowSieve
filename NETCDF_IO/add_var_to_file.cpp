@@ -30,9 +30,9 @@ void add_var_to_file(
     char varname [50];
     double fill_value = -32767;
     snprintf(varname, 50, var_name);
-    retval = nc_def_var(ncid, varname, NC_DOUBLE, num_dims, dim_ids, &var_id);
+    retval = nc_def_var(ncid, varname, NC_FLOAT, num_dims, dim_ids, &var_id);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    retval = nc_put_att_double(ncid, var_id, "_FillValue", NC_DOUBLE, 1, &fill_value);
+    retval = nc_put_att_double(ncid, var_id, "_FillValue", NC_FLOAT, 1, &fill_value);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Close the file
