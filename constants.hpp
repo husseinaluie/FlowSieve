@@ -6,7 +6,7 @@
 #endif
 
 #ifndef CARTESIAN
-    #define CARTESIAN true
+    #define CARTESIAN false
 #endif
 
 #ifndef PERIODIC_X
@@ -14,7 +14,7 @@
 #endif
 
 #ifndef PERIODIC_Y
-    #define PERIODIC_Y true
+    #define PERIODIC_Y false
 #endif
 
 #ifndef COMP_VORT
@@ -26,7 +26,7 @@
 #endif
 
 #ifndef COMP_BC_TRANSFERS
-    #define COMP_BC_TRANSFERS true
+    #define COMP_BC_TRANSFERS false
 #endif
 
 /*!
@@ -68,7 +68,7 @@ namespace constants
      * \brief Mean fluid density
      * @ingroup constants
      */
-    const double rho0 = 1e3;
+    const double rho0 = 1025;
 
     /*!
      * \param g
@@ -82,7 +82,7 @@ namespace constants
      * \brief Differentiation order for finite differencing (currently must be 4)
      * @ingroup constants
      */
-    const int DiffOrd = 4;
+    const int DiffOrd = 6;
 
 }
 /*! @} End of Doxygen Groups*/

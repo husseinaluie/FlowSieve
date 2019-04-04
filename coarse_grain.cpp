@@ -66,9 +66,9 @@ int main(int argc, char *argv[]) {
     //   add zero as the end for padding
     // Scale must be increasing (ignoring the end)
     // A zero scale will cause everything to nan out (again ignoring the end)
-    const int Nfilt = 1;
+    const int Nfilt = 2;
     const double scales [Nfilt+1] = 
-            {200e3, 0};
+            {100e3, 1000e3, 0};
 
     std::vector<double> filter_scales;
     filter_scales.assign(scales, scales + Nfilt);
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
 
     // Read in the velocity fields
     read_var_from_file(u_lon, "uo", "input.nc", &mask);
-    read_var_from_file(u_lat, "vo", "input.nc", NULL);
+    read_var_from_file(u_lat, "vo", "input.nc", &mask);
 
     // No u_r in inputs, so initialize as zero
     u_r.resize(u_lon.size());
@@ -107,8 +107,6 @@ int main(int argc, char *argv[]) {
 
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
-    //const int Ntime  = time.size();
-    //const int Ndetph = depth.size();
 
     #if not(CARTESIAN)
     // Convert coordinate to radians
@@ -137,6 +135,31 @@ int main(int argc, char *argv[]) {
 
     std::vector<double> areas(Nlon * Nlat);
     compute_areas(areas, longitude, latitude);
+
+    /*
+    #if COMP_BC_TRANSFERS
+    const int Ntime  = time.size();
+    const int Ndetph = depth.size();
+    std::vector<double> rho_mean(Ntime * Ndepth);
+    compute_mean(rho_mean, rho, areas, 
+            Ntime, Ndepth, Nlat, Nlon,
+            mask);
+    
+    // Subtract the density mean
+    for (int Itime = 0; Itime < Ntime; Itime++) {
+        for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
+            for (int Ilat = 0; Ilat < Nlat; Ilat++) {
+                for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+                    index = Index(
+                            Itime, Idepth, Ilat, Ilon,
+                            Ntime, Ndepth, Nlat, Nlon)
+                    rho.at(index) = rho.at(index) - rho_mean(Itime*Ndepth + Idepth);
+                }
+            }
+        }
+    }
+    #endif
+    */
 
     // Now pass the arrays along to the filtering routines
     filtering(u_r, u_lon, u_lat,

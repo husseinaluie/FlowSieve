@@ -118,6 +118,25 @@ void filtering(const std::vector<double> & u_r,
                const std::vector<double> & mask);
 
 /*!
+ * \brief Main filtering driver
+ *
+ * This function is the main filtering driver. It sets up the appropriate
+ * loop sequences, calls the other funcations (velocity conversions), and
+ * calls the IO functionality.
+ */
+void filtering_qg(
+        std::vector<double> & u_x, 
+        std::vector<double> & u_y, 
+        std::vector<double> & pv,
+        const std::vector<double> & scales, 
+        const std::vector<double> & dAreas, 
+        const std::vector<double> & time, 
+        const std::vector<double> & depth,
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask);
+
+/*!
  * \brief Compute filtered field at a single point
  *
  * Computes the integral of the provided field with the
@@ -128,6 +147,27 @@ void filtering(const std::vector<double> & u_r,
 void apply_filter_at_point(
         double & coarse_val,   
         const std::vector<double> & field, 
+        const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
+        const int Itime,  const int Idepth, const int Ilat, const int Ilon,
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude,
+        const std::vector<double> & dAreas, 
+        const double scale,
+        const std::vector<double> & mask,
+        const bool use_mask);
+
+/*!
+ * \brief Compute filtered (field1 * field2) at a single point
+ *
+ * Computes the integral of the provided fields with the
+ * kernel().
+ *
+ * dArea for integration computed in compute_areas() 
+ */
+void apply_filter_at_point_to_product(
+        double & coarse_val,   
+        const std::vector<double> & field1, 
+        const std::vector<double> & field2, 
         const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
         const std::vector<double> & longitude, 
@@ -286,5 +326,50 @@ double equation_of_state(
         const double T,
         const double S,
         const double p);
+
+void compute_div_transport(
+        std::vector<double> & div_J,
+        const std::vector<double> & u_x,
+        const std::vector<double> & u_y,
+        const std::vector<double> & u_z,
+        const std::vector<double> & uxux,
+        const std::vector<double> & uxuy,
+        const std::vector<double> & uxuz,
+        const std::vector<double> & uyuy,
+        const std::vector<double> & uyuz,
+        const std::vector<double> & uzuz,
+        const std::vector<double> & coarse_p,
+        const std::vector<double> & coarse_KE,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const std::vector<double> & mask);
+
+void compute_mean(
+        std::vector<double> & means,
+        const std::vector<double> & field,
+        const std::vector<double> & dArea,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const std::vector<double> & mask);
+
+void compute_div_vel(
+        std::vector<double> & div,
+        const std::vector<double> * full_div,
+        const std::vector<double> & u_x,
+        const std::vector<double> & u_y,
+        const std::vector<double> & u_z,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const std::vector<double> & mask);
 
 #endif

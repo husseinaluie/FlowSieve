@@ -31,8 +31,15 @@ void filtering(
 
     const int num_pts = Ntime * Ndepth * Nlat * Nlon;
 
+    // Add additional files to the output file as necessary
+    const char* dim_names[] = {"scale", "time", "depth", "latitude", "longitude"};
     size_t starts[] = {0, 0, 0, 0, 0};
     size_t counts[] = {1, (size_t)Ntime, (size_t)Ndepth, (size_t)Nlat, (size_t)Nlon};
+
+    // Add additional files to the output file as necessary
+    const char* dim_names_noscale[] = {"time", "depth", "latitude", "longitude"};
+    size_t starts_noscale[] = {0, 0, 0, 0};
+    size_t counts_noscale[] = {(size_t)Ntime, (size_t)Ndepth, (size_t)Nlat, (size_t)Nlon};
 
     #if DEBUG >= 1
     fprintf(stdout, "Converting to Cartesian velocities.\n");
@@ -98,12 +105,18 @@ void filtering(
     #endif
     initialize_output_file(time, depth, longitude, latitude, scales, mask);
 
-    // Add additional files to the output file as necessary
-    const char* dim_names[] = {"scale","time", "depth", "latitude", "longitude"};
-
     std::vector<double> fine_u_r(  num_pts);
     std::vector<double> fine_u_lon(num_pts);
     std::vector<double> fine_u_lat(num_pts);
+
+    std::vector<double> full_div(num_pts);
+    compute_div_vel(full_div, NULL, u_x, u_y, u_z,
+            longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+    add_var_to_file("full_vel_div", dim_names_noscale, 4);
+    write_field_to_output(full_div, "full_vel_div", starts_noscale, counts_noscale);
+
+    std::vector<double> div(num_pts);
+    add_var_to_file("vel_div", dim_names, 5);
 
     #if COMP_VORT
     std::vector<double> fine_vort_r(  num_pts);
@@ -155,6 +168,9 @@ void filtering(
 
     std::vector<double> baroclinic_transfer(num_pts);
     add_var_to_file("baroclinic_transfer", dim_names, 5);
+
+    std::vector<double> div_J(num_pts);
+    add_var_to_file("div_Jtransport", dim_names, 5);
 
     compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
             full_u_r, full_u_lon, full_u_lat,
@@ -215,7 +231,7 @@ void filtering(
                         KE_tmp, tid) \
                 firstprivate(perc)
                 {
-                    #pragma omp for collapse(2) schedule(guided)
+                    #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -336,7 +352,7 @@ void filtering(
                         tid)\
                 firstprivate(perc)
                 {
-                    #pragma omp for collapse(2) schedule(guided)
+                    #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -424,7 +440,7 @@ void filtering(
                         perc_base, tid, stdout)\
                 firstprivate(perc)
                 {
-                    #pragma omp for collapse(2) schedule(guided)
+                    #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -467,7 +483,7 @@ void filtering(
                                 fine_rho.at(index) = full_rho.at(index) - coarse_rho.at(index);
                                 fine_p.at(index)   = full_p.at(  index) - coarse_p.at(  index);
 
-                                PEtoKE.at(index) =   coarse_rho.at(index)
+                                PEtoKE.at(index) =   (coarse_rho.at(index) - constants::rho0)
                                                    * (-constants::g)
                                                    * coarse_u_r.at(index);
 
@@ -533,6 +549,10 @@ void filtering(
         write_field_to_output(fine_p,   "p", starts, counts);
         #endif
 
+        // Compute the divergence of the 'full' velocity field
+        compute_div_vel(full_div, NULL, u_x, u_y, u_z,
+                longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+
         // Now that we've filtered at the previous scale,
         //   just keep the coarse part for the next iteration
         for (int Itime = 0; Itime < Ntime; Itime++) {
@@ -575,6 +595,25 @@ void filtering(
                 }  // end pragma parallel block
             }  // end for(depth) block
         }  // end for(time) block
+
+        // Compute the divergence of the coarse field, but subtract 
+        //   from the 'full', so get the divergence of the fine scale
+        compute_div_vel(div, &full_div, u_x, u_y, u_z, longitude, latitude,
+                Ntime, Ndepth, Nlat, Nlon, mask);
+        write_field_to_output(div, "vel_div", starts, counts);
+
+        #if COMP_BC_TRANSFERS
+        compute_div_transport(
+                div_J,
+                coarse_u_x, coarse_u_y, coarse_u_z,
+                coarse_uxux, coarse_uxuy, coarse_uxuz,
+                coarse_uyuy, coarse_uyuz, coarse_uzuz,
+                coarse_p, coarse_KE,
+                longitude, latitude,
+                Ntime, Ndepth, Nlat, Nlon,
+                mask);
+        write_field_to_output(div_J, "div_Jtransport", starts, counts);
+        #endif
 
         #if DEBUG >= 0
         // Flushing stdout is necessary for SLURM outputs.
@@ -657,6 +696,13 @@ void filtering(
     write_field_to_output(coarse_u_lat, "u_lat", starts, counts);
 
     write_field_to_output(coarse_KE, "KE_filt",  starts, counts);
+
+    // Compute the divergence of the coarse field
+    //   no need to subtract this time, since only the coarse
+    //   is left
+    compute_div_vel(div, NULL, u_x, u_y, u_z, longitude, latitude,
+            Ntime, Ndepth, Nlat, Nlon, mask);
+    write_field_to_output(div, "vel_div", starts, counts);
 
     #if COMP_VORT
     // Compute and write vorticity
