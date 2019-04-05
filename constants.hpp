@@ -29,6 +29,13 @@
     #define COMP_BC_TRANSFERS false
 #endif
 
+//  0 = tophat
+//  1 = Hyper gaus (exp(-x^4))
+//  2 = Gaus  (exp(-x^2))
+#ifndef KERNEL_OPT
+    #define KERNEL_OPT 1
+#endif
+
 /*!
  * \file
  * \brief Provide namespace for global constants (physical and computational).
@@ -83,6 +90,22 @@ namespace constants
      * @ingroup constants
      */
     const int DiffOrd = 6;
+
+    /*!
+     * \param KernPad
+     * \brief Scale factor for kernel search radius 
+     *
+     * Filter integral applied in circle of radius (filt_scale/2) * KernPad
+     *
+     * @ingroup constants
+     */
+    #if KERNEL_OPT == 0
+    const double KernPad = 1.1;
+    #elif KERNEL_OPT == 1
+    const double KernPad = 2.5;
+    #elif KERNEL_OPT == 2
+    const double KernPad = 5.;
+    #endif
 
 }
 /*! @} End of Doxygen Groups*/
