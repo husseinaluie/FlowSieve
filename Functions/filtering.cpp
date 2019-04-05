@@ -118,6 +118,9 @@ void filtering(
     std::vector<double> div(num_pts);
     add_var_to_file("vel_div", dim_names, 5);
 
+    std::vector<double> div_J(num_pts);
+    add_var_to_file("div_Jtransport", dim_names, 5);
+
     #if COMP_VORT
     std::vector<double> fine_vort_r(  num_pts);
     std::vector<double> fine_vort_lat(num_pts);
@@ -169,9 +172,6 @@ void filtering(
     std::vector<double> baroclinic_transfer(num_pts);
     add_var_to_file("baroclinic_transfer", dim_names, 5);
 
-    std::vector<double> div_J(num_pts);
-    add_var_to_file("div_Jtransport", dim_names, 5);
-
     compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
             full_u_r, full_u_lon, full_u_lat,
             Ntime, Ndepth, Nlat, Nlon,
@@ -183,6 +183,9 @@ void filtering(
     //    rho_bar * g * w_bar
     std::vector<double> PEtoKE(num_pts);
     add_var_to_file("PEtoKE", dim_names, 5);
+    #else
+    // Create an empty holder
+    std::vector<double> coarse_p;
     #endif
 
     #if DEBUG >= 1
@@ -602,18 +605,15 @@ void filtering(
                 Ntime, Ndepth, Nlat, Nlon, mask);
         write_field_to_output(div, "vel_div", starts, counts);
 
-        #if COMP_BC_TRANSFERS
         compute_div_transport(
                 div_J,
                 coarse_u_x, coarse_u_y, coarse_u_z,
                 coarse_uxux, coarse_uxuy, coarse_uxuz,
                 coarse_uyuy, coarse_uyuz, coarse_uzuz,
-                coarse_p, coarse_KE,
-                longitude, latitude,
+                coarse_p, longitude, latitude,
                 Ntime, Ndepth, Nlat, Nlon,
                 mask);
         write_field_to_output(div_J, "div_Jtransport", starts, counts);
-        #endif
 
         #if DEBUG >= 0
         // Flushing stdout is necessary for SLURM outputs.

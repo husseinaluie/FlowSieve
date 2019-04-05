@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include "constants.hpp"
 
 /*!
  * \file
@@ -327,6 +328,17 @@ double equation_of_state(
         const double S,
         const double p);
 
+/*!
+ * \brief Compute KE transport caused by div(J)
+ *
+ * Currently implements:
+ *    - advection by coarse-scale velocity
+ *    - pressure-induced transport
+ *    - advection by fine-scale velocity
+ *
+ * NOT implemented:
+ *    - Diffusion
+ */
 void compute_div_transport(
         std::vector<double> & div_J,
         const std::vector<double> & u_x,
@@ -339,7 +351,6 @@ void compute_div_transport(
         const std::vector<double> & uyuz,
         const std::vector<double> & uzuz,
         const std::vector<double> & coarse_p,
-        const std::vector<double> & coarse_KE,
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
         const int Ntime,
@@ -358,6 +369,9 @@ void compute_mean(
         const int Nlon,
         const std::vector<double> & mask);
 
+/*!
+ * \brief Compute the divergence of the filtered velocity fields.
+ */
 void compute_div_vel(
         std::vector<double> & div,
         const std::vector<double> * full_div,
@@ -371,5 +385,13 @@ void compute_div_vel(
         const int Nlat,
         const int Nlon,
         const std::vector<double> & mask);
+
+/*!
+ * \brief Print summary of compile-time variables.
+ *
+ * This is triggered by passing --version to the executable.
+ */
+void print_compile_info(
+        const std::vector<double> &scales);
 
 #endif

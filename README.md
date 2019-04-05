@@ -14,6 +14,20 @@ This repository stores source code for running coarse graining procedures on net
 3. Call `make tests` to compile the unit test routines.
  * The resulting executables are then stored in `Tests/`
 
+### Interpolator
+
+1. The interpolator requires the ALGLIB package. 
+ * Compile via `make ALGLIB`
+ * only needs to be done once (unless you call `make hardclean`)
+2. Call `make interpolator.x`
+
+---
+
+## Command-line Arguments
+
+1. `--version`
+ * Calling `./coarse_grain.x --version` prints a summary of the constants / variables used when compiling
+
 ---
 
 ## Function Map
