@@ -6,7 +6,7 @@
 #endif
 
 #ifndef CARTESIAN
-    #define CARTESIAN true
+    #define CARTESIAN false
 #endif
 
 #ifndef PERIODIC_X
@@ -14,7 +14,7 @@
 #endif
 
 #ifndef PERIODIC_Y
-    #define PERIODIC_Y true
+    #define PERIODIC_Y false
 #endif
 
 #ifndef COMP_VORT
@@ -26,7 +26,7 @@
 #endif
 
 #ifndef COMP_BC_TRANSFERS
-    #define COMP_BC_TRANSFERS false
+    #define COMP_BC_TRANSFERS true
 #endif
 
 //  0 = tophat
