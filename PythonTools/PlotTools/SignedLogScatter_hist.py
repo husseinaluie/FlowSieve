@@ -4,15 +4,19 @@ import numpy as np
 from matplotlib.colors import LogNorm
 
 def SignedLogScatter_hist(
-        XX, YY, axes, s = 0.1, cmap = 'cmo.amp',
+        XX, YY, axes, s = 0.1, cmap = 'cmo.matter',
         force_equal = False, nbins_x = 100, nbins_y = 100, 
-        log_cbar = True):
+        log_cbar = True, num_ords = 3):
+
+    # If same number of bins in each direction,
+    #   add one to y to cause errors if we accidentally
+    #   plot the transpose
+    if nbins_x == nbins_y:
+        nbins_y += 1
 
     x_max = np.nanmax(np.abs(XX))
     y_max = np.nanmax(np.abs(YY))
 
-    #x_min = np.nanmin(np.abs(XX)[np.abs(XX)>0])
-    #y_min = np.nanmin(np.abs(YY)[np.abs(YY)>0])
     x_min = np.percentile(np.abs(XX)[np.abs(XX)>0], 0.01)
     y_min = np.percentile(np.abs(YY)[np.abs(YY)>0], 0.01)
 
@@ -56,22 +60,14 @@ def SignedLogScatter_hist(
     x_sub = XX[sel == 1]
     y_sub = YY[sel == 1]
 
-    counts = np.zeros((nbins_y, nbins_x))
-    for II in range(len(x_sub)):
-        Ix = int(np.floor((np.log10(x_sub[II]) - xe_min) / xe_del))
-        Iy = int(np.floor((np.log10(y_sub[II]) - ye_min) / ye_del))
-        if Ix >= nbins_x:
-            Ix = nbins_x-1
-        if Iy >= nbins_y:
-            Iy = nbins_y-1
-        counts[Iy,Ix] += 1
+    counts, null_xe, null_ye = np.histogram2d(x_sub, y_sub, (x_edges, y_edges))
     num_counts = np.sum(counts)
     counts = counts / num_counts / dA
 
     vmax = max(vmax, counts.max())
     vmin = min(vmin, counts.min())
 
-    qm_pp = ax.pcolormesh(x_edges, y_edges, counts, cmap=cmap)
+    qm_pp = ax.pcolormesh(x_edges, y_edges, counts.T, cmap=cmap)
 
     # Next, plot the all negatives
     ax = ax_nn
@@ -79,22 +75,14 @@ def SignedLogScatter_hist(
     x_sub = -XX[sel == 1]
     y_sub = -YY[sel == 1]
 
-    counts = np.zeros((nbins_y, nbins_x))
-    for II in range(len(x_sub)):
-        Ix = int(np.floor((np.log10(x_sub[II]) - xe_min) / xe_del))
-        Iy = int(np.floor((np.log10(y_sub[II]) - ye_min) / ye_del))
-        if Ix >= nbins_x:
-            Ix = nbins_x-1
-        if Iy >= nbins_y:
-            Iy = nbins_y-1
-        counts[Iy,Ix] += 1
+    counts, null_xe, null_ye = np.histogram2d(x_sub, y_sub, (x_edges, y_edges))
     num_counts = np.sum(counts)
     counts = counts / num_counts / dA
 
     vmax = max(vmax, counts.max())
     vmin = min(vmin, counts.min())
 
-    qm_nn = ax.pcolormesh(x_edges, y_edges, counts, cmap=cmap)
+    qm_nn = ax.pcolormesh(x_edges, y_edges, counts.T, cmap=cmap)
 
     # Next, plot X > 0, Y < 0
     ax = ax_pn
@@ -102,22 +90,14 @@ def SignedLogScatter_hist(
     x_sub =  XX[sel == 1]
     y_sub = -YY[sel == 1]
 
-    counts = np.zeros((nbins_y, nbins_x))
-    for II in range(len(x_sub)):
-        Ix = int(np.floor((np.log10(x_sub[II]) - xe_min) / xe_del))
-        Iy = int(np.floor((np.log10(y_sub[II]) - ye_min) / ye_del))
-        if Ix >= nbins_x:
-            Ix = nbins_x-1
-        if Iy >= nbins_y:
-            Iy = nbins_y-1
-        counts[Iy,Ix] += 1
+    counts, null_xe, null_ye = np.histogram2d(x_sub, y_sub, (x_edges, y_edges))
     num_counts = np.sum(counts)
     counts = counts / num_counts / dA
 
     vmax = max(vmax, counts.max())
     vmin = min(vmin, counts.min())
 
-    qm_pn = ax.pcolormesh(x_edges, y_edges, counts, cmap=cmap)
+    qm_pn = ax.pcolormesh(x_edges, y_edges, counts.T, cmap=cmap)
 
     # Next, plot X < 0, Y > 0
     ax = ax_np
@@ -125,22 +105,14 @@ def SignedLogScatter_hist(
     x_sub = -XX[sel == 1]
     y_sub =  YY[sel == 1]
 
-    counts = np.zeros((nbins_y, nbins_x))
-    for II in range(len(x_sub)):
-        Ix = int(np.floor((np.log10(x_sub[II]) - xe_min) / xe_del))
-        Iy = int(np.floor((np.log10(y_sub[II]) - ye_min) / ye_del))
-        if Ix >= nbins_x:
-            Ix = nbins_x-1
-        if Iy >= nbins_y:
-            Iy = nbins_y-1
-        counts[Iy,Ix] += 1
+    counts, null_xe, null_ye = np.histogram2d(x_sub, y_sub, (x_edges, y_edges))
     num_counts = np.sum(counts)
     counts = counts / num_counts / dA
 
     vmax = max(vmax, counts.max())
     vmin = min(vmin, counts.min())
 
-    qm_np = ax.pcolormesh(x_edges, y_edges, counts, cmap=cmap)
+    qm_np = ax.pcolormesh(x_edges, y_edges, counts.T, cmap=cmap)
 
     for ax in [ax_pp, ax_np, ax_pn, ax_nn]:
         ax.set_xlim(x_lb, x_ub)
@@ -179,7 +151,7 @@ def SignedLogScatter_hist(
     # Update norms / vmin/vmax
     for qm in [qm_pp, qm_np, qm_pn, qm_nn]:
         if log_cbar:
-            vmin = vmax / 1e3
+            vmin = vmax / (10**num_ords)
             qm.set_norm(LogNorm(vmin=vmin, vmax=vmax))
         else:
             qm.set_clim(vmin, vmax)

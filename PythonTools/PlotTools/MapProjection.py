@@ -3,7 +3,8 @@ from pyproj import Proj
 from netCDF4 import Dataset
 
 def null_proj(x, y, inverse=False):
-    return x, y
+    coef = ( np.pi / 180 ) / 1e3
+    return x * coef, y * coef
 
 def MapProjection(longitude, latitude, R_earth = 6371e3):
 
@@ -11,8 +12,12 @@ def MapProjection(longitude, latitude, R_earth = 6371e3):
     lat_0 = np.mean(latitude)
 
     source = Dataset('input.nc', 'r')
+    try:
+        unit = source.variables['latitude'].units
+    except:
+        unit = ''
 
-    if source.variables['latitude'].units == 'm':
+    if unit == 'm':
         proj = null_proj
     else:
         proj = Proj(proj='wag7', lon_0=lon_0, lat_0=lat_0)
