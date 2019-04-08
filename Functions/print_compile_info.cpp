@@ -66,7 +66,7 @@ void print_compile_info(
     fprintf(stdout, "  DiffOrd = %d\n", constants::DiffOrd);
     fprintf(stdout, "\n");
 
-    fprintf(stdout, "Filter Scales (%zu) (km)\n", scales.size());
+    fprintf(stdout, "%zu Filter Scales (km)\n", scales.size());
     fprintf(stdout, "  ");
     for (size_t II = 0; II < scales.size(); ++II) {
         fprintf(stdout, "%g", scales.at(II)/1e3);

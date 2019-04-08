@@ -374,7 +374,6 @@ void compute_mean(
  */
 void compute_div_vel(
         std::vector<double> & div,
-        const std::vector<double> * full_div,
         const std::vector<double> & u_x,
         const std::vector<double> & u_y,
         const std::vector<double> & u_z,
