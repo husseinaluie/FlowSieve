@@ -1,10 +1,11 @@
 
 #include <vector>
+#include <string>
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
 
 void add_var_to_file(
-        const char * var_name,   /**< [in] variable name */
+        const std::string var_name,   /**< [in] variable name */
         const char ** dim_list,  /**< [in] list of dimensions (in order!) */
         const int num_dims,      /**< [in] number of dimensions */
         const char * filename    /**< [in] file name */
@@ -28,8 +29,8 @@ void add_var_to_file(
     // Declare the variable
     int var_id;
     char varname [50];
-    double fill_value = -32767;
-    snprintf(varname, 50, var_name);
+    double fill_value = constants::fill_value;
+    snprintf(varname, 50, var_name.c_str());
     retval = nc_def_var(ncid, varname, NC_FLOAT, num_dims, dim_ids, &var_id);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     retval = nc_put_att_double(ncid, var_id, "_FillValue", NC_FLOAT, 1, &fill_value);

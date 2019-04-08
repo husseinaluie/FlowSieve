@@ -30,16 +30,12 @@ void filtering(
     const int Nlon    = longitude.size();
 
     const int num_pts = Ntime * Ndepth * Nlat * Nlon;
-
-    // Add additional files to the output file as necessary
-    const char* dim_names[] = {"scale", "time", "depth", "latitude", "longitude"};
-    size_t starts[] = {0, 0, 0, 0, 0};
-    size_t counts[] = {1, (size_t)Ntime, (size_t)Ndepth, (size_t)Nlat, (size_t)Nlon};
-
-    // Add additional files to the output file as necessary
-    const char* dim_names_noscale[] = {"time", "depth", "latitude", "longitude"};
-    size_t starts_noscale[] = {0, 0, 0, 0};
-    size_t counts_noscale[] = {(size_t)Ntime, (size_t)Ndepth, (size_t)Nlat, (size_t)Nlon};
+    char filename [50];
+    
+    const int ndims = 4;
+    size_t starts[ndims] = {0, 0, 0, 0};
+    size_t counts[ndims] = {size_t(Ntime), size_t(Ndepth), size_t(Nlat), size_t(Nlon)};
+    std::vector<std::string> vars_to_write;
 
     #if DEBUG >= 1
     fprintf(stdout, "Converting to Cartesian velocities.\n");
@@ -53,10 +49,9 @@ void filtering(
     std::vector<double> coarse_u_r(  full_u_r);
     std::vector<double> coarse_u_lon(full_u_lon);
     std::vector<double> coarse_u_lat(full_u_lat);
-
-    double KE_tmp;
-    std::vector<double> coarse_KE(num_pts);
-    std::vector<double> fine_KE_filt(num_pts);
+    vars_to_write.push_back("coarse_u_r");
+    vars_to_write.push_back("coarse_u_lon");
+    vars_to_write.push_back("coarse_u_lat");
 
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
@@ -78,15 +73,9 @@ void filtering(
                                            Ntime, Ndepth, Nlat, Nlon);
 
                         if (mask.at(mask_index) == 1) { // Skip land areas
-
                             vel_Spher_to_Cart(     u_x.at(index),      u_y.at(  index),      u_z.at(  index),
                                               full_u_r.at(index), full_u_lon.at(index), full_u_lat.at(index),
                                               longitude.at(Ilon), latitude.at(Ilat));
-
-                            coarse_KE.at(index) = 0.5 * ( 
-                                      pow(u_x.at(index), 2) 
-                                    + pow(u_y.at(index), 2) 
-                                    + pow(u_z.at(index), 2) );
                         }
                     }
                 }
@@ -98,37 +87,30 @@ void filtering(
     double scale,
            u_x_tmp, u_y_tmp,   u_z_tmp,  // The local coarse-graining result
            u_r_tmp, u_lon_tmp, u_lat_tmp;
-    
-    // Create the output file
-    #if DEBUG >= 1
-    fprintf(stdout, "Creating output file.\n");
-    #endif
-    initialize_output_file(time, depth, longitude, latitude, scales, mask);
 
     std::vector<double> fine_u_r(  num_pts);
     std::vector<double> fine_u_lon(num_pts);
     std::vector<double> fine_u_lat(num_pts);
-
-    std::vector<double> full_div(num_pts);
-    compute_div_vel(full_div, NULL, u_x, u_y, u_z,
-            longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
-    add_var_to_file("full_vel_div", dim_names_noscale, 4);
-    write_field_to_output(full_div, "full_vel_div", starts_noscale, counts_noscale);
-
-    std::vector<double> div(num_pts);
-    add_var_to_file("vel_div", dim_names, 5);
+    vars_to_write.push_back("fine_u_r");
+    vars_to_write.push_back("fine_u_lon");
+    vars_to_write.push_back("fine_u_lat");
 
     std::vector<double> div_J(num_pts);
-    add_var_to_file("div_Jtransport", dim_names, 5);
+    vars_to_write.push_back("div_Jtransport");
 
     #if COMP_VORT
     std::vector<double> fine_vort_r(  num_pts);
     std::vector<double> fine_vort_lat(num_pts);
     std::vector<double> fine_vort_lon(num_pts);
 
-    add_var_to_file("vort_r", dim_names, 5);
-    add_var_to_file("vort_lon", dim_names, 5);
-    add_var_to_file("vort_lat", dim_names, 5);
+    std::vector<double> coarse_vort_r(num_pts);
+    std::vector<double> coarse_vort_lon(num_pts);
+    std::vector<double> coarse_vort_lat(num_pts);
+
+    vars_to_write.push_back("fine_vort_r");
+    vars_to_write.push_back("coarse_vort_r");
+    //vars_to_write.push_back("vort_lon");
+    //vars_to_write.push_back("vort_lat");
     #endif
 
     #if COMP_TRANSFERS
@@ -147,30 +129,35 @@ void filtering(
     std::vector<double> coarse_u_y(num_pts);
     std::vector<double> coarse_u_z(num_pts);
 
+    std::vector<double> div(num_pts);
+    vars_to_write.push_back("full_vel_div");
+    vars_to_write.push_back("coarse_vel_div");
+
     // Also an array for the transfer itself
     std::vector<double> energy_transfer(num_pts);
-    add_var_to_file("energy_transfer", dim_names, 5);
+    vars_to_write.push_back("energy_transfer");
 
     // If we're computing transfers, then we already have what
     //   we need to computed band-filtered KE, so might as well do it
+    double KE_tmp;
     std::vector<double> fine_KE(num_pts);
-    add_var_to_file("KE", dim_names, 5);
+    std::vector<double> coarse_KE(num_pts);
+    vars_to_write.push_back("fine_KE");
+    vars_to_write.push_back("coarse_KE");
     #endif
 
     #if COMP_BC_TRANSFERS
-    std::vector<double> coarse_vort_r(num_pts);
-    std::vector<double> coarse_vort_lon(num_pts);
-    std::vector<double> coarse_vort_lat(num_pts);
-
     std::vector<double> coarse_rho(full_rho);
     std::vector<double> coarse_p(full_p);
     std::vector<double> fine_rho(full_rho);
     std::vector<double> fine_p(full_p);
-    add_var_to_file("rho", dim_names, 5);
-    add_var_to_file("p", dim_names, 5);
+    vars_to_write.push_back("fine_rho");
+    vars_to_write.push_back("fine_p");
+    vars_to_write.push_back("coarse_rho");
+    vars_to_write.push_back("coarse_p");
 
     std::vector<double> baroclinic_transfer(num_pts);
-    add_var_to_file("baroclinic_transfer", dim_names, 5);
+    vars_to_write.push_back("Lambda_m");
 
     compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
             full_u_r, full_u_lon, full_u_lat,
@@ -182,7 +169,7 @@ void filtering(
     // We also have what we need to compute the PEtoKE term
     //    rho_bar * g * w_bar
     std::vector<double> PEtoKE(num_pts);
-    add_var_to_file("PEtoKE", dim_names, 5);
+    vars_to_write.push_back("PEtoKE");
     #else
     // Create an empty holder
     std::vector<double> coarse_p;
@@ -200,6 +187,11 @@ void filtering(
     fprintf(stdout, "Beginning main filtering loop.\n\n");
     #endif
     for (int Iscale = 0; Iscale < Nscales; Iscale++) {
+
+        // Create the output file
+        snprintf(filename, 50, "filter_%.6gkm.nc", scales.at(Iscale)/1e3);
+        initialize_output_file(time, depth, longitude, latitude, 
+                mask, vars_to_write, filename, scales.at(Iscale));
 
         #if DEBUG >= 0
         fprintf(stdout, "Scale %d of %d\n", Iscale+1, Nscales);
@@ -225,7 +217,7 @@ void filtering(
                 shared(Itime, Idepth, mask, u_x, u_y, u_z,\
                         stdout,\
                         longitude, latitude, dAreas, scale,\
-                        coarse_KE, fine_KE_filt,\
+                        coarse_KE, fine_KE,\
                         coarse_u_r, coarse_u_lon, coarse_u_lat,\
                         fine_u_r, fine_u_lon, fine_u_lat, perc_base)\
                 private(Ilat, Ilon, index, mask_index,\
@@ -289,6 +281,7 @@ void filtering(
                                         longitude, latitude,
                                         dAreas, scale, mask, true);
 
+
                                 // Convert the filtered fields back to spherical
                                 #if DEBUG >= 3
                                 fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
@@ -304,7 +297,8 @@ void filtering(
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
                                         dAreas, scale, mask, true);
-                                fine_KE_filt.at(index) = coarse_KE.at(index) - KE_tmp;
+                                fine_KE.at(index) = 0.5 * ( pow(u_x.at(index), 2) + pow(u_y.at(index), 2) + pow(u_z.at(index), 2) ) - KE_tmp;
+                                coarse_KE.at(index) = KE_tmp;
 
                                 // Subtract current coarse from preceeding coarse to
                                 //    get current fine
@@ -324,6 +318,17 @@ void filtering(
                                 coarse_u_lat.at(index) = u_lat_tmp;
 
                             }  // end if(masked) block
+                            else { // if not masked
+                                fine_KE.at(   index) = constants::fill_value;
+                                fine_u_r.at(  index) = constants::fill_value;
+                                fine_u_lon.at(index) = constants::fill_value;
+                                fine_u_lat.at(index) = constants::fill_value;
+
+                                coarse_KE.at(   index) = constants::fill_value;
+                                coarse_u_r.at(  index) = constants::fill_value;
+                                coarse_u_lon.at(index) = constants::fill_value;
+                                coarse_u_lat.at(index) = constants::fill_value;
+                            }  // end not(masked) block
                         }  // end for(longitude) block
                     }  // end for(latitude) block
                 }  // end pragma parallel block
@@ -333,7 +338,6 @@ void filtering(
                     fprintf(stdout, "\n");
                 }
                 #endif
-
 
                 #if COMP_TRANSFERS
                 perc = perc_base;
@@ -348,7 +352,7 @@ void filtering(
                         coarse_u_x, coarse_u_y, coarse_u_z,\
                         coarse_uxux, coarse_uxuy, coarse_uxuz,\
                         coarse_uyuy, coarse_uyuz, coarse_uzuz,\
-                        u_x, u_y, u_z, fine_KE, perc_base) \
+                        u_x, u_y, u_z, perc_base) \
                 private(Ilat, Ilon, index, mask_index,\
                         u_x_tmp, u_y_tmp, u_z_tmp,\
                         uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,\
@@ -410,12 +414,12 @@ void filtering(
                                 coarse_u_y.at(index) = u_y_tmp;
                                 coarse_u_z.at(index) = u_z_tmp;
                             
-                                fine_KE.at(index) = 0.5 * (   
-                                          ( uxux_tmp - u_x_tmp * u_x_tmp )
-                                        + ( uyuy_tmp - u_y_tmp * u_y_tmp )
-                                        + ( uzuz_tmp - u_z_tmp * u_z_tmp )
-                                        );
                             }  // end if(masked) block
+                            else { // if not masked
+                                coarse_u_x.at(index) = constants::fill_value;
+                                coarse_u_y.at(index) = constants::fill_value;
+                                coarse_u_z.at(index) = constants::fill_value;
+                            }  // end not(masked) block
                         }  // end for(longitude) block
                     }  // end for(latitude) block
                 } // end pragma parallel block
@@ -490,7 +494,16 @@ void filtering(
                                                    * (-constants::g)
                                                    * coarse_u_r.at(index);
 
-                            }  // end if(masked) block
+                            }  // end if(water) block
+                            else { // if(land)
+                                coarse_rho.at(index) = constants::fill_value;
+                                coarse_p.at(  index) = constants::fill_value;
+
+                                fine_rho.at(index) = constants::fill_value;
+                                fine_p.at(  index) = constants::fill_value;
+
+                                PEtoKE.at(index) = constants::fill_value;
+                            }  // end if(land) block
                         }  // end for(longitude) block
                     }  // end for(latitude) block
                 }  // end pragma parallel block
@@ -505,12 +518,15 @@ void filtering(
         }  // end for(time) block
 
         // Write to file
-        starts[0] = Iscale;
-        write_field_to_output(fine_u_r,   "u_r",   starts, counts);
-        write_field_to_output(fine_u_lon, "u_lon", starts, counts);
-        write_field_to_output(fine_u_lat, "u_lat", starts, counts);
+        write_field_to_output(fine_u_r,     "fine_u_r",     starts, counts, filename);
+        write_field_to_output(fine_u_lon,   "fine_u_lon",   starts, counts, filename);
+        write_field_to_output(fine_u_lat,   "fine_u_lat",   starts, counts, filename);
+        write_field_to_output(coarse_u_r,   "coarse_u_r",   starts, counts, filename);
+        write_field_to_output(coarse_u_lon, "coarse_u_lon", starts, counts, filename);
+        write_field_to_output(coarse_u_lat, "coarse_u_lat", starts, counts, filename);
 
-        write_field_to_output(fine_KE_filt, "KE_filt", starts, counts);
+        write_field_to_output(fine_KE,   "fine_KE",   starts, counts, filename);
+        write_field_to_output(coarse_KE, "coarse_KE", starts, counts, filename);
 
         #if COMP_VORT
         // Compute and write vorticity
@@ -518,9 +534,17 @@ void filtering(
                 fine_u_r, fine_u_lon, fine_u_lat,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
-        write_field_to_output(fine_vort_r,   "vort_r",   starts, counts);
-        write_field_to_output(fine_vort_lon, "vort_lon", starts, counts);
-        write_field_to_output(fine_vort_lat, "vort_lat", starts, counts);
+        write_field_to_output(fine_vort_r,   "fine_vort_r",   starts, counts, filename);
+        //write_field_to_output(fine_vort_lon, "fine_vort_lon", starts, counts, filename);
+        //write_field_to_output(fine_vort_lat, "fine_vort_lat", starts, counts, filename);
+
+        compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
+                coarse_u_r, coarse_u_lon, coarse_u_lat,
+                Ntime, Ndepth, Nlat, Nlon,
+                longitude, latitude, mask);
+        write_field_to_output(coarse_vort_r,   "coarse_vort_r",   starts, counts, filename);
+        //write_field_to_output(coarse_vort_lon, "coarse_vort_lon", starts, counts, filename);
+        //write_field_to_output(coarse_vort_lat, "coarse_vort_lat", starts, counts, filename);
         #endif
 
         #if COMP_TRANSFERS
@@ -532,78 +556,31 @@ void filtering(
                 coarse_uyuy, coarse_uyuz, coarse_uzuz,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
-        write_field_to_output(energy_transfer, "energy_transfer", starts, counts);
-        write_field_to_output(fine_KE, "KE", starts, counts);
+        write_field_to_output(energy_transfer, "energy_transfer", starts, counts, filename);
+
+        // Compute the divergence of the coarse field and full field (for comparison)
+        compute_div_vel(div, coarse_u_x, coarse_u_y, coarse_u_z, longitude, latitude,
+                Ntime, Ndepth, Nlat, Nlon, mask);
+        write_field_to_output(div, "coarse_vel_div", starts, counts, filename);
+
+        compute_div_vel(div, u_x, u_y, u_z, longitude, latitude,
+                Ntime, Ndepth, Nlat, Nlon, mask);
+        write_field_to_output(div, "full_vel_div", starts, counts, filename);
         #endif
 
         #if COMP_BC_TRANSFERS
-        compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
-                coarse_u_r, coarse_u_lon, coarse_u_lat,
-                Ntime, Ndepth, Nlat, Nlon,
-                longitude, latitude, mask);
         compute_baroclinic_transfer(baroclinic_transfer,
                 coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
                 coarse_rho, coarse_p,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
-        write_field_to_output(baroclinic_transfer, "baroclinic_transfer", starts, counts);
-        write_field_to_output(PEtoKE, "PEtoKE", starts, counts);
-        write_field_to_output(fine_rho, "rho", starts, counts);
-        write_field_to_output(fine_p,   "p", starts, counts);
+        write_field_to_output(baroclinic_transfer, "Lambda_m", starts, counts, filename);
+        write_field_to_output(PEtoKE,     "PEtoKE",     starts, counts, filename);
+        write_field_to_output(coarse_rho, "coarse_rho", starts, counts, filename);
+        write_field_to_output(coarse_p,   "coarse_p",   starts, counts, filename);
+        write_field_to_output(fine_rho,   "fine_rho",   starts, counts, filename);
+        write_field_to_output(fine_p,     "fine_p",     starts, counts, filename);
         #endif
-
-        // Compute the divergence of the 'full' velocity field
-        compute_div_vel(full_div, NULL, u_x, u_y, u_z,
-                longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
-
-        // Now that we've filtered at the previous scale,
-        //   just keep the coarse part for the next iteration
-        for (int Itime = 0; Itime < Ntime; Itime++) {
-            for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-                #pragma omp parallel \
-                default(none) \
-                shared(u_x, u_y, u_z, longitude, latitude, coarse_u_r, coarse_u_lon, \
-                        coarse_u_lat, coarse_KE, fine_KE_filt, mask, Itime, Idepth,\
-                        stdout) \
-                private(Ilat, Ilon, index, mask_index, u_x_tmp, u_y_tmp, u_z_tmp)
-                {
-                    #pragma omp for collapse(2) schedule(guided)
-                    for (Ilat = 0; Ilat < Nlat; Ilat++) {
-                        for (Ilon = 0; Ilon < Nlon; Ilon++) {
-
-                            // Convert our four-index to a one-index
-                            index = Index(Itime, Idepth, Ilat, Ilon,
-                                          Ntime, Ndepth, Nlat, Nlon);
-                            mask_index = Index(0,     0,      Ilat, Ilon,
-                                               Ntime, Ndepth, Nlat, Nlon);
-
-                            if (mask.at(mask_index) == 1) { // Skip land areas
-
-                                #if DEBUG >= 3
-                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
-                                #endif
-                                vel_Spher_to_Cart(u_x_tmp,           u_y_tmp,             u_z_tmp,
-                                                  coarse_u_r.at(index), coarse_u_lon.at(index), coarse_u_lat.at(index),
-                                                  longitude.at(Ilon),   latitude.at(Ilat));
-
-                                u_x.at(index) = u_x_tmp;
-                                u_y.at(index) = u_y_tmp;
-                                u_z.at(index) = u_z_tmp;
-
-                                coarse_KE.at(index) = coarse_KE.at(index) - fine_KE_filt.at(index);
-
-                            }  // end if(masked) block
-                        }  // end for(longitude) block
-                    }  // end for(latitude) block
-                }  // end pragma parallel block
-            }  // end for(depth) block
-        }  // end for(time) block
-
-        // Compute the divergence of the coarse field, but subtract 
-        //   from the 'full', so get the divergence of the fine scale
-        compute_div_vel(div, &full_div, u_x, u_y, u_z, longitude, latitude,
-                Ntime, Ndepth, Nlat, Nlon, mask);
-        write_field_to_output(div, "vel_div", starts, counts);
 
         compute_div_transport(
                 div_J,
@@ -613,7 +590,7 @@ void filtering(
                 coarse_p, longitude, latitude,
                 Ntime, Ndepth, Nlat, Nlon,
                 mask);
-        write_field_to_output(div_J, "div_Jtransport", starts, counts);
+        write_field_to_output(div_J, "div_Jtransport", starts, counts, filename);
 
         #if DEBUG >= 0
         // Flushing stdout is necessary for SLURM outputs.
@@ -621,108 +598,4 @@ void filtering(
         #endif
 
     }  // end for(scale) block
-
-    // Now write the remaining small scales
-    for (int Itime = 0; Itime < Ntime; Itime++) {
-        for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-            #pragma omp parallel \
-            default(none) \
-            shared(u_x, u_y, u_z, longitude, latitude, coarse_u_r, coarse_u_lon, \
-                    coarse_u_lat, mask, Itime, Idepth) \
-            private(Ilat, Ilon, index, mask_index, u_r_tmp, u_lon_tmp, u_lat_tmp)
-            {
-                #pragma omp for collapse(2) schedule(guided)
-                for (Ilat = 0; Ilat < Nlat; Ilat++) {
-                    for (Ilon = 0; Ilon < Nlon; Ilon++) {
-
-                        // Convert our four-index to a one-index
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon);
-                        mask_index = Index(0,     0,      Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon);
-
-                        if (mask.at(mask_index) == 1) { // Skip land areas
-
-                            vel_Cart_to_Spher(
-                                    u_r_tmp,    u_lon_tmp,  u_lat_tmp,
-                                    u_x.at(index), u_y.at(index), u_z.at(index),
-                                    longitude.at(Ilon),   latitude.at(Ilat));
-
-                            coarse_u_r.at(  index) = u_r_tmp;
-                            coarse_u_lon.at(index) = u_lon_tmp;
-                            coarse_u_lat.at(index) = u_lat_tmp;
-                        }  // end if(masked) block
-                    }  // end for(longitude) block
-                }  // end for(latitude) block
-            }  // end pragma parallel block
-            #if COMP_TRANSFERS
-            #pragma omp parallel \
-            default(none) \
-            shared(u_x, u_y, u_z, fine_KE, mask, Itime, Idepth) \
-            private(Ilat, Ilon, index, mask_index)
-            {
-                #pragma omp for collapse(2) schedule(guided)
-                for (Ilat = 0; Ilat < Nlat; Ilat++) {
-                    for (Ilon = 0; Ilon < Nlon; Ilon++) {
-
-                        // Convert our four-index to a one-index
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                      Ntime, Ndepth, Nlat, Nlon);
-                        mask_index = Index(0,     0,      Ilat, Ilon,
-                                           Ntime, Ndepth, Nlat, Nlon);
-
-                        if (mask.at(mask_index) == 1) { // Skip land areas
-
-                            // Technically the coarse KE, but re-use the variable
-                            // Following Eyink, G. L., & Aluie, H. (2009). 
-                            //     Localness of energy cascade in hydrodynamic turbulence. 
-                            //         I. smooth coarse graining. 
-                            //     Physics of Fluids, 21(11), 1–9. 
-                            // This is the KE above the largest filter scale
-                            fine_KE.at(index) = 0.5 * (  pow( u_x.at(index), 2 ) 
-                                                       + pow( u_y.at(index), 2 ) 
-                                                       + pow( u_z.at(index), 2 ) );
-                        }  // end if(masked) block
-                    }  // end for(longitude) block
-                }  // end for(latitude) block
-            }  // end pragma parallel block
-            #endif
-        }  // end for(depth) block
-    }  // end for(time) block
-
-    starts[0] = Nscales;
-    write_field_to_output(coarse_u_r,   "u_r",   starts, counts);
-    write_field_to_output(coarse_u_lon, "u_lon", starts, counts);
-    write_field_to_output(coarse_u_lat, "u_lat", starts, counts);
-
-    write_field_to_output(coarse_KE, "KE_filt",  starts, counts);
-
-    // Compute the divergence of the coarse field
-    //   no need to subtract this time, since only the coarse
-    //   is left
-    compute_div_vel(div, NULL, u_x, u_y, u_z, longitude, latitude,
-            Ntime, Ndepth, Nlat, Nlon, mask);
-    write_field_to_output(div, "vel_div", starts, counts);
-
-    #if COMP_VORT
-    // Compute and write vorticity
-    //    this is actually coarse vort, not fine, but
-    //    COMP_VORT only guarantees that fine_vort variables exist.
-    compute_vorticity(fine_vort_r, fine_vort_lon, fine_vort_lat,
-            coarse_u_r, coarse_u_lon, coarse_u_lat,
-            Ntime, Ndepth, Nlat, Nlon,
-            longitude, latitude, mask);
-    write_field_to_output(fine_vort_r,   "vort_r",    starts, counts);
-    write_field_to_output(fine_vort_lon, "vort_lon",  starts, counts);
-    write_field_to_output(fine_vort_lat, "vort_lat",  starts, counts);
-    #endif
-
-    #if COMP_TRANSFERS
-    write_field_to_output(fine_KE, "KE", starts, counts);
-    #endif
-
-    #if COMP_BC_TRANSFERS
-    write_field_to_output(coarse_rho, "rho", starts, counts);
-    write_field_to_output(coarse_p,   "p", starts, counts);
-    #endif
-}
+} // end filtering

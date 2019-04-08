@@ -6,7 +6,7 @@
 #endif
 
 #ifndef CARTESIAN
-    #define CARTESIAN false
+    #define CARTESIAN true
 #endif
 
 #ifndef PERIODIC_X
@@ -14,7 +14,7 @@
 #endif
 
 #ifndef PERIODIC_Y
-    #define PERIODIC_Y false
+    #define PERIODIC_Y true
 #endif
 
 #ifndef COMP_VORT
@@ -90,6 +90,13 @@ namespace constants
      * @ingroup constants
      */
     const int DiffOrd = 6;
+
+    /*!
+     * \param fill_value
+     * \brief Fill value used to indicate land values in output files
+     * @ingroup constants
+     */
+    const double fill_value = -32767;
 
     /*!
      * \param KernPad

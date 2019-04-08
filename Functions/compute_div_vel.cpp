@@ -8,7 +8,6 @@
 
 void compute_div_vel(
         std::vector<double> & div,
-        const std::vector<double> * full_div,
         const std::vector<double> & u_x,
         const std::vector<double> & u_y,
         const std::vector<double> & u_z,
@@ -33,7 +32,7 @@ void compute_div_vel(
             default(none) \
             shared( div, Idepth, Itime, stdout,\
                     latitude, longitude, mask,\
-                    u_x, u_y, u_z, full_div)\
+                    u_x, u_y, u_z)\
             private(Ilat, Ilon, index, mask_index, \
                     ux_x, uy_y, uz_z,\
                     div_tmp)
@@ -69,16 +68,16 @@ void compute_div_vel(
 
                             // u_i,i
                             div_tmp = ux_x + uy_y + uz_z;
-                        }
+                        } // end if(water) block
+                        else { // if(land)
+                            div_tmp = constants::fill_value;
+                        } // end if(land)
 
                         div.at(index) = div_tmp;
-                        if (full_div != NULL) {
-                            div.at(index) = full_div->at(index) - div.at(index);
-                        }
 
                     } // end Ilon loop
                 } // end Ilat loop
             } // end pragma
         } // end Idepth loop
     } // end Itime loop
-}
+} // end function

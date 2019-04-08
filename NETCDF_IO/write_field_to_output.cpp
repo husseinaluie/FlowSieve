@@ -1,4 +1,5 @@
 #include <vector>
+#include <string>
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
 
@@ -30,6 +31,6 @@ void write_field_to_output(
     if ((retval = nc_close(ncid))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     #if DEBUG >= 2
-    fprintf(stdout, "  - wrote %s to file -\n", field_name);
+    fprintf(stdout, "  - wrote %s to %s -\n", field_name, filename);
     #endif
 }

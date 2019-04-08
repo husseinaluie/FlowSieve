@@ -79,7 +79,7 @@ void compute_energy_transfer_through_scale(
                                 );
 
                         } else {
-                            pi_tmp = 0.;
+                            pi_tmp = constants::fill_value;
                         }
 
                         energy_transfer.at(index) = pi_tmp;

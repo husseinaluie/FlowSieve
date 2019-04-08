@@ -1,16 +1,17 @@
-
+#include <math.h>
 #include <vector>
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
 
 void initialize_output_file(
-        const std::vector<double> & time,      /**< [in] time vector (1D) */
-        const std::vector<double> & depth,     /**< [in] depth vector (1D) */
-        const std::vector<double> & longitude, /**< [in] longitude vector (1D) */
-        const std::vector<double> & latitude,  /**< [in] longitude vector (1D) */
-        const std::vector<double> & scales,    /**< [in] filter scales (1D) */
-        const std::vector<double> & mask,      /**< [in] masking (land vs water, 2D) */
-        const char * filename                  /**< [in] name for the output file */
+        const std::vector<double> & time,       /**< [in] time vector (1D) */
+        const std::vector<double> & depth,      /**< [in] depth vector (1D) */
+        const std::vector<double> & longitude,  /**< [in] longitude vector (1D) */
+        const std::vector<double> & latitude,   /**< [in] longitude vector (1D) */
+        const std::vector<double> & mask,       /**< [in] masking (land vs water, 2D) */
+        const std::vector<std::string> & vars,  /**< [in] name of variables to write */
+        const char * filename,                  /**< [in] name for the output file */
+        const double filter_scale               /**< [in] lengthscale used in the filter */
         ) {
 
     // Open the NETCDF file
@@ -21,17 +22,17 @@ void initialize_output_file(
     if (( retval = nc_create(buffer, FLAG, &ncid) ))
         NC_ERR(retval, __LINE__, __FILE__);
 
+    retval = nc_put_att_double(ncid, NC_GLOBAL, "filter_scale", NC_FLOAT, 1, &filter_scale);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
     // Extract dimension sizes
-    const int Nscales = scales.size();
     const int Ntime   = time.size();
     const int Ndepth  = depth.size();
     const int Nlat    = latitude.size();
     const int Nlon    = longitude.size();
 
     // Define the dimensions
-    int scale_dimid, time_dimid, depth_dimid, lat_dimid, lon_dimid;
-    if ((retval = nc_def_dim(ncid, "scale",     Nscales+1, &scale_dimid)))
-        NC_ERR(retval, __LINE__, __FILE__);
+    int time_dimid, depth_dimid, lat_dimid, lon_dimid;
     if ((retval = nc_def_dim(ncid, "time",      Ntime,     &time_dimid)))
         NC_ERR(retval, __LINE__, __FILE__);
     if ((retval = nc_def_dim(ncid, "depth",     Ndepth,    &depth_dimid)))
@@ -42,9 +43,7 @@ void initialize_output_file(
         NC_ERR(retval, __LINE__, __FILE__);
 
     // Define coordinate variables
-    int scale_varid, time_varid, depth_varid, lat_varid, lon_varid;
-    if ((retval = nc_def_var(ncid, "scale",     NC_FLOAT, 1, &scale_dimid, &scale_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
+    int time_varid, depth_varid, lat_varid, lon_varid;
     if ((retval = nc_def_var(ncid, "time",      NC_FLOAT, 1, &time_dimid,  &time_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
     if ((retval = nc_def_var(ncid, "depth",     NC_FLOAT, 1, &depth_dimid, &depth_varid)))
@@ -54,35 +53,13 @@ void initialize_output_file(
     if ((retval = nc_def_var(ncid, "longitude", NC_FLOAT, 1, &lon_dimid,   &lon_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
 
-    // CF ordering (with scale added at the beginning)
-    const int ndims = 5;
-    int dimids[ndims];
-    dimids[0] = scale_dimid;
-    dimids[1] = time_dimid;
-    dimids[2] = depth_dimid;
-    dimids[3] = lat_dimid;
-    dimids[4] = lon_dimid;
+    const double rad_to_degree = 180. / M_PI;
+    retval = nc_put_att_double(ncid, lon_varid, "scale_factor", NC_FLOAT, 1, &rad_to_degree);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    retval = nc_put_att_double(ncid, lat_varid, "scale_factor", NC_FLOAT, 1, &rad_to_degree);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
-    // Declare variables
-    int u_r_varid, u_lon_varid, u_lat_varid;
-    if ((retval = nc_def_var(ncid, "u_r",   NC_FLOAT, ndims, dimids, &u_r_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "u_lon", NC_FLOAT, ndims, dimids, &u_lon_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
-    if ((retval = nc_def_var(ncid, "u_lat", NC_FLOAT, ndims, dimids, &u_lat_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
-
-    int KE_filt_varid;
-    if ((retval = nc_def_var(ncid, "KE_filt", NC_FLOAT, ndims, dimids, &KE_filt_varid)))
-        NC_ERR(retval, __LINE__, __FILE__);
-
-    double fill_value = -32767;
-    nc_put_att_double(ncid, u_r_varid,     "_FillValue", NC_FLOAT, 1, &fill_value);
-    nc_put_att_double(ncid, u_lon_varid,   "_FillValue", NC_FLOAT, 1, &fill_value);
-    nc_put_att_double(ncid, u_lat_varid,   "_FillValue", NC_FLOAT, 1, &fill_value);
-    nc_put_att_double(ncid, KE_filt_varid, "_FillValue", NC_FLOAT, 1, &fill_value);
-
-    int mask_dimids[ndims];
+    int mask_dimids[2];
     mask_dimids[0] = lat_dimid;
     mask_dimids[1] = lon_dimid;
     int mask_varid;
@@ -108,10 +85,6 @@ void initialize_output_file(
     if ((retval = nc_put_vara_double(ncid, lon_varid,   start, count, &longitude[0])))
         NC_ERR(retval, __LINE__, __FILE__);
 
-    count[0] = Nscales+1;
-    if ((retval = nc_put_vara_double(ncid, scale_varid, start, count, &scales[0])))
-        NC_ERR(retval, __LINE__, __FILE__);
-
     size_t mask_start[2], mask_count[2];
     mask_start[0] = 0;
     mask_start[1] = 0;
@@ -124,7 +97,16 @@ void initialize_output_file(
     if ((retval = nc_close(ncid))) { NC_ERR(retval, __LINE__, __FILE__); }
 
     #if DEBUG >= 2
-    fprintf(stdout, "Output file initialized.\n\n");
+    fprintf(stdout, "Output file (%s) initialized.\n\n", buffer);
     #endif
+
+
+    // Loop through and add the desired variables
+    // Dimension names (in order!)
+    const char* dim_names[] = {"time", "depth", "latitude", "longitude"};
+    const int ndims = 4;
+    for (size_t varInd = 0; varInd < vars.size(); ++varInd) {
+        add_var_to_file(vars.at(varInd), dim_names, ndims, buffer);
+    }
 
 }

@@ -268,9 +268,11 @@ void compute_div_transport(
                                  + uz * ( (uzux_x - uz_x*ux) + (uzuy_y - uz_y*uy) + ( uzuz_z - uz_z*uz) )
                                 );
 
-                        }
+                        } // end if(water) block
+                        else { // if(land)
+                            div_J_tmp = constants::fill_value;
+                        } // end if(land)
 
-                        //
                         div_J.at(index) = div_J_tmp;
 
                     } // end Ilon loop
@@ -332,9 +334,8 @@ void compute_div_transport(
                             // (p * u_j),j = p_,j * u_j
                             div_J_tmp += ux * dpdx + uy * dpdy + uz * dpdz;
 
-                        }
+                        } // end if(water) block
 
-                        //
                         div_J.at(index) += div_J_tmp;
 
                     } // end Ilon loop

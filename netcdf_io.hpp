@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <string>
 //#include <mpi.h>
 
 #include "netcdf.h"
@@ -61,13 +62,14 @@ void read_source(
  *    filter_scale, time, depth, latitude, longitude
  */
 void initialize_output_file(
-        const std::vector<double> &time,      
-        const std::vector<double> &depth, 
-        const std::vector<double> &longitude, 
-        const std::vector<double> &latitude, 
-        const std::vector<double> &scales,    
-        const std::vector<double> &mask,
-        const char * filename = "filter_output.nc");
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask,
+        const std::vector<std::string> & vars,
+        const char * filename,
+        const double filter_scale);
 
 /*!
  * \brief Write on scales worth of a single field.
@@ -81,7 +83,7 @@ void write_field_to_output(
         const char * field_name,
         const size_t * start, 
         const size_t * count,
-        const char * filename = "filter_output.nc");
+        const char * filename);
 
 /*!
  *  \brief Read a specific variable from a specific file.
@@ -98,7 +100,7 @@ void read_var_from_file(
  *  Note: this declares a new variable, but doesn't write to it.
  */
 void add_var_to_file(
-        const char * var_name,
+        const std::string var_name,
         const char ** dim_list,
         const int num_dims,
         const char * filename = "filter_output.nc");
