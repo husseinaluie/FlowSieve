@@ -31,7 +31,7 @@ void compute_vorticity(
             private(Ilat, Ilon, index, mask_index, \
                     vort_r_tmp, vort_lon_tmp, vort_lat_tmp)
             {
-                #pragma omp for collapse(2) schedule(guided)
+                #pragma omp for collapse(2) schedule(dynamic)
                 for (Ilat = 0; Ilat < Nlat; Ilat++) {
                     for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -56,12 +56,17 @@ void compute_vorticity(
                                     mask);
 
                         }
+                        else { // if not masked
+                            vort_r_tmp   = constants::fill_value;
+                            vort_lon_tmp = constants::fill_value;
+                            vort_lat_tmp = constants::fill_value;
+                        }  // end not(masked) block
                         vort_r.at(  index) = vort_r_tmp;
                         vort_lon.at(index) = vort_lon_tmp;
                         vort_lat.at(index) = vort_lat_tmp;
-                    }
-                }
-            }
-        }
-    }
-}
+                    } // end lon loop
+                } // end lat loop
+            } // end pragma
+        } // end depth loop
+    } // end time loop
+} // end compute_vorticity

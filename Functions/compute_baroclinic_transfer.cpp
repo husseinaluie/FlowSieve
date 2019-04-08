@@ -77,10 +77,13 @@ void  compute_baroclinic_transfer(
                                 coarse_vort_r.at(index) * ( drhodlon * dpdlat  -  drhodlat * dpdlon ) 
                                 / ( coarse_rho.at(index) * pow(constants::R_earth,2) * cos(latitude.at(Ilat)) );
 
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+                        } // end if(water) block
+                        else { // if(land)
+                            baroclinic_transfer.at(index) = constants::fill_value;
+                        }  // end if(land) block
+                    } // end lon loop
+                } // end lat loop
+            } // end pragma block
+        } // end depth loop
+    } // end time loop
+} // end function

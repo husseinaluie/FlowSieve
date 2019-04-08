@@ -14,6 +14,31 @@
 
 int main(int argc, char *argv[]) {
 
+    // For the time being, hard-code the filter scales
+    //   add zero as the end for padding
+    // Scale must be increasing (ignoring the end)
+    // A zero scale will cause everything to nan out (again ignoring the end)
+    const int Nfilt = 2;
+    const double scales [Nfilt+1] = 
+            {100e3, 200e3, 0};
+
+    std::vector<double> filter_scales;
+    filter_scales.assign(scales, scales + Nfilt);
+
+    // Parse command-line flags
+    char buffer [50];
+    for(int ii = 1; ii < argc; ++ii) {  
+        fprintf(stdout, "Argument %d : %s\n", ii, argv[ii]);
+        snprintf(buffer, 50, "--version");
+        if (strcmp(argv[ii], buffer) == 0) {
+            print_compile_info(filter_scales);
+            return 0;
+        } else {
+            fprintf(stderr, "Flag %s not recognized.\n", argv[ii]);
+            return -1;
+        }
+    }
+
     #if DEBUG >= 0
     fprintf(stdout, "\n\n");
     fprintf(stdout, "Compiled at %s on %s.\n", __TIME__, __DATE__);
@@ -61,17 +86,6 @@ int main(int argc, char *argv[]) {
     std::vector<double> p;
 
     std::vector<double> mask;
-
-    // For the time being, hard-code the filter scales
-    //   add zero as the end for padding
-    // Scale must be increasing (ignoring the end)
-    // A zero scale will cause everything to nan out (again ignoring the end)
-    const int Nfilt = 2;
-    const double scales [Nfilt+1] = 
-            {100e3, 1000e3, 0};
-
-    std::vector<double> filter_scales;
-    filter_scales.assign(scales, scales + Nfilt);
 
     // Read in source data / get size information
     #if DEBUG >= 1

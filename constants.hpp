@@ -26,7 +26,14 @@
 #endif
 
 #ifndef COMP_BC_TRANSFERS
-    #define COMP_BC_TRANSFERS false
+    #define COMP_BC_TRANSFERS true
+#endif
+
+//  0 = tophat
+//  1 = Hyper gaus (exp(-x^4))
+//  2 = Gaus  (exp(-x^2))
+#ifndef KERNEL_OPT
+    #define KERNEL_OPT 1
 #endif
 
 /*!
@@ -83,6 +90,29 @@ namespace constants
      * @ingroup constants
      */
     const int DiffOrd = 6;
+
+    /*!
+     * \param fill_value
+     * \brief Fill value used to indicate land values in output files
+     * @ingroup constants
+     */
+    const double fill_value = -32767;
+
+    /*!
+     * \param KernPad
+     * \brief Scale factor for kernel search radius 
+     *
+     * Filter integral applied in circle of radius (filt_scale/2) * KernPad
+     *
+     * @ingroup constants
+     */
+    #if KERNEL_OPT == 0
+    const double KernPad = 1.1;
+    #elif KERNEL_OPT == 1
+    const double KernPad = 2.5;
+    #elif KERNEL_OPT == 2
+    const double KernPad = 5.;
+    #endif
 
 }
 /*! @} End of Doxygen Groups*/

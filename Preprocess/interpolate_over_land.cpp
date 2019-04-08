@@ -7,10 +7,6 @@
 #include "../constants.hpp"
 #include "../functions.hpp"
 
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
 void interpolate_over_land(
         std::vector<double> &interp_field,
         const std::vector<double> &field,

@@ -1,12 +1,14 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import cmocean, sys
+import cmocean, sys, PlotTools, os, shutil, datetime, glob
 from netCDF4 import Dataset
-import PlotTools, shutil, os, datetime
 from matplotlib.colors import ListedColormap
 
 dpi = PlotTools.dpi
+
+# List of variables to (try to) plot
+variables = ['energy_transfer', 'Lambda_m', 'PEtoKE', 'div_Jtransport']
 
 try: # Try using mpi
     from mpi4py import MPI
@@ -17,6 +19,9 @@ except:
     rank = 0
     num_procs = 1
 print("Proc {0:d} of {1:d}".format(rank+1,num_procs))
+
+# Get the available filter files
+files = glob.glob('filter_*.nc')
 
 # If the Figures directory doesn't exist, create it.
 # Same with the Figures/tmp
@@ -33,16 +38,11 @@ if (rank == 0):
     if not(os.path.exists(tmp_direct)):
         os.makedirs(tmp_direct)
 
-fp = 'filter_output.nc'
-results = Dataset(fp, 'r')
-source  = Dataset('input.nc', 'r')
-
-R_earth = 6371e3
-
-D2R = np.pi / 180
-R2D = 180 / np.pi
-
-eps = 1e-10
+source = Dataset('input.nc', 'r')
+try:
+    units = source.variables['latitude'].units
+except:
+    units = ''
 
 # Create cmap for mask data
 ref_cmap = cmocean.cm.gray
@@ -50,186 +50,171 @@ mask_cmap = ref_cmap(np.arange(ref_cmap.N))
 mask_cmap[:,-1] = np.linspace(1, 0, ref_cmap.N)
 mask_cmap = ListedColormap(mask_cmap)
 
-# Get the grid from the first filter
-latitude  = results.variables['latitude'][:] * R2D
-longitude = results.variables['longitude'][:] * R2D
-scales    = results.variables['scale'][:]
-depth     = results.variables['depth'][:]
-time      = results.variables['time'][:] * (60*60) # hours to seconds
-mask      = results.variables['mask'][:]
-transfer  = results.variables['energy_transfer'][:, :, 0, :, :]
-if 'baroclinic_transfer' in results.variables:
-    bc_transfer = results.variables['baroclinic_transfer'][:, :, 0, :, :]
+# Some parameters for plotting
+cbar_props     = dict(pad = 0.02, shrink = 0.85)
+gridspec_props = dict(wspace = 0.15, hspace = 0.15, left = 0.1, right = 0.95, bottom = 0.1, top = 0.9)
 
-# Do some time handling tp adjust the epochs
-# appropriately
-epoch = datetime.datetime(1950,1,1)   # the epoch of the time dimension
-dt_epoch = datetime.datetime.fromtimestamp(0)  # the epoch used by datetime
-epoch_delta = dt_epoch - epoch  # difference
-time = time - epoch_delta.total_seconds()  # shift
+# Loop through filters
+for fp in files:
+    with Dataset(fp, 'r') as results:
+        scale = results.filter_scale
 
-Ntime = len(time)
-num_scales = len(scales)-1
+        # Get the grid from the first filter
+        if units == 'm':
+            latitude  = results.variables['latitude'][:] / 1e3
+            longitude = results.variables['longitude'][:] / 1e3
+        else:
+            latitude  = results.variables['latitude'][:]
+            longitude = results.variables['longitude'][:]
+        LON, LAT = np.meshgrid(longitude, latitude)
 
-LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
+        depth = results.variables['depth'][:]
+        time  = results.variables['time'][:] * (60*60) # convert hours to seconds
+        mask  = results.variables['mask'][:]
 
-Nlat = len(latitude)
-Nlon = len(longitude)
+        Ntime = len(time)
 
-proj = PlotTools.MapProjection(longitude, latitude)
-Xp, Yp = proj(LON*R2D, LAT*R2D)
+        # Do some time handling tp adjust the epochs
+        # appropriately
+        epoch       = datetime.datetime(1950,1,1)   # the epoch of the time dimension
+        dt_epoch    = datetime.datetime.fromtimestamp(0)  # the epoch used by datetime
+        epoch_delta = dt_epoch - epoch  # difference
+        time        = time - epoch_delta.total_seconds()  # shift
 
-meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
-parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
+        # lat/lon lines to draw
+        meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
+        parallels = np.round(np.linspace(latitude.min(),  latitude.max(), 5))
 
-cbar_props     = dict(pad = 0.1, shrink = 0.85, orientation = 'vertical')
-gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.1, right = 0.9, bottom = 0.1, top = 0.9)
+        # Map projection
+        proj = PlotTools.MapProjection(longitude, latitude)
+        Xp, Yp = proj(LON, LAT, inverse=False)
 
-##
-## Begin Plotting
-##
+        # Plot stuff
+        for Itime in range(rank, Ntime, num_procs):    
 
-for Itime in range(rank, Ntime, num_procs):    
+            timestamp = datetime.datetime.fromtimestamp(time[Itime])
+            sup_title = "{0:02d} - {1:02d} - {2:04d} ( {3:02d}:{4:02d} )".format(
+                timestamp.day, timestamp.month, timestamp.year, 
+                timestamp.hour, timestamp.minute)
 
-    timestamp = datetime.datetime.fromtimestamp(time[Itime])
-    sup_title = "{0:02d} - {1:02d} - {2:04d} ( {3:02d}:{4:02d} )".format(
-            timestamp.day, timestamp.month, timestamp.year, 
-            timestamp.hour, timestamp.minute)
-    
-    # Plot each band
-    for ii in range(num_scales):
-    
-        # Initialize figure
-        fig, axes = plt.subplots(1, 1,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(6, 4))
+            for var_name in variables:
+                if var_name in results.variables:
 
-        fig.suptitle(sup_title)
+                    # Initialize figure
+                    fig, axes = plt.subplots(1, 1,
+                        sharex=True, sharey=True, squeeze=False, 
+                        gridspec_kw = gridspec_props,
+                        figsize=(6, 4))
+
+                    fig.suptitle(sup_title)
+
+                    to_plot = results.variables[var_name][Itime, 0, :, :]
+                    if np.max(np.abs(to_plot)) > 0:
+                        PlotTools.SignedLogPlot_onMap(LON, LAT, to_plot, 
+                                axes[0,0], fig, proj, num_ords = 3, percentile=99.9)
+
+                    # Add land and lat/lon lines
+                    axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+                    PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
+                        parallels, meridians, latitude, longitude)
         
-        to_plot = transfer[ii,Itime,:,:] * 1e6
-        to_plot = np.ma.masked_where(mask==0, to_plot)
-    
-        if np.max(np.abs(to_plot)) > 0:
-            PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[0,0], fig, proj, num_ords = 5)
-    
-        # Add coastlines, lat/lon lines, and draw the map
-        axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-        PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
-            parallels, meridians, latitude, longitude)
-            
-        plt.savefig(tmp_direct + '/{0:.4g}_Pi_{1:04d}.png'.format(scales[ii]/1e3,Itime), dpi=dpi)
-        plt.close()
-    
-    
-# If baroclinic transfers are there, use them.
-if 'baroclinic_transfer' in results.variables:
-    for Itime in range(rank, Ntime, num_procs):    
+                    plt.savefig(tmp_direct + '/{0:.4g}_{1:s}_{2:04d}.png'.format(
+                        scale/1e3, var_name, Itime), dpi=dpi)
+                    plt.close()
 
-        timestamp = datetime.datetime.fromtimestamp(time[Itime])
-        sup_title = "{0:02d} - {1:02d} - {2:04d} ( {3:02d}:{4:02d} )".format(
-            timestamp.day, timestamp.month, timestamp.year, 
-            timestamp.hour, timestamp.minute)
     
-        # Plot each band
-        for ii in range(num_scales):
-    
-            # Initialize figure
-            fig, axes = plt.subplots(1, 1,
-                sharex=True, sharey=True, squeeze=False,
-                gridspec_kw = gridspec_props,
-                figsize=(6, 4))
-
-            fig.suptitle(sup_title)
-        
-            to_plot = bc_transfer[ii,Itime,:,:] * 1e6
-            to_plot = np.ma.masked_where(mask==0, to_plot)
-    
-            if np.max(np.abs(to_plot)) > 0:
-                PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[0,0], fig, proj, num_ords = 4, percentile=99.99)
-    
-            # Add coastlines, lat/lon lines, and draw the map
-            Xp, Yp = proj(LON*R2D, LAT*R2D)
-            axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-            PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
-                parallels, meridians, latitude, longitude)
-            
-            plt.savefig(tmp_direct + '/{0:.4g}_Lambda_m_{1:04d}.png'.format(scales[ii]/1e3,Itime), dpi=dpi)
-            plt.close()
-
+if (rank > 0):
+    sys.exit()
 
 # If more than one time point, create mp4s
-for ii in range(num_scales):
-    if Ntime > 1:
-        PlotTools.merge_to_mp4(tmp_direct + '/{0:.4g}_Pi_%04d.png'.format(scales[ii]/1e3),    
-                out_direct + '/{0:.4g}km/Pi.mp4'.format(scales[ii]/1e3),    fps=12)
-        if 'baroclinic_transfer' in results.variables:
-            PlotTools.merge_to_mp4(tmp_direct + '/{0:.4g}_Lambda_m_%04d.png'.format(scales[ii]/1e3), 
-                    out_direct + '/{0:.4g}km/Lambda_m.mp4'.format(scales[ii]/1e3), fps=12)
-    else:
-        shutil.move(tmp_direct + '/{0:.4g}_Pi_0000.png'.format(scales[ii]/1e3), 
-                out_direct + '/{0:.4g}km/Pi.png'.format(scales[ii]/1e3))
-        if 'p' in source.variables:
-            shutil.move(tmp_direct + '/{0:.4g}_Lambda_m_0000.png'.format(scales[ii]/1e3), 
-                    out_direct + '/{0:.4g}km/Lambda_m.png'.format(scales[ii]/1e3))
+if Ntime > 1:
+    for fp in files:
+        with Dataset(fp, 'r') as results:
+            scale = results.filter_scale
+            for var_name in variables:
+                if var_name in results.variables:
+                    PlotTools.merge_to_mp4(tmp_direct + '/{0:.04g}_{1:s}_%04d.png'.format(scale/1e3, var_name),
+                            out_direct + '/{0:.04g}km/{1:s}.mp4'.format(scale/1e3, var_name), fps=12)
+else:
+    for fp in files:
+        with Dataset(fp, 'r') as results:
+            scale = results.filter_scale
+            for var_name in variables:
+                if var_name in results.variables:
+                    shutil.move(tmp_direct + '/{0:.04g}_{1:s}_0000.png'.format(scale/1e3, var_name),
+                            out_direct + '/{0:.04g}km/{1:s}.png'.format(scale/1e3, var_name))
 
 # Now delete the frames
 shutil.rmtree(tmp_direct)
 
-## Plot time averages if Ntime > 1
+# Plot time-mean
+for fp in files:
+    with Dataset(fp, 'r') as results:
 
-if (Ntime > 1):
-    
-    # Plot each band
-    for ii in range(num_scales):
+        scale = results.filter_scale
 
-        # Initialize figure
-        fig, axes = plt.subplots(1, 1,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(6, 4))
+        # Get the grid from the first filter
+        if units == 'm':
+            latitude  = results.variables['latitude'][:] / 1e3
+            longitude = results.variables['longitude'][:] / 1e3
+        else:
+            latitude  = results.variables['latitude'][:]
+            longitude = results.variables['longitude'][:]
+        LON, LAT = np.meshgrid(longitude, latitude)
 
-        fig.suptitle('Time average')
-        
-        to_plot = np.mean(transfer[ii,:,:,:] * 1e6, axis=0)
-        to_plot = np.ma.masked_where(mask==0, to_plot)
-    
-        if np.max(np.abs(to_plot)) > 0:
-            PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[0,0], fig, proj, num_ords = 5)
-    
-        # Add coastlines, lat/lon lines, and draw the map
-        axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-        PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
-            parallels, meridians, latitude, longitude)
-            
-        plt.savefig(out_direct + '/{0:.4g}km/AVE_Pi.png'.format(scales[ii]/1e3), dpi=dpi)
-        plt.close()
-    
-    
-if 'baroclinic_transfer' in results.variables:
-    if (Ntime > 1):
-    
-        # Plot each band
-        for ii in range(num_scales):
+        depth = results.variables['depth'][:]
+        time  = results.variables['time'][:] * (60*60) # convert hours to seconds
+        mask  = results.variables['mask'][:]
+
+        Ntime = len(time)
+
+        # Do some time handling tp adjust the epochs
+        # appropriately
+        epoch       = datetime.datetime(1950,1,1)   # the epoch of the time dimension
+        dt_epoch    = datetime.datetime.fromtimestamp(0)  # the epoch used by datetime
+        epoch_delta = dt_epoch - epoch  # difference
+        time        = time - epoch_delta.total_seconds()  # shift
+
+        # lat/lon lines to draw
+        meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
+        parallels = np.round(np.linspace(latitude.min(),  latitude.max(), 5))
+
+        # Map projection
+        proj = PlotTools.MapProjection(longitude, latitude)
+        Xp, Yp = proj(LON, LAT, inverse=False)
+
+        ## Vorticity dichotomies
+        if (Ntime > 1):
 
             # Initialize figure
-            fig, axes = plt.subplots(1, 1,
-                sharex=True, sharey=True, squeeze=False,
+            fig, axes = plt.subplots(1, 2,
+                sharex=True, sharey=True, squeeze=False, 
                 gridspec_kw = gridspec_props,
-                figsize=(6, 4))
+                figsize=(7, 3))
 
             fig.suptitle('Time average')
+
+            for var_name in variables:
+                if var_name in results.variables:
+
+                    # Initialize figure
+                    fig, axes = plt.subplots(1, 1,
+                        sharex=True, sharey=True, squeeze=False, 
+                        gridspec_kw = gridspec_props,
+                        figsize=(6, 4))
+
+                    fig.suptitle(sup_title)
+
+                    to_plot = np.mean(results.variables[var_name][:, 0, :, :], axis=0)
+                    if np.max(np.abs(to_plot)) > 0:
+                        PlotTools.SignedLogPlot_onMap(LON, LAT, to_plot, 
+                                axes[0,0], fig, proj, num_ords = 3, percentile=99.9)
+
+                    # Add land and lat/lon lines
+                    axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+                    PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
+                        parallels, meridians, latitude, longitude)
         
-            to_plot = np.mean(bc_transfer[ii,:,:,:] * 1e6, axis=0)
-            to_plot = np.ma.masked_where(mask==0, to_plot)
-    
-            if np.max(np.abs(to_plot)) > 0:
-                PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[0,0], fig, proj, num_ords = 4, percentile=99.99)
-    
-            # Add coastlines, lat/lon lines, and draw the map
-            axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-            PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
-                parallels, meridians, latitude, longitude)
-        
-            plt.savefig(out_direct + '/{0:.4g}km/AVE_Lambda_m.png'.format(scales[ii]/1e3), dpi=dpi)
-            plt.close()
+                    plt.savefig(out_direct + '/{0:.4g}km/AVE_{1:s}.png'.format(
+                        scale/1e3, var_name), dpi=dpi)
+                    plt.close()

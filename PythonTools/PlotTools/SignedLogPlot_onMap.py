@@ -34,7 +34,7 @@ def SignedLogPlot_onMap(XX, YY, ZZ, ax, fig, proj_map,
 
     ## Plot
     if vmax == None:
-        vmax = np.percentile(np.abs(ZZ), percentile)
+        vmax = np.percentile(np.abs(ZZ[~ZZ.mask]), percentile)
     vmin = 10**(np.ceil(np.log10(vmax)-num_ords)-1.0)
 
     # Plot the positives in red

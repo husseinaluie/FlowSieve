@@ -5,15 +5,15 @@
 
 void compute_energy_transfer_through_scale(
         std::vector<double> & energy_transfer,  /**< [in] where to store the energy transfer */
-        const std::vector<double> & ux,         /**< [in] filtered u_x */
-        const std::vector<double> & uy,         /**< [in] filtered u_y */
-        const std::vector<double> & uz,         /**< [in] filtered u_z */
-        const std::vector<double> & uxux,       /**< [in] filtered u_x * u_x */
-        const std::vector<double> & uxuy,       /**< [in] filtered u_x * u_y */
-        const std::vector<double> & uxuz,       /**< [in] filtered u_x * u_z */
-        const std::vector<double> & uyuy,       /**< [in] filtered u_y * u_y */
-        const std::vector<double> & uyuz,       /**< [in] filtered u_y * u_z */
-        const std::vector<double> & uzuz,       /**< [in] filtered u_z * u_z */
+        const std::vector<double> & ux,         /**< [in] coarse u_x */
+        const std::vector<double> & uy,         /**< [in] coarse u_y */
+        const std::vector<double> & uz,         /**< [in] coarse u_z */
+        const std::vector<double> & uxux,       /**< [in] coarse u_x * u_x */
+        const std::vector<double> & uxuy,       /**< [in] coarse u_x * u_y */
+        const std::vector<double> & uxuz,       /**< [in] coarse u_x * u_z */
+        const std::vector<double> & uyuy,       /**< [in] coarse u_y * u_y */
+        const std::vector<double> & uyuz,       /**< [in] coarse u_y * u_z */
+        const std::vector<double> & uzuz,       /**< [in] coarse u_z * u_z */
         const int Ntime,                        /**< [in] Length of time dimension */
         const int Ndepth,                       /**< [in] Length of depth dimension */
         const int Nlat,                         /**< [in] Length of latitude dimension */
@@ -79,7 +79,7 @@ void compute_energy_transfer_through_scale(
                                 );
 
                         } else {
-                            pi_tmp = 0.;
+                            pi_tmp = constants::fill_value;
                         }
 
                         energy_transfer.at(index) = pi_tmp;

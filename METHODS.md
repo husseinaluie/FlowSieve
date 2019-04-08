@@ -19,9 +19,21 @@ The outer loop in the integral is then from \f$I_{\phi_0} - \Delta\phi_N\f$ to \
 Next, at each latitude \f$\phi\f$ within that loop, the same process is applied to compute the bounds for the longitude loop, with
 the spacing between longitude band, in *metres*, given by \f$\Delta\lambda_m=\Delta\lambda R_E \cos(\phi)\f$.
 
-## Across-scale Energy Transfer
+## Evolution of Kinetic Energy of Filter Velocities
 
-\f[ \Pi_l = -\rho_0 S_{ij}\tau_{ij} = -\frac{\rho_0}{2}\left(\overline{u}_{i,j}+\overline{u}_{j,i}\right)\left(\overline{u_iu_j} - \overline{u_i}\cdot\overline{u_j}\right) \f]
+\f[
+\frac{\partial}{\partial t}\left( \frac{\rho_0}{2}\left| \overline{\vec{u}} \right|^2 \right)
++ \nabla\cdot J_{\mathrm{transport}} 
+=
+-\Pi 
+- \rho_0\nu\left| \nabla\overline{\vec{u}}\right|^2
++ \overline{\rho}\vec{g}\cdot\overline{\vec{u}}
++\rho_0\overline{F}_{\mathrm{forcing}}\cdot\overline{\vec{u}}
+\f]
+
+### Across-scale Kinetic Energy Transfer
+
+\f[ \Pi = -\rho_0 S_{ij}\tau_{ij} = -\frac{\rho_0}{2}\left(\overline{u}_{i,j}+\overline{u}_{j,i}\right)\left(\overline{u_iu_j} - \overline{u_i}\cdot\overline{u_j}\right) \f]
 
 Unit-wise,
 \f[ 
@@ -32,6 +44,48 @@ Unit-wise,
 \Rightarrow \qquad
 \left[ \Pi\right] = \frac{\mathrm{W}}{\mathrm{m}^3}
 \f]
+
+### Advection of Kinetic Energy
+
+\f{eqnarray*}{
+J_{\mathrm{transport}} =\qquad\qquad\qquad
+\frac{\rho_0}{2} \left| \overline{\vec{u}} \right|^2 \overline{\vec{u}} &\mapsto& \mathrm{Advection}\,\mathrm{by}\,\mathrm{coarse}\mathrm{-}\mathrm{scale}\,\mathrm{flow} \\
++ \overline{P} \overline{u} &\mapsto& \mathrm{Pressure}\mathrm{-}\mathrm{induced}\,\mathrm{transport} \\
+- \nu \frac{\rho}{2}  \nabla\left( \left| \overline{\vec{u}} \right|^2 \right) &\mapsto& \mathrm{Diffusion} \\
++ \rho_0  \overline{\vec{u}}\,\,\overline{\tau}(\vec{u}, \vec{u}) &\mapsto& \mathrm{Advection}\,\mathrm{by}\,\mathrm{fine}\mathrm{-}\mathrm{scale}\,\mathrm{flow}
+\f}
+
+The following assume incompressibility: \f[\nabla\cdot\overline{\vec{u}}=\overline{u}_{j,j}=0\f]
+
+#### Advection by coarse-scale Flow
+\f{eqnarray}{
+\nabla\cdot\left(\frac{\rho_0}{2}  \left| \overline{\vec{u}} \right|^2  \overline{\vec{u}}\right) &=&  \frac{\rho_0}{2}  [ (\overline{u}_i \overline{u}_i)  \overline{u}_j ]_{,j} \\
+&=&  \frac{\rho_0}{2} (\overline{u}_i \overline{u}_i)_{,j}  \overline{u}_j \\
+&=& \rho_0  \overline{u}_i  \overline{u}_{i,j}  \overline{u}_j
+\f}
+
+#### Pressure-induced transport
+
+\f{eqnarray}{
+\nabla\cdot\left(\overline{P}\,\overline{u}\right) &=& (\overline{p}\,\overline{u}_j)_{,j} \\
+&=& \overline{p}_{,j}\, \overline{u}_j
+\f}
+
+#### Diffusion
+
+Not implemented.
+
+#### Advection by fine-scale flow
+
+\f{eqnarray}{
+\nabla\cdot\left(  \rho_0  \overline{\vec{u}} \,\,\overline{\tau}(\vec{u}, \vec{u})  \right)
+&=& \rho_0  [ \overline{u}_i \tau_{ij} ]_{,j} \\
+&=& \rho_0 \left(
+\overline{u}_{i,j} \left[ \overline{(u_iu_j)}  - \overline{u}_i\,\overline{u}_j \right]
++ \overline{u}_i  \left[ \overline{(u_iu_j)}_{,j} - \overline{u}_{i,j}\,\overline{u}_j \right]
+\right)
+\f}
+
 
 ## Baroclinic Energy Transfer
 
@@ -55,9 +109,6 @@ In the case that \f$ \vec{\omega}=\left(\omega_r,0,0\right) \f$, then this reduc
 \Lambda^m = \frac{\overline{\omega_r}}{\overline{\rho}r^2\cos(\phi)}\left( \partial_{\lambda}\overline{\rho}\partial_{\phi}\overline{p} - \partial_{\phi}\overline{\rho}\partial_{\lambda}\overline{p} \right)
 \f]
 
-\f{eqnarray}{
-
-\f}
 
 ## Differentiation
 

@@ -8,10 +8,6 @@
 #include "../functions.hpp"
 #include "../preprocess.hpp"
 
-#ifndef DEBUG
-    #define DEBUG 0
-#endif
-
 void interpolate_over_land_from_coast(
         std::vector<double> &interp_field,
         const std::vector<double> &field,
@@ -56,7 +52,7 @@ void interpolate_over_land_from_coast(
     const double D2R = M_PI / 180;
 
     double rbase;
-    const int nlayers = 10;
+    const int nlayers = 7;
     const double scale = 128.;
 
     std::vector<double> lon_coast;

@@ -14,6 +14,29 @@ This repository stores source code for running coarse graining procedures on net
 3. Call `make tests` to compile the unit test routines.
  * The resulting executables are then stored in `Tests/`
 
+### Interpolator
+
+1. The interpolator requires the ALGLIB package. 
+ * Compile via `make ALGLIB`
+ * only needs to be done once (unless you call `make hardclean`)
+2. Call `make interpolator.x`
+
+### System File
+
+The `Systems` directory contains a few sample system files. To prepare a system file for your machine, there are a few steps.
+1. Copy the most appropraite system file from `Systems` to `system.mk` into the main directory.
+2. Compilers: Indicate your chosen compilers (CXX for C++ and MPICXX for C++ with openmpi)
+3. Links: these may need to change depending on your compiler (e.g. `-fopenmp` to `-qopenmp` for intel compilers)
+4. EXTRA_OPT_FLAGS: this is for other optimizations that you may not want on by default. For example, `-ip -ipo` for intel compilers.
+5. Depending on how your libraries are set up, you may need to add various library and include directories to `LIB_DIRS` and `INC_DIRS`
+
+---
+
+## Command-line Arguments
+
+1. `--version`
+ * Calling `./coarse_grain.x --version` prints a summary of the constants / variables used when compiling
+
 ---
 
 ## Function Map
