@@ -56,7 +56,7 @@ double Cart_derivative_at_point(
         deriv_val =   ( cos_lon / (r * cos_lat ) ) * dfield_dlon
                     - ( sin_lon * sin_lat / r )    * dfield_dlat;
     } else if (dim == "z") {
-        deriv_val = ( cos_lon / r ) * dfield_dlat;
+        deriv_val = ( cos_lat / r ) * dfield_dlat;
     }
     #elif CARTESIAN
     // If we're on an underlying Cartesian grid, then
