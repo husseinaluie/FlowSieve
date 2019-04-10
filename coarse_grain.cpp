@@ -15,12 +15,10 @@
 int main(int argc, char *argv[]) {
 
     // For the time being, hard-code the filter scales
-    //   add zero as the end for padding
-    // Scale must be increasing (ignoring the end)
-    // A zero scale will cause everything to nan out (again ignoring the end)
-    const int Nfilt = 2;
-    const double scales [Nfilt+1] = 
-            {100e3, 200e3, 0};
+    // A zero scale will cause everything to nan out
+    const int Nfilt = 1;
+    const double scales [Nfilt] = 
+            {100e3};
 
     std::vector<double> filter_scales;
     filter_scales.assign(scales, scales + Nfilt);
@@ -149,31 +147,6 @@ int main(int argc, char *argv[]) {
 
     std::vector<double> areas(Nlon * Nlat);
     compute_areas(areas, longitude, latitude);
-
-    /*
-    #if COMP_BC_TRANSFERS
-    const int Ntime  = time.size();
-    const int Ndetph = depth.size();
-    std::vector<double> rho_mean(Ntime * Ndepth);
-    compute_mean(rho_mean, rho, areas, 
-            Ntime, Ndepth, Nlat, Nlon,
-            mask);
-    
-    // Subtract the density mean
-    for (int Itime = 0; Itime < Ntime; Itime++) {
-        for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-            for (int Ilat = 0; Ilat < Nlat; Ilat++) {
-                for (int Ilon = 0; Ilon < Nlon; Ilon++) {
-                    index = Index(
-                            Itime, Idepth, Ilat, Ilon,
-                            Ntime, Ndepth, Nlat, Nlon)
-                    rho.at(index) = rho.at(index) - rho_mean(Itime*Ndepth + Idepth);
-                }
-            }
-        }
-    }
-    #endif
-    */
 
     // Now pass the arrays along to the filtering routines
     filtering(u_r, u_lon, u_lat,

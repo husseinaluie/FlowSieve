@@ -25,6 +25,9 @@ void initialize_output_file(
     retval = nc_put_att_double(ncid, NC_GLOBAL, "filter_scale", NC_FLOAT, 1, &filter_scale);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
+    retval = nc_put_att_double(ncid, NC_GLOBAL, "rho0", NC_FLOAT, 1, &constants::rho0);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
     // Extract dimension sizes
     const int Ntime   = time.size();
     const int Ndepth  = depth.size();

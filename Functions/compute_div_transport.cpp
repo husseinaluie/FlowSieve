@@ -215,7 +215,7 @@ void compute_div_transport(
                             uzuy_loc = uyuz.at(index);
                             uzuz_loc = uzuz.at(index);
 
-                            // tau_ij,j
+                            // bar(u_i*u_j),j
                             uxux_x = Cart_derivative_at_point(uxux, latitude, longitude, "x",
                                     Itime, Idepth, Ilat, Ilon,
                                     Ntime, Ndepth, Nlat, Nlon,
@@ -252,6 +252,12 @@ void compute_div_transport(
                                     Itime, Idepth, Ilat, Ilon,
                                     Ntime, Ndepth, Nlat, Nlon,
                                     mask);
+                            
+                            //  rho0 * 
+                            //    (  
+                            //       u_i,j * ( bar(u_i*u_j)   - bar(u_i  )*bar(u_j) )
+                            //     + u_i   * ( bar(u_i*u_j),j - bar(u_i,j)*bar(u_j) )
+                            //    )
 
                             // rho0 * ( u_i,j * ( bar(u_i*u_j)   - bar(u_i  )*bar(u_j) ) )
                             div_J_tmp += constants::rho0 *

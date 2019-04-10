@@ -170,6 +170,13 @@ void filtering(
     //    rho_bar * g * w_bar
     std::vector<double> PEtoKE(num_pts);
     vars_to_write.push_back("PEtoKE");
+
+    // Get horizontally-averaged rho
+    //std::vector<double> rho_mean(Ntime * Ndepth);
+    //compute_mean(rho_mean, full_rho, dAreas, 
+    //        Ntime, Ndepth, Nlat, Nlon,
+    //        mask);
+    
     #else
     // Create an empty holder
     std::vector<double> coarse_p;

@@ -15,22 +15,18 @@ double field_func(const double lat, const double lon) {
 }
 
 double mask_func(const double lat, const double lon) {
-    double ret_val;
-
-    // Make a square island, pi/3 by pi/3
-    /*
-    if ( (abs(lat) < M_PI/6) and (abs(lon) < M_PI/6) ) {
-        ret_val = 0.;
-    } else {
-        ret_val = 1.;
-    }
-    */
+    // 1 indicates water, 0 indicates land
+    double ret_val = 1.;
     
     // Make a circular island, radius pi/6
     if ( sqrt( lat*lat + lon*lon ) < M_PI/6 ) {
-        ret_val = 0.;
-    } else {
-        ret_val = 1.;
+        ret_val *= 0.;
+    }
+
+    // Add a square island poking out in the corners
+    // Essentially, just don't make the island too smooth
+    if ( (fabs(lat) < M_PI/7) and (fabs(lon) < M_PI/7) ) {
+        ret_val *= 0.;
     }
 
     return ret_val;
@@ -67,12 +63,10 @@ void apply_test(double & err2_lon, double & err2_lat,
             index = Ilat * Nlon + Ilon;
 
             // Compute longitudinal derivative
-            //tmp = longitude_derivative_at_point(field, longitude, 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
             tmp = spher_derivative_at_point(field, longitude, "lon", 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
             numer_lon_deriv.at(index) = tmp;
 
             // Compute latitudinal derivative
-            //tmp = latitude_derivative_at_point(field, latitude, 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
             tmp = spher_derivative_at_point(field, latitude, "lat", 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
             numer_lat_deriv.at(index) = tmp;
         }
@@ -156,11 +150,11 @@ int main(int argc, char *argv[]) {
         dlon = (lon_max - lon_min) / Nlon;
 
         // Create the grid
-        longitude.resize(Nlon);
-        latitude.resize(Nlat);
-        dArea.resize(Nlon * Nlat);
-        mask.resize(Nlon * Nlat);
-        field.resize(Nlon * Nlat);
+        longitude.resize( Nlon );
+        latitude.resize(  Nlat );
+        dArea.resize( Nlon * Nlat );
+        mask.resize(  Nlon * Nlat );
+        field.resize( Nlon * Nlat );
 
         for (int II = 0; II < Nlat; II++) { latitude.at( II) = lat_min + (II+0.5) * dlat; }
         for (int II = 0; II < Nlon; II++) { longitude.at(II) = lon_min + (II+0.5) * dlon; }
@@ -171,7 +165,6 @@ int main(int argc, char *argv[]) {
         int index;
         int num_land = 0;
 
-        // cos(long) * exp( - lat**2 )
         for (int Ilat = 0; Ilat < Nlat; Ilat++) {
             for (int Ilon = 0; Ilon < Nlon; Ilon++) {
                 index = Ilat * Nlon + Ilon;
@@ -258,8 +251,8 @@ int main(int argc, char *argv[]) {
     mean_x_lat = 0.;
     mean_y_lon = 0.;
     mean_y_lat = 0.;
-    var_x_lon = 0.;
-    var_x_lat = 0.;
+    var_x_lon  = 0.;
+    var_x_lat  = 0.;
     cov_xy_lon = 0.;
     cov_xy_lat = 0.;
 
