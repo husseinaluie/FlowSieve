@@ -45,13 +45,14 @@ void filtering(
     std::vector<double> u_y(num_pts);
     std::vector<double> u_z(num_pts);
 
-    // Copy the current full u_r into the initial coarse
-    std::vector<double> coarse_u_r(  full_u_r);
-    std::vector<double> coarse_u_lon(full_u_lon);
-    std::vector<double> coarse_u_lat(full_u_lat);
+    std::vector<double> coarse_u_r(  num_pts);
+    std::vector<double> coarse_u_lon(num_pts);
+    std::vector<double> coarse_u_lat(num_pts);
     vars_to_write.push_back("coarse_u_r");
     vars_to_write.push_back("coarse_u_lon");
     vars_to_write.push_back("coarse_u_lat");
+
+    std::vector<double> full_KE(num_pts);
 
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
@@ -76,6 +77,8 @@ void filtering(
                             vel_Spher_to_Cart(     u_x.at(index),      u_y.at(  index),      u_z.at(  index),
                                               full_u_r.at(index), full_u_lon.at(index), full_u_lat.at(index),
                                               longitude.at(Ilon), latitude.at(Ilat));
+
+                            full_KE.at(index) = 0.5 * ( pow(u_x.at(index), 2) + pow(u_y.at(index), 2) + pow(u_z.at(index), 2) );
                         }
                     }
                 }
@@ -224,7 +227,8 @@ void filtering(
                 shared(Itime, Idepth, mask, u_x, u_y, u_z,\
                         stdout,\
                         longitude, latitude, dAreas, scale,\
-                        coarse_KE, fine_KE,\
+                        full_KE, coarse_KE, fine_KE,\
+                        full_u_r, full_u_lon, full_u_lat,\
                         coarse_u_r, coarse_u_lon, coarse_u_lat,\
                         fine_u_r, fine_u_lon, fine_u_lat, perc_base)\
                 private(Ilat, Ilon, index, mask_index,\
@@ -297,32 +301,23 @@ void filtering(
                                                   u_x_tmp, u_y_tmp,   u_z_tmp,
                                                   longitude.at(Ilon), latitude.at(Ilat));
 
+                                coarse_u_r.at(  index) = u_r_tmp;
+                                coarse_u_lon.at(index) = u_lon_tmp;
+                                coarse_u_lat.at(index) = u_lat_tmp;
+
+                                fine_u_r.at(  index) = full_u_r.at(  index) - coarse_u_r.at(  index);
+                                fine_u_lon.at(index) = full_u_lon.at(index) - coarse_u_lon.at(index);
+                                fine_u_lat.at(index) = full_u_lat.at(index) - coarse_u_lat.at(index);
+
                                 // Also filter KE
                                 apply_filter_at_point(
-                                        KE_tmp, coarse_KE,     
+                                        KE_tmp, full_KE,
                                         Ntime,  Ndepth, Nlat, Nlon,
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
                                         dAreas, scale, mask, true);
-                                fine_KE.at(index) = 0.5 * ( pow(u_x.at(index), 2) + pow(u_y.at(index), 2) + pow(u_z.at(index), 2) ) - KE_tmp;
                                 coarse_KE.at(index) = KE_tmp;
-
-                                // Subtract current coarse from preceeding coarse to
-                                //    get current fine
-                                #if DEBUG >= 3
-                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
-                                #endif
-                                fine_u_r.at(  index) = coarse_u_r.at(  index) - u_r_tmp;
-                                fine_u_lon.at(index) = coarse_u_lon.at(index) - u_lon_tmp;
-                                fine_u_lat.at(index) = coarse_u_lat.at(index) - u_lat_tmp;
-
-                                // Now pass the new coarse along as the preceeding coarse.
-                                #if DEBUG >= 3
-                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
-                                #endif
-                                coarse_u_r.at(  index) = u_r_tmp;
-                                coarse_u_lon.at(index) = u_lon_tmp;
-                                coarse_u_lat.at(index) = u_lat_tmp;
+                                fine_KE.at(index) = full_KE.at(index) - coarse_KE.at(index);
 
                             }  // end if(masked) block
                             else { // if not masked
@@ -406,8 +401,8 @@ void filtering(
 
                                 vel_Spher_to_Cart(u_x_tmp, u_y_tmp, u_z_tmp,
                                                   coarse_u_r.at(index), 
-                                                  coarse_u_lat.at(index),  
-                                                  coarse_u_lon.at(index),
+                                                  coarse_u_lon.at(index),  
+                                                  coarse_u_lat.at(index),
                                                   longitude.at(Ilon), latitude.at(Ilat));
 
                                 coarse_uxux.at(index) = uxux_tmp;
