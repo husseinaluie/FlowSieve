@@ -76,19 +76,6 @@ for fp in files:
         do_PEtoKE = ('PEtoKE' in results.variables)
         do_divJ   = ('div_Jtransport' in results.variables)
 
-        net_KE      = np.zeros((Ntime,))
-        net_KE_proc = np.zeros((Ntime,))
-        net_Pi      = np.zeros((Ntime,))
-        net_Pi_proc = np.zeros((Ntime,))
-        net_div_vel      = np.zeros((Ntime,))
-        net_div_vel_proc = np.zeros((Ntime,))
-        if do_PEtoKE:
-            net_PEtoKE      = np.zeros((Ntime,))
-            net_PEtoKE_proc = np.zeros((Ntime,))
-        if do_divJ:
-            net_divJ      = np.zeros((Ntime,))
-            net_divJ_proc = np.zeros((Ntime,))
-
         depth  = results.variables['depth']
         Ndepth = len(depth)
 
@@ -116,22 +103,14 @@ for fp in files:
                     timestamp.day, timestamp.month, timestamp.year, 
                     timestamp.hour, timestamp.minute)
             Pi        = results.variables['energy_transfer'][iT,:,:,:]
-            div_vel   = results.variables['full_vel_div'][iT,:,:,:]
 
-            net_KE_proc[iT] = np.sum(KE_from_vel[iT,:,:,:] * dArea)
-            net_Pi_proc[iT] = np.sum(- Pi * dArea)
-            if do_PEtoKE:
-                PEtoKE = results.variables['PEtoKE'][iT,:,:,:]
-                net_PEtoKE_proc[iT] =  np.sum(PEtoKE * dArea)
-            if do_divJ:
-                div_J = results.variables['div_Jtransport'][iT,:,:,:]
-                net_divJ_proc[iT] = -np.sum(div_J * dArea)
-    
             KE_sel =  KE_flux[iT,:][~KE_flux[iT,:].mask].ravel()
             Pi_sel = -Pi[~Pi.mask].ravel()
             if do_PEtoKE:
+                PEtoKE  = results.variables['PEtoKE'][iT,:,:,:]
                 Pi_sel += PEtoKE[~PEtoKE.mask].ravel()
             if do_divJ:
+                div_J   = results.variables['div_Jtransport'][iT,:,:,:]
                 Pi_sel += -div_J[~div_J.mask].ravel()
         
             label = '$-\Pi$' 
@@ -180,121 +159,6 @@ for fp in files:
                 rotation='vertical', fontsize=16)
         
             plt.savefig(tmp_direct + '/{0:.4g}_KE_fluxes_{1:04d}.png'.format(scale/1e3,iT), dpi=dpi)
-            plt.close()
-
-    
-        comm.Allreduce(net_KE_proc, net_KE, op=MPI.SUM)
-        comm.Allreduce(net_Pi_proc, net_Pi, op=MPI.SUM)
-        comm.Allreduce(net_div_vel_proc, net_div_vel, op=MPI.SUM)
-        if do_PEtoKE:
-            comm.Allreduce(net_PEtoKE_proc, net_PEtoKE, op=MPI.SUM)
-        if do_divJ:
-            comm.Allreduce(net_divJ_proc, net_divJ, op=MPI.SUM)
-        if rank == 0:
-            # Now plot the space-integrated version
-            colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
-            fig = plt.figure()
-            ax1    = fig.add_axes([0.1, 0.25, 0.8, 0.7])
-            ax2    = fig.add_axes([0.1, 0.15, 0.8, 0.1])
-            leg_ax = fig.add_axes([0.1, 0.05, 0.8, 0.1])
-
-            net_KE_flux = np.dot(Dt, net_KE)
-
-            to_plot = net_KE_flux
-            label='$\int_{\Omega}\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$'
-            ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[0], label=label)
-            ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[0])#, label=label)
-
-            to_plot = net_Pi 
-            label='$-\int_{\Omega}\Pi\mathrm{dA}$'
-            ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[1], label=label)
-            ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[1])#, label=label)
-
-            if do_PEtoKE:
-                label='$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'
-                to_plot = net_PEtoKE
-                ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[2], label=label)
-                ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[2])#, label=label)
-
-            if do_divJ:
-                label='$-\int_{\Omega}\\nabla\cdot J\mathrm{dA}$'
-                to_plot = net_divJ
-                ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[3], label=label)
-                ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[3])#, label=label)
-
-            ax1.set_yscale('log')
-            ax1.set_ylabel('$\mathrm{W}$')
-
-            ax2.set_xlim(ax1.get_xlim())
-
-            ax1.set_xticks([])
-            ax2.set_xticks([])
-            ax2.set_yticks([])
-
-            PlotTools.LabelTimeAxis(ax2, time)
-
-            # Add legend
-            handles, labels = ax1.get_legend_handles_labels()
-            leg_ax.legend(handles, labels, bbox_to_anchor=(0., 0., 1., 1.), ncol=3, mode='expand',
-                    frameon = True, borderaxespad=0.)
-            leg_ax.set_xticks([])
-            leg_ax.set_yticks([])
-            for pos in ['left', 'right', 'top', 'bottom']:
-                leg_ax.spines[pos].set_visible(False)
-
-            plt.savefig(out_direct + '/{0:.4g}km/KE_fluxes_net.pdf'.format(scale/1e3))
-            plt.close()
-
-            # Also plot the time-integrated version
-            colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
-            fig = plt.figure()
-            ax1    = fig.add_axes([0.1, 0.25, 0.8, 0.7])
-            ax2    = fig.add_axes([0.1, 0.15, 0.8, 0.1])
-            leg_ax = fig.add_axes([0.1, 0.05, 0.8, 0.1])
-
-            label='$\int_{\Omega}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$'
-            to_plot = net_KE
-            ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[0], label=label)
-            ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[0])#, label=label)
-
-            label='$-\int^t\int_{\Omega}\Pi\mathrm{dA}$'
-            to_plot = spi.cumtrapz(net_Pi, time)
-            ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[1], label=label)
-            ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[1])#, label=label)
-
-            if do_PEtoKE:
-                label='$\int^t\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'
-                to_plot = spi.cumtrapz(net_PEtoKE, time)
-                ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[2], label=label)
-                ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[2])#, label=label)
-
-            if do_divJ:
-                label='$-\int^t\int_{\Omega}\\nabla\cdot J\mathrm{dA}$'
-                to_plot = spi.cumtrapz(net_divJ, time)
-                ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[3], label=label)
-                ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[3])#, label=label)
-
-            ax1.set_yscale('log')
-            ax1.set_ylabel('$\mathrm{J}$')
-
-            ax2.set_xlim(ax1.get_xlim())
-
-            ax1.set_xticks([])
-            ax2.set_xticks([])
-            ax2.set_yticks([])
-
-            PlotTools.LabelTimeAxis(ax2, time)
-
-            # Add legend
-            handles, labels = ax1.get_legend_handles_labels()
-            leg_ax.legend(handles, labels, bbox_to_anchor=(0., 0., 1., 1.), ncol=3, mode='expand',
-                    frameon = True, borderaxespad=0.)
-            leg_ax.set_xticks([])
-            leg_ax.set_yticks([])
-            for pos in ['left', 'right', 'top', 'bottom']:
-                leg_ax.spines[pos].set_visible(False)
-
-            plt.savefig(out_direct + '/{0:.4g}km/KE_net.pdf'.format(scale/1e3))
             plt.close()
 
 if (rank > 0):

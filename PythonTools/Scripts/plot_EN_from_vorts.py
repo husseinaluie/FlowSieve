@@ -3,9 +3,13 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import cmocean, sys, PlotTools, os, shutil, datetime, glob
 from netCDF4 import Dataset
+from matplotlib.colors import LogNorm
 from matplotlib.colors import ListedColormap
 
 dpi = PlotTools.dpi
+
+# List of variables to (try to) plot
+variables = ['energy_transfer', 'Lambda_m', 'PEtoKE', 'div_Jtransport']
 
 try: # Try using mpi
     from mpi4py import MPI
@@ -54,7 +58,6 @@ gridspec_props = dict(wspace = 0.15, hspace = 0.15, left = 0.1, right = 0.95, bo
 # Loop through filters
 for fp in files:
     with Dataset(fp, 'r') as results:
-
         scale = results.filter_scale
 
         # Get the grid from the first filter
@@ -88,10 +91,10 @@ for fp in files:
         Xp, Yp = proj(LON, LAT, inverse=False)
 
         rat   = (Xp.max() - Xp.min()) / (Yp.max() - Yp.min())
-        rat  *= (2./1) * (1.2)
+        rat  *= 0.5 * (1.2)
         fig_h = 8.
 
-        ## Vorticity dichotomies
+        # Plot stuff
         for Itime in range(rank, Ntime, num_procs):    
 
             timestamp = datetime.datetime.fromtimestamp(time[Itime])
@@ -99,58 +102,48 @@ for fp in files:
                 timestamp.day, timestamp.month, timestamp.year, 
                 timestamp.hour, timestamp.minute)
 
+            vort_r   = results.variables['fine_vort_r'  ][Itime,0,:,:]
+            #vort_lon = results.variables['fine_vort_lon'][Itime,0,:,:]
+            #vort_lat = results.variables['fine_vort_lat'][Itime,0,:,:]
+            #to_plot_below = 0.5 * ( vort_r**2 + vort_lon**2 + vort_lat**2 )
+            to_plot_below = 0.5 * ( vort_r**2 )
+
+            vort_r   = results.variables['coarse_vort_r'  ][Itime,0,:,:]
+            #vort_lon = results.variables['coarse_vort_lon'][Itime,0,:,:]
+            #vort_lat = results.variables['coarse_vort_lat'][Itime,0,:,:]
+            #to_plot_above = 0.5 * ( vort_r**2 + vort_lon**2 + vort_lat**2 )
+            to_plot_above = 0.5 * ( vort_r**2 )
+
             # Initialize figure
-            fig, axes = plt.subplots(1, 2,
+            fig, axes = plt.subplots(2, 1,
                 sharex=True, sharey=True, squeeze=False, 
                 gridspec_kw = gridspec_props,
                 figsize=(fig_h*rat, fig_h))
 
             fig.suptitle(sup_title)
 
-            for jj in range(1):
+            CV_a = np.percentile(np.abs(to_plot_above[~to_plot_above.mask]), 99.9)
+            CV_b = np.percentile(np.abs(to_plot_below[~to_plot_above.mask]), 99.9)
     
-                if jj == 0:
-                    vort = 'vort_r'
-                if jj == 1:
-                    vort = 'vort_lon'
-                if jj == 2:
-                    vort = 'vort_lat'
+            vmax = max(CV_a, CV_b)
+            vmin = 10**(np.log10(vmax) - 3)
 
-                to_plot_below = results.variables['fine_'   + vort][Itime, 0, :, :]
-                to_plot_above = results.variables['coarse_' + vort][Itime, 0, :, :]
+            qm_a = axes[0,0].pcolormesh(Xp, Yp, to_plot_above, cmap='cmo.amp',
+                norm=LogNorm(vmin=vmin, vmax=vmax))
     
-                #CV_a = np.max(np.abs(to_plot_above))
-                #CV_b = np.max(np.abs(to_plot_below))
-                CV_a = np.percentile(np.abs(to_plot_above[~to_plot_above.mask]), 99.9)
-                CV_b = np.percentile(np.abs(to_plot_below[~to_plot_below.mask]), 99.9)
+            qm_b = axes[1,0].pcolormesh(Xp, Yp, to_plot_below, cmap='cmo.amp',
+                norm=LogNorm(vmin=vmin, vmax=vmax))
+
+            cbar = plt.colorbar(qm_b, ax = axes[:,0], **cbar_props)
     
-                qm_a  = axes[jj,0].pcolormesh(Xp, Yp, to_plot_above, 
-                        cmap='cmo.balance', vmin = -CV_a, vmax = CV_a)
-                qm_b  = axes[jj,1].pcolormesh(Xp, Yp, to_plot_below, 
-                        cmap='cmo.balance', vmin = -CV_b, vmax = CV_b)
+            # Add land and lat/lon lines
+            for ax in axes[:,0]:
+                ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+                PlotTools.AddParallels_and_Meridians(ax, proj, 
+                    parallels, meridians, latitude, longitude)
 
-                cbar_a = plt.colorbar(qm_a, ax = axes[jj,0], **cbar_props)
-                cbar_b = plt.colorbar(qm_b, ax = axes[jj,1], **cbar_props)
-                PlotTools.ScientificCbar(cbar_a, units='m/s')
-                PlotTools.ScientificCbar(cbar_b, units='m/s')
-
-                # Add land and lat/lon lines
-                for ax in axes[jj,:]:
-                    ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-                    PlotTools.AddParallels_and_Meridians(ax, proj, 
-                        parallels, meridians, latitude, longitude)
-
-                for ax in axes.ravel():
-                    ax.set_aspect('equal')
-        
-            axes[0,0].set_ylabel('$\omega_r$', fontsize=16)
-            #axes[1,0].set_ylabel('$\omega_\lambda$', fontsize=16)
-            #axes[2,0].set_ylabel('$\omega_\phi$', fontsize=16)
-
-            axes[0,0].set_title('Coarse $(>l)$')
-            axes[0,1].set_title('Fine $(>l)$')
-    
-            plt.savefig(tmp_direct + '/{0:.4g}_vorticity_dichotomies_{1:04d}.png'.format(scale/1e3, Itime), dpi=dpi)
+            plt.savefig(tmp_direct + '/{0:.4g}_EN_dichotomies_from_vorts_{1:04d}.png'.format(
+                scale/1e3, Itime), dpi=dpi)
             plt.close()
 
     
@@ -162,14 +155,14 @@ if Ntime > 1:
     for fp in files:
         with Dataset(fp, 'r') as results:
             scale = results.filter_scale
-            PlotTools.merge_to_mp4(tmp_direct + '/{0:.04g}_vorticity_dichotomies_%04d.png'.format(scale/1e3),    
-                out_direct + '/{0:.04g}km/vorticity_dichotomies.mp4'.format(scale/1e3), fps=12)
+            PlotTools.merge_to_mp4(tmp_direct + '/{0:.04g}_EN_dichotomies_from_vorts_%04d.png'.format(scale/1e3),
+                    out_direct + '/{0:.04g}km/EN_dichotomies_from_vorts.mp4'.format(scale/1e3), fps=12)
 else:
     for fp in files:
         with Dataset(fp, 'r') as results:
             scale = results.filter_scale
-            shutil.move(tmp_direct + '/{0:.04g}_vorticity_dichotomies_0000.png'.format(scale/1e3),
-                out_direct + '/{0:.04g}km/vorticity_dichotomies.png'.format(scale/1e3))
+            shutil.move(tmp_direct + '/{0:.04g}_EN_dichotomies_from_vorts_0000.png'.format(scale/1e3),
+                    out_direct + '/{0:.04g}km/EN_dichotomies_from_vorts.png'.format(scale/1e3))
 
 # Now delete the frames
 shutil.rmtree(tmp_direct)
@@ -211,62 +204,54 @@ for fp in files:
         Xp, Yp = proj(LON, LAT, inverse=False)
 
         rat   = (Xp.max() - Xp.min()) / (Yp.max() - Yp.min())
-        rat  *= (2./1) * (1.2)
+        rat  *= 0.5 * (1.2)
         fig_h = 8.
 
         ## Vorticity dichotomies
         if (Ntime > 1):
 
             # Initialize figure
-            fig, axes = plt.subplots(1, 2,
+            fig, axes = plt.subplots(2, 1,
                 sharex=True, sharey=True, squeeze=False, 
                 gridspec_kw = gridspec_props,
                 figsize=(fig_h*rat, fig_h))
 
             fig.suptitle('Time average')
 
-            for jj in range(1):
+            vort_r   = results.variables['fine_vort_r'  ][:,0,:,:]
+            #vort_lon = results.variables['fine_vort_lon'][:,0,:,:]
+            #vort_lat = results.variables['fine_vort_lat'][:,0,:,:]
+            #to_plot_below = 0.5 * ( vort_r**2 + vort_lon**2 + vort_lat**2 )
+            to_plot_below = 0.5 * ( vort_r**2 )
+            to_plot_below = np.mean(to_plot_below, axis=0)
+
+            vort_r   = results.variables['coarse_vort_r'  ][:,0,:,:]
+            #vort_lon = results.variables['coarse_vort_lon'][:,0,:,:]
+            #vort_lat = results.variables['coarse_vort_lat'][:,0,:,:]
+            #to_plot_above = 0.5 * ( vort_r**2 + vort_lon**2 + vort_lat**2 )
+            to_plot_above = 0.5 * ( vort_r**2 )
+            to_plot_above = np.mean(to_plot_above, axis=0)
+
+            CV_a = np.percentile(np.abs(to_plot_above[~to_plot_above.mask]), 99.9)
+            CV_b = np.percentile(np.abs(to_plot_below[~to_plot_above.mask]), 99.9)
     
-                if jj == 0:
-                    vort = 'vort_r'
-                if jj == 1:
-                    vort = 'vort_lon'
-                if jj == 2:
-                    vort = 'vort_lat'
+            vmax = max(CV_a, CV_b)
+            vmin = 10**(np.log10(vmax) - 3)
 
-                to_plot_below = np.mean(results.variables['fine_'   + vort][:, 0, :, :], axis=0)
-                to_plot_above = np.mean(results.variables['coarse_' + vort][:, 0, :, :], axis=0)
+            qm_a = axes[0,0].pcolormesh(Xp, Yp, to_plot_above, cmap='cmo.amp',
+                norm=LogNorm(vmin=vmin, vmax=vmax))
     
-                #CV_a = np.max(np.abs(to_plot_above))
-                #CV_b = np.max(np.abs(to_plot_below))
-                CV_a = np.percentile(np.abs(to_plot_above[~to_plot_above.mask]), 99.9)
-                CV_b = np.percentile(np.abs(to_plot_below[~to_plot_below.mask]), 99.9)
-    
-                qm_a  = axes[jj,0].pcolormesh(Xp, Yp, to_plot_above, 
-                        cmap='cmo.balance', vmin = -CV_a, vmax = CV_a)
-                qm_b  = axes[jj,1].pcolormesh(Xp, Yp, to_plot_below, 
-                        cmap='cmo.balance', vmin = -CV_b, vmax = CV_b)
+            qm_b = axes[1,0].pcolormesh(Xp, Yp, to_plot_below, cmap='cmo.amp',
+                norm=LogNorm(vmin=vmin, vmax=vmax))
 
-                cbar_a = plt.colorbar(qm_a, ax = axes[jj,0], **cbar_props)
-                cbar_b = plt.colorbar(qm_b, ax = axes[jj,1], **cbar_props)
-                PlotTools.ScientificCbar(cbar_a, units='m/s')
-                PlotTools.ScientificCbar(cbar_b, units='m/s')
+            cbar = plt.colorbar(qm_b, ax = axes[:,0], **cbar_props)
 
-                # Add land and lat/lon lines
-                for ax in axes[jj,:]:
-                    ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-                    PlotTools.AddParallels_and_Meridians(ax, proj, 
-                        parallels, meridians, latitude, longitude)
-
-                for ax in axes.ravel():
-                    ax.set_aspect('equal')
+            # Add land and lat/lon lines
+            for ax in axes[:,0]:
+                ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+                PlotTools.AddParallels_and_Meridians(ax, proj, 
+                    parallels, meridians, latitude, longitude)
         
-            axes[0,0].set_ylabel('$\omega_r$', fontsize=16)
-            #axes[1,0].set_ylabel('$\omega_\lambda$', fontsize=16)
-            #axes[2,0].set_ylabel('$\omega_\phi$', fontsize=16)
-
-            axes[0,0].set_title('Coarse $(>l)$')
-            axes[0,1].set_title('Fine $(>l)$')
-    
-            plt.savefig(out_direct + '/{0:.4g}km/AVE_vorticity_dichotomies.png'.format(scale/1e3), dpi=dpi)
+            plt.savefig(out_direct + '/{0:.4g}km/AVE_EN_dichotomies_from_vorts.png'.format(
+                scale/1e3), dpi=dpi)
             plt.close()

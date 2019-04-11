@@ -87,6 +87,10 @@ for fp in files:
         proj = PlotTools.MapProjection(longitude, latitude)
         Xp, Yp = proj(LON, LAT, inverse=False)
 
+        rat   = (Xp.max() - Xp.min()) / (Yp.max() - Yp.min())
+        rat  *= (2./3) * (1.2)
+        fig_h = 8.
+
         ## Velocity dichotomies
         for Itime in range(rank, Ntime, num_procs):    
 
@@ -99,7 +103,7 @@ for fp in files:
             fig, axes = plt.subplots(3, 2,
                 sharex=True, sharey=True, squeeze=False, 
                 gridspec_kw = gridspec_props,
-                figsize=(7, 9))
+                figsize=(fig_h*rat, fig_h))
 
             fig.suptitle(sup_title)
 
@@ -133,6 +137,9 @@ for fp in files:
                     ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
                     PlotTools.AddParallels_and_Meridians(ax, proj, 
                         parallels, meridians, latitude, longitude)
+
+                for ax in axes.ravel():
+                    ax.set_aspect('equal')
         
             axes[0,0].set_ylabel('$u_r$', fontsize=16)
             axes[1,0].set_ylabel('$u_\lambda$', fontsize=16)
@@ -201,6 +208,10 @@ for fp in files:
         proj = PlotTools.MapProjection(longitude, latitude)
         Xp, Yp = proj(LON, LAT, inverse=False)
 
+        rat   = (Xp.max() - Xp.min()) / (Yp.max() - Yp.min())
+        rat  *= (2./3) * (1.2)
+        fig_h = 8.
+
         ## Velocity dichotomies
         if (Ntime > 1):
 
@@ -208,7 +219,7 @@ for fp in files:
             fig, axes = plt.subplots(3, 2,
                 sharex=True, sharey=True, squeeze=False, 
                 gridspec_kw = gridspec_props,
-                figsize=(7, 9))
+                figsize=(fig_h*rat, fig_h))
 
             fig.suptitle('Time average')
 
@@ -242,6 +253,9 @@ for fp in files:
                     ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
                     PlotTools.AddParallels_and_Meridians(ax, proj, 
                         parallels, meridians, latitude, longitude)
+
+                for ax in axes.ravel():
+                    ax.set_aspect('equal')
         
             axes[0,0].set_ylabel('$u_r$', fontsize=16)
             axes[1,0].set_ylabel('$u_\lambda$', fontsize=16)

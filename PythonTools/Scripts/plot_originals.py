@@ -35,12 +35,12 @@ if (rank == 0):
 
 source = Dataset('input.nc', 'r')
 
-fp = 'filter_output.nc'
-results = Dataset(fp, 'r')
+try:
+    units = source.variables['latitude'].units
+except:
+    units = ''
 
 R_earth = 6371e3
-D2R     = np.pi / 180
-R2D     = 180 / np.pi
 eps     = 1e-10
 
 # Create cmap for mask data
@@ -50,12 +50,15 @@ mask_cmap[:,-1] = np.linspace(1, 0, ref_cmap.N)
 mask_cmap = ListedColormap(mask_cmap)
 
 # Get the grid from the first filter
-latitude  = results.variables['latitude'][:] * R2D
-longitude = results.variables['longitude'][:] * R2D
-scales    = results.variables['scale'][:]
-depth     = results.variables['depth'][:]
-time      = results.variables['time'][:] * (60*60) # convert hours to second
-mask      = results.variables['mask'][:]
+if units == 'm':
+    latitude  = source.variables['latitude'][:] / 1e3
+    longitude = source.variables['longitude'][:] / 1e3
+else:
+    latitude  = source.variables['latitude'][:]
+    longitude = source.variables['longitude'][:]
+LON, LAT = np.meshgrid(longitude, latitude)
+depth     = source.variables['depth'][:]
+time      = source.variables['time'][:] * (60*60) # convert hours to second
 
 # Do some time handling tp adjust the epochs
 # appropriately
@@ -64,19 +67,21 @@ dt_epoch = datetime.datetime.fromtimestamp(0)  # the epoch used by datetime
 epoch_delta = dt_epoch - epoch  # difference
 time = time - epoch_delta.total_seconds()  # shift
 
-num_scales = len(scales)-1
 Ntime = len(time)
-
-LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
 
 uo = source.variables['uo'][:, 0, :, :]
 vo = source.variables['vo'][:, 0, :, :]
 Full_KE = 0.5 * (uo**2 + vo**2)
 
+mask = 1 - source.variables['uo'][0,0,:,:].mask.astype(float)
 
 # Some parameters for plotting
 proj = PlotTools.MapProjection(longitude, latitude)
-Xp, Yp = proj(LON * R2D, LAT * R2D, inverse=False)
+Xp, Yp = proj(LON, LAT, inverse=False)
+
+rat   = (Xp.max() - Xp.min()) / (Yp.max() - Yp.min())
+rat  *= 1.2
+fig_h = 8.
 
 meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
 parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
@@ -84,11 +89,11 @@ parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
 cbar_props = dict(pad = 0.1, shrink = 0.85, orientation = 'vertical')
 gridspec_props = dict(wspace = 0.05, hspace = 0.05, left = 0.1, right = 0.9, bottom = 0.1, top = 0.9)
 
-def plot(LON, LAT, to_plot, filename, 
+def plot(Xp, Yp, to_plot, filename, 
         one_sided=False, vmin=None, vmax=None, units='',
         cmap=None, title=None):
 
-    plt.figure()
+    plt.figure(figsize=(fig_h*rat, fig_h))
     ax = plt.subplot(1,1,1)
     
     if cmap == None:
@@ -117,6 +122,7 @@ def plot(LON, LAT, to_plot, filename,
 
     if not(title == None):
         ax.set_title(title)
+    ax.set_aspect('equal')
     
     plt.savefig(filename, dpi=dpi)
     plt.close()
@@ -130,29 +136,29 @@ for Itime in range(rank, Ntime, num_procs):
 
     # Plot KE
     to_plot = Full_KE[Itime,:,:]
-    to_plot = np.ma.masked_where(mask==0, to_plot)
+    #to_plot = np.ma.masked_where(mask==0, to_plot)
 
     CV = np.max(np.abs(Full_KE))
 
-    plot(LON*R2D, LAT*R2D, to_plot, tmp_direct + '/KE_{0:04d}.png'.format(Itime),
+    plot(Xp, Yp, to_plot, tmp_direct + '/KE_{0:04d}.png'.format(Itime),
             one_sided=True, vmin = 0, vmax = CV, cmap='cmo.dense', title=sup_title)
     
     ## Full uo
     to_plot = uo[Itime,:,:]
-    to_plot = np.ma.masked_where(mask==0, to_plot)
+    #to_plot = np.ma.masked_where(mask==0, to_plot)
 
     CV = np.max(np.abs(uo))
 
-    plot(LON*R2D, LAT*R2D, to_plot, tmp_direct + '/u_lon_{0:04d}.png'.format(Itime),
+    plot(Xp, Yp, to_plot, tmp_direct + '/u_lon_{0:04d}.png'.format(Itime),
             one_sided=False, vmin = -CV, vmax = CV, title=sup_title)
         
     ## Full vo
     to_plot = vo[Itime,:,:]
-    to_plot = np.ma.masked_where(mask==0, to_plot)
+    #to_plot = np.ma.masked_where(mask==0, to_plot)
 
     CV = np.max(np.abs(vo))
 
-    plot(LON*R2D, LAT*R2D, to_plot, tmp_direct + '/u_lat_{0:04d}.png'.format(Itime),
+    plot(Xp, Yp, to_plot, tmp_direct + '/u_lat_{0:04d}.png'.format(Itime),
             one_sided=False, vmin = -CV, vmax = CV, title=sup_title)
     
     ## Rho, if available
@@ -163,7 +169,7 @@ for Itime in range(rank, Ntime, num_procs):
         mu = np.mean(source.variables['rho'][:,0,:,:])
         CV = np.max(np.abs(source.variables['rho'][:,0,:,:] - mu))
 
-        plot(LON*R2D, LAT*R2D, to_plot-mu, tmp_direct + '/rho_{0:04d}.png'.format(Itime),
+        plot(Xp, Yp, to_plot-mu, tmp_direct + '/rho_{0:04d}.png'.format(Itime),
                 one_sided=False, vmin=-CV, vmax=CV, title=sup_title, units=' + {0:.4g}'.format(mu))
     
     ## Pressure, if available
@@ -174,9 +180,11 @@ for Itime in range(rank, Ntime, num_procs):
         mu = np.mean(source.variables['p'][:,0,:,:])
         CV = np.max(np.abs(source.variables['p'][:,0,:,:] - mu))
 
-        plot(LON*R2D, LAT*R2D, to_plot, tmp_direct + '/pressure_{0:04d}.png'.format(Itime), 
+        plot(Xp, Yp, to_plot, tmp_direct + '/pressure_{0:04d}.png'.format(Itime), 
                 one_sided=True, vmin=mu-CV, vmax=mu+CV, cmap='cmo.thermal', title=sup_title)
     
+if (rank > 0):
+    sys.exit()
 
 # If more than one time point, create mp4s
 if Ntime > 1:

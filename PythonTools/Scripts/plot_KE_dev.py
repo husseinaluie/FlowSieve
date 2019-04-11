@@ -1,10 +1,8 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import cmocean, sys, os, shutil, datetime
+import cmocean, sys, PlotTools, os, shutil, datetime, glob
 from netCDF4 import Dataset
-import PlotTools
-from matplotlib.colors import LogNorm
 from matplotlib.colors import ListedColormap
 
 dpi = PlotTools.dpi
@@ -18,6 +16,9 @@ except:
     rank = 0
     num_procs = 1
 print("Proc {0:d} of {1:d}".format(rank+1,num_procs))
+
+# Get the available filter files
+files = glob.glob('filter_*.nc')
 
 # If the Figures directory doesn't exist, create it.
 # Same with the Figures/tmp
@@ -35,14 +36,11 @@ if (rank == 0):
         os.makedirs(tmp_direct)
 
 source = Dataset('input.nc', 'r')
-
-fp = 'filter_output.nc'
-results = Dataset(fp, 'r')
-
-R_earth = 6371e3
-D2R     = np.pi / 180
-R2D     = 180 / np.pi
-eps     = 1e-10
+try:
+    units = source.variables['latitude'].units
+except:
+    units = ''
+dAreas = PlotTools.getAreas(source)
 
 # Create cmap for mask data
 ref_cmap = cmocean.cm.gray
@@ -50,286 +48,204 @@ mask_cmap = ref_cmap(np.arange(ref_cmap.N))
 mask_cmap[:,-1] = np.linspace(1, 0, ref_cmap.N)
 mask_cmap = ListedColormap(mask_cmap)
 
-# Get the grid from the first filter
-latitude  = results.variables['latitude'][:] * R2D
-longitude = results.variables['longitude'][:] * R2D
-scales    = results.variables['scale'][:]
-depth     = results.variables['depth'][:]
-time      = results.variables['time'][:] * 60 * 60 # convert hours to seconds
-mask      = results.variables['mask'][:]
-
-# Do some time handling tp adjust the epochs
-# appropriately
-epoch = datetime.datetime(1950,1,1)   # the epoch of the time dimension
-dt_epoch = datetime.datetime.fromtimestamp(0)  # the epoch used by datetime
-epoch_delta = dt_epoch - epoch  # difference
-time = time - epoch_delta.total_seconds()  # shift
-
-Ntime = len(time)
-num_scales = len(scales)
-
-dlat = (latitude[1]  - latitude[0] ) * D2R
-dlon = (longitude[1] - longitude[0]) * D2R
-LON, LAT = np.meshgrid(longitude * D2R, latitude * D2R)
-if source.variables['latitude'].units == 'm':
-    dAreas = dlat * dlon * np.ones(LAT.shape)
-else:
-    dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
-
 # Some parameters for plotting
-proj = PlotTools.MapProjection(longitude, latitude)
+cbar_props     = dict(pad = 0.02, shrink = 0.85)
+gridspec_props = dict(wspace = 0.15, hspace = 0.15, left = 0.1, right = 0.95, bottom = 0.1, top = 0.9)
 
-meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
-parallels = np.round(np.linspace(latitude.min(),  latitude.max(),  5))
+# Loop through filters
+for fp in files:
+    with Dataset(fp, 'r') as results:
 
-cbar_props = dict(pad = 0.1, shrink = 0.85, orientation = 'vertical')
-gridspec_props = dict(wspace = 0.05, hspace = 0.07, left = 0.1, right = 0.9, bottom = 0.1, top = 0.9)
+        scale = results.filter_scale
 
-
-##
-## Begin Plotting
-##
-
-## KE binning
-for Itime in range(rank, Ntime, num_procs):    
-
-    timestamp = datetime.datetime.fromtimestamp(time[Itime])
-    sup_title = "{0:02d} - {1:02d} - {2:04d} ( {3:02d}:{4:02d} )".format(
-            timestamp.day, timestamp.month, timestamp.year, 
-            timestamp.hour, timestamp.minute)
-
-    KE = results.variables['KE_filt'][:, Itime, 0, :, :] 
-    uo = source.variables[ 'uo'     ][   Itime, 0, :, :]
-    vo = source.variables[ 'vo'     ][   Itime, 0, :, :]
-    Full_KE = 0.5 * (uo**2 + vo**2)
-
-    mean_KE = np.sum( Full_KE * mask * dAreas) / np.sum(mask * dAreas)
-    
-    # Initialize figure
-    fig, axes = plt.subplots(num_scales+1, 1,
-            sharex=True, sharey=True, 
-            gridspec_kw = gridspec_props,
-            figsize=(6,4*(num_scales+1)))
-
-    fig.suptitle(sup_title)
-    
-    # Plot each band
-    for ii in range(num_scales+1):
-        
-        if (ii == num_scales):
-            to_plot = Full_KE - np.sum(KE, axis=0)
+        # Get the grid from the first filter
+        if units == 'm':
+            latitude  = results.variables['latitude'][:] / 1e3
+            longitude = results.variables['longitude'][:] / 1e3
         else:
-            to_plot = KE[ii,:,:]
-    
-        if (ii == num_scales - 1):
-            to_plot = to_plot - mean_KE
-        
-        to_plot = np.ma.masked_where(mask==0, to_plot)
-    
-        CV  = np.nanmax(np.abs(to_plot))
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, proj, num_ords = 3)
-    
-        # Add coastlines and lat/lon lines
-        Xp, Yp = proj(LON*R2D, LAT*R2D)
-        axes[ii].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-        PlotTools.AddParallels_and_Meridians(axes[ii], proj, 
-            parallels, meridians, latitude, longitude, label_meridians=(ii==num_scales))
-    
-        if (ii == 0):
-            axes[ii].set_ylabel('Below {0:0.1f} km'.format(scales[0] / 1e3))
-        elif (ii == num_scales):
-            axes[ii].set_ylabel('Orig - bandsum')
-        elif (ii == num_scales - 1):
-            axes[ii].set_ylabel('Above {0:0.1f} km'.format(scales[ii-1] / 1e3))
-        else:
-            axes[ii].set_ylabel('{0:.1f} to {1:0.1f} km'.format(scales[ii-1] / 1e3, scales[ii] / 1e3))
-            
-        
-    plt.savefig(tmp_direct + '/KE_dev_bands_{0:04d}.png'.format(Itime), dpi=dpi)
-    plt.close()
-    
-    
-## Dichotomies
-for Itime in range(rank, Ntime, num_procs):    
+            latitude  = results.variables['latitude'][:]
+            longitude = results.variables['longitude'][:]
+        LON, LAT = np.meshgrid(longitude, latitude)
 
-    timestamp = datetime.datetime.fromtimestamp(time[Itime])
-    sup_title = "{0:02d} - {1:02d} - {2:04d} ( {3:02d}:{4:02d} )".format(
-            timestamp.day, timestamp.month, timestamp.year, 
-            timestamp.hour, timestamp.minute)
+        depth = results.variables['depth'][:]
+        time  = results.variables['time'][:] * (60*60) # convert hours to seconds
+        mask  = results.variables['mask'][:]
 
-    KE = results.variables['KE_filt'][:, Itime, 0, :, :] 
-    uo = source.variables[ 'uo'     ][   Itime, 0, :, :]
-    vo = source.variables[ 'vo'     ][   Itime, 0, :, :]
-    Full_KE = 0.5 * (uo**2 + vo**2)
-    
-    # Plot each band
-    for ii in range(num_scales-1):
-    
-        # Initialize figure
-        fig, axes = plt.subplots(3, 1,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(10, 15))
+        Ntime = len(time)
 
-        fig.suptitle(sup_title)
+        # Do some time handling tp adjust the epochs
+        # appropriately
+        epoch       = datetime.datetime(1950,1,1)   # the epoch of the time dimension
+        dt_epoch    = datetime.datetime.fromtimestamp(0)  # the epoch used by datetime
+        epoch_delta = dt_epoch - epoch  # difference
+        time        = time - epoch_delta.total_seconds()  # shift
+
+        # lat/lon lines to draw
+        meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
+        parallels = np.round(np.linspace(latitude.min(),  latitude.max(), 5))
+
+        # Map projection
+        proj = PlotTools.MapProjection(longitude, latitude)
+        Xp, Yp = proj(LON, LAT, inverse=False)
+
+        rat   = (Xp.max() - Xp.min()) / (Yp.max() - Yp.min())
+        rat  *= (2./1) * (1.2)
+        fig_h = 8.
+
+        ## Vorticity dichotomies
+        for Itime in range(rank, Ntime, num_procs):    
+
+            timestamp = datetime.datetime.fromtimestamp(time[Itime])
+            sup_title = "{0:02d} - {1:02d} - {2:04d} ( {3:02d}:{4:02d} )".format(
+                timestamp.day, timestamp.month, timestamp.year, 
+                timestamp.hour, timestamp.minute)
+
+            # Initialize figure
+            fig, axes = plt.subplots(1, 2,
+                sharex=True, sharey=True, squeeze=False, 
+                gridspec_kw = gridspec_props,
+                figsize=(fig_h*rat, fig_h))
+
+            fig.suptitle(sup_title)
+
+            uo = source.variables['uo'][Itime, 0, :, :]
+            vo = source.variables['vo'][Itime, 0, :, :]
+            mean_KE = 0.5 * np.sum( (uo**2 + vo**2) * dAreas) / np.sum(dAreas)
+
+            to_plot_below = results.variables['fine_KE'  ][Itime, 0, :, :]
+            to_plot_above = results.variables['coarse_KE'][Itime, 0, :, :] - mean_KE
+    
+            CV_a = np.percentile(np.abs(to_plot_above[~to_plot_above.mask]), 99.9)
+            CV_b = np.percentile(np.abs(to_plot_below[~to_plot_below.mask]), 99.9)
+    
+            qm_a  = axes[0,0].pcolormesh(Xp, Yp, to_plot_above, 
+                    cmap='cmo.balance', vmin = -CV_a, vmax = CV_a)
+            qm_b  = axes[0,1].pcolormesh(Xp, Yp, to_plot_below, 
+                    cmap='cmo.balance', vmin = -CV_b, vmax = CV_b)
+
+            cbar_a = plt.colorbar(qm_a, ax = axes[0,0], **cbar_props)
+            cbar_b = plt.colorbar(qm_b, ax = axes[0,1], **cbar_props)
+            PlotTools.ScientificCbar(cbar_a, units='m/s')
+            PlotTools.ScientificCbar(cbar_b, units='m/s')
+
+            # Add land and lat/lon lines
+            for ax in axes[0,:]:
+                ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+                PlotTools.AddParallels_and_Meridians(ax, proj, 
+                    parallels, meridians, latitude, longitude)
+
+            for ax in axes.ravel():
+                ax.set_aspect('equal')
         
-        to_plot_below = np.sum(KE[:ii+1,:,:], axis=0)
-        to_plot_above = np.sum(KE[ii+1:,:,:], axis=0) - mean_KE
-        missing = Full_KE - (to_plot_below + to_plot_above) - mean_KE
+            axes[0,0].set_title('Coarse $(>l)$')
+            axes[0,1].set_title('Fine $(>l)$')
     
-        to_plot_below = np.ma.masked_where(mask==0, to_plot_below)
-        to_plot_above = np.ma.masked_where(mask==0, to_plot_above)
-        missing       = np.ma.masked_where(mask==0, missing)
+            plt.savefig(tmp_direct + '/{0:.4g}_KE_dev_dichotomies_{1:04d}.png'.format(scale/1e3, Itime), dpi=dpi)
+            plt.close()
+
     
-        CV_a = np.nanmax(np.abs(to_plot_above))
-        CV_b = np.nanmax(np.abs(to_plot_below))
-        CV_m = np.nanmax(np.abs(missing))
-    
-        vmax = max(CV_a, CV_b, CV_m)
-        vmin = 10**(np.log10(vmax) - 3)
-    
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_above, axes[0,0], fig, proj, num_ords = 3)
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_below, axes[1,0], fig, proj, num_ords = 3)
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, missing, axes[2,0], fig, proj, num_ords = 3)
-    
-        # Add coastlines and lat/lon lines
-        for ax in axes[:,0]:
-            Xp, Yp = proj(LON*R2D, LAT*R2D)
-            ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-            PlotTools.AddParallels_and_Meridians(ax, proj, 
-                parallels, meridians, latitude, longitude, label_meridians=(ax==axes[2,0]))
-    
-        axes[0,0].set_ylabel('Coarse $(>l)$')
-        axes[1,0].set_ylabel('Fine $(<l)$')
-        axes[2,0].set_ylabel('Missing')
-    
-        plt.savefig(tmp_direct + '/{0:.4g}_KE_dev_dichotomies_{1:04d}.png'.format(scales[ii]/1e3, Itime), dpi=dpi)
-        plt.close()
-    
+if (rank > 0):
+    sys.exit()
 
 # If more than one time point, create mp4s
 if Ntime > 1:
-    PlotTools.merge_to_mp4(tmp_direct + '/KE_dev_bands_%04d.png',    
-            out_direct + '/KE_dev_bands.mp4', fps=12)
-    for ii in range(num_scales-1):
-        PlotTools.merge_to_mp4(tmp_direct + '/{0:.4g}_KE_dev_dichotomies_%04d.png'.format(scales[ii]/1e3),    
-                out_direct + '/{0:.4g}km/KE_dev_dichotomies.mp4'.format(scales[ii]/1e3), fps=12)
+    for fp in files:
+        with Dataset(fp, 'r') as results:
+            scale = results.filter_scale
+            PlotTools.merge_to_mp4(tmp_direct + '/{0:.04g}_KE_dev_dichotomies_%04d.png'.format(scale/1e3),    
+                out_direct + '/{0:.04g}km/KE_dev_dichotomies.mp4'.format(scale/1e3), fps=12)
 else:
-    shutil.move(tmp_direct + '/KE_dev_bands_0000.png',
-            out_direct + '/KE_dev_bands.png')
-    for ii in range(num_scales-1):
-        shutil.move(tmp_direct + '/{0:.4g}_KE_dev_dichotomies_0000.png'.format(scales[ii]/1e3),
-                out_direct + '/{0:.4g}km/KE_dev_dichotomies.png'.format(scales[ii]/1e3))
+    for fp in files:
+        with Dataset(fp, 'r') as results:
+            scale = results.filter_scale
+            shutil.move(tmp_direct + '/{0:.04g}_KE_dev_dichotomies_0000.png'.format(scale/1e3),
+                out_direct + '/{0:.04g}km/KE_dev_dichotomies.png'.format(scale/1e3))
 
 # Now delete the frames
 shutil.rmtree(tmp_direct)
 
+# Plot time-mean
+for fp in files:
+    with Dataset(fp, 'r') as results:
 
+        scale = results.filter_scale
 
-### Plot time average
-
-## KE binning
-if (Ntime > 1):
-
-    KE = np.mean(results.variables['KE_filt'][:, :, 0, :, :], axis=1)
-    uo = np.mean(source.variables[ 'uo'     ][   :, 0, :, :], axis=0)
-    vo = np.mean(source.variables[ 'vo'     ][   :, 0, :, :], axis=0)
-    Full_KE = 0.5 * (uo**2 + vo**2)
-
-    mean_KE = np.sum( Full_KE * mask * dAreas) / np.sum(mask * dAreas)
-    
-    # Initialize figure
-    fig, axes = plt.subplots(num_scales+1, 1,
-            sharex=True, sharey=True, 
-            gridspec_kw = gridspec_props,
-            figsize=(6,4*(num_scales+1)))
-
-    fig.suptitle('Time average')
-    
-    # Plot each band
-    for ii in range(num_scales+1):
-        
-        if (ii == num_scales):
-            to_plot = Full_KE - np.sum(KE, axis=0)
+        # Get the grid from the first filter
+        if units == 'm':
+            latitude  = results.variables['latitude'][:] / 1e3
+            longitude = results.variables['longitude'][:] / 1e3
         else:
-            to_plot = KE[ii,:,:]
-    
-        if (ii == num_scales - 1):
-            to_plot = to_plot - mean_KE
-        
-        to_plot = np.ma.masked_where(mask==0, to_plot)
-    
-        CV  = np.nanmax(np.abs(to_plot))
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot, axes[ii], fig, proj, num_ords = 3)
-    
-        # Add coastlines and lat/lon lines
-        Xp, Yp = proj(LON*R2D, LAT*R2D)
-        axes[ii].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-        PlotTools.AddParallels_and_Meridians(axes[ii], proj, 
-            parallels, meridians, latitude, longitude, label_meridians=(ii==num_scales))
-    
-        if (ii == 0):
-            axes[ii].set_ylabel('Below {0:0.1f} km'.format(scales[0] / 1e3))
-        elif (ii == num_scales):
-            axes[ii].set_ylabel('Orig - bandsum')
-        elif (ii == num_scales - 1):
-            axes[ii].set_ylabel('Above {0:0.1f} km'.format(scales[ii-1] / 1e3))
-        else:
-            axes[ii].set_ylabel('{0:.1f} to {1:0.1f} km'.format(scales[ii-1] / 1e3, scales[ii] / 1e3))
-            
-        
-    plt.savefig(out_direct + '/AVE_KE_dev_bands.png', dpi=dpi)
-    plt.close()
-    
-    
-## Dichotomies
-if (Ntime > 1):
+            latitude  = results.variables['latitude'][:]
+            longitude = results.variables['longitude'][:]
+        LON, LAT = np.meshgrid(longitude, latitude)
 
-    KE = np.mean(results.variables['KE_filt'][:, :, 0, :, :], axis=1)
-    uo = np.mean(source.variables[ 'uo'     ][   :, 0, :, :], axis=0)
-    vo = np.mean(source.variables[ 'vo'     ][   :, 0, :, :], axis=0)
-    Full_KE = 0.5 * (uo**2 + vo**2)
-    
-    # Plot each band
-    for ii in range(num_scales-1):
-    
-        # Initialize figure
-        fig, axes = plt.subplots(3, 1,
-            sharex=True, sharey=True, squeeze=False,
-            gridspec_kw = gridspec_props,
-            figsize=(10, 15))
+        depth = results.variables['depth'][:]
+        time  = results.variables['time'][:] * (60*60) # convert hours to seconds
+        mask  = results.variables['mask'][:]
 
-        fig.suptitle('Time average')
+        Ntime = len(time)
+
+        # Do some time handling tp adjust the epochs
+        # appropriately
+        epoch       = datetime.datetime(1950,1,1)   # the epoch of the time dimension
+        dt_epoch    = datetime.datetime.fromtimestamp(0)  # the epoch used by datetime
+        epoch_delta = dt_epoch - epoch  # difference
+        time        = time - epoch_delta.total_seconds()  # shift
+
+        # lat/lon lines to draw
+        meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
+        parallels = np.round(np.linspace(latitude.min(),  latitude.max(), 5))
+
+        # Map projection
+        proj = PlotTools.MapProjection(longitude, latitude)
+        Xp, Yp = proj(LON, LAT, inverse=False)
+
+        rat   = (Xp.max() - Xp.min()) / (Yp.max() - Yp.min())
+        rat  *= (2./1) * (1.2)
+        fig_h = 8.
+
+        ## Vorticity dichotomies
+        if (Ntime > 1):
+
+            # Initialize figure
+            fig, axes = plt.subplots(1, 2,
+                sharex=True, sharey=True, squeeze=False, 
+                gridspec_kw = gridspec_props,
+                figsize=(fig_h*rat, fig_h))
+
+            fig.suptitle('Time average')
+
+            uo = source.variables['uo'][Itime, 0, :, :]
+            vo = source.variables['vo'][Itime, 0, :, :]
+            mean_KE = 0.5 * np.sum( (uo**2 + vo**2) * dAreas) / np.sum(dAreas)
+
+            to_plot_below = np.mean(results.variables['fine_KE'  ][:, 0, :, :], axis=0)
+            to_plot_above = np.mean(results.variables['coarse_KE'][:, 0, :, :], axis=0) - mean_KE
+    
+            CV_a = np.percentile(np.abs(to_plot_above[~to_plot_above.mask]), 99.9)
+            CV_b = np.percentile(np.abs(to_plot_below[~to_plot_below.mask]), 99.9)
+    
+            qm_a  = axes[0,0].pcolormesh(Xp, Yp, to_plot_above, 
+                    cmap='cmo.balance', vmin = -CV_a, vmax = CV_a)
+            qm_b  = axes[0,1].pcolormesh(Xp, Yp, to_plot_below, 
+                    cmap='cmo.balance', vmin = -CV_b, vmax = CV_b)
+
+            cbar_a = plt.colorbar(qm_a, ax = axes[0,0], **cbar_props)
+            cbar_b = plt.colorbar(qm_b, ax = axes[0,1], **cbar_props)
+            PlotTools.ScientificCbar(cbar_a, units='m/s')
+            PlotTools.ScientificCbar(cbar_b, units='m/s')
+
+            # Add land and lat/lon lines
+            for ax in axes[0,:]:
+                ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
+                PlotTools.AddParallels_and_Meridians(ax, proj, 
+                    parallels, meridians, latitude, longitude)
+
+            for ax in axes.ravel():
+                ax.set_aspect('equal')
         
-        to_plot_below = np.sum(KE[:ii+1,:,:], axis=0)
-        to_plot_above = np.sum(KE[ii+1:,:,:], axis=0) - mean_KE
-        missing = Full_KE - (to_plot_below + to_plot_above) - mean_KE
+            axes[0,0].set_title('Coarse $(>l)$')
+            axes[0,1].set_title('Fine $(>l)$')
     
-        to_plot_below = np.ma.masked_where(mask==0, to_plot_below)
-        to_plot_above = np.ma.masked_where(mask==0, to_plot_above)
-        missing       = np.ma.masked_where(mask==0, missing)
-    
-        CV_a = np.nanmax(np.abs(to_plot_above))
-        CV_b = np.nanmax(np.abs(to_plot_below))
-        CV_m = np.nanmax(np.abs(missing))
-    
-        vmax = max(CV_a, CV_b, CV_m)
-        vmin = 10**(np.log10(vmax) - 3)
-    
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_above, axes[0,0], fig, proj, num_ords = 3)
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, to_plot_below, axes[1,0], fig, proj, num_ords = 3)
-        PlotTools.SignedLogPlot_onMap(LON * R2D, LAT * R2D, missing, axes[2,0], fig, proj, num_ords = 3)
-    
-        # Add coastlines and lat/lon lines
-        for ax in axes[:,0]:
-            Xp, Yp = proj(LON*R2D, LAT*R2D)
-            ax.pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-            PlotTools.AddParallels_and_Meridians(ax, proj, 
-                parallels, meridians, latitude, longitude, label_meridians=(ax==axes[2,0]))
-    
-        axes[0,0].set_ylabel('Coarse $(>l)$')
-        axes[1,0].set_ylabel('Fine $(<l)$')
-        axes[2,0].set_ylabel('Missing')
-    
-        plt.savefig(out_direct + '/{0:.4g}km/AVE_KE_dev_dichotomies.png'.format(scales[ii]/1e3), dpi=dpi)
-        plt.close()
+            plt.savefig(out_direct + '/{0:.4g}km/AVE_vorticity_dichotomies.png'.format(scale/1e3), dpi=dpi)
+            plt.close()

@@ -89,6 +89,10 @@ for fp in files:
         proj = PlotTools.MapProjection(longitude, latitude)
         Xp, Yp = proj(LON, LAT, inverse=False)
 
+        rat   = (Xp.max() - Xp.min()) / (Yp.max() - Yp.min())
+        rat  *= 1.2
+        fig_h = 8.
+
         # Plot stuff
         for Itime in range(rank, Ntime, num_procs):    
 
@@ -104,7 +108,7 @@ for fp in files:
                     fig, axes = plt.subplots(1, 1,
                         sharex=True, sharey=True, squeeze=False, 
                         gridspec_kw = gridspec_props,
-                        figsize=(6, 4))
+                        figsize=(fig_h*rat, fig_h))
 
                     fig.suptitle(sup_title)
 
@@ -117,6 +121,9 @@ for fp in files:
                     axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
                     PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
                         parallels, meridians, latitude, longitude)
+
+                    for ax in axes.ravel():
+                        ax.set_aspect('equal')
         
                     plt.savefig(tmp_direct + '/{0:.4g}_{1:s}_{2:04d}.png'.format(
                         scale/1e3, var_name, Itime), dpi=dpi)
@@ -183,6 +190,10 @@ for fp in files:
         proj = PlotTools.MapProjection(longitude, latitude)
         Xp, Yp = proj(LON, LAT, inverse=False)
 
+        rat   = (Xp.max() - Xp.min()) / (Yp.max() - Yp.min())
+        rat  *= 1.2
+        fig_h = 8.
+
         ## Vorticity dichotomies
         if (Ntime > 1):
 
@@ -190,7 +201,7 @@ for fp in files:
             fig, axes = plt.subplots(1, 2,
                 sharex=True, sharey=True, squeeze=False, 
                 gridspec_kw = gridspec_props,
-                figsize=(7, 3))
+                figsize=(fig_h*rat, fig_h))
 
             fig.suptitle('Time average')
 
@@ -214,6 +225,9 @@ for fp in files:
                     axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
                     PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
                         parallels, meridians, latitude, longitude)
+
+                    for ax in axes.ravel():
+                        ax.set_aspect('equal')
         
                     plt.savefig(out_direct + '/{0:.4g}km/AVE_{1:s}.png'.format(
                         scale/1e3, var_name), dpi=dpi)
