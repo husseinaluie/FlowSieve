@@ -15,13 +15,10 @@
 int main(int argc, char *argv[]) {
 
     // For the time being, hard-code the filter scales
+    //   include scales as a comma-separated list
+    //   scales are given in metres
     // A zero scale will cause everything to nan out
-    const int Nfilt = 1;
-    const double scales [Nfilt] = 
-            {100e3};
-
-    std::vector<double> filter_scales;
-    filter_scales.assign(scales, scales + Nfilt);
+    std::vector<double> filter_scales {500, 100e3, 400e3};
 
     // Parse command-line flags
     char buffer [50];
@@ -156,7 +153,6 @@ int main(int argc, char *argv[]) {
               time, depth,
               longitude, latitude,
               mask);
-
 
     // Done!
     #if DEBUG >= 0
