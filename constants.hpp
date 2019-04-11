@@ -86,7 +86,7 @@ namespace constants
 
     /*!
      * \param DiffOrd
-     * \brief Differentiation order for finite differencing (currently must be 4)
+     * \brief Differentiation order for finite differencing (currently must be 2, 4, or 6)
      * @ingroup constants
      */
     const int DiffOrd = 6;
