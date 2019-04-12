@@ -184,7 +184,7 @@ int main(int argc, char *argv[]) {
 
     fprintf(stdout, "Beginning tests for differentiation routines.\n");
 
-    const int num_tests = 8;
+    const int num_tests = 10;
     const int base_nlon = 32;
     const int base_nlat = 32;
 
