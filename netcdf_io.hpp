@@ -28,38 +28,24 @@
  */
 void NC_ERR(const int e, const int line_num, const char* file_name);
 
-/*! \brief Read necessary input data into workspace.
- *
- * Read source data (from input.nc) for coarse graining.
- *
- * Current assumptions:
- *    Variables to read: uo (as u_lon), vo (as u_lat)
- *
- *    Dimensions: time, depth, longitude, latitude (in that order)
- *
- * There's no u_r in the current data files, so we'll zero it out.
- */
-void read_source(
-        std::vector<double> &longitude,
-        std::vector<double> &latitude,
-        std::vector<double> &time,
-        std::vector<double> &depth,
-        std::vector<double> &u_r,
-        std::vector<double> &u_lon,
-        std::vector<double> &u_lat,
-        std::vector<double> &rho,
-        std::vector<double> &p,
-        std::vector<double> &mask);
 
 /*! 
  * \brief Initialize netcdf output file for filtered fields.
  *
- *  Creates filter_output.nc, a netcdf4-formatted file,
- *  which will contain the filtered fields in a 
- *  pseudo-CF convention.
+ *  Given the filter scale (filter_scale) creates filter_###km.nc, 
+ *  a netcdf4-formatted file, (### is formatted to print the filter scale)
+ *  which will contain the filtered fields following the CF-convention.
  *
  *  Dimension ordering is:
- *    filter_scale, time, depth, latitude, longitude
+ *    time, depth, latitude, longitude
+ *
+ *  vars is a list of variables to initialize when creating the file
+ *
+ *  filter_scale and rho0 are included as global attributes
+ *
+ *  The output longitude and latitude fields are given a scale factor
+ *    to convert from radians to degrees
+ *
  */
 void initialize_output_file(
         const std::vector<double> & time,
@@ -75,8 +61,11 @@ void initialize_output_file(
  * \brief Write on scales worth of a single field.
  *
  *  Write a single filter-scale worth of a single field,
- *  called field_name, to the previously initialized netcdf
- *  file "filter_output.nc".
+ *  called field_name, to the previously initialized file,
+ *  called filename.
+ *
+ *  start and count correspond to the netcdf put_var arguments 
+ *    of the same name
  */
 void write_field_to_output(
         const std::vector<double> & field, 
@@ -87,6 +76,10 @@ void write_field_to_output(
 
 /*!
  *  \brief Read a specific variable from a specific file.
+ *
+ *  Accounts for variable attributes 'scale_factor' and 'add_offset'.
+ *
+ *  If mask != NULL, then determine the mask based on variable attribute '_FillValue'
  */
 void read_var_from_file(
         std::vector<double> &var,
@@ -98,6 +91,7 @@ void read_var_from_file(
  *  \brief Add a new variable to a netcdf file
  *
  *  Note: this declares a new variable, but doesn't write to it.
+ *  Adds the variable attribute '_FillValue' given as fill_value in constants.hpp
  */
 void add_var_to_file(
         const std::string var_name,
