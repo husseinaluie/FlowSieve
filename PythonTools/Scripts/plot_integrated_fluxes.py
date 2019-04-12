@@ -8,6 +8,7 @@ import scipy.integrate as spi
 import sys, os, shutil, datetime, glob
 
 dpi = PlotTools.dpi
+LW = 2
 
 try: # Try using mpi
     from mpi4py import MPI
@@ -52,7 +53,7 @@ for fp in files:
 
         if (Ntime == 1):
             if (rank == 0):
-                print("Not enough time points to plot KE flux")
+                print("Not enough time points to plot integrated fluxes")
             sys.exit()
 
         # Do some time handling to adjust the epochs
@@ -142,36 +143,96 @@ for fp in files:
 
             label = '$\int_{\Omega}\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$'
             to_plot = net_KE_flux
-            ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[0], label=label)
-            ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[0])
+            ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[0], linewidth=LW+1, label=label)
+            ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[0], linewidth=LW+1)
 
             label = '$-\int_{\Omega}\Pi\mathrm{dA}$'
             to_plot   = net_Pi
             plot_sum  = net_Pi.copy()
-            ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[1], label=label)
-            ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[1])
+            ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[1], linewidth=LW, label=label)
+            ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[1], linewidth=LW)
 
             if do_PEtoKE:
                 label = '$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'
                 to_plot    = net_PEtoKE
                 plot_sum  += net_PEtoKE
-                ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[2], label=label)
-                ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[2])
+                ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[2], linewidth=LW, label=label)
+                ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[2], linewidth=LW)
 
             if do_divJ:
                 label = '$-\int_{\Omega}\\nabla\cdot J\mathrm{dA}$'
                 to_plot    = net_divJ
                 plot_sum  += net_divJ
-                ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[3], label=label)
-                ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[3])
+                ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[3], linewidth=LW, label=label)
+                ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[3], linewidth=LW)
 
-            #if (do_PEtoKE or do_divJ) :
-            #    label = 'Sum'
-            #    to_plot = plot_sum
-            #    ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[4], label=label)
-            #    ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[4])
+            if (do_PEtoKE or do_divJ) :
+                label = 'Sum'
+                to_plot = plot_sum
+                ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[4], linewidth=LW-1, label=label)
+                ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[4], linewidth=LW-1)
 
             ax1.set_yscale('log')
+            ax1.set_ylabel('$\mathrm{W}$')
+
+            ax2.set_xlim(ax1.get_xlim())
+
+            ax1.set_xticks([])
+            ax2.set_xticks([])
+            ax2.set_yticks([])
+
+            PlotTools.LabelTimeAxis(ax2, time)
+
+            # Add legend
+            handles, labels = ax1.get_legend_handles_labels()
+            leg_ax.legend(handles, labels, bbox_to_anchor=(0., 0., 1., 1.), ncol=3, mode='expand',
+                    frameon = True, borderaxespad=0.)
+            leg_ax.set_xticks([])
+            leg_ax.set_yticks([])
+            for pos in ['left', 'right', 'top', 'bottom']:
+                leg_ax.spines[pos].set_visible(False)
+
+            plt.savefig(out_direct + '/{0:.4g}km/KE_fluxes_net_log.pdf'.format(scale/1e3))
+            plt.close()
+
+
+
+
+            ##
+            ## Again plot the space-integrated version (without log y)
+            ##
+
+            colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
+            fig = plt.figure()
+            ax1    = fig.add_axes([0.15, 0.25, 0.8, 0.7])
+            ax2    = fig.add_axes([0.15, 0.15, 0.8, 0.1])
+            leg_ax = fig.add_axes([0.15, 0.05, 0.8, 0.1])
+
+            net_KE_flux = np.dot(Dt, net_KE)
+
+            to_plot = net_KE_flux
+            label='$\int_{\Omega}\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$'
+            ax1.plot(time,  to_plot, '-', color=colours[0], label=label, linewidth=LW+1)
+
+            to_plot = net_Pi 
+            label='$-\int_{\Omega}\Pi\mathrm{dA}$'
+            ax1.plot(time,  to_plot, '-', color=colours[1], label=label, linewidth=LW)
+
+            if do_PEtoKE:
+                label='$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'
+                to_plot = net_PEtoKE
+                ax1.plot(time,  to_plot, '-', color=colours[2], label=label, linewidth=LW)
+
+            if do_divJ:
+                label='$-\int_{\Omega}\\nabla\cdot J\mathrm{dA}$'
+                to_plot = net_divJ
+                ax1.plot(time,  to_plot, '-', color=colours[3], label=label, linewidth=LW)
+
+            if (do_PEtoKE or do_divJ) :
+                label = 'Sum'
+                to_plot = plot_sum
+                ax1.plot(time,  to_plot, '-', color=colours[4], label=label, linewidth=LW-1)
+
             ax1.set_ylabel('$\mathrm{W}$')
 
             ax2.set_xlim(ax1.get_xlim())
@@ -196,43 +257,46 @@ for fp in files:
 
 
 
-
             ##
-            ## Again plot the space-integrated version (without log y)
+            ## Also plot the time-integrated version
             ##
 
             colours = plt.rcParams['axes.prop_cycle'].by_key()['color']
             fig = plt.figure()
-            ax1    = fig.add_axes([0.15, 0.25, 0.8, 0.7])
-            ax2    = fig.add_axes([0.15, 0.15, 0.8, 0.1])
-            leg_ax = fig.add_axes([0.15, 0.05, 0.8, 0.1])
+            ax1    = fig.add_axes([0.1, 0.25, 0.8, 0.7])
+            ax2    = fig.add_axes([0.1, 0.15, 0.8, 0.1])
+            leg_ax = fig.add_axes([0.1, 0.05, 0.8, 0.1])
 
-            net_KE_flux = np.dot(Dt, net_KE)
+            label='$\int_{\Omega}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$'
+            to_plot = net_KE
+            ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[0], linewidth=LW+1, label=label)
+            ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[0], linewidth=LW+1)
 
-            to_plot = net_KE_flux
-            label='$\int_{\Omega}\\frac{d}{dt}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$'
-            ax1.plot(time,  to_plot, '-', color=colours[0], label=label)
-
-            to_plot = net_Pi 
-            label='$-\int_{\Omega}\Pi\mathrm{dA}$'
-            ax1.plot(time,  to_plot, '-', color=colours[1], label=label)
+            label='$-\int^t\int_{\Omega}\Pi\mathrm{dA}$'
+            to_plot = spi.cumtrapz(net_Pi, time)
+            ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[1], linewidth=LW, label=label)
+            ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[1], linewidth=LW)
 
             if do_PEtoKE:
-                label='$\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'
-                to_plot = net_PEtoKE
-                ax1.plot(time,  to_plot, '-', color=colours[2], label=label)
+                label='$\int^t\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'
+                to_plot = spi.cumtrapz(net_PEtoKE, time)
+                ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[2], linewidth=LW, label=label)
+                ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[2], linewidth=LW)
 
             if do_divJ:
-                label='$-\int_{\Omega}\\nabla\cdot J\mathrm{dA}$'
-                to_plot = net_divJ
-                ax1.plot(time,  to_plot, '-', color=colours[3], label=label)
+                label='$-\int^t\int_{\Omega}\\nabla\cdot J\mathrm{dA}$'
+                to_plot = spi.cumtrapz(net_divJ, time)
+                ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[3], linewidth=LW, label=label)
+                ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[3], linewidth=LW)
 
-            #if (do_PEtoKE or do_divJ) :
-            #    label = 'Sum'
-            #    to_plot = plot_sum
-            #    ax1.plot(time,  to_plot, '-', color=colours[4], label=label)
+            if (do_PEtoKE or do_divJ) :
+                label = 'Sum'
+                to_plot = spi.cumtrapz(plot_sum, time)
+                ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[4], linewidth=LW-1, label=label)
+                ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[4], linewidth=LW-1)
 
-            ax1.set_ylabel('$\mathrm{W}$')
+            ax1.set_yscale('log')
+            ax1.set_ylabel('$\mathrm{J}$')
 
             ax2.set_xlim(ax1.get_xlim())
 
@@ -251,10 +315,9 @@ for fp in files:
             for pos in ['left', 'right', 'top', 'bottom']:
                 leg_ax.spines[pos].set_visible(False)
 
-            plt.savefig(out_direct + '/{0:.4g}km/KE_fluxes_net_v2.pdf'.format(scale/1e3))
+            plt.savefig(out_direct + '/{0:.4g}km/KE_net_log.pdf'.format(scale/1e3))
+
             plt.close()
-
-
 
             ##
             ## Also plot the time-integrated version
@@ -268,33 +331,27 @@ for fp in files:
 
             label='$\int_{\Omega}\left( \\frac{\\rho_0}{2}\overline{u}\cdot\overline{u} \\right)\mathrm{dA}$'
             to_plot = net_KE
-            ax1.plot(np.ma.masked_where(to_plot<0, time),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[0], label=label)
-            ax1.plot(np.ma.masked_where(to_plot>0, time),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[0])
+            ax1.plot(time, to_plot, '-', color=colours[0], linewidth=LW+1, label=label)
 
             label='$-\int^t\int_{\Omega}\Pi\mathrm{dA}$'
             to_plot = spi.cumtrapz(net_Pi, time)
-            ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[1], label=label)
-            ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[1])
+            ax1.plot(time[1:], to_plot, '-', color=colours[1], linewidth=LW, label=label)
 
             if do_PEtoKE:
                 label='$\int^t\int_{\Omega}\overline{\\rho}g\overline{u}_r\mathrm{dA}$'
                 to_plot = spi.cumtrapz(net_PEtoKE, time)
-                ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[2], label=label)
-                ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[2])
+                ax1.plot(time[1:], to_plot, '-', color=colours[2], linewidth=LW, label=label)
 
             if do_divJ:
                 label='$-\int^t\int_{\Omega}\\nabla\cdot J\mathrm{dA}$'
                 to_plot = spi.cumtrapz(net_divJ, time)
-                ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[3], label=label)
-                ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[3])
+                ax1.plot(time[1:], to_plot, '-', color=colours[3], linewidth=LW, label=label)
 
-            #if (do_PEtoKE or do_divJ) :
-            #    label = 'Sum'
-            #    to_plot = spi.cumtrapz(plot_sum, time)
-            #    ax1.plot(np.ma.masked_where(to_plot<0, time[1:]),  np.ma.masked_where(to_plot<0, np.abs(to_plot)), '-',  color=colours[4], label=label)
-            #    ax1.plot(np.ma.masked_where(to_plot>0, time[1:]),  np.ma.masked_where(to_plot>0, np.abs(to_plot)), '--', color=colours[4])
+            if (do_PEtoKE or do_divJ) :
+                label = 'Sum'
+                to_plot = spi.cumtrapz(plot_sum, time)
+                ax1.plot(time[1:], to_plot, '-', color=colours[4], linewidth=LW-1, label=label)
 
-            ax1.set_yscale('log')
             ax1.set_ylabel('$\mathrm{J}$')
 
             ax2.set_xlim(ax1.get_xlim())
@@ -317,4 +374,5 @@ for fp in files:
             plt.savefig(out_direct + '/{0:.4g}km/KE_net.pdf'.format(scale/1e3))
 
             plt.close()
+
     cnt += 1

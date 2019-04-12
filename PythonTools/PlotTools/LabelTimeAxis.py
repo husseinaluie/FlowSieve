@@ -50,8 +50,25 @@ def LabelTimeAxis(ax, time):
     dark_day   = False
     dark_hour  = True
 
+    ticks = []
+    labels = []
+    if draw_year:
+        ticks += [0.5]
+        labels += ['Year']
+    if draw_month:
+        ticks += [draw_year+0.5]
+        labels += ['Mo.']
+    if draw_day:
+        ticks += [draw_year+draw_month+0.5]
+        labels += ['Day']
+    if draw_hour:
+        ticks += [draw_year+draw_month+draw_day+0.5]
+        labels += ['Hour']
+    ax.set_yticks(ticks)
+    ax.set_yticklabels(labels)
+
     one_day  = datetime.timedelta(0, 24 * 60 * 60)
-    one_hour = datetime.timedelta(0, 60 * 60)
+    one_hour = datetime.timedelta(0,      60 * 60)
 
     # Indicate fast timescale
     start = datetime.datetime.fromtimestamp(time[ 0])

@@ -115,7 +115,7 @@ for fp in files:
                     to_plot = results.variables[var_name][Itime, 0, :, :]
                     if np.max(np.abs(to_plot)) > 0:
                         PlotTools.SignedLogPlot_onMap(LON, LAT, to_plot, 
-                                axes[0,0], fig, proj, num_ords = 3, percentile=99.9)
+                                axes[0,0], fig, proj, num_ords = 2, percentile=99.9)
 
                     # Add land and lat/lon lines
                     axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
@@ -153,82 +153,3 @@ else:
 
 # Now delete the frames
 shutil.rmtree(tmp_direct)
-
-# Plot time-mean
-for fp in files:
-    with Dataset(fp, 'r') as results:
-
-        scale = results.filter_scale
-
-        # Get the grid from the first filter
-        if units == 'm':
-            latitude  = results.variables['latitude'][:] / 1e3
-            longitude = results.variables['longitude'][:] / 1e3
-        else:
-            latitude  = results.variables['latitude'][:]
-            longitude = results.variables['longitude'][:]
-        LON, LAT = np.meshgrid(longitude, latitude)
-
-        depth = results.variables['depth'][:]
-        time  = results.variables['time'][:] * (60*60) # convert hours to seconds
-        mask  = results.variables['mask'][:]
-
-        Ntime = len(time)
-
-        # Do some time handling tp adjust the epochs
-        # appropriately
-        epoch       = datetime.datetime(1950,1,1)   # the epoch of the time dimension
-        dt_epoch    = datetime.datetime.fromtimestamp(0)  # the epoch used by datetime
-        epoch_delta = dt_epoch - epoch  # difference
-        time        = time - epoch_delta.total_seconds()  # shift
-
-        # lat/lon lines to draw
-        meridians = np.round(np.linspace(longitude.min(), longitude.max(), 5))
-        parallels = np.round(np.linspace(latitude.min(),  latitude.max(), 5))
-
-        # Map projection
-        proj = PlotTools.MapProjection(longitude, latitude)
-        Xp, Yp = proj(LON, LAT, inverse=False)
-
-        rat   = (Xp.max() - Xp.min()) / (Yp.max() - Yp.min())
-        rat  *= 1.2
-        fig_h = 8.
-
-        ## Vorticity dichotomies
-        if (Ntime > 1):
-
-            # Initialize figure
-            fig, axes = plt.subplots(1, 2,
-                sharex=True, sharey=True, squeeze=False, 
-                gridspec_kw = gridspec_props,
-                figsize=(fig_h*rat, fig_h))
-
-            fig.suptitle('Time average')
-
-            for var_name in variables:
-                if var_name in results.variables:
-
-                    # Initialize figure
-                    fig, axes = plt.subplots(1, 1,
-                        sharex=True, sharey=True, squeeze=False, 
-                        gridspec_kw = gridspec_props,
-                        figsize=(6, 4))
-
-                    fig.suptitle(sup_title)
-
-                    to_plot = np.mean(results.variables[var_name][:, 0, :, :], axis=0)
-                    if np.max(np.abs(to_plot)) > 0:
-                        PlotTools.SignedLogPlot_onMap(LON, LAT, to_plot, 
-                                axes[0,0], fig, proj, num_ords = 3, percentile=99.9)
-
-                    # Add land and lat/lon lines
-                    axes[0,0].pcolormesh(Xp, Yp, mask, vmin=-1, vmax=1, cmap=mask_cmap)
-                    PlotTools.AddParallels_and_Meridians(axes[0,0], proj, 
-                        parallels, meridians, latitude, longitude)
-
-                    for ax in axes.ravel():
-                        ax.set_aspect('equal')
-        
-                    plt.savefig(out_direct + '/{0:.4g}km/AVE_{1:s}.png'.format(
-                        scale/1e3, var_name), dpi=dpi)
-                    plt.close()
