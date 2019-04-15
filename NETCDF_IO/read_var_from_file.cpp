@@ -7,9 +7,9 @@
 // Write to netcdf file
 void read_var_from_file(
         std::vector<double> &var,   /**< [in] Vector into which to store the variable */
-        const char * var_name,      /**< [in] Name of the variable*/
-        const char * filename,      /**< [in] Name of the file*/
-        std::vector<double> *mask   /**< [in] Pointer to mask array to be created*/
+        const char * var_name,      /**< [in] Name of the variable */
+        const char * filename,      /**< [in] Name of the file */
+        std::vector<double> *mask   /**< [in] Pointer to mask array to be created */
         ) {
 
     #if DEBUG >= 1

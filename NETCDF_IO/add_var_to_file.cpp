@@ -5,10 +5,10 @@
 #include "../constants.hpp"
 
 void add_var_to_file(
-        const std::string var_name,   /**< [in] variable name */
-        const char ** dim_list,  /**< [in] list of dimensions (in order!) */
-        const int num_dims,      /**< [in] number of dimensions */
-        const char * filename    /**< [in] file name */
+        const std::string var_name, /**< [in] variable name */
+        const char ** dim_list,     /**< [in] list of dimensions (in order!) */
+        const int num_dims,         /**< [in] number of dimensions */
+        const char * filename       /**< [in] file name */
         ) {
 
     // Open the NETCDF file
