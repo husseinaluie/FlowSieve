@@ -34,6 +34,7 @@ void apply_filter_at_point_for_quadratics(
     double u_x_loc, u_y_loc, u_z_loc;
     int index, mask_index;
     int curr_lon, curr_lat;
+    const double KernPad = constants::KernPad;
 
     kA_sum  = 0.;
     uxux_tmp = 0.;
@@ -56,7 +57,8 @@ void apply_filter_at_point_for_quadratics(
     #elif not(CARTESIAN)
     dlat_m = dlat * constants::R_earth;
     #endif
-    dlat_N = ceil( (1.1*scale / dlat_m) / 2 );
+    dlat_N = ceil( (KernPad * scale / dlat_m) / 2. );
+    dlat_N = std::min(Nlat, dlat_N);
 
     int LAT_lb, LAT_ub, LON_lb, LON_ub;
     // Latitude periodicity is a little different / awkward
@@ -101,7 +103,7 @@ void apply_filter_at_point_for_quadratics(
         //    required (by up to a factor of 4), which should
         //    improve performance.
         //  The abs in local_scale is to handle the 'comfort zone'
-        //    where delta_lat > scale (from the 1.1 factor in dlat_N)
+        //    where delta_lat > scale (from the KernPad factor in dlat_N)
         #if CARTESIAN
         delta_lat   = lat_at_ilat - lat_at_curr;
         #elif not(CARTESIAN)
@@ -111,7 +113,8 @@ void apply_filter_at_point_for_quadratics(
 
         // Now find the appropriate integration region
         //   The factor of 2 is diameter->radius 
-        dlon_N = ceil( ( 1.1 * local_scale / dlon_m) / 2 );
+        dlon_N = ceil( ( KernPad * local_scale / dlon_m) / 2. );
+        dlon_N = std::min(Nlon, dlon_N);
         #if PERIODIC_X
         LON_lb = Ilon - dlon_N;
         LON_ub = Ilon + dlon_N;

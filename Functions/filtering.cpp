@@ -74,11 +74,17 @@ void filtering(
                                            Ntime, Ndepth, Nlat, Nlon);
 
                         if (mask.at(mask_index) == 1) { // Skip land areas
-                            vel_Spher_to_Cart(     u_x.at(index),      u_y.at(  index),      u_z.at(  index),
-                                              full_u_r.at(index), full_u_lon.at(index), full_u_lat.at(index),
-                                              longitude.at(Ilon), latitude.at(Ilat));
+                            vel_Spher_to_Cart(     
+                                u_x.at(index),      u_y.at(  index),      u_z.at(  index),
+                                full_u_r.at(index), full_u_lon.at(index), full_u_lat.at(index),
+                                longitude.at(Ilon), latitude.at(Ilat));
 
-                            full_KE.at(index) = 0.5 * ( pow(u_x.at(index), 2) + pow(u_y.at(index), 2) + pow(u_z.at(index), 2) );
+                            full_KE.at(index) = 
+                                0.5 * ( 
+                                          pow(u_x.at(index), 2) 
+                                        + pow(u_y.at(index), 2) 
+                                        + pow(u_z.at(index), 2) 
+                                      );
                         }
                     }
                 }
@@ -193,7 +199,7 @@ void filtering(
     //
     //// Begin the main filtering loop
     //
-    #if DEBUG>=2
+    #if DEBUG>=1
     fprintf(stdout, "Beginning main filtering loop.\n\n");
     #endif
     for (int Iscale = 0; Iscale < Nscales; Iscale++) {

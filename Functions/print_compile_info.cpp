@@ -64,6 +64,7 @@ void print_compile_info(
     fprintf(stdout, "  rho0    = %g\n", constants::rho0);
     fprintf(stdout, "  g       = %g\n", constants::g);
     fprintf(stdout, "  DiffOrd = %d\n", constants::DiffOrd);
+    fprintf(stdout, "  KernPad = %g\n", constants::KernPad);
     fprintf(stdout, "\n");
 
     fprintf(stdout, "%zu Filter Scales (km)\n", scales.size());
