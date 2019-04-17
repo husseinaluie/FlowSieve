@@ -46,7 +46,11 @@ void apply_filter_at_point(
     #elif not(CARTESIAN)
     dlat_m = dlat * constants::R_earth;
     #endif
-    dlat_N = ceil( ( KernPad * scale / dlat_m ) / 2.);
+    if (KernPad < 0) {
+        dlat_N = Nlat;
+    } else {
+        dlat_N = ceil( ( KernPad * scale / dlat_m ) / 2.);
+    }
     dlat_N = std::min(Nlat, dlat_N);
 
     int LAT_lb, LAT_ub, LON_lb, LON_ub;
@@ -60,6 +64,7 @@ void apply_filter_at_point(
     LAT_lb = std::max(0,    Ilat - dlat_N);
     LAT_ub = std::min(Nlat, Ilat + dlat_N);
     #endif
+    //fprintf(stdout, "LAT(lb, ub) = (%d, %d)\n", LAT_lb, LAT_ub);
 
     double local_scale, delta_lat;
     double lat_at_curr, lat_at_ilat;
@@ -102,7 +107,11 @@ void apply_filter_at_point(
 
         // Now find the appropriate integration region
         //   The factor of 2 is diameter->radius 
-        dlon_N = ceil( ( KernPad * local_scale / dlon_m ) / 2.);
+        if (KernPad < 0) {
+            dlon_N = Nlon;
+        } else {
+            dlon_N = ceil( ( KernPad * local_scale / dlon_m ) / 2.);
+        }
         dlon_N = std::min(Nlon, dlon_N);
         #if PERIODIC_X
         LON_lb = Ilon - dlon_N;

@@ -34,7 +34,7 @@
 //  2 = Gaus  (exp(-x^2))
 //  3 = sinc (sharp-spectral)
 #ifndef KERNEL_OPT
-    #define KERNEL_OPT 1
+    #define KERNEL_OPT 3
 #endif
 
 /*!
@@ -114,7 +114,7 @@ namespace constants
     #elif KERNEL_OPT == 2
     const double KernPad = 5.;
     #elif KERNEL_OPT == 3
-    const double KernPad = 1e10;
+    const double KernPad = -1; // negative indicate 'infinity'
     #endif
 
 }
