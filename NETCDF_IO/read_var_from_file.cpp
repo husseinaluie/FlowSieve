@@ -31,10 +31,8 @@ void read_var_from_file(
     char buffer [50];
     snprintf(buffer, 50, filename);
     //if (( retval = nc_open(buffer, FLAG, &ncid) )) 
-    if (wRank == 0) { fprintf(stdout, "About to open file.\n");  }
     if (( retval = nc_open_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid) ))
         NC_ERR(retval, __LINE__, __FILE__); 
-    if (wRank == 0) { fprintf(stdout, "File opened.\n");  }
 
     char varname [50];
     snprintf(varname, 50, var_name);
@@ -61,6 +59,7 @@ void read_var_from_file(
 
     // Get the size of each dimension
     size_t start[num_dims], count[num_dims];
+    size_t full_counts[num_dims];
     size_t num_pts = 1;
     int my_count;
     if (myCounts != NULL) {
@@ -72,35 +71,42 @@ void read_var_from_file(
         if ((retval = nc_inq_dim(ncid, dim_ids[II] , NULL, &count[II]  ))) 
             NC_ERR(retval, __LINE__, __FILE__);
         #if DEBUG >= 2
-        fprintf(stdout, "%zu ", count[II]);
+        if (wRank == 0) { fprintf(stdout, "%zu ", count[II]); }
         #endif
+        full_counts[II] = count[II];
 
         // If we're split on multiple MPI procs and have > 2 dimensions, 
         //   then divide all but the last two we don't split the last 
         //   two because those are assumed to be lat/lon
         if ( (num_dims > 2) and (wSize > 1) and (II == 0) ) {
-            #if DEBUG >= 1
-            if (wRank == 0) {
-                fprintf(stdout, "More than two dimensions and more than 1 MPI proc, "
-                        "so will split the first %d dimensions.\n", num_dims - 2);
-            }
-            #endif
             // For now, just split in time (assumed to be the first dimension)
             my_count = ((int)count[0]) / wSize;
             start[II] = (size_t) (wRank * my_count);
             if (wRank == wSize - 1) { my_count = (int)(count[II] - start[II]); }
-            if (myCounts != NULL) { myCounts->at(II) = my_count;  }
-            if (myStarts != NULL) { myStarts->at(II) = (int) start[II];  }
-            #if DEBUG >= 2
-            fprintf(stdout, "   proc %d of %d taking %d of %zu points in dimension %d.\n",
-                    wRank+1, wSize, my_count, count[0], II);
-            #endif
             count[II] = (size_t) my_count;
         }
         num_pts *= count[II];
+        if (myCounts != NULL) { myCounts->at(II) = (int) count[II]; }
+        if (myStarts != NULL) { myStarts->at(II) = (int) start[II]; }
     }
     #if DEBUG >= 2
-    fprintf(stdout, "\n");
+    if (wRank == 0) { fprintf(stdout, "\n"); }
+    #endif
+
+    #if DEBUG >= 1
+    if (num_dims > 1) {
+        if (myCounts != NULL) {
+            fprintf(stdout, "  Rank %d: starts = %d %d %d %d\n", wRank, 
+                    myStarts->at(0), myStarts->at(1), myStarts->at(2), myStarts->at(3));
+            fprintf(stdout, "  Rank %d: counts = %d %d %d %d\n", wRank,
+                    myCounts->at(0), myCounts->at(1), myCounts->at(2), myCounts->at(3));
+        } else {
+            fprintf(stdout, "  Rank %d: starts = %zu %zu %zu %zu\n", wRank, 
+                    start[0], start[1], start[2], start[3]);
+            fprintf(stdout, "  Rank %d: counts = %zu %zu %zu %zu\n", wRank,
+                    count[0], count[1], count[2], count[3]);
+        }
+    }
     #endif
 
     // Now resize the vector to the appropriate size
@@ -167,4 +173,12 @@ void read_var_from_file(
         }
         #endif
     }
+
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "\n\n"); }
+    #endif
+
+    MPI_Barrier(comm);
+    if (( retval = nc_close(ncid) ))
+        NC_ERR(retval, __LINE__, __FILE__); 
 }

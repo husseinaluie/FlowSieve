@@ -36,6 +36,7 @@ void write_field_to_output(
         NC_ERR(retval, __LINE__, __FILE__);
 
     // Close the file
+    MPI_Barrier(comm);
     if (( retval = nc_close(ncid) )) 
         NC_ERR(retval, __LINE__, __FILE__);
 
