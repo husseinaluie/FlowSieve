@@ -158,27 +158,6 @@ void apply_filter_at_point(
         const bool use_mask);
 
 /*!
- * \brief Compute filtered (field1 * field2) at a single point
- *
- * Computes the integral of the provided fields with the
- * kernel().
- *
- * dArea for integration computed in compute_areas() 
- */
-void apply_filter_at_point_to_product(
-        double & coarse_val,   
-        const std::vector<double> & field1, 
-        const std::vector<double> & field2, 
-        const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
-        const int Itime,  const int Idepth, const int Ilat, const int Ilon,
-        const std::vector<double> & longitude, 
-        const std::vector<double> & latitude,
-        const std::vector<double> & dAreas, 
-        const double scale,
-        const std::vector<double> & mask,
-        const bool use_mask);
-
-/*!
  * \brief Primary kernel function coarse-graining procedure (G in publications)
  */
 double kernel(const double distance, const double scale);
@@ -359,6 +338,11 @@ void compute_div_transport(
         const int Nlon,
         const std::vector<double> & mask);
 
+/*!
+ * \brief Given a field, compute the horizontal average.
+ *
+ * The result, means, is a function of time and depth.
+ */
 void compute_mean(
         std::vector<double> & means,
         const std::vector<double> & field,
