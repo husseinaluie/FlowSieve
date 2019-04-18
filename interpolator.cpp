@@ -104,18 +104,17 @@ int main(int argc, char **argv)
     #if DEBUG >= 0
     fprintf(stdout, "Creating output\n");
     #endif
-    initialize_output_file(time, depth, longitude, latitude, scales, mask, "interp.nc");
+    std::vector<std::string> vars_to_write;
+    vars_to_write.push_back("pressure_orig");
+    vars_to_write.push_back("density_orig");
+    vars_to_write.push_back("pressure_interp");
+    vars_to_write.push_back("density_interp");
+    initialize_output_file(time, depth, longitude, latitude, mask, 
+            vars_to_write, "interp.nc", 0.);
 
     #if DEBUG >= 0
     fprintf(stdout, "Adding appropraite variables to source.nc\n");
     #endif
-    const char* dim_names[] = {"time", "depth", "latitude", "longitude"};
-    add_var_to_file("pressure_orig", dim_names, 4, "interp.nc");
-    add_var_to_file("density_orig",  dim_names, 4, "interp.nc");
-
-    add_var_to_file("pressure_interp", dim_names, 4, "interp.nc");
-    add_var_to_file("density_interp",  dim_names, 4, "interp.nc");
-
     size_t starts[] = {0, 0, 0, 0};
     size_t counts[] = {time.size(),
                        depth.size(),
