@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <mpi.h>
 #include "constants.hpp"
 
 /*!
@@ -116,7 +117,10 @@ void filtering(const std::vector<double> & u_r,
                const std::vector<double> & depth,
                const std::vector<double> & longitude, 
                const std::vector<double> & latitude,
-               const std::vector<double> & mask);
+               const std::vector<double> & mask,
+               const std::vector<int>    & myCounts,
+               const std::vector<int>    & myStarts,
+               const MPI_Comm comm = MPI_COMM_WORLD);
 
 /*!
  * \brief Main filtering driver
