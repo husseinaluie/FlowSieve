@@ -16,6 +16,10 @@ void initialize_output_file(
         const MPI_Comm comm                     /**< [in] MPI Communicator */
         ) {
 
+    int wRank=-1, wSize=-1;
+    MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
+    MPI_Comm_size( MPI_COMM_WORLD, &wSize );
+
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_CLOBBER | NC_MPIIO;
     int ncid=0, retval;
@@ -105,13 +109,13 @@ void initialize_output_file(
     fprintf(stdout, "Output file (%s) initialized.\n\n", buffer);
     #endif
 
-
-    // Loop through and add the desired variables
-    // Dimension names (in order!)
-    const char* dim_names[] = {"time", "depth", "latitude", "longitude"};
-    const int ndims = 4;
-    for (size_t varInd = 0; varInd < vars.size(); ++varInd) {
-        add_var_to_file(vars.at(varInd), dim_names, ndims, buffer);
+    if (wRank == 0) {
+        // Loop through and add the desired variables
+        // Dimension names (in order!)
+        const char* dim_names[] = {"time", "depth", "latitude", "longitude"};
+        const int ndims = 4;
+        for (size_t varInd = 0; varInd < vars.size(); ++varInd) {
+            add_var_to_file(vars.at(varInd), dim_names, ndims, buffer);
+        }
     }
-
 }
