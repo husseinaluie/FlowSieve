@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
         #endif
     }
     #endif
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // Print processor assignments
     int tid, nthreads;
@@ -130,8 +131,25 @@ int main(int argc, char *argv[]) {
     read_var_from_file(p,   "p",   "input.nc");
     #endif
 
+    //const int Ntime  = time.size();
+    //const int Ndepth = depth.size();
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
+
+    const int ndims = 4;
+    size_t starts[ndims] = {
+        size_t(myStarts.at(0)), size_t(myStarts.at(1)), 
+        size_t(myStarts.at(2)), size_t(myStarts.at(3))};
+    size_t counts[ndims] = {
+        size_t(myCounts.at(0)), size_t(myCounts.at(1)), 
+        size_t(myCounts.at(2)), size_t(myCounts.at(3))};
+    std::vector<std::string> vars_to_write;
+    vars_to_write.push_back("u_lon");
+
+    initialize_output_file(time, depth, longitude, latitude, 
+            mask, vars_to_write, "temp.nc", 0.);
+
+    write_field_to_output(u_lon, "u_lon", starts, counts, "temp.nc");
 
     #if not(CARTESIAN)
     // Convert coordinate to radians

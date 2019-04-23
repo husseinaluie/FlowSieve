@@ -59,7 +59,7 @@ void read_var_from_file(
 
     // Get the size of each dimension
     size_t start[num_dims], count[num_dims];
-    size_t full_counts[num_dims];
+    //size_t full_counts[num_dims];
     size_t num_pts = 1;
     int my_count;
     if (myCounts != NULL) {
@@ -73,7 +73,7 @@ void read_var_from_file(
         #if DEBUG >= 2
         if (wRank == 0) { fprintf(stdout, "%zu ", count[II]); }
         #endif
-        full_counts[II] = count[II];
+        //full_counts[II] = count[II];
 
         // If we're split on multiple MPI procs and have > 2 dimensions, 
         //   then divide all but the last two we don't split the last 

@@ -31,6 +31,11 @@ void write_field_to_output(
     if (( retval = nc_inq_varid(ncid, field_name, &field_varid ) )) 
         NC_ERR(retval, __LINE__, __FILE__);
 
+    fprintf(stdout, "  Rank %d: starts = %zu %zu %zu %zu\n", wRank, 
+            start[0], start[1], start[2], start[3]);
+    fprintf(stdout, "  Rank %d: counts = %zu %zu %zu %zu\n", wRank,
+            count[0], count[1], count[2], count[3]);
+
     // Write the current scale to the output
     if (( retval = nc_put_vara_double(ncid, field_varid, start, count, &field[0]) ))
         NC_ERR(retval, __LINE__, __FILE__);

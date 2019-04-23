@@ -97,7 +97,8 @@ namespace constants
      * \brief Fill value used to indicate land values in output files
      * @ingroup constants
      */
-    const double fill_value = -1e8;
+    const double fill_value = -32767;
+    //const double fill_value = -1e8;
 
     /*!
      * \param KernPad
