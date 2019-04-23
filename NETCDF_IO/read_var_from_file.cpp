@@ -30,7 +30,6 @@ void read_var_from_file(
     int ncid=0, retval;
     char buffer [50];
     snprintf(buffer, 50, filename);
-    //if (( retval = nc_open(buffer, FLAG, &ncid) )) 
     if (( retval = nc_open_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid) ))
         NC_ERR(retval, __LINE__, __FILE__); 
 
@@ -59,9 +58,8 @@ void read_var_from_file(
 
     // Get the size of each dimension
     size_t start[num_dims], count[num_dims];
-    //size_t full_counts[num_dims];
     size_t num_pts = 1;
-    int my_count;
+    int my_count, overflow;
     if (myCounts != NULL) {
         myCounts->resize(num_dims);
         myStarts->resize(num_dims);
@@ -73,17 +71,24 @@ void read_var_from_file(
         #if DEBUG >= 2
         if (wRank == 0) { fprintf(stdout, "%zu ", count[II]); }
         #endif
-        //full_counts[II] = count[II];
 
         // If we're split on multiple MPI procs and have > 2 dimensions, 
         //   then divide all but the last two we don't split the last 
         //   two because those are assumed to be lat/lon
         if ( (num_dims > 2) and (wSize > 1) and (II == 0) ) {
             // For now, just split in time (assumed to be the first dimension)
-            my_count = ((int)count[0]) / wSize;
-            start[II] = (size_t) (wRank * my_count);
-            if (wRank == wSize - 1) { my_count = (int)(count[II] - start[II]); }
+            my_count = ((int)count[II]) / wSize;
+            overflow = (int)( count[II] - my_count * wSize );
+
+            start[II] = (size_t) (   
+                    std::min(wRank,            overflow) * (my_count + 1)
+                  + std::max(wRank - overflow, 0       ) *  my_count
+                  );
+
+            // Distribute the remainder over the first chunk of processors
+            if (wRank < overflow) { my_count++; }
             count[II] = (size_t) my_count;
+
         }
         num_pts *= count[II];
         if (myCounts != NULL) { myCounts->at(II) = (int) count[II]; }

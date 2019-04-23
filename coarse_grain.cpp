@@ -54,7 +54,8 @@ int main(int argc, char *argv[]) {
     if (wRank == 0) {
         fprintf(stdout, "\n\n");
         fprintf(stdout, "Compiled at %s on %s.\n", __TIME__, __DATE__);
-        fprintf(stdout, "  Version %d.%d.%d \n", MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
+        fprintf(stdout, "  Version %d.%d.%d \n", 
+                MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
         fprintf(stdout, "\n");
     }
     #endif
@@ -75,12 +76,14 @@ int main(int argc, char *argv[]) {
     size_t II;
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
-    #pragma omp parallel default(none) private(tid, nthreads) shared(stdout) firstprivate(wRank, wSize)
+    #pragma omp parallel default(none) private(tid, nthreads) \
+        shared(stdout) firstprivate(wRank, wSize)
     {
         tid = omp_get_thread_num();
         nthreads = omp_get_num_threads();
         #if DEBUG >= 1
-        fprintf(stdout, "Hello from thread %d of %d on processor %d of %d.\n", tid+1, nthreads, wRank+1, wSize);
+        fprintf(stdout, "Hello from thread %d of %d on processor %d of %d.\n", 
+                tid+1, nthreads, wRank+1, wSize);
         #endif
     }
     MPI_Barrier(MPI_COMM_WORLD);
@@ -136,21 +139,6 @@ int main(int argc, char *argv[]) {
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
-    const int ndims = 4;
-    size_t starts[ndims] = {
-        size_t(myStarts.at(0)), size_t(myStarts.at(1)), 
-        size_t(myStarts.at(2)), size_t(myStarts.at(3))};
-    size_t counts[ndims] = {
-        size_t(myCounts.at(0)), size_t(myCounts.at(1)), 
-        size_t(myCounts.at(2)), size_t(myCounts.at(3))};
-    std::vector<std::string> vars_to_write;
-    vars_to_write.push_back("u_lon");
-
-    initialize_output_file(time, depth, longitude, latitude, 
-            mask, vars_to_write, "temp.nc", 0.);
-
-    write_field_to_output(u_lon, "u_lon", starts, counts, "temp.nc");
-
     #if not(CARTESIAN)
     // Convert coordinate to radians
     int ii;
@@ -199,5 +187,4 @@ int main(int argc, char *argv[]) {
     fprintf(stdout, "Processor %d / %d waiting to finalize.\n", wRank + 1, wSize);
     MPI_Finalize();
     return 0;
-
 }

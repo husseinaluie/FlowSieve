@@ -17,12 +17,19 @@ void write_field_to_output(
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
 
+    #if DEBUG >= 2
+    fprintf(stdout, "  Rank %d: starts = %zu %zu %zu %zu\n", wRank, 
+            start[0], start[1], start[2], start[3]);
+    fprintf(stdout, "  Rank %d: counts = %zu %zu %zu %zu\n", wRank,
+            count[0], count[1], count[2], count[3]);
+    #endif
+
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_WRITE | NC_MPIIO;
     int ncid=0, retval;
     char buffer [50];
     snprintf(buffer, 50, filename);
-    //if (( retval = nc_open(buffer, FLAG, &ncid) ))
+    MPI_Barrier(comm);
     if (( retval = nc_open_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid) ))
         NC_ERR(retval, __LINE__, __FILE__);
 
@@ -30,11 +37,6 @@ void write_field_to_output(
     int field_varid;
     if (( retval = nc_inq_varid(ncid, field_name, &field_varid ) )) 
         NC_ERR(retval, __LINE__, __FILE__);
-
-    fprintf(stdout, "  Rank %d: starts = %zu %zu %zu %zu\n", wRank, 
-            start[0], start[1], start[2], start[3]);
-    fprintf(stdout, "  Rank %d: counts = %zu %zu %zu %zu\n", wRank,
-            count[0], count[1], count[2], count[3]);
 
     // Write the current scale to the output
     if (( retval = nc_put_vara_double(ncid, field_varid, start, count, &field[0]) ))

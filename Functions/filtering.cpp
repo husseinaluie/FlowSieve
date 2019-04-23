@@ -213,11 +213,9 @@ void filtering(
     for (int Iscale = 0; Iscale < Nscales; Iscale++) {
 
         // Create the output file
-        if (wRank == 0) {
-            snprintf(filename, 50, "filter_%.6gkm.nc", scales.at(Iscale)/1e3);
-            initialize_output_file(time, depth, longitude, latitude, 
-                    mask, vars_to_write, filename, scales.at(Iscale));
-        }
+        snprintf(filename, 50, "filter_%.6gkm.nc", scales.at(Iscale)/1e3);
+        initialize_output_file(time, depth, longitude, latitude, 
+                mask, vars_to_write, filename, scales.at(Iscale));
 
         #if DEBUG >= 0
         if (wRank == 0) { fprintf(stdout, "Scale %d of %d\n", Iscale+1, Nscales); }
@@ -536,6 +534,13 @@ void filtering(
                 #endif
             }  // end for(depth) block
         }  // end for(time) block
+
+        // Barrier to line up processors before entering main writing block
+        MPI_Barrier(comm);
+
+        #if DEBUG >= 2
+        fprintf(stdout, "  = Rank %d finished time loop =\n", wRank);
+        #endif
 
         // Write to file
         write_field_to_output(fine_u_r,     "fine_u_r",     starts, counts, filename);

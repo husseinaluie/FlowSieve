@@ -5,7 +5,7 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=2 $(CFLAGS)
+CFLAGS:=-DDEBUG=1 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true

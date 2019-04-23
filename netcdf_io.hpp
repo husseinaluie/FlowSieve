@@ -55,7 +55,8 @@ void initialize_output_file(
         const std::vector<double> & mask,
         const std::vector<std::string> & vars,
         const char * filename,
-        const double filter_scale);
+        const double filter_scale,
+        MPI_Comm = MPI_COMM_WORLD);
 
 /*!
  * \brief Write on scales worth of a single field.
@@ -102,6 +103,5 @@ void add_var_to_file(
         const char ** dim_list,
         const int num_dims,
         const char * filename);
-        //const char * filename = "filter_output.nc");
 
 #endif
