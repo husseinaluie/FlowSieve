@@ -49,7 +49,4 @@ void compute_areas(
     }
     #endif
 
-    #if DEBUG >= 2
-    fprintf(stdout, "  finished computing areas.\n\n");
-    #endif
 }

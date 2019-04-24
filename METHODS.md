@@ -177,3 +177,95 @@ then \f$ \partial/\partial r\equiv0  \f$, so this reduced down to
 
 [spher-deriv]: @ref spher_derivative_at_point "spherical derivatives"
 [cart-deriv]: @ref Cart_derivative_at_point "Cartesian derivatives"
+
+## Parallelization
+
+This section outlines some of the parallelizations that are used.
+The coarse graining routine uses hybrid parallelization with OpenMPI (forks) and OpenMP (threads).
+This is done to minimize communication costs as much as possible.
+
+### Maximum number of processors
+The OpenMPI-based limit is:
+* Number of OpenMPI Processes <= Ntime * Ndepth
+
+The OpenMP-based limit is then:
+* Threads per OpenMPI Process <= Number of processors on physical chip
+
+If we then assign one OpenMPI processor to each physical compute node, this gives the over-all upper-bound on the number of processors that can be used as
+**(# Processors per Node) * Ntime * Ndepth**, assuming that the number of processors per node is constant.
+
+#### Example
+
+Suppose you have a dataset with daily resolution, spanning ten years, but only at the surface.
+
+Then Ntime = 365 * 10 = 3650 (ignoring leap years) and Ndepth = 1.
+
+Further suppose that your computing environment has 24 processors per node.
+
+You could then theoretically use up to 87,600 ( = 3650 * 1 * 24) processors.
+
+Moreover, this is theoretically without encurring onerous communication costs, since the OpenMPI forks only need to communicate / synchronize during I/O, which only happens once per filter scale and once at the very beginning of the routine.
+
+### OpenMPI
+
+#### Time and Depth
+The time and depth loops *are* split and across processors with OpenMPI.
+At current, only time is actually split, but it is intended that depth will also be split across processors.
+Since the filtering routine only uses horizontal integrals, there is no need to communicate between different times and depths.
+This helps to avoid costly OpenMPI communication.
+
+#### Horizontal dimensions
+Horizontal (lat/lon) loops are *NOT* parallelized with OpenMPI.
+This is because there is a lot of communication required, especially when using large filtering scales or sharp-spectral kernels.
+This communication would be prohibitive.
+
+#### Filter scales
+The filter scales are also *NOT* parallelized with OpenMPI.
+This is because it would be difficult to load balance, particularly with non-sharp spectral kernels, where different filter scales would require very different amounts of time / work. 
+Accounting for this would be non-trivial and, unless there were a large number of filter scales, not practical or efficient. 
+
+### OpenMP
+
+The horizontal (lat/lon) loops are threaded (openmp) in `for` loops. 
+Both `dynamic` and `guided` scheduling routines are used to divide the work over the threads.
+These are used to give load balancing in light of the land/water distinctions.
+OpenMP uses shared memory, which avoids the need for (potentially very high) communication costs.
+There is a price to pay with scheduling, particularly since we can't use static scheduling (for load balancing reasons), but it's far less than would arise from OpenMPI.
+
+### Functions
+
+The following functions occur *within* a time/depth `for` loop, and so do not use OpenMPI reoutines.
+* apply_filter_at_point
+* apply_filter_at_point_for_quadratics
+
+The following functions occur *outside* of time/depth `for` loops. However, the appropriate values for `Ntime` and `Ndepth` are passed through, so there's no need for further OpenMPI routines (outside of using the processor rank for print statements, of which there are none!).
+* compute_vorticity
+* compute_energy_transfer_through_scale
+* compute_div_vel
+* compute_baroclinic_transfer
+* compute_div_transport
+
+This means that there's almost no modifications required, except for:
+* coarse_grain.cpp
+* Functions/filtering.cpp
+* NETCDF_IO/read_var_from_file.cpp
+* NETCDF_IO/write_field_to_output.cpp
+
+### SLURM
+
+If you're running on a SLURM-managed cluster (such as the ComputeCanada clusters, Bluehive, etc), then you can submit using hybridized parallelization using the following.
+
+<pre>
+#!/bin/bash
+#SBATCH -p standard
+#SBATCH --output=sim-%j.log
+#SBATCH --error=sim-%j.err
+#SBATCH --time=02-00:00:00         # time (DD-HH:MM:SS)
+#SBATCH --ntasks=10                # number of OpenMPI processes
+#SBATCH --cpus-per-task=10         # number of OpenMP threads per OpenMPI process
+#SBATCH --mem-per-cpu=450M         # memory per OpenMP thread
+#SBATCH --job-name="job-name-here"
+
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+mpirun -n ${SLURM_NTASKS} ./coarse_grain.x
+</pre>

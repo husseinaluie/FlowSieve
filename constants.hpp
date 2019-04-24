@@ -6,7 +6,7 @@
 #endif
 
 #ifndef CARTESIAN
-    #define CARTESIAN true
+    #define CARTESIAN false
 #endif
 
 #ifndef PERIODIC_X
@@ -14,7 +14,7 @@
 #endif
 
 #ifndef PERIODIC_Y
-    #define PERIODIC_Y true
+    #define PERIODIC_Y false
 #endif
 
 #ifndef COMP_VORT
@@ -26,7 +26,7 @@
 #endif
 
 #ifndef COMP_BC_TRANSFERS
-    #define COMP_BC_TRANSFERS false
+    #define COMP_BC_TRANSFERS true
 #endif
 
 //  0 = tophat
@@ -34,7 +34,7 @@
 //  2 = Gaus  (exp(-x^2))
 //  3 = sinc (sharp-spectral)
 #ifndef KERNEL_OPT
-    #define KERNEL_OPT 3
+    #define KERNEL_OPT 1
 #endif
 
 /*!
@@ -97,7 +97,8 @@ namespace constants
      * \brief Fill value used to indicate land values in output files
      * @ingroup constants
      */
-    const double fill_value = -1e8;
+    const double fill_value = -32767;
+    //const double fill_value = -1e8;
 
     /*!
      * \param KernPad

@@ -1,7 +1,7 @@
 # The following modules were last used
 #  openmpi/2.1.1/b1  
 #  hdf5/1.8.17/b1     
-#  netcdf/4.6.0/b1
+#  netcdf/4.3.3.1
 #  gcc/8.2.0/b1
 
 # Specify compilers
