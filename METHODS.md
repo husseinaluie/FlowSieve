@@ -188,15 +188,22 @@ This is done to minimize communication costs as much as possible.
 The OpenMPI-based limit is:
 * Number of OpenMPI Processes <= Ntime * Ndepth
 
+The OpenMP-based limit is then:
+* Threads per OpenMPI Process <= Number of processors on physical chip
+
 If we then assign one OpenMPI processor to each physical compute node, this gives the over-all upper-bound on the number of processors that can be used as
 **(# Processors per Node) * Ntime * Ndepth**, assuming that the number of processors per node is constant.
 
 #### Example
 
 Suppose you have a dataset with daily resolution, spanning ten years, but only at the surface.
+
 Then Ntime = 365 * 10 = 3650 (ignoring leap years) and Ndepth = 1.
+
 Further suppose that your computing environment has 24 processors per node.
+
 You could then theoretically use up to 87,600 ( = 3650 * 1 * 24) processors.
+
 Moreover, this is theoretically without encurring onerous communication costs, since the OpenMPI forks only need to communicate / synchronize during I/O, which only happens once per filter scale and once at the very beginning of the routine.
 
 ### OpenMPI
@@ -243,3 +250,22 @@ This means that there's almost no modifications required, except for:
 * Functions/filtering.cpp
 * NETCDF_IO/read_var_from_file.cpp
 * NETCDF_IO/write_field_to_output.cpp
+
+### SLURM
+
+If you're running on a SLURM-managed cluster (such as the ComputeCanada clusters, Bluehive, etc), then you can submit using hybridized parallelization using the following.
+
+<pre>
+#!/bin/bash
+#SBATCH -p standard
+#SBATCH --output=sim-%j.log
+#SBATCH --error=sim-%j.err
+#SBATCH --time=02-00:00:00         # time (DD-HH:MM:SS)
+#SBATCH --ntasks=10                # number of OpenMPI processes
+#SBATCH --cpus-per-task=10         # number of OpenMP threads per OpenMPI process
+#SBATCH --mem-per-cpu=450M         # memory per OpenMP thread
+#SBATCH --job-name="job-name-here"
+
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+mpirun -n ${SLURM_NTASKS} ./coarse_grain.x
+</pre>
