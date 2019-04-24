@@ -98,7 +98,7 @@ void read_var_from_file(
     if (wRank == 0) { fprintf(stdout, "\n"); }
     #endif
 
-    #if DEBUG >= 1
+    #if DEBUG >= 2
     if (num_dims > 1) {
         if (myCounts != NULL) {
             fprintf(stdout, "  Rank %d: starts = %d %d %d %d\n", wRank, 
