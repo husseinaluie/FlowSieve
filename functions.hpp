@@ -54,6 +54,21 @@ double distance(const double lon1,     const double lat1,
                 const double Llon = 0, const double Llat = 0);
 
 /*!
+ * \brief Compute an array of the distances (in metres) from a 
+ * given reference point to every other point in the domain
+ *
+ * (ref_ilat, ref_ilon) is the reference point from which 
+ *   distances are computed.
+ */
+void compute_distances(
+        std::vector<double> & distances,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const int ref_ilat, const int ref_ilon,
+        const int Ntime, const int Ndepth,
+        const int Nlat,  const int Nlon);
+
+/*!
  * \brief Convert single spherical velocity to Cartesian velocity
  *
  * Convert Spherical velocities to Cartesian
@@ -123,25 +138,6 @@ void filtering(const std::vector<double> & u_r,
                const MPI_Comm comm = MPI_COMM_WORLD);
 
 /*!
- * \brief Main filtering driver
- *
- * This function is the main filtering driver. It sets up the appropriate
- * loop sequences, calls the other funcations (velocity conversions), and
- * calls the IO functionality.
- */
-void filtering_qg(
-        std::vector<double> & u_x, 
-        std::vector<double> & u_y, 
-        std::vector<double> & pv,
-        const std::vector<double> & scales, 
-        const std::vector<double> & dAreas, 
-        const std::vector<double> & time, 
-        const std::vector<double> & depth,
-        const std::vector<double> & longitude, 
-        const std::vector<double> & latitude,
-        const std::vector<double> & mask);
-
-/*!
  * \brief Compute filtered field at a single point
  *
  * Computes the integral of the provided field with the
@@ -159,7 +155,8 @@ void apply_filter_at_point(
         const std::vector<double> & dAreas, 
         const double scale,
         const std::vector<double> & mask,
-        const bool use_mask);
+        const bool use_mask,
+        const std::vector<double> * distances);
 
 /*!
  * \brief Primary kernel function coarse-graining procedure (G in publications)
@@ -167,13 +164,9 @@ void apply_filter_at_point(
 double kernel(const double distance, const double scale);
 
 /*!
- * \brief Compute the (spherical) vorticity at a given point.
- *
- * Uses fourth-order finite differentiation for derivatives.
+ * \brief Compute the vorticity at a given point.
  *
  * Assumes that the lon-lat grid is uniform.
- *
- * Stencil placement side-steps coast/land.
  *
  * Currently only computes the vort_r component.
  */
@@ -230,7 +223,8 @@ void apply_filter_at_point_for_quadratics(
         const std::vector<double> & latitude,
         const std::vector<double> & dAreas, 
         const double scale,
-        const std::vector<double> & mask);
+        const std::vector<double> & mask,
+        const std::vector<double> * distances);
 
 /*!
  * \brief Compute the energy transfer through the current filter scale

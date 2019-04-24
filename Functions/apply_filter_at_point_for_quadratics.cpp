@@ -26,7 +26,8 @@ void apply_filter_at_point_for_quadratics(
         const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
         const std::vector<double> & dAreas,     /**< [in] Array of cell areas (2D) (compute_areas())*/
         const double scale,                     /**< [in] The filtering scale */
-        const std::vector<double> & mask        /**< [in] Array to distinguish between land and water cells (2D) */
+        const std::vector<double> & mask,       /**< [in] Array to distinguish between land and water cells (2D) */
+        const std::vector<double> * distances   /**< [in] Array of distances (if not NULL) */
         ) {
 
 
@@ -143,22 +144,26 @@ void apply_filter_at_point_for_quadratics(
             curr_lon = LON;
             #endif
 
-            #if CARTESIAN
-            dist = distance(longitude.at(Ilon),     lat_at_ilat,
-                            longitude.at(curr_lon), lat_at_curr,
-                            dlon_m * Nlon, dlat_m * Nlat);
-            #elif not(CARTESIAN)
-            dist = distance(longitude.at(Ilon),     lat_at_ilat,
-                            longitude.at(curr_lon), lat_at_curr);
-            #endif
-
-            kern = kernel(dist, scale);
-
             index = Index(Itime, Idepth, curr_lat, curr_lon,
                           Ntime, Ndepth, Nlat,     Nlon);
 
             mask_index = Index(0,     0,      curr_lat, curr_lon,
                                Ntime, Ndepth, Nlat,     Nlon);
+
+            if (distances == NULL) {
+                #if CARTESIAN
+                dist = distance(longitude.at(Ilon),     lat_at_ilat,
+                                longitude.at(curr_lon), lat_at_curr,
+                                dlon_m * Nlon, dlat_m * Nlat);
+                #elif not(CARTESIAN)
+                dist = distance(longitude.at(Ilon),     lat_at_ilat,
+                                longitude.at(curr_lon), lat_at_curr);
+                #endif
+            } else {
+                dist = distances->at(mask_index);
+            }
+
+            kern = kernel(dist, scale);
 
             area     = dAreas.at(mask_index);
             kA_sum  += kern * area;

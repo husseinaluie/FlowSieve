@@ -49,6 +49,8 @@ void filtering(
     if (wRank == 0) { fprintf(stdout, "Converting to Cartesian velocities.\n"); }
     #endif
 
+    std::vector<double> distances(Nlat * Nlon);
+
     std::vector<double> u_x(num_pts);
     std::vector<double> u_y(num_pts);
     std::vector<double> u_z(num_pts);
@@ -65,12 +67,12 @@ void filtering(
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
     //     coordinate system)
-    int index, mask_index, Ilat, Ilon, tid;
-    for (int Itime = 0; Itime < Ntime; Itime++) {
-        for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-            #pragma omp parallel private(Ilat, Ilon, index, mask_index)
-            {
-                #pragma omp for collapse(2) schedule(guided)
+    int index, mask_index, Itime, Idepth, Ilat, Ilon, tid;
+    #pragma omp parallel private(Itime, Idepth, Ilat, Ilon, index, mask_index)
+    {
+        #pragma omp for collapse(4) schedule(guided)
+        for (Itime = 0; Itime < Ntime; Itime++) {
+            for (Idepth = 0; Idepth < Ndepth; Idepth++) {
                 for (Ilat = 0; Ilat < Nlat; Ilat++) {
                     for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -93,12 +95,12 @@ void filtering(
                                         + pow(u_y.at(index), 2) 
                                         + pow(u_z.at(index), 2) 
                                       );
-                        }
-                    }
-                }
-            }
-        }
-    }
+                        } // done if land
+                    } // done lon loop
+                } // done lat loop
+            } // done depth loop
+        } // done time loop
+    } // done pragma
 
     // Now prepare to filter
     double scale,
@@ -249,11 +251,15 @@ void filtering(
                         u_x_tmp, u_y_tmp, u_z_tmp,\
                         u_r_tmp, u_lat_tmp, u_lon_tmp,\
                         KE_tmp, tid) \
-                firstprivate(perc, wRank)
+                firstprivate(perc, wRank, distances)
                 {
                     #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                            compute_distances(
+                                    distances, longitude, latitude,
+                                    Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                             #if DEBUG >= 3
                             // Need to group these together because of pragma collapse syntax
@@ -294,19 +300,22 @@ void filtering(
                                         Ntime,  Ndepth, Nlat, Nlon,
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
-                                        dAreas, scale, mask, true);
+                                        dAreas, scale, mask, true,
+                                        &distances);
                                 apply_filter_at_point(
                                         u_y_tmp, u_y,     
                                         Ntime,  Ndepth, Nlat, Nlon,
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
-                                        dAreas, scale, mask, true);
+                                        dAreas, scale, mask, true,
+                                        &distances);
                                 apply_filter_at_point(
                                         u_z_tmp, u_z,     
                                         Ntime,  Ndepth, Nlat, Nlon,
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
-                                        dAreas, scale, mask, true);
+                                        dAreas, scale, mask, true,
+                                        &distances);
 
 
                                 // Convert the filtered fields back to spherical
@@ -331,7 +340,8 @@ void filtering(
                                         Ntime,  Ndepth, Nlat, Nlon,
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
-                                        dAreas, scale, mask, true);
+                                        dAreas, scale, mask, true,
+                                        &distances);
                                 coarse_KE.at(index) = KE_tmp;
                                 fine_KE.at(index) = full_KE.at(index) - coarse_KE.at(index);
 
@@ -375,11 +385,15 @@ void filtering(
                         u_x_tmp, u_y_tmp, u_z_tmp,\
                         uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,\
                         tid)\
-                firstprivate(perc, wRank)
+                firstprivate(perc, wRank, distances)
                 {
                     #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                            compute_distances(
+                                    distances, longitude, latitude,
+                                    Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                             // Convert our four-index to a one-index
                             index = Index(Itime, Idepth, Ilat, Ilon,
@@ -413,7 +427,7 @@ void filtering(
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
                                         dAreas, scale,
-                                        mask);
+                                        mask, &distances);
 
                                 vel_Spher_to_Cart(u_x_tmp, u_y_tmp, u_z_tmp,
                                                   coarse_u_r.at(index), 
@@ -463,11 +477,15 @@ void filtering(
                         coarse_rho, coarse_p, fine_rho, fine_p, \
                         PEtoKE, coarse_u_r,\
                         perc_base, tid, stdout)\
-                firstprivate(perc, wRank)
+                firstprivate(perc, wRank, distances)
                 {
                     #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
                         for (Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                            compute_distances(
+                                    distances, longitude, latitude,
+                                    Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                             // Convert our four-index to a one-index
                             index = Index(Itime, Idepth, Ilat, Ilon,
@@ -495,13 +513,15 @@ void filtering(
                                         Ntime,  Ndepth, Nlat, Nlon,
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
-                                        dAreas, scale, mask, false);
+                                        dAreas, scale, mask, false,
+                                        &distances);
                                 apply_filter_at_point(
                                         p_tmp, full_p,     
                                         Ntime,  Ndepth, Nlat, Nlon,
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
-                                        dAreas, scale, mask, false);
+                                        dAreas, scale, mask, false,
+                                        &distances);
                                 coarse_rho.at(index) = rho_tmp;
                                 coarse_p.at(  index) = p_tmp;
 
