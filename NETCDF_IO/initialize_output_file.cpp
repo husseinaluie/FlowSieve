@@ -1,5 +1,6 @@
 #include <math.h>
 #include <vector>
+#include <mpi.h>
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
 
@@ -11,15 +12,20 @@ void initialize_output_file(
         const std::vector<double> & mask,       /**< [in] masking (land vs water, 2D) */
         const std::vector<std::string> & vars,  /**< [in] name of variables to write */
         const char * filename,                  /**< [in] name for the output file */
-        const double filter_scale               /**< [in] lengthscale used in the filter */
+        const double filter_scale,              /**< [in] lengthscale used in the filter */
+        const MPI_Comm comm                     /**< [in] MPI Communicator */
         ) {
 
+    int wRank=-1, wSize=-1;
+    MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
+    MPI_Comm_size( MPI_COMM_WORLD, &wSize );
+
     // Open the NETCDF file
-    int FLAG = NC_NETCDF4 | NC_CLOBBER;
+    int FLAG = NC_NETCDF4 | NC_CLOBBER | NC_MPIIO;
     int ncid=0, retval;
     char buffer [50];
     snprintf(buffer, 50, filename);
-    if (( retval = nc_create(buffer, FLAG, &ncid) ))
+    if (( retval = nc_create_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid) ))
         NC_ERR(retval, __LINE__, __FILE__);
 
     retval = nc_put_att_double(ncid, NC_GLOBAL, "filter_scale", NC_FLOAT, 1, &filter_scale);
@@ -103,13 +109,13 @@ void initialize_output_file(
     fprintf(stdout, "Output file (%s) initialized.\n\n", buffer);
     #endif
 
-
-    // Loop through and add the desired variables
-    // Dimension names (in order!)
-    const char* dim_names[] = {"time", "depth", "latitude", "longitude"};
-    const int ndims = 4;
-    for (size_t varInd = 0; varInd < vars.size(); ++varInd) {
-        add_var_to_file(vars.at(varInd), dim_names, ndims, buffer);
+    if (wRank == 0) {
+        // Loop through and add the desired variables
+        // Dimension names (in order!)
+        const char* dim_names[] = {"time", "depth", "latitude", "longitude"};
+        const int ndims = 4;
+        for (size_t varInd = 0; varInd < vars.size(); ++varInd) {
+            add_var_to_file(vars.at(varInd), dim_names, ndims, buffer);
+        }
     }
-
 }

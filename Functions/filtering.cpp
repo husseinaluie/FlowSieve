@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <vector>
 #include <omp.h>
+#include <mpi.h>
 #include "../functions.hpp"
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
@@ -18,27 +19,34 @@ void filtering(
         const std::vector<double> & depth,          /**< [in] Depth dimension (1D) */
         const std::vector<double> & longitude,      /**< [in] Longitude dimension (1D) */
         const std::vector<double> & latitude,       /**< [in] Latitude dimension (1D) */
-        const std::vector<double> & mask            /**< [in] Array to distinguish between land and water cells (2D) */
+        const std::vector<double> & mask,           /**< [in] Array to distinguish between land and water cells (2D) */
+        const std::vector<int>    & myCounts,       /**< [in] Array of dimension sizes */
+        const std::vector<int>    & myStarts,       /**< [in] Array of dimension sizes */
+        const MPI_Comm comm                         /**< [in] MPI Communicator */
         ) {
 
+    int wRank, wSize;
+    MPI_Comm_rank( comm, &wRank );
+    MPI_Comm_size( comm, &wSize );
 
     // Get dimension sizes
     const int Nscales = scales.size();
-    const int Ntime   = time.size();
-    const int Ndepth  = depth.size();
-    const int Nlat    = latitude.size();
-    const int Nlon    = longitude.size();
+    const int Ntime   = myCounts.at(0);
+    const int Ndepth  = myCounts.at(1);
+    const int Nlat    = myCounts.at(2);
+    const int Nlon    = myCounts.at(3);
 
     const int num_pts = Ntime * Ndepth * Nlat * Nlon;
     char filename [50];
     
     const int ndims = 4;
-    size_t starts[ndims] = {0, 0, 0, 0};
+    size_t starts[ndims] = {
+        size_t(myStarts.at(0)), size_t(myStarts.at(1)), size_t(myStarts.at(2)), size_t(myStarts.at(3))};
     size_t counts[ndims] = {size_t(Ntime), size_t(Ndepth), size_t(Nlat), size_t(Nlon)};
     std::vector<std::string> vars_to_write;
 
     #if DEBUG >= 1
-    fprintf(stdout, "Converting to Cartesian velocities.\n");
+    if (wRank == 0) { fprintf(stdout, "Converting to Cartesian velocities.\n"); }
     #endif
 
     std::vector<double> u_x(num_pts);
@@ -200,7 +208,7 @@ void filtering(
     //// Begin the main filtering loop
     //
     #if DEBUG>=1
-    fprintf(stdout, "Beginning main filtering loop.\n\n");
+    if (wRank == 0) { fprintf(stdout, "Beginning main filtering loop.\n\n"); }
     #endif
     for (int Iscale = 0; Iscale < Nscales; Iscale++) {
 
@@ -210,7 +218,7 @@ void filtering(
                 mask, vars_to_write, filename, scales.at(Iscale));
 
         #if DEBUG >= 0
-        fprintf(stdout, "Scale %d of %d\n", Iscale+1, Nscales);
+        if (wRank == 0) { fprintf(stdout, "Scale %d of %d\n", Iscale+1, Nscales); }
         #endif
 
         scale  = scales.at(Iscale);
@@ -218,13 +226,13 @@ void filtering(
         for (int Itime = 0; Itime < Ntime; Itime++) {
 
             #if DEBUG >= 0
-            fprintf(stdout, "  Time %d of %d\n", Itime+1, Ntime);
+            if (wRank == 0) { fprintf(stdout, "  Time %d of %d\n", Itime+1, Ntime); }
             #endif
             
             for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
 
                 #if DEBUG >= 0
-                fprintf(stdout, "    Depth %d of %d\n", Idepth+1, Ndepth);
+                if (wRank == 0) { fprintf(stdout, "    Depth %d of %d\n", Idepth+1, Ndepth); }
                 #endif
                 perc = perc_base;
 
@@ -241,7 +249,7 @@ void filtering(
                         u_x_tmp, u_y_tmp, u_z_tmp,\
                         u_r_tmp, u_lat_tmp, u_lon_tmp,\
                         KE_tmp, tid) \
-                firstprivate(perc)
+                firstprivate(perc, wRank)
                 {
                     #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -249,8 +257,10 @@ void filtering(
 
                             #if DEBUG >= 3
                             // Need to group these together because of pragma collapse syntax
-                            if (Ilon == 0) { fprintf(stdout, "      Ilat %d of %d\n", Ilat+1, Nlat); }
-                            fprintf(stdout, "        Ilon %d of %d\n", Ilon+1, Nlon);
+                            if (wRank == 0) {
+                                if (Ilon == 0) { fprintf(stdout, "      Ilat %d of %d\n", Ilat+1, Nlat); }
+                                fprintf(stdout, "        Ilon %d of %d\n", Ilon+1, Nlon);
+                            }
                             #endif
 
                             // Convert our four-index to a one-index
@@ -262,7 +272,7 @@ void filtering(
 
                             #if DEBUG >= 1
                             tid = omp_get_thread_num();
-                            if (tid == 0) {
+                            if ( (tid == 0) and (wRank == 0) ) {
                                 // Every 10 percent, print a dot, but only the first thread
                                 if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
                                     if (perc == perc_base) { fprintf(stdout, "      "); }
@@ -277,7 +287,7 @@ void filtering(
     
                                 // Apply the filter at the point
                                 #if DEBUG >= 3
-                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                                if (wRank == 0) { fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__); }
                                 #endif
                                 apply_filter_at_point(
                                         u_x_tmp, u_x,     
@@ -301,7 +311,7 @@ void filtering(
 
                                 // Convert the filtered fields back to spherical
                                 #if DEBUG >= 3
-                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                                if (wRank == 0) { fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__); }
                                 #endif
                                 vel_Cart_to_Spher(u_r_tmp, u_lon_tmp, u_lat_tmp,
                                                   u_x_tmp, u_y_tmp,   u_z_tmp,
@@ -343,7 +353,7 @@ void filtering(
                 #if DEBUG >= 1
                 #pragma omp master
                 {
-                    fprintf(stdout, "\n");
+                    if (wRank == 0) { fprintf(stdout, "\n"); }
                 }
                 #endif
 
@@ -365,7 +375,7 @@ void filtering(
                         u_x_tmp, u_y_tmp, u_z_tmp,\
                         uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,\
                         tid)\
-                firstprivate(perc)
+                firstprivate(perc, wRank)
                 {
                     #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -380,7 +390,7 @@ void filtering(
 
                             #if DEBUG >= 1
                             tid = omp_get_thread_num();
-                            if (tid == 0) {
+                            if ( (tid == 0) and (wRank == 0) ) {
                                 // Every 10 percent, print a dot, but only the first thread
                                 if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
                                     if (perc == perc_base) { fprintf(stdout, "      "); }
@@ -393,7 +403,7 @@ void filtering(
 
                             if (mask.at(mask_index) == 1) { // Skip land areas
                                 #if DEBUG >= 3
-                                fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__);
+                                if (wRank == 0) { fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__); }
                                 #endif
                                 apply_filter_at_point_for_quadratics(
                                         uxux_tmp, uxuy_tmp, uxuz_tmp,
@@ -434,7 +444,7 @@ void filtering(
                 #if DEBUG >= 1
                 #pragma omp master
                 {
-                    fprintf(stdout, "\n");
+                    if (wRank == 0) { fprintf(stdout, "\n"); }
                 }
                 #endif
                 #endif
@@ -453,7 +463,7 @@ void filtering(
                         coarse_rho, coarse_p, fine_rho, fine_p, \
                         PEtoKE, coarse_u_r,\
                         perc_base, tid, stdout)\
-                firstprivate(perc)
+                firstprivate(perc, wRank)
                 {
                     #pragma omp for collapse(2) schedule(dynamic)
                     for (Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -468,7 +478,7 @@ void filtering(
 
                             #if DEBUG >= 1
                             tid = omp_get_thread_num();
-                            if (tid == 0) {
+                            if ( (tid == 0) and (wRank == 0) ) {
                                 // Every 10 percent, print a dot, but only the first thread
                                 if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
                                     if (perc == perc_base) { fprintf(stdout, "      "); }
@@ -518,12 +528,19 @@ void filtering(
                 #if DEBUG >= 1
                 #pragma omp master
                 {
-                    fprintf(stdout, "\n");
+                    if (wRank == 0) { fprintf(stdout, "\n"); }
                 }
                 #endif
                 #endif
             }  // end for(depth) block
         }  // end for(time) block
+
+        // Barrier to line up processors before entering main writing block
+        MPI_Barrier(comm);
+
+        #if DEBUG >= 2
+        fprintf(stdout, "  = Rank %d finished time loop =\n", wRank);
+        #endif
 
         // Write to file
         write_field_to_output(fine_u_r,     "fine_u_r",     starts, counts, filename);

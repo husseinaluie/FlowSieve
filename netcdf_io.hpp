@@ -5,10 +5,10 @@
 #include <stdlib.h>
 #include <vector>
 #include <string>
-//#include <mpi.h>
+#include <mpi.h>
 
 #include "netcdf.h"
-//#include "netcdf_par.h"
+#include "netcdf_par.h"
 #include "hdf5.h"
 
 /*!
@@ -55,7 +55,8 @@ void initialize_output_file(
         const std::vector<double> & mask,
         const std::vector<std::string> & vars,
         const char * filename,
-        const double filter_scale);
+        const double filter_scale,
+        MPI_Comm = MPI_COMM_WORLD);
 
 /*!
  * \brief Write on scales worth of a single field.
@@ -72,7 +73,8 @@ void write_field_to_output(
         const char * field_name,
         const size_t * start, 
         const size_t * count,
-        const char * filename);
+        const char * filename,
+        MPI_Comm = MPI_COMM_WORLD);
 
 /*!
  *  \brief Read a specific variable from a specific file.
@@ -85,7 +87,10 @@ void read_var_from_file(
         std::vector<double> &var,
         const char * var_name,
         const char * filename,
-        std::vector<double> *mask );
+        std::vector<double> *mask = NULL,
+        std::vector<int> *myCounts = NULL,
+        std::vector<int> *myStarts = NULL,
+        const MPI_Comm = MPI_COMM_WORLD );
 
 /*!
  *  \brief Add a new variable to a netcdf file
@@ -97,6 +102,6 @@ void add_var_to_file(
         const std::string var_name,
         const char ** dim_list,
         const int num_dims,
-        const char * filename = "filter_output.nc");
+        const char * filename);
 
 #endif
