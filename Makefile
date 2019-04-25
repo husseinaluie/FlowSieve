@@ -85,23 +85,23 @@ ALGLIB/%.o: ALGLIB/%.cpp
 
 # The core coarse_graining functions use the same compile flags
 Functions/Differentiation_Tools/%.o: Functions/Differentiation_Tools/%.cpp
-	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
 Functions/%.o: Functions/%.cpp
 	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
 NETCDF_IO/%.o: NETCDF_IO/%.cpp
-	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
 Preprocess/%.o: Preprocess/%.cpp
 	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $<
 
 # Building test scripts
 Tests/%.o: Tests/%.cpp
-	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
 Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
-	$(MPICXX) ${VERSION} $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(MPICXX) $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 # Building coarse_grain executable
 coarse_grain.o: coarse_grain.cpp
