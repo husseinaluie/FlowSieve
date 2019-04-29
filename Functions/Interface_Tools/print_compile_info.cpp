@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <vector>
-#include "../constants.hpp"
+#include "../../constants.hpp"
+#include "../../functions.hpp"
 
 void print_compile_info(
         const std::vector<double> &scales   /**< [in] Scales used for filtering */

@@ -48,6 +48,10 @@ FUNCTIONS_OBJS := $(addprefix Functions/,$(notdir $(FUNCTIONS_CPPS:.cpp=.o)))
 DIFF_TOOL_CPPS := $(wildcard Functions/Differentiation_Tools/*.cpp)
 DIFF_TOOL_OBJS := $(addprefix Functions/Differentiation_Tools/,$(notdir $(DIFF_TOOL_CPPS:.cpp=.o)))
 
+# Get list of interface cpp files
+INTERFACE_CPPS := $(wildcard Functions/Interface_Tools/*.cpp)
+INTERFACE_OBJS := $(addprefix Functions/Interface_Tools/,$(notdir $(INTERFACE_CPPS:.cpp=.o)))
+
 # Get list of ALGLIB object files
 ALGLIB_CPPS := $(wildcard ALGLIB/*.cpp)
 ALGLIB_OBJS := $(addprefix ALGLIB/,$(notdir $(ALGLIB_CPPS:.cpp=.o)))
@@ -62,9 +66,22 @@ TEST_EXES := $(addprefix Tests/,$(notdir $(TEST_CPPS:.cpp=.x)))
 
 .PHONY: clean hardclean docs cleandocs tests all ALGLIB
 clean:
-	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o Tests/*.o Preprocess/*.o
+	rm -f *.o 
+	rm -f NETCDF_IO/*.o 
+	rm -f Functions/*.o 
+	rm -f Functions/Differentiation_Tools/*.o 
+	rm -f Functions/Interface_Tools/*.o 
+	rm -f Tests/*.o 
+	rm -f Preprocess/*.o
 hardclean:
-	rm -f *.o NETCDF_IO/*.o Functions/*.o Functions/Differentiation_Tools/*.o coarse_grain.x Tests/*.o Tests/*.x
+	rm -f *.o 
+	rm -f NETCDF_IO/*.o 
+	rm -f Functions/*.o 
+	rm -f Functions/Differentiation_Tools/*.o 
+	rm -f Tests/*.o 
+	rm -f Tests/*.x
+	rm -f Functions/Interface_Tools/*.o 
+	rm -f coarse_grain.x 
 	rm -r coarse_grain.x.dSYM
 	rm ALGLIB/*.o
 	rm -r docs/html
@@ -85,29 +102,32 @@ ALGLIB/%.o: ALGLIB/%.cpp
 
 # The core coarse_graining functions use the same compile flags
 Functions/Differentiation_Tools/%.o: Functions/Differentiation_Tools/%.cpp
+	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+
+Functions/Interface_Tools/%.o: Functions/Interface_Tools/%.cpp
 	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
 Functions/%.o: Functions/%.cpp
-	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
 NETCDF_IO/%.o: NETCDF_IO/%.cpp
-	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
 Preprocess/%.o: Preprocess/%.cpp
 	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $<
 
 # Building test scripts
 Tests/%.o: Tests/%.cpp
-	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
+	$(MPICXX) $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
 Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
-	$(MPICXX) ${VERSION} $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
+	$(MPICXX) $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 # Building coarse_grain executable
 coarse_grain.o: coarse_grain.cpp
 	$(MPICXX) ${VERSION} $(LINKS) $(LDFLAGS) -c $(CFLAGS) -o $@ $<
 
-coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} coarse_grain.o
+coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} coarse_grain.o
 	$(MPICXX) ${VERSION} $(LINKS) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 # Interpolator needs to link in ALGLIB
