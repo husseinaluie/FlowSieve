@@ -23,6 +23,7 @@ int main(int argc, char *argv[]) {
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_safety_provided);
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI::ERRORS_THROW_EXCEPTIONS);
     //MPI_Status status;
+    const double start_time = MPI_Wtime();
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
@@ -32,7 +33,7 @@ int main(int argc, char *argv[]) {
     //   include scales as a comma-separated list
     //   scales are given in metres
     // A zero scale will cause everything to nan out
-    std::vector<double> filter_scales {100e3};
+    std::vector<double> filter_scales {150e3};
 
     // Parse command-line flags
     char buffer [50];
@@ -168,6 +169,7 @@ int main(int argc, char *argv[]) {
     compute_areas(areas, longitude, latitude);
 
     // Now pass the arrays along to the filtering routines
+    const double pre_filter_time = MPI_Wtime();
     filtering(u_r, u_lon, u_lat,
               rho, p,
               filter_scales,
@@ -175,12 +177,18 @@ int main(int argc, char *argv[]) {
               time, depth,
               longitude, latitude,
               mask, myCounts, myStarts);
+    const double post_filter_time = MPI_Wtime();
 
     // Done!
     #if DEBUG >= 0
+    const double delta_clock = MPI_Wtick();
     if (wRank == 0) {
         fprintf(stdout, "\n\n");
         fprintf(stdout, "Process completed.\n");
+        fprintf(stdout, "\n");
+        fprintf(stdout, "Start-up time:  %g\n", pre_filter_time - start_time);
+        fprintf(stdout, "Filtering time: %g\n", post_filter_time - pre_filter_time);
+        fprintf(stdout, "   (clock resolution = %g)\n", delta_clock);
     }
     #endif
 
