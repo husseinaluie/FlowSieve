@@ -19,19 +19,17 @@ double kernel(
    
     double kern;
 
-    #if KERNEL_OPT == 0
-    if ( dist < (scale / 2) ) {
-        kern =  1.;
-    } else {
-        kern =  0.;
+    switch (constants::KERNEL_OPT) {
+        case 0: if ( dist < (scale / 2) ) { kern =  1.; }
+                else { kern =  0.; }
+                break;
+        case 1: kern = exp( -pow( dist / (scale/2)  , 4) );
+                break;
+        case 2: kern = exp( -pow( dist / (scale/2)  , 2) );
+                break;
+        case 3: kern = sinc( dist / (scale/2) );
+                break;
     }
-    #elif KERNEL_OPT == 1
-    kern = exp( -pow( dist / (scale/2)  , 4) );
-    #elif KERNEL_OPT == 2
-    kern = exp( -pow( dist / (scale/2)  , 2) );
-    #elif KERNEL_OPT == 3
-    kern = sinc( dist / (scale/2) );
-    #endif
 
     #if DEBUG >= 6
     fprintf(stdout, "Kernel(dist=%.4g, scale=%.4g) = %.4g\n",

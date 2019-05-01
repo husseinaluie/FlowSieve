@@ -19,34 +19,23 @@ void compute_areas(
     const int Nlon = longitude.size();
     const int Nlat = latitude.size();
 
-    #if CARTESIAN
-    const double coeff = dlat * dlon;
-    #elif not(CARTESIAN)
-    const double coeff = pow( constants::R_earth, 2) * dlat * dlon;
-    #endif
+    double coeff;
+    if (constants::CARTESIAN) { coeff = dlat * dlon; }
+    else { coeff = pow( constants::R_earth, 2) * dlat * dlon; }
 
     // Compute the area of each cell
     int ii, jj;
-    #if CARTESIAN
-    #pragma omp parallel default(none) private(ii, jj) shared(areas)
+    #pragma omp parallel default(none) private(ii, jj) shared(areas, coeff, latitude)
     {
         #pragma omp for collapse(2) schedule(static)
         for (ii = 0; ii < Nlat; ii++) {
             for (jj = 0; jj < Nlon; jj++) {
-                areas.at(ii*Nlon + jj) = coeff;
+                if (constants::CARTESIAN) {
+                    areas.at(ii*Nlon + jj) = coeff;
+                } else {
+                    areas.at(ii*Nlon + jj) = coeff * cos(latitude.at(ii));
+                }
             }
         }
     }
-    #elif not(CARTESIAN)
-    #pragma omp parallel default(none) private(ii, jj) shared(areas, latitude)
-    {
-        #pragma omp for collapse(2) schedule(static)
-        for (ii = 0; ii < Nlat; ii++) {
-            for (jj = 0; jj < Nlon; jj++) {
-                areas.at(ii*Nlon + jj) = coeff * cos(latitude.at(ii));
-            }
-        }
-    }
-    #endif
-
 }

@@ -90,9 +90,7 @@ void compute_div_transport(
 
     double div_J_tmp; 
     
-    #if COMP_BC_TRANSFERS
     double dpdx, dpdy, dpdz;
-    #endif
 
     int Ilat, Ilon, index, mask_index;
 
@@ -117,7 +115,7 @@ void compute_div_transport(
             shared( div_J, Idepth, Itime, stdout,\
                     latitude, longitude, mask, \
                     u_x, u_y, u_z, uxux, uxuy, uxuz,\
-                    uyuy, uyuz, uzuz)\
+                    uyuy, uyuz, uzuz, coarse_p)\
             private(Ilat, Ilon, index, mask_index, \
                     ux,   uy,   uz,\
                     ux_x, uy_x, uz_x,\
@@ -129,6 +127,7 @@ void compute_div_transport(
                     uxux_loc, uxuy_loc, uxuz_loc,\
                     uyux_loc, uyuy_loc, uyuz_loc,\
                     uzux_loc, uzuy_loc, uzuz_loc,\
+                    dpdx, dpdy, dpdz,\
                     div_J_tmp)
             {
                 #pragma omp for collapse(2) schedule(guided)
@@ -274,6 +273,35 @@ void compute_div_transport(
                                  + uz * ( (uzux_x - uz_x*ux) + (uzuy_y - uz_y*uy) + ( uzuz_z - uz_z*uz) )
                                 );
 
+
+                            // Pressure term
+                            // (p * u_j),j = p_,j * u_j
+                            if (constants::COMP_BC_TRANSFERS) {
+                                // p_,j
+                                dpdx = Cart_derivative_at_point(
+                                        coarse_p,
+                                        latitude, longitude, "x",
+                                        Itime, Idepth, Ilat, Ilon,
+                                        Ntime, Ndepth, Nlat, Nlon,
+                                        mask);
+                                dpdy = Cart_derivative_at_point(
+                                        coarse_p,
+                                        latitude, longitude, "y",
+                                        Itime, Idepth, Ilat, Ilon,
+                                        Ntime, Ndepth, Nlat, Nlon,
+                                        mask);
+                                dpdz = Cart_derivative_at_point(
+                                        coarse_p,
+                                        latitude, longitude, "z",
+                                        Itime, Idepth, Ilat, Ilon,
+                                        Ntime, Ndepth, Nlat, Nlon,
+                                        mask);
+
+                                // Pressure term
+                                // (p * u_j),j = p_,j * u_j
+                                div_J_tmp += ux * dpdx + uy * dpdy + uz * dpdz;
+                            }
+
                         } // end if(water) block
                         else { // if(land)
                             div_J_tmp = constants::fill_value;
@@ -284,70 +312,6 @@ void compute_div_transport(
                     } // end Ilon loop
                 } // end Ilat loop
             } // end pragma
-
-            // Pressure term
-            #if COMP_BC_TRANSFERS
-            #pragma omp parallel \
-            default(none) \
-            shared( div_J, Idepth, Itime, stdout,\
-                    latitude, longitude, mask, coarse_p, \
-                    u_x, u_y, u_z)\
-            private(Ilat, Ilon, index, mask_index, \
-                    dpdx, dpdy, dpdz,\
-                    ux,   uy,   uz,\
-                    div_J_tmp)
-            {
-                #pragma omp for collapse(2) schedule(guided)
-                for (Ilat = 0; Ilat < Nlat; Ilat++) {
-                    for (Ilon = 0; Ilon < Nlon; Ilon++) {
-
-                        div_J_tmp = 0.;
-
-                        // Convert our four-index to a one-index
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon);
-                        mask_index = Index(0,     0,      Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon);
-
-                        if (mask.at(mask_index) == 1) { // Skip land areas
-
-                            // u_i
-                            ux = u_x.at(index);
-                            uy = u_y.at(index);
-                            uz = u_z.at(index);
-
-                            // p_,j
-                            dpdx = Cart_derivative_at_point(
-                                    coarse_p,
-                                    latitude, longitude, "x",
-                                    Itime, Idepth, Ilat, Ilon,
-                                    Ntime, Ndepth, Nlat, Nlon,
-                                    mask);
-                            dpdy = Cart_derivative_at_point(
-                                    coarse_p,
-                                    latitude, longitude, "y",
-                                    Itime, Idepth, Ilat, Ilon,
-                                    Ntime, Ndepth, Nlat, Nlon,
-                                    mask);
-                            dpdz = Cart_derivative_at_point(
-                                    coarse_p,
-                                    latitude, longitude, "z",
-                                    Itime, Idepth, Ilat, Ilon,
-                                    Ntime, Ndepth, Nlat, Nlon,
-                                    mask);
-
-                            // Pressure term
-                            // (p * u_j),j = p_,j * u_j
-                            div_J_tmp += ux * dpdx + uy * dpdy + uz * dpdz;
-
-                        } // end if(water) block
-
-                        div_J.at(index) += div_J_tmp;
-
-                    } // end Ilon loop
-                } // end Ilat loop
-            } // end pragma
-            #endif
         } // end Idepth loop
     } // end Itime loop
 }

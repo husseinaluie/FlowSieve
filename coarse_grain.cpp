@@ -63,11 +63,11 @@ int main(int argc, char *argv[]) {
 
     #if DEBUG >= 0
     if (wRank == 0) {
-        #if not(CARTESIAN)
-        fprintf(stdout, "Using spherical coordinates.\n");
-        #elif CARTESIAN
-        fprintf(stdout, "Using Cartesian coordinates.\n");
-        #endif
+        if (constants::CARTESIAN) { 
+            fprintf(stdout, "Using spherical coordinates.\n");
+        } else {
+            fprintf(stdout, "Using Cartesian coordinates.\n");
+        }
     }
     #endif
     MPI_Barrier(MPI_COMM_WORLD);
@@ -129,35 +129,35 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    #if COMP_BC_TRANSFERS
-    // If desired, read in rho and p
-    read_var_from_file(rho, "rho", "input.nc");
-    read_var_from_file(p,   "p",   "input.nc");
-    #endif
+    if (constants::COMP_BC_TRANSFERS) {
+        // If desired, read in rho and p
+        read_var_from_file(rho, "rho", "input.nc");
+        read_var_from_file(p,   "p",   "input.nc");
+    }
 
     //const int Ntime  = time.size();
     //const int Ndepth = depth.size();
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
-    #if not(CARTESIAN)
-    // Convert coordinate to radians
-    int ii;
-    #pragma omp parallel default(none) private(ii) shared(longitude)
-    { 
-        #pragma omp for collapse(1) schedule(static)
-        for (ii = 0; ii < Nlon; ii++) {
-            longitude.at(ii) = longitude.at(ii) * M_PI / 180;
+    if (not(constants::CARTESIAN)) {
+        // Convert coordinate to radians
+        int ii;
+        #pragma omp parallel default(none) private(ii) shared(longitude)
+        { 
+            #pragma omp for collapse(1) schedule(static)
+            for (ii = 0; ii < Nlon; ii++) {
+                longitude.at(ii) = longitude.at(ii) * M_PI / 180;
+            }
+        }
+        #pragma omp parallel default(none) private(ii) shared(latitude)
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for (ii = 0; ii < Nlat; ii++) {
+                latitude.at(ii) = latitude.at(ii) * M_PI / 180;
+            }
         }
     }
-    #pragma omp parallel default(none) private(ii) shared(latitude)
-    {
-        #pragma omp for collapse(1) schedule(static)
-        for (ii = 0; ii < Nlat; ii++) {
-            latitude.at(ii) = latitude.at(ii) * M_PI / 180;
-        }
-    }
-    #endif
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration

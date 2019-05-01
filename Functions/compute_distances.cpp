@@ -18,11 +18,12 @@ void compute_distances(
     double dist;
     int index;
 
-    #if CARTESIAN
-    // Grid spacing: assume uniform grid
-    const double dlat_m = latitude.at( 1) - latitude.at( 0);
-    const double dlon_m = longitude.at(1) - longitude.at(0);
-    #endif
+    double dlat_m, dlon_m;
+    if (constants::CARTESIAN) {
+        // Grid spacing: assume uniform grid
+        dlat_m = latitude.at( 1) - latitude.at( 0);
+        dlon_m = longitude.at(1) - longitude.at(0);
+    }
 
     const double ref_lat = latitude.at(ref_ilat);
     const double ref_lon = longitude.at(ref_ilon);
@@ -33,14 +34,14 @@ void compute_distances(
             index = Index(0,     0,      Ilat, Ilon,
                           Ntime, Ndepth, Nlat, Nlon);
 
-            #if CARTESIAN
-            dist = distance(longitude.at(Ilon), latitude.at(Ilat),
-                            ref_lon, ref_lat,
-                            dlon_m * Nlon, dlat_m * Nlat);
-            #elif not(CARTESIAN)
-            dist = distance(longitude.at(Ilon), latitude.at(Ilat),
-                            ref_lon, ref_lat);
-            #endif
+            if (constants::CARTESIAN) {
+                dist = distance(longitude.at(Ilon), latitude.at(Ilat),
+                        ref_lon, ref_lat,
+                        dlon_m * Nlon, dlat_m * Nlat);
+            } else {
+                dist = distance(longitude.at(Ilon), latitude.at(Ilat),
+                        ref_lon, ref_lat);
+            }
 
             distances.at(index) = dist;
         } // end longitude loop

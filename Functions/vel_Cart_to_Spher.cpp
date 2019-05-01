@@ -13,25 +13,25 @@ void vel_Cart_to_Spher(
             const double lat  /**< [in] latitude of location for conversion */
         ) {
 
-    #if CARTESIAN
-    u_lon = u_x;
-    u_lat = u_y;
-    u_r   = u_z;
-    #elif not(CARTESIAN)
-    const double cos_lon = cos(lon);
-    const double cos_lat = cos(lat);
-    const double sin_lon = sin(lon);
-    const double sin_lat = sin(lat);
-    u_r   =   u_x * cos_lon * cos_lat
-            + u_y * sin_lon * cos_lat
-            + u_z           * sin_lat;
-    
-    u_lon = - u_x * sin_lon
-            + u_y * cos_lon;
-    
-    u_lat = - u_x * cos_lon * sin_lat
-            - u_y * sin_lon * sin_lat
-            + u_z           * cos_lat;
-    #endif
+    if (constants::CARTESIAN) {
+        u_lon = u_x;
+        u_lat = u_y;
+        u_r   = u_z;
+    } else {
+        const double cos_lon = cos(lon);
+        const double cos_lat = cos(lat);
+        const double sin_lon = sin(lon);
+        const double sin_lat = sin(lat);
 
+        u_r   =   u_x * cos_lon * cos_lat
+                + u_y * sin_lon * cos_lat
+                + u_z           * sin_lat;
+
+        u_lon = - u_x * sin_lon
+                + u_y * cos_lon;
+
+        u_lat = - u_x * cos_lon * sin_lat
+                - u_y * sin_lon * sin_lat
+                + u_z           * cos_lat;
+    }
 }

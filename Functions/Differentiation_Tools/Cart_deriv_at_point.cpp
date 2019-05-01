@@ -41,32 +41,32 @@ double Cart_derivative_at_point(
 
     double deriv_val = 0.;
 
-    #if not(CARTESIAN)
-    const double lon = longitude.at(Ilon);
-    const double lat = latitude.at(Ilat);
-    const double r = constants::R_earth;
-    const double sin_lon = sin(lon);
-    const double sin_lat = sin(lat);
-    const double cos_lon = cos(lon);
-    const double cos_lat = cos(lat);
-    if (dim == "x") {
-        deriv_val = - ( sin_lon / (r * cos_lat ) ) * dfield_dlon
-                    - ( cos_lon * sin_lat / r )    * dfield_dlat;
-    } else if (dim == "y") {
-        deriv_val =   ( cos_lon / (r * cos_lat ) ) * dfield_dlon
-                    - ( sin_lon * sin_lat / r )    * dfield_dlat;
-    } else if (dim == "z") {
-        deriv_val = ( cos_lat / r ) * dfield_dlat;
+    if (not(constants::CARTESIAN)) {
+        const double lon = longitude.at(Ilon);
+        const double lat = latitude.at(Ilat);
+        const double r = constants::R_earth;
+        const double sin_lon = sin(lon);
+        const double sin_lat = sin(lat);
+        const double cos_lon = cos(lon);
+        const double cos_lat = cos(lat);
+        if (dim == "x") {
+            deriv_val = - ( sin_lon / (r * cos_lat ) ) * dfield_dlon
+                        - ( cos_lon * sin_lat / r )    * dfield_dlat;
+        } else if (dim == "y") {
+            deriv_val =   ( cos_lon / (r * cos_lat ) ) * dfield_dlon
+                        - ( sin_lon * sin_lat / r )    * dfield_dlat;
+        } else if (dim == "z") {
+            deriv_val = ( cos_lat / r ) * dfield_dlat;
+        }
+    } else {
+        // If we're on an underlying Cartesian grid, then
+        //    the 'spherical' derivatives are actually the
+        //    Cartesian derivatives, so we don't need to 
+        //    do anything.
+        if      (dim == "x") { deriv_val = dfield_dlon; } 
+        else if (dim == "y") { deriv_val = dfield_dlat; } 
+        else if (dim == "z") { deriv_val = 0.; }
     }
-    #elif CARTESIAN
-    // If we're on an underlying Cartesian grid, then
-    //    the 'spherical' derivatives are actually the
-    //    Cartesian derivatives, so we don't need to 
-    //    do anything.
-    if      (dim == "x") { deriv_val = dfield_dlon; } 
-    else if (dim == "y") { deriv_val = dfield_dlat; } 
-    else if (dim == "z") { deriv_val = 0.; }
-    #endif
 
     return deriv_val;
 }
