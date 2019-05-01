@@ -202,7 +202,7 @@ void filtering(
     #endif
 
     #if DEBUG >= 1
-    int perc_base = 10;
+    int perc_base = 5;
     int perc;
     #endif
 
@@ -223,77 +223,60 @@ void filtering(
         if (wRank == 0) { fprintf(stdout, "Scale %d of %d\n", Iscale+1, Nscales); }
         #endif
 
-        scale  = scales.at(Iscale);
+        scale = scales.at(Iscale);
+        perc  = perc_base;
 
-        for (int Itime = 0; Itime < Ntime; Itime++) {
+        #if DEBUG >= 0
+        if (wRank == 0) { fprintf(stdout, "  core filtering: "); }
+        #endif
 
-            #if DEBUG >= 0
-            if (wRank == 0) { fprintf(stdout, "  Time %d of %d\n", Itime+1, Ntime); }
-            #endif
-            
-            for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-
-                #if DEBUG >= 0
-                if (wRank == 0) { fprintf(stdout, "    Depth %d of %d\n", Idepth+1, Ndepth); }
-                #endif
-                perc = perc_base;
-
-                #pragma omp parallel \
-                default(none) \
-                shared(Itime, Idepth, mask, u_x, u_y, u_z,\
-                        stdout,\
-                        longitude, latitude, dAreas, scale,\
-                        full_KE, coarse_KE, fine_KE,\
-                        full_u_r, full_u_lon, full_u_lat,\
-                        coarse_u_r, coarse_u_lon, coarse_u_lat,\
-                        fine_u_r, fine_u_lon, fine_u_lat, perc_base)\
-                private(Ilat, Ilon, index, mask_index,\
-                        u_x_tmp, u_y_tmp, u_z_tmp,\
-                        u_r_tmp, u_lat_tmp, u_lon_tmp,\
-                        KE_tmp, tid) \
-                firstprivate(perc, wRank, distances)
-                {
-                    #pragma omp for collapse(2) schedule(dynamic)
-                    for (Ilat = 0; Ilat < Nlat; Ilat++) {
-                        for (Ilon = 0; Ilon < Nlon; Ilon++) {
-
-                            compute_distances(
-                                    distances, longitude, latitude,
-                                    Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
-
-                            #if DEBUG >= 3
-                            // Need to group these together because of pragma collapse syntax
-                            if (wRank == 0) {
-                                if (Ilon == 0) { fprintf(stdout, "      Ilat %d of %d\n", Ilat+1, Nlat); }
-                                fprintf(stdout, "        Ilon %d of %d\n", Ilon+1, Nlon);
-                            }
-                            #endif
+        #pragma omp parallel \
+        default(none) \
+        shared(mask, u_x, u_y, u_z,\
+                stdout,\
+                longitude, latitude, dAreas, scale,\
+                full_KE, coarse_KE, fine_KE,\
+                full_u_r, full_u_lon, full_u_lat,\
+                coarse_u_r, coarse_u_lon, coarse_u_lat,\
+                fine_u_r, fine_u_lon, fine_u_lat, perc_base)\
+        private(Itime, Idepth, Ilat, Ilon, index, mask_index,\
+                u_x_tmp, u_y_tmp, u_z_tmp,\
+                u_r_tmp, u_lat_tmp, u_lon_tmp,\
+                KE_tmp, tid) \
+        firstprivate(perc, wRank, distances)
+        {
+            #pragma omp for collapse(2) schedule(dynamic)
+            for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                for (Ilon = 0; Ilon < Nlon; Ilon++) {
+                    compute_distances(
+                            distances, longitude, latitude,
+                            Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                    mask_index = Index(0,     0,      Ilat, Ilon,
+                                       Ntime, Ndepth, Nlat, Nlon);
+                    for (Itime = 0; Itime < Ntime; Itime++) {
+                        for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
                             // Convert our four-index to a one-index
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
-    
-                            mask_index = Index(0,     0,      Ilat, Ilon,
-                                               Ntime, Ndepth, Nlat, Nlon);
-
-                            #if DEBUG >= 1
-                            tid = omp_get_thread_num();
-                            if ( (tid == 0) and (wRank == 0) ) {
-                                // Every 10 percent, print a dot, but only the first thread
-                                if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
-                                    if (perc == perc_base) { fprintf(stdout, "      "); }
-                                    fprintf(stdout, ".");
-                                    fflush(stdout);
-                                    perc += perc_base;
-                                }
-                            }
-                            #endif
-    
                             if (mask.at(mask_index) == 1) { // Skip land areas
+
+                                #if DEBUG >= 1
+                                tid = omp_get_thread_num();
+                                if ( (tid == 0) and (wRank == 0) ) {
+                                    // Every perc_base percent, print a dot, but only the first thread
+                                    if ( ((double)(index+1) / (Ntime*Ndepth*Nlat*Nlon)) * 100 >= perc ) {
+                                        fprintf(stdout, ".");
+                                        fflush(stdout);
+                                        perc += perc_base;
+                                    }
+                                }
+                                #endif
+    
     
                                 // Apply the filter at the point
                                 #if DEBUG >= 3
-                                if (wRank == 0) { fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__); }
+                                if (wRank == 0) { fprintf(stdout, "    Line %d of %s\n", __LINE__, __FILE__); }
                                 #endif
                                 apply_filter_at_point(
                                         u_x_tmp, u_x,     
@@ -357,67 +340,69 @@ void filtering(
                                 coarse_u_lon.at(index) = constants::fill_value;
                                 coarse_u_lat.at(index) = constants::fill_value;
                             }  // end not(masked) block
-                        }  // end for(longitude) block
-                    }  // end for(latitude) block
-                }  // end pragma parallel block
-                #if DEBUG >= 1
-                #pragma omp master
-                {
-                    if (wRank == 0) { fprintf(stdout, "\n"); }
-                }
-                #endif
+                        }  // end for(depth) block
+                    }  // end for(time) block
+                }  // end for(longitude) block
+            }  // end for(latitude) block
+        }  // end pragma parallel block
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "\n"); }
+        #endif
 
-                #if COMP_TRANSFERS
-                perc = perc_base;
-                // If we want energy transfers (Pi), then loop through again to do it.
-                //   It needs to be in a separate loop because the list of shared
-                //   variables is dependent on the pre-processor flags
-                #pragma omp parallel \
-                default(none) \
-                shared(Itime, Idepth, mask, stdout,\
-                        longitude, latitude, dAreas, scale,\
-                        coarse_u_r, coarse_u_lat, coarse_u_lon,\
-                        coarse_u_x, coarse_u_y, coarse_u_z,\
-                        coarse_uxux, coarse_uxuy, coarse_uxuz,\
-                        coarse_uyuy, coarse_uyuz, coarse_uzuz,\
-                        u_x, u_y, u_z, perc_base) \
-                private(Ilat, Ilon, index, mask_index,\
-                        u_x_tmp, u_y_tmp, u_z_tmp,\
-                        uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,\
-                        tid)\
-                firstprivate(perc, wRank, distances)
-                {
-                    #pragma omp for collapse(2) schedule(dynamic)
-                    for (Ilat = 0; Ilat < Nlat; Ilat++) {
-                        for (Ilon = 0; Ilon < Nlon; Ilon++) {
-
-                            compute_distances(
-                                    distances, longitude, latitude,
-                                    Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+        #if COMP_TRANSFERS
+        // If we want energy transfers (Pi), then loop through again to do it.
+        //   It needs to be in a separate loop because the list of shared
+        //   variables is dependent on the pre-processor flags
+        #if DEBUG >= 0
+        if (wRank == 0) { fprintf(stdout, "  filter for transfers: "); }
+        #endif
+        perc = perc_base;
+        #pragma omp parallel \
+        default(none) \
+        shared(mask, stdout,\
+                longitude, latitude, dAreas, scale,\
+                coarse_u_r, coarse_u_lat, coarse_u_lon,\
+                coarse_u_x, coarse_u_y, coarse_u_z,\
+                coarse_uxux, coarse_uxuy, coarse_uxuz,\
+                coarse_uyuy, coarse_uyuz, coarse_uzuz,\
+                u_x, u_y, u_z, perc_base) \
+        private(Itime, Idepth, Ilat, Ilon, index, mask_index,\
+                u_x_tmp, u_y_tmp, u_z_tmp,\
+                uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,\
+                tid)\
+        firstprivate(perc, wRank, distances)
+        {
+            #pragma omp for collapse(2) schedule(dynamic)
+            for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                for (Ilon = 0; Ilon < Nlon; Ilon++) {
+                    compute_distances(
+                            distances, longitude, latitude,
+                            Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+    
+                    mask_index = Index(0,     0,      Ilat, Ilon,
+                                       Ntime, Ndepth, Nlat, Nlon);
+                    for (Itime = 0; Itime < Ntime; Itime++) {
+                        for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
                             // Convert our four-index to a one-index
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
-    
-                            mask_index = Index(0,     0,      Ilat, Ilon,
-                                               Ntime, Ndepth, Nlat, Nlon);
-
-                            #if DEBUG >= 1
-                            tid = omp_get_thread_num();
-                            if ( (tid == 0) and (wRank == 0) ) {
-                                // Every 10 percent, print a dot, but only the first thread
-                                if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
-                                    if (perc == perc_base) { fprintf(stdout, "      "); }
-                                    fprintf(stdout, ".");
-                                    fflush(stdout);
-                                    perc += perc_base;
-                                }
-                            }
-                            #endif
-
                             if (mask.at(mask_index) == 1) { // Skip land areas
+
+                                #if DEBUG >= 1
+                                tid = omp_get_thread_num();
+                                if ( (tid == 0) and (wRank == 0) ) {
+                                    // Every perc_base percent, print a dot, but only the first thread
+                                    if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
+                                        fprintf(stdout, ".");
+                                        fflush(stdout);
+                                        perc += perc_base;
+                                    }
+                                }
+                                #endif
+
                                 #if DEBUG >= 3
-                                if (wRank == 0) { fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__); }
+                                if (wRank == 0) { fprintf(stdout, "    Line %d of %s\n", __LINE__, __FILE__); }
                                 #endif
                                 apply_filter_at_point_for_quadratics(
                                         uxux_tmp, uxuy_tmp, uxuz_tmp,
@@ -452,62 +437,67 @@ void filtering(
                                 coarse_u_y.at(index) = constants::fill_value;
                                 coarse_u_z.at(index) = constants::fill_value;
                             }  // end not(masked) block
-                        }  // end for(longitude) block
-                    }  // end for(latitude) block
-                } // end pragma parallel block
-                #if DEBUG >= 1
-                #pragma omp master
-                {
-                    if (wRank == 0) { fprintf(stdout, "\n"); }
-                }
-                #endif
-                #endif
+                        }  // end for(depth) block
+                    }  // end for(time) block
+                }  // end for(longitude) block
+            }  // end for(latitude) block
+        } // end pragma parallel block
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "\n"); }
+        #endif  // end debug if
+        #endif  // end if COMP_TRANSFER
                 
-                #if COMP_BC_TRANSFERS
-                // If we want baroclinic transfers, then loop through again
-                // to compute as necessary
-                //   It needs to be in a separate loop because the list of shared
-                //   variables is dependent on the pre-processor flags
-                #pragma omp parallel \
-                default(none) \
-                private(index, mask_index, Ilat, Ilon,\
-                        rho_tmp, p_tmp) \
-                shared(Itime, Idepth, scale, mask, dAreas, \
-                        longitude, latitude, full_rho, full_p,\
-                        coarse_rho, coarse_p, fine_rho, fine_p, \
-                        PEtoKE, coarse_u_r,\
-                        perc_base, tid, stdout)\
-                firstprivate(perc, wRank, distances)
-                {
-                    #pragma omp for collapse(2) schedule(dynamic)
-                    for (Ilat = 0; Ilat < Nlat; Ilat++) {
-                        for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
-                            compute_distances(
-                                    distances, longitude, latitude,
-                                    Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
+        #if COMP_BC_TRANSFERS
+        // If we want baroclinic transfers, then loop through again
+        // to compute as necessary
+        //   It needs to be in a separate loop because the list of shared
+        //   variables is dependent on the pre-processor flags
+        #if DEBUG >= 0
+        if (wRank == 0) { fprintf(stdout, "  filter for baroclinic transfers: "); }
+        #endif
+        perc = perc_base;
+        #pragma omp parallel \
+        default(none) \
+        private(index, mask_index, Itime, Idepth, Ilat, Ilon,\
+                rho_tmp, p_tmp) \
+        shared(scale, mask, dAreas, \
+                longitude, latitude, full_rho, full_p,\
+                coarse_rho, coarse_p, fine_rho, fine_p, \
+                PEtoKE, coarse_u_r,\
+                perc_base, tid, stdout)\
+        firstprivate(perc, wRank, distances)
+        {
+            #pragma omp for collapse(2) schedule(dynamic)
+            for (Ilat = 0; Ilat < Nlat; Ilat++) {
+                for (Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                    compute_distances(
+                        distances, longitude, latitude,
+                        Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+    
+                    mask_index = Index(0,     0,      Ilat, Ilon,
+                                       Ntime, Ndepth, Nlat, Nlon);
+                    for (Itime = 0; Itime < Ntime; Itime++) {
+                        for (Idepth = 0; Idepth < Ndepth; Idepth++) {
                             // Convert our four-index to a one-index
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
-    
-                            mask_index = Index(0,     0,      Ilat, Ilon,
-                                               Ntime, Ndepth, Nlat, Nlon);
-
-                            #if DEBUG >= 1
-                            tid = omp_get_thread_num();
-                            if ( (tid == 0) and (wRank == 0) ) {
-                                // Every 10 percent, print a dot, but only the first thread
-                                if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
-                                    if (perc == perc_base) { fprintf(stdout, "      "); }
-                                    fprintf(stdout, ".");
-                                    fflush(stdout);
-                                    perc += perc_base;
-                                }
-                            }
-                            #endif
-
                             if (mask.at(mask_index) == 1) { // Skip land areas
+
+                                #if DEBUG >= 1
+                                tid = omp_get_thread_num();
+                                if ( (tid == 0) and (wRank == 0) ) {
+                                    // Every 10 percent, print a dot, but only the first thread
+                                    if ( ((double)(mask_index+1) / (Nlat*Nlon)) * 100 >= perc ) {
+                                        fprintf(stdout, ".");
+                                        fflush(stdout);
+                                    perc += perc_base;
+                                    }
+                                }
+                                #endif
+
                                 apply_filter_at_point(
                                         rho_tmp, full_rho,     
                                         Ntime,  Ndepth, Nlat, Nlon,
@@ -542,24 +532,18 @@ void filtering(
 
                                 PEtoKE.at(index) = constants::fill_value;
                             }  // end if(land) block
-                        }  // end for(longitude) block
-                    }  // end for(latitude) block
-                }  // end pragma parallel block
-                #if DEBUG >= 1
-                #pragma omp master
-                {
-                    if (wRank == 0) { fprintf(stdout, "\n"); }
-                }
-                #endif
-                #endif
-            }  // end for(depth) block
-        }  // end for(time) block
-
-        // Barrier to line up processors before entering main writing block
-        MPI_Barrier(comm);
+                        }  // end for(depth) block
+                    }  // end for(time) block
+                }  // end for(longitude) block
+            }  // end for(latitude) block
+        }  // end pragma parallel block
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "\n"); }
+        #endif
+        #endif
 
         #if DEBUG >= 2
-        fprintf(stdout, "  = Rank %d finished time loop =\n", wRank);
+        fprintf(stdout, "  = Rank %d finished filtering loops =\n", wRank);
         #endif
 
         // Write to file
