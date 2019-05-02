@@ -36,13 +36,16 @@ void filtering(
     const int Nlat    = myCounts.at(2);
     const int Nlon    = myCounts.at(3);
 
-    const int num_pts = Ntime * Ndepth * Nlat * Nlon;
+    const unsigned int num_pts = Ntime * Ndepth * Nlat * Nlon;
     char filename [50];
     
     const int ndims = 4;
     size_t starts[ndims] = {
-        size_t(myStarts.at(0)), size_t(myStarts.at(1)), size_t(myStarts.at(2)), size_t(myStarts.at(3))};
-    size_t counts[ndims] = {size_t(Ntime), size_t(Ndepth), size_t(Nlat), size_t(Nlon)};
+        size_t(myStarts.at(0)), size_t(myStarts.at(1)), 
+        size_t(myStarts.at(2)), size_t(myStarts.at(3))};
+    size_t counts[ndims] = {
+        size_t(Ntime), size_t(Ndepth), 
+        size_t(Nlat), size_t(Nlon)};
     std::vector<std::string> vars_to_write;
 
     #if DEBUG >= 1
@@ -117,7 +120,6 @@ void filtering(
     std::vector<double> div_J(num_pts);
     vars_to_write.push_back("div_Jtransport");
 
-
     std::vector<double> fine_vort_r, fine_vort_lat, fine_vort_lon,
         coarse_vort_r, coarse_vort_lon, coarse_vort_lat;
     if (constants::COMP_VORT) {
@@ -134,7 +136,6 @@ void filtering(
         //vars_to_write.push_back("vort_lon");
         //vars_to_write.push_back("vort_lat");
     }
-
 
     double uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp;
     double KE_tmp;
@@ -231,8 +232,7 @@ void filtering(
 
         #pragma omp parallel \
         default(none) \
-        shared(mask, u_x, u_y, u_z,\
-                stdout,\
+        shared(mask, u_x, u_y, u_z, stdout,\
                 longitude, latitude, dAreas, scale,\
                 full_KE, coarse_KE, fine_KE,\
                 full_u_r, full_u_lon, full_u_lat,\
@@ -272,14 +272,13 @@ void filtering(
                                 tid = omp_get_thread_num();
                                 if ( (tid == 0) and (wRank == 0) ) {
                                     // Every perc_base percent, print a dot, but only the first thread
-                                    if ( ((double)(index+1) / (Ntime*Ndepth*Nlat*Nlon)) * 100 >= perc ) {
+                                    if ( ((double)(index+1) / num_pts) * 100 >= perc ) {
                                         fprintf(stdout, ".");
                                         fflush(stdout);
                                         perc += perc_base;
                                     }
                                 }
                                 #endif
-    
     
                                 // Apply the filter at the point
                                 #if DEBUG >= 3
@@ -306,7 +305,6 @@ void filtering(
                                         longitude, latitude,
                                         dAreas, scale, mask, true,
                                         &distances);
-
 
                                 // Convert the filtered fields back to spherical
                                 #if DEBUG >= 3
@@ -500,7 +498,7 @@ void filtering(
 
         compute_div_transport(
                 div_J,
-                coarse_u_x, coarse_u_y, coarse_u_z,
+                coarse_u_x,  coarse_u_y,  coarse_u_z,
                 coarse_uxux, coarse_uxuy, coarse_uxuz,
                 coarse_uyuy, coarse_uyuz, coarse_uzuz,
                 coarse_p, longitude, latitude,

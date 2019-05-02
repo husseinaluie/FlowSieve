@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
     {
         tid = omp_get_thread_num();
         nthreads = omp_get_num_threads();
-        #if DEBUG >= 1
+        #if DEBUG >= 2
         fprintf(stdout, "Hello from thread %d of %d on processor %d of %d.\n", 
                 tid+1, nthreads, wRank+1, wSize);
         #endif
