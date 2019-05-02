@@ -30,43 +30,60 @@ void compute_vorticity_at_point(
     vort_lon_tmp = 0.;
     vort_lat_tmp = 0.;
 
+    std::vector<const std::vector<double>*> deriv_fields {&u_lon, &u_lat, &u_r};
 
     if (constants::CARTESIAN) {
-        vort_r_tmp += Cart_derivative_at_point(
-                u_lat, latitude, longitude, "x",
-                Itime, Idepth, Ilat, Ilon,
-                Ntime, Ndepth, Nlat, Nlon,
-                mask);
-        vort_r_tmp -= Cart_derivative_at_point(
-                u_lon, latitude, longitude, "y",
-                Itime, Idepth, Ilat, Ilon,
-                Ntime, Ndepth, Nlat, Nlon,
-                mask);
+
+        double ux_y, ux_z, uy_x, uy_z, uz_x, uz_y;
+        std::vector<double*> x_deriv_vals {NULL,  &ux_y, &ux_z};
+        std::vector<double*> y_deriv_vals {&uy_x, NULL,  &ux_z};
+        std::vector<double*> z_deriv_vals {&uz_x, &ux_y, NULL };
+
+        Cart_derivatives_at_point(
+           x_deriv_vals, y_deriv_vals,
+           z_deriv_vals, deriv_fields,
+           latitude, longitude,
+           Itime, Idepth, Ilat, Ilon,
+           Ntime, Ndepth, Nlat, Nlon,
+           mask);
+
+        vort_lon_tmp = uz_y - uy_z;
+        vort_lat_tmp = ux_z - uz_x;
+        vort_r_tmp   = uy_x - ux_y;
     } else {
+
+        int index = Index(Itime, Idepth, Ilat, Ilon,
+                          Ntime, Ndepth, Nlat, Nlon);
+        double ur_lon, ur_lat, ulon_r, ulon_lat, ulat_r, ulat_lon;
+        std::vector<double*> lon_deriv_vals {NULL,      &ulat_lon, &ur_lon};
+        std::vector<double*> lat_deriv_vals {&ulon_lat, NULL,      &ur_lat};
+        std::vector<double*> r_deriv_vals   {&ulon_r,   &ulat_r,   NULL   };
+
+        spher_derivative_at_point(
+                lat_deriv_vals, deriv_fields,
+                latitude, "lat",
+                Itime, Idepth, Ilat, Ilon,
+                Ntime, Ndepth, Nlat, Nlon,
+                mask);
+
+        spher_derivative_at_point(
+                lon_deriv_vals, deriv_fields,
+                longitude, "lon",
+                Itime, Idepth, Ilat, Ilon,
+                Ntime, Ndepth, Nlat, Nlon,
+                mask);
+
         // Longitudinal derivative component
-        vort_r_tmp += constants::R_earth
-            * spher_derivative_at_point(
-                    u_lat, longitude, "lon",
-                    Itime, Idepth, Ilat, Ilon,
-                    Ntime, Ndepth, Nlat, Nlon,
-                    mask);
+        vort_r_tmp += constants::R_earth * ulat_lon;
 
         // Latitudinal derivative component
         //  - ddlat ( u_lon * cos(lat) ) = u_lon * sin(lat) - ddlat( u_lon ) * cos(lat)
-        int index = Index(Itime, Idepth, Ilat, Ilon,
-                Ntime, Ndepth, Nlat, Nlon);
-
         vort_r_tmp += constants::R_earth
             * (   sin(latitude.at(Ilat)) * u_lon.at(index)
-                    - cos(latitude.at(Ilat)) * spher_derivative_at_point(
-                        u_lon, latitude, "lat",
-                        Itime, Idepth, Ilat, Ilon,
-                        Ntime, Ndepth, Nlat, Nlon,
-                        mask)
+                - cos(latitude.at(Ilat)) * ulon_lat
               );
 
         // Scale
         vort_r_tmp *= 1. / ( pow(constants::R_earth, 2) * cos(latitude.at(Ilat)) );
     }
 }
-

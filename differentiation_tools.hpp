@@ -21,49 +21,71 @@
  *
  * The grid need not be centred (to account for coastlines).
  */
-void differentiation_vector(std::vector<double> & diff_array, const double delta, const int index);
+void differentiation_vector(
+        std::vector<double> & diff_array, 
+        const double delta, 
+        const int index);
 
 /*!
  * \brief Computes latitudinal derivative at a specific point.
+ *
+ * \param vector of pointers to return values
+ * \param vector of pointers to fields to differentiate
+ * \param (1D) latitude  or longitude array
+ * \param "lat" or "lon": dimensional along which to differentate
+ * \param time index at which to differentiate
+ * \param depth index at which to differentiate
+ * \param latitude index at which to differentiate
+ * \param longitude at which to differentiate
+ * \param size of time dimension
+ * \param size of depth dimension
+ * \param size of latitude dimension
+ * \param size of longitude dimension
+ * \param (2D) array to distinguish land/water cells 
  */
-double spher_derivative_at_point(
-        const std::vector<double> & field, 
+void spher_derivative_at_point(
+        const std::vector<double*> & deriv_vals,
+        const std::vector<const std::vector<double>*> & fields,
         const std::vector<double> & grid,
         const std::string & dim,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const std::vector<double> & mask);
 
-/*!
- * \brief Computes latitudinal derivative at a specific point.
- */
-double latitude_derivative_at_point(
-        const std::vector<double> & field, const std::vector<double> & latitude,
-        const int Itime, const int Idepth, const int Ilat, const int Ilon,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & mask);
 
 /*!
- * \brief Computes longitudinal derivative at a specific point.
- */
-double longitude_derivative_at_point(
-        const std::vector<double> & field, const std::vector<double> & longitude,
-        const int Itime, const int Idepth, const int Ilat, const int Ilon,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & mask);
-
-/*!
- * \brief Computes specified Cartesian derivative at a specific point.
+ * \brief Computes all Cartesian derivative at a specific point.
  *
  * Computation is done via chain rule on spherical coordinate derivatives.
+ * Since both lat- and lon- derivatives are taken, the cost increase to 
+ * compute all three Cartesian derivatives in comparison to computing a 
+ * single Cartesian derivative is negligible.
  *
  * Calls latitude_derivative_at_point() and longitude_derivative_at_point()
+ *
+ * \param vector of pointers to return x-deriv values
+ * \param vector of pointers to return y-deriv values
+ * \param vector of pointers to return z-deriv values
+ * \param vector of pointers to fields to differentiate
+ * \param (1D) latitude array
+ * \param (1D) longitude array
+ * \param time index at which to differentiate
+ * \param depth index at which to differentiate
+ * \param latitude index at which to diffentiate
+ * \param longitude at which to differentiate
+ * \param size of time dimension
+ * \param size of depth dimension
+ * \param size of latitude dimension
+ * \param size of longitude dimension
+ * \param (2D) array to distinguish land/water cells 
  */
-double Cart_derivative_at_point(
-        const std::vector<double> & field, 
+void Cart_derivatives_at_point(
+        const std::vector<double*> & x_deriv_vals,
+        const std::vector<double*> & y_deriv_vals,
+        const std::vector<double*> & z_deriv_vals,
+        const std::vector<const std::vector<double>*> & fields,
         const std::vector<double> & latitude, 
         const std::vector<double> & longitude,
-        const std::string & dim,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const std::vector<double> & mask);

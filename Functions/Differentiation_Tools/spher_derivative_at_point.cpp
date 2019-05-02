@@ -1,26 +1,35 @@
 #include <vector>
 #include <string>
+#include <assert.h>
 #include "../../differentiation_tools.hpp"
 #include "../../constants.hpp"
 #include "../../functions.hpp"
 
-double spher_derivative_at_point(
-        const std::vector<double> & field,  /**< [in] field to differentiate */
-        const std::vector<double> & grid,   /**< [in] (1D) latitude  or longitude array */
-        const std::string & dim,            /**< [in] "lat" or "lon": dimensional along which to differentate */
-        const int Itime,                    /**< [in] time index at which to differentiate */
-        const int Idepth,                   /**< [in] depth index at which to differentiate */
-        const int Ilat,                     /**< [in] latitude index at which to differentiate */
-        const int Ilon,                     /**< [in] longitude at which to differentiate */
-        const int Ntime,                    /**< [in] size of time dimension */
-        const int Ndepth,                   /**< [in] size of depth dimension */
-        const int Nlat,                     /**< [in] size of latitude dimension */
-        const int Nlon,                     /**< [in] size of longitude dimension */
-        const std::vector<double> & mask    /**< [in] (2D) array to distinguish land/water cells */
+void spher_derivative_at_point(
+        const std::vector<double*> & deriv_vals,
+        const std::vector<const std::vector<double>*> & fields,
+        const std::vector<double> & grid,
+        const std::string & dim,
+        const int Itime,
+        const int Idepth,
+        const int Ilat,
+        const int Ilon,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const std::vector<double> & mask
         ) {
 
+    // Confirm that input sizes match
+    assert(deriv_vals.size() == fields.size());
+    const int num_deriv = deriv_vals.size();
+
+    for (int ii = 0; ii < num_deriv; ii++) {
+        *deriv_vals.at(ii) = 0.;
+    }
+
     int index, Iref;
-    double deriv_val = 0.;
     const int Nref = grid.size();
     const bool do_lat = (dim == "lat");
     const bool do_lon = (dim == "lon");
@@ -28,10 +37,11 @@ double spher_derivative_at_point(
     if      (do_lon) { Iref = Ilon; }
     else if (do_lat) { Iref = Ilat; }
     else { 
-        fprintf(stderr, "Illegal dimension provided! %s given to %s\n", dim.c_str(), __FILE__);
-        Iref = 0;
-        index = 0;
+        fprintf(stderr, "Illegal dimension provided! %s given to %s\n", 
+                dim.c_str(), __FILE__);
+        assert(false);
     }
+
     int LB = Iref;
     int UB = Iref;
 
@@ -46,8 +56,8 @@ double spher_derivative_at_point(
     while (LB > 0) {
         if ( (Iref - LB) > constants::DiffOrd ) { break; }
        
-        if      (do_lon) { index = Index(0, 0, Ilat, LB,   Ntime, Ndepth, Nlat, Nlon); }
-        else if (do_lat) { index = Index(0, 0, LB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        if (do_lon) { index = Index(0, 0, Ilat, LB,   Ntime, Ndepth, Nlat, Nlon); }
+        else        { index = Index(0, 0, LB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
         
         if (mask.at(index) == 0) { LB++; break; }
 
@@ -57,8 +67,8 @@ double spher_derivative_at_point(
     while (UB < Nref-1) {
         if ( (UB - Iref) > constants::DiffOrd ) { break; }
        
-        if      (do_lon) { index = Index(0, 0, Ilat, UB,   Ntime, Ndepth, Nlat, Nlon); }
-        else if (do_lat) { index = Index(0, 0, UB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        if (do_lon) { index = Index(0, 0, Ilat, UB,   Ntime, Ndepth, Nlat, Nlon); }
+        else        { index = Index(0, 0, UB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
         if (mask.at(index) == 0) { UB--; break; }
 
@@ -76,15 +86,12 @@ double spher_derivative_at_point(
         differentiation_vector(ddl, dl, Iref - LB);
         for (int IND = LB; IND <= UB; IND++) {
 
-            if      (do_lon) { index = Index(Itime, Idepth, Ilat, IND,  Ntime, Ndepth, Nlat, Nlon); }
-            else if (do_lat) { index = Index(Itime, Idepth, IND,  Ilon, Ntime, Ndepth, Nlat, Nlon); }
+            if (do_lon) { index = Index(Itime, Idepth, Ilat, IND,  Ntime, Ndepth, Nlat, Nlon); }
+            else        { index = Index(Itime, Idepth, IND,  Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
-            deriv_val +=  field.at(index) * ddl.at(IND - LB);
+            for (int ii = 0; ii < num_deriv; ii++) {
+                *(deriv_vals.at(ii)) += fields[ii]->at(index) * ddl.at(IND - LB);
+            }
         }
-    } else {
-        // Otherwise, return 0
-        deriv_val = 0.;
     }
-
-    return deriv_val;
 }

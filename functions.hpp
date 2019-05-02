@@ -266,6 +266,20 @@ void compute_largescale_strain(
 
 /*!
  * \brief Compute the baroclinic energy transfer through the current filter scale
+ *
+ * \param Where to store the computed values
+ * \param Full vorticity (r   component)
+ * \param Full vorticity (lon component)
+ * \param Full vorticity (lat component)
+ * \param Coarse density field
+ * \param Coarse pressure field
+ * \param Length of time dimension
+ * \param Length of depth dimension
+ * \param Length of latitude dimension
+ * \param Length of longitude dimension
+ * \param Longitude dimension (1D)
+ * \param Latitude dimension (1D)
+ * \param Mask array (2D) to distinguish land from water
  */
 void compute_baroclinic_transfer(
     std::vector<double> & baroclinic_transfer,

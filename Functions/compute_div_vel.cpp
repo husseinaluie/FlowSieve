@@ -22,52 +22,66 @@ void compute_div_vel(
 
     double div_tmp;
 
-    int Ilat, Ilon, index, mask_index;
+    int Itime, Idepth, Ilat, Ilon, index, mask_index;
 
     double ux_x, uy_y, uz_z;
+    std::vector<double*> x_deriv_vals, y_deriv_vals, z_deriv_vals;
+    std::vector<const std::vector<double>*> deriv_fields;
+
+    deriv_fields.push_back(&u_x);
+    deriv_fields.push_back(&u_y);
+    deriv_fields.push_back(&u_z);
     
-    for (int Itime = 0; Itime < Ntime; Itime++) {
-        for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-            #pragma omp parallel \
-            default(none) \
-            shared( div, Idepth, Itime, stdout,\
-                    latitude, longitude, mask,\
-                    u_x, u_y, u_z)\
-            private(Ilat, Ilon, index, mask_index, \
-                    ux_x, uy_y, uz_z,\
-                    div_tmp)
-            {
-                #pragma omp for collapse(2) schedule(dynamic)
-                for (Ilat = 0; Ilat < Nlat; Ilat++) {
-                    for (Ilon = 0; Ilon < Nlon; Ilon++) {
+    #pragma omp parallel \
+    default(none) \
+    shared( div, Idepth, Itime, stdout,\
+            latitude, longitude, mask,\
+            u_x, u_y, u_z, deriv_fields)\
+    private(Ilat, Ilon, index, mask_index, \
+            ux_x, uy_y, uz_z,\
+            x_deriv_vals, y_deriv_vals, z_deriv_vals,\
+            div_tmp)
+    {
 
-                        div_tmp = 0.;
+        x_deriv_vals.push_back(&ux_x);
+        x_deriv_vals.push_back(NULL);
+        x_deriv_vals.push_back(NULL);
 
-                        // Convert our four-index to a one-index
-                        index = Index(
-                                Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon);
-                        mask_index = Index(
-                                0,     0,      Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon);
+        y_deriv_vals.push_back(NULL);
+        y_deriv_vals.push_back(&uy_y);
+        y_deriv_vals.push_back(NULL);
+
+        z_deriv_vals.push_back(NULL);
+        z_deriv_vals.push_back(NULL);
+        z_deriv_vals.push_back(&uz_z);
+
+        #pragma omp for collapse(2) schedule(dynamic)
+        for (Ilat = 0; Ilat < Nlat; Ilat++) {
+            for (Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                mask_index = Index(
+                        0,     0,      Ilat, Ilon,
+                        Ntime, Ndepth, Nlat, Nlon);
+
+                for (Itime = 0; Itime < Ntime; Itime++) {
+                    for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+
+                        index = Index(Itime, Idepth, Ilat, Ilon,
+                                      Ntime, Ndepth, Nlat, Nlon);
 
                         if (mask.at(mask_index) == 1) { // Skip land areas
 
-                            ux_x = Cart_derivative_at_point(u_x, latitude, longitude, "x",
-                                    Itime, Idepth, Ilat, Ilon,
-                                    Ntime, Ndepth, Nlat, Nlon,
-                                    mask);
-                            uy_y = Cart_derivative_at_point(u_y, latitude, longitude, "y",
-                                    Itime, Idepth, Ilat, Ilon,
-                                    Ntime, Ndepth, Nlat, Nlon,
-                                    mask);
-                            uz_z = Cart_derivative_at_point(u_z, latitude, longitude, "z",
+                            Cart_derivatives_at_point(
+                                    x_deriv_vals, y_deriv_vals,
+                                    z_deriv_vals, deriv_fields,
+                                    latitude, longitude,
                                     Itime, Idepth, Ilat, Ilon,
                                     Ntime, Ndepth, Nlat, Nlon,
                                     mask);
 
                             // u_i,i
                             div_tmp = ux_x + uy_y + uz_z;
+
                         } // end if(water) block
                         else { // if(land)
                             div_tmp = constants::fill_value;
@@ -75,9 +89,9 @@ void compute_div_vel(
 
                         div.at(index) = div_tmp;
 
-                    } // end Ilon loop
-                } // end Ilat loop
-            } // end pragma
-        } // end Idepth loop
-    } // end Itime loop
+                    } // end Idepth loop
+                } // end Itime loop
+            } // end Ilon loop
+        } // end Ilat loop
+    } // end pragma
 } // end function
