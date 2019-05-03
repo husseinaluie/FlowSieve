@@ -104,6 +104,9 @@ void filtering(
             } // done depth loop
         } // done time loop
     } // done pragma
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
+    #endif
 
     // Now prepare to filter
     double scale,
@@ -123,6 +126,9 @@ void filtering(
     std::vector<double> fine_vort_r, fine_vort_lat, fine_vort_lon,
         coarse_vort_r, coarse_vort_lon, coarse_vort_lat;
     if (constants::COMP_VORT) {
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "Initializing COMP_VORT fields.\n"); }
+        #endif
         fine_vort_r.resize(  num_pts);
         fine_vort_lat.resize(num_pts);
         fine_vort_lon.resize(num_pts);
@@ -135,7 +141,11 @@ void filtering(
         vars_to_write.push_back("coarse_vort_r");
         //vars_to_write.push_back("vort_lon");
         //vars_to_write.push_back("vort_lat");
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
+        #endif
     }
+
 
     double uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp;
     double KE_tmp;
@@ -144,6 +154,9 @@ void filtering(
         coarse_u_y, coarse_u_z, div, energy_transfer,
         fine_KE, coarse_KE;
     if (constants::COMP_TRANSFERS) {
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "Initializing COMP_TRANSFERS fields.\n"); }
+        #endif
         // If computing energy transfers, we'll need some more arrays
         coarse_uxux.resize(num_pts);
         coarse_uxuy.resize(num_pts);
@@ -171,6 +184,9 @@ void filtering(
         coarse_KE.resize(num_pts);
         vars_to_write.push_back("fine_KE");
         vars_to_write.push_back("coarse_KE");
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
+        #endif
     }
 
 
@@ -178,6 +194,9 @@ void filtering(
     std::vector<double> coarse_rho, coarse_p, fine_rho, fine_p,
         baroclinic_transfer, PEtoKE;
     if (constants::COMP_BC_TRANSFERS) {
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "Initializing COMP_BC_TRANSFERS fields.\n"); }
+        #endif
         coarse_rho.resize(num_pts);
         coarse_p.resize(  num_pts);
         fine_rho.resize(  num_pts);
@@ -199,6 +218,9 @@ void filtering(
         //    rho_bar * g * w_bar
         PEtoKE.resize(num_pts);
         vars_to_write.push_back("PEtoKE");
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
+        #endif
     }
 
     #if DEBUG >= 1
@@ -228,6 +250,7 @@ void filtering(
 
         #if DEBUG >= 0
         if (wRank == 0) { fprintf(stdout, "  filtering: "); }
+        fflush(stdout);
         #endif
 
         #pragma omp parallel \
@@ -255,11 +278,26 @@ void filtering(
             #pragma omp for collapse(2) schedule(dynamic)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
                 for (Ilon = 0; Ilon < Nlon; Ilon++) {
+
                     compute_distances(
                             distances, longitude, latitude,
                             Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+
                     mask_index = Index(0,     0,      Ilat, Ilon,
                                        Ntime, Ndepth, Nlat, Nlon);
+
+                    #if DEBUG >= 1
+                    tid = omp_get_thread_num();
+                    if ( (tid == 0) and (wRank == 0) ) {
+                        // Every perc_base percent, print a dot, but only the first thread
+                        if ( ((double)(mask_index+1) / (Nlon*Nlat)) * 100 >= perc ) {
+                            fprintf(stdout, ".");
+                            fflush(stdout);
+                            perc += perc_base;
+                        }
+                    }
+                    #endif
+
                     for (Itime = 0; Itime < Ntime; Itime++) {
                         for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
@@ -267,18 +305,6 @@ void filtering(
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
                             if (mask.at(mask_index) == 1) { // Skip land areas
-
-                                #if DEBUG >= 1
-                                tid = omp_get_thread_num();
-                                if ( (tid == 0) and (wRank == 0) ) {
-                                    // Every perc_base percent, print a dot, but only the first thread
-                                    if ( ((double)(index+1) / num_pts) * 100 >= perc ) {
-                                        fprintf(stdout, ".");
-                                        fflush(stdout);
-                                        perc += perc_base;
-                                    }
-                                }
-                                #endif
     
                                 // Apply the filter at the point
                                 #if DEBUG >= 3

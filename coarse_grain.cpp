@@ -73,8 +73,8 @@ int main(int argc, char *argv[]) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     // Print processor assignments
+    #if DEBUG >= 2
     int tid, nthreads;
-    size_t II;
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
     #pragma omp parallel default(none) private(tid, nthreads) \
@@ -82,12 +82,11 @@ int main(int argc, char *argv[]) {
     {
         tid = omp_get_thread_num();
         nthreads = omp_get_num_threads();
-        #if DEBUG >= 2
         fprintf(stdout, "Hello from thread %d of %d on processor %d of %d.\n", 
                 tid+1, nthreads, wRank+1, wSize);
-        #endif
     }
     MPI_Barrier(MPI_COMM_WORLD);
+    #endif
 
     std::vector<double> longitude;
     std::vector<double> latitude;
@@ -103,6 +102,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<double> mask;
     std::vector<int> myCounts, myStarts;
+    size_t II;
 
     // Read in source data / get size information
     #if DEBUG >= 1

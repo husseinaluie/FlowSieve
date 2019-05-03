@@ -198,7 +198,8 @@ void compute_vorticity(
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const std::vector<double> & longitude, 
         const std::vector<double> & latitude,
-        const std::vector<double> & mask);
+        const std::vector<double> & mask,
+        const MPI_Comm comm = MPI_COMM_WORLD);
 
 /*!
  * \brief Compute filtered quadratic velocities at a single point

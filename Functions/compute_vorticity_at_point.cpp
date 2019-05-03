@@ -35,9 +35,9 @@ void compute_vorticity_at_point(
     if (constants::CARTESIAN) {
 
         double ux_y, ux_z, uy_x, uy_z, uz_x, uz_y;
-        std::vector<double*> x_deriv_vals {NULL,  &ux_y, &ux_z};
-        std::vector<double*> y_deriv_vals {&uy_x, NULL,  &ux_z};
-        std::vector<double*> z_deriv_vals {&uz_x, &ux_y, NULL };
+        std::vector<double*> x_deriv_vals {NULL,  &uy_x, &uz_x};
+        std::vector<double*> y_deriv_vals {&ux_y, NULL,  &uz_y};
+        std::vector<double*> z_deriv_vals {&ux_z, &uy_z, NULL };
 
         Cart_derivatives_at_point(
            x_deriv_vals, y_deriv_vals,
@@ -55,6 +55,8 @@ void compute_vorticity_at_point(
         int index = Index(Itime, Idepth, Ilat, Ilon,
                           Ntime, Ndepth, Nlat, Nlon);
         double ur_lon, ur_lat, ulon_r, ulon_lat, ulat_r, ulat_lon;
+        double lat = latitude.at(Ilat);
+
         std::vector<double*> lon_deriv_vals {NULL,      &ulat_lon, &ur_lon};
         std::vector<double*> lat_deriv_vals {&ulon_lat, NULL,      &ur_lat};
         std::vector<double*> r_deriv_vals   {&ulon_r,   &ulat_r,   NULL   };
@@ -79,11 +81,9 @@ void compute_vorticity_at_point(
         // Latitudinal derivative component
         //  - ddlat ( u_lon * cos(lat) ) = u_lon * sin(lat) - ddlat( u_lon ) * cos(lat)
         vort_r_tmp += constants::R_earth
-            * (   sin(latitude.at(Ilat)) * u_lon.at(index)
-                - cos(latitude.at(Ilat)) * ulon_lat
-              );
+            * (sin(lat) * u_lon.at(index)  -  cos(lat) * ulon_lat);
 
         // Scale
-        vort_r_tmp *= 1. / ( pow(constants::R_earth, 2) * cos(latitude.at(Ilat)) );
+        vort_r_tmp *= 1. / ( pow(constants::R_earth, 2) * cos(lat) );
     }
 }

@@ -1,6 +1,7 @@
 #ifndef CONSTANTS_HPP
 #define CONSTANTS_HPP 1
 
+// Default debug value
 #ifndef DEBUG
     #define DEBUG 0
 #endif

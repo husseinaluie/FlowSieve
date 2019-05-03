@@ -26,7 +26,9 @@ void spher_derivative_at_point(
     const int num_deriv = deriv_vals.size();
 
     for (int ii = 0; ii < num_deriv; ii++) {
-        *deriv_vals.at(ii) = 0.;
+        if (deriv_vals.at(ii) != NULL) {
+            *(deriv_vals.at(ii)) = 0.;
+        }
     }
 
     int index, Iref;
@@ -86,11 +88,15 @@ void spher_derivative_at_point(
         differentiation_vector(ddl, dl, Iref - LB);
         for (int IND = LB; IND <= UB; IND++) {
 
-            if (do_lon) { index = Index(Itime, Idepth, Ilat, IND,  Ntime, Ndepth, Nlat, Nlon); }
-            else        { index = Index(Itime, Idepth, IND,  Ilon, Ntime, Ndepth, Nlat, Nlon); }
+            if (do_lon) { index = Index(Itime, Idepth, Ilat, IND,  
+                                        Ntime, Ndepth, Nlat, Nlon); }
+            else        { index = Index(Itime, Idepth, IND,  Ilon, 
+                                        Ntime, Ndepth, Nlat, Nlon); }
 
             for (int ii = 0; ii < num_deriv; ii++) {
-                *(deriv_vals.at(ii)) += fields[ii]->at(index) * ddl.at(IND - LB);
+                if (deriv_vals.at(ii) != NULL) {
+                    *(deriv_vals.at(ii)) += fields[ii]->at(index) * ddl.at(IND - LB);
+                }
             }
         }
     }
