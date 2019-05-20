@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     //   include scales as a comma-separated list
     //   scales are given in metres
     // A zero scale will cause everything to nan out
-    std::vector<double> filter_scales {150e3};
+    std::vector<double> filter_scales {0.5e3, 100e3, 400e3};
 
     // Parse command-line flags
     char buffer [50];
@@ -64,9 +64,9 @@ int main(int argc, char *argv[]) {
     #if DEBUG >= 0
     if (wRank == 0) {
         if (constants::CARTESIAN) { 
-            fprintf(stdout, "Using spherical coordinates.\n");
-        } else {
             fprintf(stdout, "Using Cartesian coordinates.\n");
+        } else {
+            fprintf(stdout, "Using spherical coordinates.\n");
         }
     }
     #endif
@@ -142,19 +142,19 @@ int main(int argc, char *argv[]) {
 
     if (not(constants::CARTESIAN)) {
         // Convert coordinate to radians
+        if (wRank == 0) { fprintf(stdout, "Converting to radians.\n\n"); }
         int ii;
-        #pragma omp parallel default(none) private(ii) shared(longitude)
+        const double D2R = M_PI / 180.;
+        #pragma omp parallel default(none) private(ii) shared(longitude, latitude)
         { 
             #pragma omp for collapse(1) schedule(static)
             for (ii = 0; ii < Nlon; ii++) {
-                longitude.at(ii) = longitude.at(ii) * M_PI / 180;
+                longitude.at(ii) = longitude.at(ii) * D2R;
             }
-        }
-        #pragma omp parallel default(none) private(ii) shared(latitude)
-        {
+
             #pragma omp for collapse(1) schedule(static)
             for (ii = 0; ii < Nlat; ii++) {
-                latitude.at(ii) = latitude.at(ii) * M_PI / 180;
+                latitude.at(ii) = latitude.at(ii) * D2R;
             }
         }
     }
@@ -186,9 +186,9 @@ int main(int argc, char *argv[]) {
         fprintf(stdout, "\n\n");
         fprintf(stdout, "Process completed.\n");
         fprintf(stdout, "\n");
-        fprintf(stdout, "Start-up time:  %g\n", pre_filter_time - start_time);
-        fprintf(stdout, "Filtering time: %g\n", post_filter_time - pre_filter_time);
-        fprintf(stdout, "   (clock resolution = %g)\n", delta_clock);
+        fprintf(stdout, "Start-up time:  %.13g\n", pre_filter_time - start_time);
+        fprintf(stdout, "Filtering time: %.13g\n", post_filter_time - pre_filter_time);
+        fprintf(stdout, "   (clock resolution = %.13g)\n", delta_clock);
     }
     #endif
 
