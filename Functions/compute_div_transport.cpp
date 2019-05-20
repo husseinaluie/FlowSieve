@@ -92,7 +92,7 @@ void compute_div_transport(
     
     double dpdx, dpdy, dpdz;
 
-    int Ilat, Ilon, index, mask_index;
+    int Itime, Idepth, Ilat, Ilon, index, mask_index;
 
     double ux, uy, uz;
 
@@ -132,7 +132,7 @@ void compute_div_transport(
             u_x, u_y, u_z, uxux, uxuy, uxuz,\
             uyuy, uyuz, uzuz,\
             deriv_fields)\
-    private(Ilat, Ilon, index, mask_index, \
+    private(Itime, Idepth, Ilat, Ilon, index, mask_index, \
             ux,   uy,   uz,\
             ux_x, uy_x, uz_x,\
             ux_y, uy_y, uz_y,\
@@ -192,13 +192,13 @@ void compute_div_transport(
 
                 div_J_tmp = 0.;
                 mask_index = Index(0,     0,      Ilat, Ilon,
-                        Ntime, Ndepth, Nlat, Nlon);
+                                   Ntime, Ndepth, Nlat, Nlon);
 
-                for (int Itime = 0; Itime < Ntime; Itime++) {
-                    for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
+                for (Itime = 0; Itime < Ntime; Itime++) {
+                    for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
                         index = Index(Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon);
+                                      Ntime, Ndepth, Nlat, Nlon);
 
                         if (mask.at(mask_index) == 1) { // Skip land areas
 
