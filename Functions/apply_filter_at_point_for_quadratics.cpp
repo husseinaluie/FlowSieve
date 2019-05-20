@@ -142,11 +142,11 @@ void apply_filter_at_point_for_quadratics(
             if (distances == NULL) {
                 if (constants::CARTESIAN) {
                     dist = distance(longitude.at(Ilon),     lat_at_ilat,
-                            longitude.at(curr_lon), lat_at_curr,
-                            dlon_m * Nlon, dlat_m * Nlat);
+                                    longitude.at(curr_lon), lat_at_curr,
+                                    dlon_m * Nlon, dlat_m * Nlat);
                 } else {
                     dist = distance(longitude.at(Ilon),     lat_at_ilat,
-                            longitude.at(curr_lon), lat_at_curr);
+                                    longitude.at(curr_lon), lat_at_curr);
                 }
             } else {
                 dist = distances->at(mask_index);

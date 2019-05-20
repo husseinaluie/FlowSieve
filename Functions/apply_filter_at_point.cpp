@@ -25,11 +25,11 @@ void apply_filter_at_point(
         ) {
 
 
-    double kA_sum, dist, kern, area;
+    double dist, kern, area;
     int index, mask_index;
     int curr_lon, curr_lat;
 
-    kA_sum = 0.;
+    double kA_sum = 0.;
     double coarse_val_tmp = 0.;
     double mask_val = 0.;
     const double KernPad = constants::KernPad;
@@ -43,10 +43,10 @@ void apply_filter_at_point(
     // The spacing (in metres and points) betwee latitude gridpoints
     //   The factor of 2 is diameter->radius 
     if (constants::CARTESIAN) { dlat_m = dlat; } 
-    else { dlat_m = dlat * constants::R_earth; }
+    else                      { dlat_m = dlat * constants::R_earth; }
 
-    if (KernPad < 0) {  dlat_N = Nlat; } 
-    else { dlat_N = ceil( ( KernPad * scale / dlat_m ) / 2.); }
+    if (KernPad < 0) { dlat_N = Nlat; } 
+    else             { dlat_N = ceil( ( KernPad * scale / dlat_m ) / 2.); }
 
     dlat_N = std::min(Nlat, dlat_N);
 
@@ -91,8 +91,8 @@ void apply_filter_at_point(
         //    improve performance.
         //  The abs in local_scale is to handle the 'comfort zone'
         //    where delta_lat > scale (from the KernPad factor in dlat_N)
-        if (constants::CARTESIAN) { delta_lat   = lat_at_ilat - lat_at_curr; }
-        else { delta_lat   = constants::R_earth * ( lat_at_ilat - lat_at_curr ); }
+        if (constants::CARTESIAN) { delta_lat = lat_at_ilat - lat_at_curr; }
+        else { delta_lat = constants::R_earth * ( lat_at_ilat - lat_at_curr ); }
         local_scale = sqrt( fabs( scale*scale - delta_lat*delta_lat ));
 
         // Now find the appropriate integration region
@@ -104,7 +104,7 @@ void apply_filter_at_point(
         if (constants::PERIODIC_X) {
             LON_lb = Ilon - dlon_N;
             LON_ub = Ilon + dlon_N;
-            if (LON_lb + Nlon < LON_ub) { LON_ub = LON_lb + Nlon; }
+            if (LON_ub - LON_lb > Nlon) { LON_ub = LON_lb + Nlon; }
         } else {
             LON_lb = std::max(0,    Ilon - dlon_N);
             LON_ub = std::min(Nlon, Ilon + dlon_N);
@@ -129,11 +129,11 @@ void apply_filter_at_point(
             if (distances == NULL) {
                 if (constants::CARTESIAN) {
                     dist = distance(longitude.at(Ilon),     lat_at_ilat,
-                            longitude.at(curr_lon), lat_at_curr,
-                            dlon_m * Nlon, dlat_m * Nlat);
+                                    longitude.at(curr_lon), lat_at_curr,
+                                    dlon_m * Nlon, dlat_m * Nlat);
                 } else {
                     dist = distance(longitude.at(Ilon),     lat_at_ilat,
-                            longitude.at(curr_lon), lat_at_curr);
+                                    longitude.at(curr_lon), lat_at_curr);
                 }
             } else {
                 dist = distances->at(mask_index);
@@ -144,17 +144,12 @@ void apply_filter_at_point(
             area    = dAreas.at(mask_index);
             kA_sum += kern * area;
 
-            if (use_mask) {
-                mask_val = mask.at(mask_index);
-            } else {
-                mask_val = 1.;
-            }
+            if (use_mask) { mask_val = mask.at(mask_index); }
+            else          { mask_val = 1.; }
 
             coarse_val_tmp += field.at(index) * kern * area * mask_val;
 
         }
     }
-
     coarse_val = coarse_val_tmp / kA_sum;
 }
-
