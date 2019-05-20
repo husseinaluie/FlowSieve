@@ -31,9 +31,12 @@ void Cart_derivatives_at_point(
     const int num_deriv = x_deriv_vals.size();
 
     // Currently assuming ddr = 0
-    // ddx = -( sin(lon) / (r cos(lat)) ) * ddlon   - ( cos(lon) * sin(lat) / r ) * ddlat
-    // ddy =  ( cos(lon) / (r cos(lat)) ) * ddlon   - ( sin(lon) * sin(lat) / r ) * ddlat
-    // ddz =                                          (            cos(lat) / r ) * ddlat
+    // ddx = - ( sin(lon)            / (r cos(lat)) ) * ddlon   
+    //       - ( cos(lon) * sin(lat) /  r           ) * ddlat
+    // ddy =   ( cos(lon)            / (r cos(lat)) ) * ddlon   
+    //       - ( sin(lon) * sin(lat) /  r           ) * ddlat
+    // ddz =                                          
+    //         (            cos(lat) /  r           ) * ddlat
     std::vector<double*> dfields_dlon_p(num_deriv);
     std::vector<double>  dfields_dlon(  num_deriv);
 
@@ -58,15 +61,22 @@ void Cart_derivatives_at_point(
 
     // Define conversion coefficients
     double c1x, c2x, c1y, c2y, c1z, c2z;
-    if (not(constants::CARTESIAN)) {
-        const double lon = longitude.at(Ilon);
-        const double lat = latitude.at(Ilat);
-        const double r = constants::R_earth;
+    if (constants::CARTESIAN) {
+        c1x = 1.;
+        c2x = 0.;
+        c1y = 0.;
+        c2y = 1.;
+        c1z = 0.;
+        c2z = 0.;
+    } else {
+        double lon = longitude.at(Ilon);
+        double lat = latitude.at(Ilat);
+        double r = constants::R_earth;
 
-        const double cos_lat = cos(lat);
-        const double cos_lon = cos(lon);
-        const double sin_lat = sin(lat);
-        const double sin_lon = sin(lon);
+        double cos_lat = cos(lat);
+        double cos_lon = cos(lon);
+        double sin_lat = sin(lat);
+        double sin_lon = sin(lon);
 
         c1x = - sin_lon           / (r * cos_lat );
         c2x = - cos_lon * sin_lat /  r;
@@ -74,14 +84,6 @@ void Cart_derivatives_at_point(
         c2y = - sin_lon * sin_lat /  r;
         c1z =             cos_lat /  r;
         c2z =   0.;
-
-    } else {
-        c1x = 1.;
-        c2x = 0.;
-        c1y = 0.;
-        c2y = 1.;
-        c1z = 0.;
-        c2z = 0.;
     }
 
     // Now do the actual conversion
