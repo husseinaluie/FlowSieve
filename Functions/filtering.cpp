@@ -242,7 +242,10 @@ void filtering(
                 mask, vars_to_write, filename, scales.at(Iscale));
 
         #if DEBUG >= 0
-        if (wRank == 0) { fprintf(stdout, "Scale %d of %d\n", Iscale+1, Nscales); }
+        if (wRank == 0) { 
+            fprintf(stdout, "Scale %d of %d (%.5g km)\n", 
+                Iscale+1, Nscales, scales.at(Iscale)/1e3); 
+        }
         #endif
 
         scale = scales.at(Iscale);
@@ -499,16 +502,25 @@ void filtering(
             write_field_to_output(energy_transfer, "energy_transfer", starts, counts, filename);
 
             // Compute the divergence of the coarse field and full field (for comparison)
+            #if DEBUG >= 1
+            if (wRank == 0) { fprintf(stdout, "Starting compute_div_vel (coarse)\n"); }
+            #endif
             compute_div_vel(div, coarse_u_x, coarse_u_y, coarse_u_z, longitude, latitude,
                     Ntime, Ndepth, Nlat, Nlon, mask);
             write_field_to_output(div, "coarse_vel_div", starts, counts, filename);
 
+            #if DEBUG >= 1
+            if (wRank == 0) { fprintf(stdout, "Starting compute_div_vel (full)\n"); }
+            #endif
             compute_div_vel(div, u_x, u_y, u_z, longitude, latitude,
                     Ntime, Ndepth, Nlat, Nlon, mask);
             write_field_to_output(div, "full_vel_div", starts, counts, filename);
         }
 
         if (constants::COMP_BC_TRANSFERS) {
+            #if DEBUG >= 1
+            if (wRank == 0) { fprintf(stdout, "Starting compute_baroclinic_transfers\n"); }
+            #endif
             compute_baroclinic_transfer(baroclinic_transfer,
                     coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
                     coarse_rho, coarse_p,
@@ -522,6 +534,9 @@ void filtering(
             write_field_to_output(fine_p,     "fine_p",     starts, counts, filename);
         }
 
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "Starting compute_div_transport\n"); }
+        #endif
         compute_div_transport(
                 div_J,
                 coarse_u_x,  coarse_u_y,  coarse_u_z,
