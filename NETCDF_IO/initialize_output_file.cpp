@@ -70,7 +70,7 @@ void initialize_output_file(
     if ((retval = nc_def_var(ncid, "longitude", NC_FLOAT, 1, &lon_dimid,   &lon_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
 
-    if (constants::CARTESIAN) {
+    if (not(constants::CARTESIAN)) {
         const double rad_to_degree = 180. / M_PI;
         retval = nc_put_att_double(ncid, lon_varid, "scale_factor", NC_FLOAT, 1, &rad_to_degree);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
