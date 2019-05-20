@@ -34,12 +34,10 @@ void compute_div_vel(
     
     #pragma omp parallel \
     default(none) \
-    shared( div, Idepth, Itime, stdout,\
-            latitude, longitude, mask,\
+    shared( div, stdout, latitude, longitude, mask,\
             u_x, u_y, u_z, deriv_fields)\
-    private(Ilat, Ilon, index, mask_index, \
-            ux_x, uy_y, uz_z,\
-            x_deriv_vals, y_deriv_vals, z_deriv_vals,\
+    private(Itime, Idepth, Ilat, Ilon, index, mask_index, \
+            ux_x, uy_y, uz_z, x_deriv_vals, y_deriv_vals, z_deriv_vals,\
             div_tmp)
     {
 
