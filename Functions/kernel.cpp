@@ -21,7 +21,7 @@ double kernel(
     const double D = dist / ( scale / 2. );
 
     switch (constants::KERNEL_OPT) {
-        case 0: kern = dist < D ? 1 : 0;
+        case 0: kern = D < 1 ? 1. : 0;
                 break;
         case 1: kern = exp( -pow( D, 4) );
                 break;
