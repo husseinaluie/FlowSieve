@@ -38,7 +38,7 @@ double distance(
         const double cos_Delta_lon = cos(Delta_lon);
 
         numer =   pow(                                    cos_lat2 * sin(Delta_lon), 2 ) 
-            + pow( cos_lat1 * sin_lat2  -  sin_lat1 * cos_lat2 * cos_Delta_lon , 2 );
+                + pow( cos_lat1 * sin_lat2  -  sin_lat1 * cos_lat2 * cos_Delta_lon , 2 );
         numer =  sqrt(numer);
 
         denom =        sin_lat1 * sin_lat2  +  cos_lat1 * cos_lat2 * cos_Delta_lon ;
