@@ -29,6 +29,28 @@ void filtering(
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
 
+    double timing_filt_main, timing_land, timing_kern_precomp,
+           timing_filt_comp_transfers, timing_filt_bc_transfers,
+           timing_comp_vorticity, timing_comp_pi,
+           timing_comp_Lambda, timing_comp_transport,
+           clock_on, clock_off;
+    //double timing_initialize, timing_writing, timing_comp_vel;
+    if (constants::DO_TIMING) {
+        // If we've passed the DO_TIMING flag, then create some timing vars
+        //timing_initialize = 0.;
+        timing_filt_main = 0.;
+        timing_land = 0.;
+        timing_kern_precomp = 0.;
+        timing_filt_comp_transfers = 0.;
+        timing_filt_bc_transfers = 0.;
+        //timing_writing = 0.;
+        timing_comp_vorticity = 0.;
+        timing_comp_pi = 0.;
+        timing_comp_Lambda = 0.;
+        timing_comp_transport = 0.;
+        //timing_comp_vel = 0.;
+    }
+
     // Get dimension sizes
     const int Nscales = scales.size();
     const int Ntime   = myCounts.at(0);
@@ -52,7 +74,7 @@ void filtering(
     if (wRank == 0) { fprintf(stdout, "Converting to Cartesian velocities.\n"); }
     #endif
 
-    std::vector<double> distances(Nlat * Nlon);
+    std::vector<double> local_kernel(Nlat * Nlon);
 
     std::vector<double> u_x(num_pts);
     std::vector<double> u_y(num_pts);
@@ -123,6 +145,13 @@ void filtering(
     std::vector<double> div_J(num_pts);
     vars_to_write.push_back("div_Jtransport");
 
+    // If we're computing transfers, then we already have what
+    //   we need to computed band-filtered KE, so might as well do it
+    std::vector<double> fine_KE(num_pts);
+    std::vector<double> coarse_KE(num_pts);
+    vars_to_write.push_back("fine_KE");
+    vars_to_write.push_back("coarse_KE");
+
     std::vector<double> fine_vort_r, fine_vort_lat, fine_vort_lon,
         coarse_vort_r, coarse_vort_lon, coarse_vort_lat;
     if (constants::COMP_VORT) {
@@ -151,8 +180,7 @@ void filtering(
     double KE_tmp;
     std::vector<double> coarse_uxux, coarse_uxuy, coarse_uxuz,
         coarse_uyuy, coarse_uyuz, coarse_uzuz, coarse_u_x,
-        coarse_u_y, coarse_u_z, div, energy_transfer,
-        fine_KE, coarse_KE;
+        coarse_u_y, coarse_u_z, div, energy_transfer;
     if (constants::COMP_TRANSFERS) {
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "Initializing COMP_TRANSFERS fields.\n"); }
@@ -177,13 +205,6 @@ void filtering(
         // Also an array for the transfer itself
         energy_transfer.resize(num_pts);
         vars_to_write.push_back("energy_transfer");
-
-        // If we're computing transfers, then we already have what
-        //   we need to computed band-filtered KE, so might as well do it
-        fine_KE.resize(num_pts);
-        coarse_KE.resize(num_pts);
-        vars_to_write.push_back("fine_KE");
-        vars_to_write.push_back("coarse_KE");
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
         #endif
@@ -223,10 +244,8 @@ void filtering(
         #endif
     }
 
-    #if DEBUG >= 1
     int perc_base = 5;
     int perc;
-    #endif
 
     //
     //// Begin the main filtering loop
@@ -259,6 +278,9 @@ void filtering(
         #pragma omp parallel \
         default(none) \
         shared(mask, u_x, u_y, u_z, stdout,\
+                timing_filt_main, timing_filt_comp_transfers,\
+                timing_filt_bc_transfers, clock_on, clock_off,\
+                timing_land, timing_kern_precomp,\
                 longitude, latitude, dAreas, scale,\
                 full_KE, coarse_KE, fine_KE,\
                 full_u_r, full_u_lon, full_u_lat,\
@@ -276,15 +298,11 @@ void filtering(
                 uyuy_tmp, uyuz_tmp, uzuz_tmp,\
                 KE_tmp, rho_tmp, p_tmp,\
                 tid) \
-        firstprivate(perc, wRank, distances)
+        firstprivate(perc, wRank, local_kernel)
         {
             #pragma omp for collapse(2) schedule(dynamic)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
                 for (Ilon = 0; Ilon < Nlon; Ilon++) {
-
-                    compute_distances(
-                            distances, longitude, latitude,
-                            Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                     mask_index = Index(0,     0,      Ilat, Ilon,
                                        Ntime, Ndepth, Nlat, Nlon);
@@ -301,17 +319,33 @@ void filtering(
                     }
                     #endif
 
-                    for (Itime = 0; Itime < Ntime; Itime++) {
-                        for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+                    if (mask.at(mask_index) == 1) { // Skip land areas
 
-                            // Convert our four-index to a one-index
-                            index = Index(Itime, Idepth, Ilat, Ilon,
-                                          Ntime, Ndepth, Nlat, Nlon);
-                            if (mask.at(mask_index) == 1) { // Skip land areas
+                        if ((constants::DO_TIMING) and (wRank == 0)) { 
+                            clock_on = MPI_Wtime(); 
+                        }
+                        compute_local_kernel(
+                                local_kernel, scale, longitude, latitude,
+                                Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                        if ((constants::DO_TIMING) and (wRank == 0)) { 
+                            clock_off = MPI_Wtime();
+                            timing_kern_precomp += clock_off - clock_on;
+                        }
+
+                        for (Itime = 0; Itime < Ntime; Itime++) {
+                            for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+
+                                // Convert our four-index to a one-index
+                                index = Index(Itime, Idepth, Ilat, Ilon,
+                                              Ntime, Ndepth, Nlat, Nlon);
     
                                 // Apply the filter at the point
+                                if ((constants::DO_TIMING) and (wRank == 0)) { 
+                                    clock_on = MPI_Wtime(); 
+                                }
                                 #if DEBUG >= 3
                                 if (wRank == 0) { fprintf(stdout, "    Line %d of %s\n", __LINE__, __FILE__); }
+                                fflush(stdout);
                                 #endif
                                 apply_filter_at_point(
                                         u_x_tmp, u_x,     
@@ -319,25 +353,26 @@ void filtering(
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
                                         dAreas, scale, mask, true,
-                                        &distances);
+                                        &local_kernel);
                                 apply_filter_at_point(
                                         u_y_tmp, u_y,     
                                         Ntime,  Ndepth, Nlat, Nlon,
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
                                         dAreas, scale, mask, true,
-                                        &distances);
+                                        &local_kernel);
                                 apply_filter_at_point(
                                         u_z_tmp, u_z,     
                                         Ntime,  Ndepth, Nlat, Nlon,
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
                                         dAreas, scale, mask, true,
-                                        &distances);
+                                        &local_kernel);
 
                                 // Convert the filtered fields back to spherical
                                 #if DEBUG >= 3
                                 if (wRank == 0) { fprintf(stdout, "          Line %d of %s\n", __LINE__, __FILE__); }
+                                fflush(stdout);
                                 #endif
                                 vel_Cart_to_Spher(u_r_tmp, u_lon_tmp, u_lat_tmp,
                                                   u_x_tmp, u_y_tmp,   u_z_tmp,
@@ -358,11 +393,19 @@ void filtering(
                                         Itime,  Idepth, Ilat, Ilon,
                                         longitude, latitude,
                                         dAreas, scale, mask, true,
-                                        &distances);
+                                        &local_kernel);
                                 coarse_KE.at(index) = KE_tmp;
                                 fine_KE.at(index) = full_KE.at(index) - coarse_KE.at(index);
+                                if ((constants::DO_TIMING) and (wRank == 0)) { 
+                                    clock_off = MPI_Wtime();
+                                    timing_filt_main += clock_off - clock_on;
+                                }
 
-                                // If we want energy transfers (Pi), then do those calculations now
+                                // If we want energy transfers (Pi), 
+                                // then do those calculations now
+                                if ((constants::DO_TIMING) and (wRank == 0)) { 
+                                    clock_on = MPI_Wtime(); 
+                                }
                                 if (constants::COMP_TRANSFERS) {
                                     apply_filter_at_point_for_quadratics(
                                             uxux_tmp, uxuy_tmp, uxuz_tmp,
@@ -372,7 +415,7 @@ void filtering(
                                             Itime,  Idepth, Ilat, Ilon,
                                             longitude, latitude,
                                             dAreas, scale,
-                                            mask, &distances);
+                                            mask, &local_kernel);
 
                                     vel_Spher_to_Cart(u_x_tmp, u_y_tmp, u_z_tmp,
                                             coarse_u_r.at(index), 
@@ -391,9 +434,16 @@ void filtering(
                                     coarse_u_y.at(index) = u_y_tmp;
                                     coarse_u_z.at(index) = u_z_tmp;
                                 }
+                                if ((constants::DO_TIMING) and (wRank == 0)) { 
+                                    clock_off = MPI_Wtime();
+                                    timing_filt_comp_transfers += clock_off - clock_on;
+                                }
 
                                 // If we want baroclinic transfers (Lambda^m), 
                                 //    then do those calculations now
+                                if ((constants::DO_TIMING) and (wRank == 0)) { 
+                                    clock_on = MPI_Wtime(); 
+                                }
                                 if (constants::COMP_BC_TRANSFERS) {
                                     apply_filter_at_point(
                                             rho_tmp, full_rho,     
@@ -401,14 +451,14 @@ void filtering(
                                             Itime,  Idepth, Ilat, Ilon,
                                             longitude, latitude,
                                             dAreas, scale, mask, false,
-                                            &distances);
+                                            &local_kernel);
                                     apply_filter_at_point(
                                             p_tmp, full_p,     
                                             Ntime,  Ndepth, Nlat, Nlon,
                                             Itime,  Idepth, Ilat, Ilon,
                                             longitude, latitude,
                                             dAreas, scale, mask, false,
-                                            &distances);
+                                            &local_kernel);
                                     coarse_rho.at(index) = rho_tmp;
                                     coarse_p.at(  index) = p_tmp;
 
@@ -419,18 +469,35 @@ void filtering(
                                         * (-constants::g)
                                         * coarse_u_r.at(index);
                                 }
+                                if ((constants::DO_TIMING) and (wRank == 0)) { 
+                                    clock_off = MPI_Wtime();
+                                    timing_filt_bc_transfers += clock_off - clock_on;
+                                }
 
-                            }  // end if(masked) block
-                            else { // if not masked
-                                fine_KE.at(   index) = constants::fill_value;
+                            }  // end for(depth) block
+                        }  // end for(time) block
+                    }  // end if(masked) block
+                    else { // if not masked
+                        if ((constants::DO_TIMING) and (wRank == 0)) { 
+                            clock_on = MPI_Wtime(); 
+                        }
+                        for (Itime = 0; Itime < Ntime; Itime++) {
+                            for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+
+                                // Convert our four-index to a one-index
+                                index = Index(Itime, Idepth, Ilat, Ilon,
+                                              Ntime, Ndepth, Nlat, Nlon);
+
                                 fine_u_r.at(  index) = constants::fill_value;
                                 fine_u_lon.at(index) = constants::fill_value;
                                 fine_u_lat.at(index) = constants::fill_value;
 
-                                coarse_KE.at(   index) = constants::fill_value;
                                 coarse_u_r.at(  index) = constants::fill_value;
                                 coarse_u_lon.at(index) = constants::fill_value;
                                 coarse_u_lat.at(index) = constants::fill_value;
+
+                                fine_KE.at(   index) = constants::fill_value;
+                                coarse_KE.at( index) = constants::fill_value;
 
                                 if (constants::COMP_TRANSFERS) {
                                     coarse_u_x.at(index) = constants::fill_value;
@@ -445,10 +512,13 @@ void filtering(
                                     fine_p.at(  index)   = constants::fill_value;
                                     PEtoKE.at(index)     = constants::fill_value;
                                 }
-
-                            }  // end not(masked) block
-                        }  // end for(depth) block
-                    }  // end for(time) block
+                            }  // end for(depth) block
+                        }  // end for(time) block
+                        if ((constants::DO_TIMING) and (wRank == 0)) { 
+                            clock_off = MPI_Wtime();
+                            timing_land += clock_off - clock_on;
+                        }
+                    }  // end not(masked) block
                 }  // end for(longitude) block
             }  // end for(latitude) block
         }  // end pragma parallel block
@@ -473,25 +543,32 @@ void filtering(
 
         if (constants::COMP_VORT) {
             // Compute and write vorticity
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_on = MPI_Wtime(); 
+            }
             compute_vorticity(fine_vort_r, fine_vort_lon, fine_vort_lat,
                     fine_u_r, fine_u_lon, fine_u_lat,
                     Ntime, Ndepth, Nlat, Nlon,
                     longitude, latitude, mask);
-            write_field_to_output(fine_vort_r,   "fine_vort_r",   starts, counts, filename);
-            //write_field_to_output(fine_vort_lon, "fine_vort_lon", starts, counts, filename);
-            //write_field_to_output(fine_vort_lat, "fine_vort_lat", starts, counts, filename);
 
             compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
                     coarse_u_r, coarse_u_lon, coarse_u_lat,
                     Ntime, Ndepth, Nlat, Nlon,
                     longitude, latitude, mask);
-            write_field_to_output(coarse_vort_r,   "coarse_vort_r",   starts, counts, filename);
-            //write_field_to_output(coarse_vort_lon, "coarse_vort_lon", starts, counts, filename);
-            //write_field_to_output(coarse_vort_lat, "coarse_vort_lat", starts, counts, filename);
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_off = MPI_Wtime();
+                timing_comp_vorticity += clock_off - clock_on;
+            }
+
+            write_field_to_output(fine_vort_r, "fine_vort_r", starts, counts, filename);
+            write_field_to_output(coarse_vort_r, "coarse_vort_r", starts, counts, filename);
         }
 
         if (constants::COMP_TRANSFERS) {
             // Compute the energy transfer through the filter scale
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_on = MPI_Wtime(); 
+            }
             compute_energy_transfer_through_scale(
                     energy_transfer, 
                     coarse_u_x,  coarse_u_y,  coarse_u_z,
@@ -499,6 +576,10 @@ void filtering(
                     coarse_uyuy, coarse_uyuz, coarse_uzuz,
                     Ntime, Ndepth, Nlat, Nlon,
                     longitude, latitude, mask);
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_off = MPI_Wtime();
+                timing_comp_pi += clock_off - clock_on;
+            }
             write_field_to_output(energy_transfer, "energy_transfer", starts, counts, filename);
 
             // Compute the divergence of the coarse field and full field (for comparison)
@@ -521,11 +602,19 @@ void filtering(
             #if DEBUG >= 1
             if (wRank == 0) { fprintf(stdout, "Starting compute_baroclinic_transfers\n"); }
             #endif
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_on = MPI_Wtime(); 
+            }
             compute_baroclinic_transfer(baroclinic_transfer,
                     coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
                     coarse_rho, coarse_p,
                     Ntime, Ndepth, Nlat, Nlon,
                     longitude, latitude, mask);
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_off = MPI_Wtime();
+                timing_comp_Lambda += clock_off - clock_on;
+            }
+
             write_field_to_output(baroclinic_transfer, "Lambda_m", starts, counts, filename);
             write_field_to_output(PEtoKE,     "PEtoKE",     starts, counts, filename);
             write_field_to_output(coarse_rho, "coarse_rho", starts, counts, filename);
@@ -537,6 +626,10 @@ void filtering(
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "Starting compute_div_transport\n"); }
         #endif
+
+        if ((constants::DO_TIMING) and (wRank == 0)) { 
+            clock_on = MPI_Wtime(); 
+        }
         compute_div_transport(
                 div_J,
                 coarse_u_x,  coarse_u_y,  coarse_u_z,
@@ -545,12 +638,43 @@ void filtering(
                 coarse_p, longitude, latitude,
                 Ntime, Ndepth, Nlat, Nlon,
                 mask);
+        if ((constants::DO_TIMING) and (wRank == 0)) { 
+            clock_off = MPI_Wtime();
+            timing_comp_transport += clock_off - clock_on;
+        }
         write_field_to_output(div_J, "div_Jtransport", starts, counts, filename);
 
         #if DEBUG >= 0
         // Flushing stdout is necessary for SLURM outputs.
         fflush(stdout);
         #endif
+
+        // If we're doing timings, then print out and reset values now
+        if ((constants::DO_TIMING) and (wRank == 0)) { 
+            fprintf(stdout, "  ::Timings::\n");
+            fprintf(stdout, "    filt_kern_precomp   = %.13g\n", timing_kern_precomp);
+            fprintf(stdout, "\n");
+            fprintf(stdout, "    filt_main           = %.13g\n", timing_filt_main);
+            fprintf(stdout, "    filt_comp_pi        = %.13g\n", timing_filt_comp_transfers);
+            fprintf(stdout, "    filt_comp_lambda    = %.13g\n", timing_filt_bc_transfers);
+            fprintf(stdout, "    filt_land           = %.13g\n", timing_land);
+            fprintf(stdout, "\n");
+            fprintf(stdout, "    filt_comp_vort      = %.13g\n", timing_comp_vorticity);
+            fprintf(stdout, "    filt_comp_pi        = %.13g\n", timing_comp_pi);
+            fprintf(stdout, "    filt_comp_Lambda    = %.13g\n", timing_comp_Lambda);
+            fprintf(stdout, "    filt_comp_transport = %.13g\n", timing_comp_transport);
+            fprintf(stdout, "\n");
+
+            timing_filt_main = 0.;
+            timing_land = 0.;
+            timing_kern_precomp = 0.;
+            timing_filt_comp_transfers = 0.;
+            timing_filt_bc_transfers = 0.;
+            timing_comp_vorticity = 0.;
+            timing_comp_pi = 0.;
+            timing_comp_Lambda = 0.;
+            timing_comp_transport = 0.;
+        }
 
     }  // end for(scale) block
 } // end filtering

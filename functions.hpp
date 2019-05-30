@@ -54,14 +54,15 @@ double distance(const double lon1,     const double lat1,
                 const double Llon = 0, const double Llat = 0);
 
 /*!
- * \brief Compute an array of the distances (in metres) from a 
+ * \brief Compute an array of the kernel values from a 
  * given reference point to every other point in the domain
  *
  * (ref_ilat, ref_ilon) is the reference point from which 
- *   distances are computed.
+ *   the kernel values are computed.
  */
-void compute_distances(
-        std::vector<double> & distances,
+void compute_local_kernel(
+        std::vector<double> & local_kernel,
+        const double scale,
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
         const int ref_ilat, const int ref_ilon,
@@ -156,7 +157,7 @@ void apply_filter_at_point(
         const double scale,
         const std::vector<double> & mask,
         const bool use_mask,
-        const std::vector<double> * distances);
+        const std::vector<double> * local_kernel);
 
 /*!
  * \brief Primary kernel function coarse-graining procedure (G in publications)
@@ -225,7 +226,7 @@ void apply_filter_at_point_for_quadratics(
         const std::vector<double> & dAreas, 
         const double scale,
         const std::vector<double> & mask,
-        const std::vector<double> * distances);
+        const std::vector<double> * local_kernel);
 
 /*!
  * \brief Compute the energy transfer through the current filter scale

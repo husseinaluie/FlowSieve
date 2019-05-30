@@ -111,6 +111,13 @@ namespace constants
     const bool COMP_BC_TRANSFERS = true;
 
     /*!
+     * \param DO_TIMING
+     * \brief Boolean indicating if we want to output internal timings
+     * @ingroup constants
+     */
+    const bool DO_TIMING = true;
+
+    /*!
      * \param KERNEL_OPT
      * \brief Integer flag indicating the choice of kernel
      *
@@ -130,12 +137,12 @@ namespace constants
      *
      * @ingroup constants
      */
-    const double KernPad =  2.5;
+    const double KernPad = 2.5;
     /*
     switch (KERNEL_OPT) {
         case 0: const double KernPad =  1.1;
-        case 1: const double KernPad =  2.5;
-        case 2: const double KernPad =  5.;
+        case 1: const double KernPad =  2.5;  // exp(-2.5^4) ~1e-17
+        case 2: const double KernPad =  5.;   // exp(-5^2)   ~1e-11
         case 3: const double KernPad = -1.;
     }
     */
