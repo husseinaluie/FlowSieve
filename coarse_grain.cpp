@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     //   include scales as a comma-separated list
     //   scales are given in metres
     // A zero scale will cause everything to nan out
-    std::vector<double> filter_scales {0.5e3, 100e3, 400e3};
+    std::vector<double> filter_scales {250e3};
 
     // Parse command-line flags
     char buffer [50];
@@ -186,8 +186,8 @@ int main(int argc, char *argv[]) {
         fprintf(stdout, "\n\n");
         fprintf(stdout, "Process completed.\n");
         fprintf(stdout, "\n");
-        fprintf(stdout, "Start-up time:  %.13g\n", pre_filter_time - start_time);
-        fprintf(stdout, "Filtering time: %.13g\n", post_filter_time - pre_filter_time);
+        fprintf(stdout, "Start-up time  = %.13g\n", pre_filter_time - start_time);
+        fprintf(stdout, "Filtering time = %.13g\n", post_filter_time - pre_filter_time);
         fprintf(stdout, "   (clock resolution = %.13g)\n", delta_clock);
     }
     #endif

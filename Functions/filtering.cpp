@@ -652,28 +652,28 @@ void filtering(
         // If we're doing timings, then print out and reset values now
         if ((constants::DO_TIMING) and (wRank == 0)) { 
             fprintf(stdout, "  ::Timings::\n");
-            fprintf(stdout, "    filt_kern_precomp   = %.13g\n", timing_kern_precomp);
+            fprintf(stdout, "    filt_kern_precomp = %.13g\n", timing_kern_precomp);
             fprintf(stdout, "\n");
-            fprintf(stdout, "    filt_main           = %.13g\n", timing_filt_main);
-            fprintf(stdout, "    filt_comp_pi        = %.13g\n", timing_filt_comp_transfers);
-            fprintf(stdout, "    filt_comp_lambda    = %.13g\n", timing_filt_bc_transfers);
-            fprintf(stdout, "    filt_land           = %.13g\n", timing_land);
+            fprintf(stdout, "    filt_main         = %.13g\n", timing_filt_main);
+            fprintf(stdout, "    filt_for_pi       = %.13g\n", timing_filt_comp_transfers);
+            fprintf(stdout, "    filt_for_lambda   = %.13g\n", timing_filt_bc_transfers);
+            fprintf(stdout, "    filt_land         = %.13g\n", timing_land);
             fprintf(stdout, "\n");
-            fprintf(stdout, "    filt_comp_vort      = %.13g\n", timing_comp_vorticity);
-            fprintf(stdout, "    filt_comp_pi        = %.13g\n", timing_comp_pi);
-            fprintf(stdout, "    filt_comp_Lambda    = %.13g\n", timing_comp_Lambda);
-            fprintf(stdout, "    filt_comp_transport = %.13g\n", timing_comp_transport);
+            fprintf(stdout, "    comp_vort         = %.13g\n", timing_comp_vorticity);
+            fprintf(stdout, "    comp_pi           = %.13g\n", timing_comp_pi);
+            fprintf(stdout, "    comp_lambda       = %.13g\n", timing_comp_Lambda);
+            fprintf(stdout, "    comp_transport    = %.13g\n", timing_comp_transport);
             fprintf(stdout, "\n");
 
-            timing_filt_main = 0.;
-            timing_land = 0.;
-            timing_kern_precomp = 0.;
+            timing_filt_main           = 0.;
+            timing_land                = 0.;
+            timing_kern_precomp        = 0.;
             timing_filt_comp_transfers = 0.;
-            timing_filt_bc_transfers = 0.;
-            timing_comp_vorticity = 0.;
-            timing_comp_pi = 0.;
-            timing_comp_Lambda = 0.;
-            timing_comp_transport = 0.;
+            timing_filt_bc_transfers   = 0.;
+            timing_comp_vorticity      = 0.;
+            timing_comp_pi             = 0.;
+            timing_comp_Lambda         = 0.;
+            timing_comp_transport      = 0.;
         }
 
     }  // end for(scale) block
