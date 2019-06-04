@@ -25,6 +25,7 @@ void spher_derivative_at_point(
     assert(deriv_vals.size() == fields.size());
     const int num_deriv = deriv_vals.size();
 
+    // Zero out before computing
     for (int ii = 0; ii < num_deriv; ii++) {
         if (deriv_vals.at(ii) != NULL) {
             *(deriv_vals.at(ii)) = 0.;
