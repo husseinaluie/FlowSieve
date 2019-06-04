@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <math.h>
 #include <vector>
+#include <assert.h>
 #include "../differentiation_tools.hpp"
 #include "../functions.hpp"
 
@@ -55,20 +56,32 @@ void apply_test(double & err2_lon, double & err2_lat,
     // Now compute the derivatives
     std::vector<double> numer_lon_deriv( Nlat * Nlon );
     std::vector<double> numer_lat_deriv( Nlat * Nlon );
-    double tmp;
-    int index;
 
+    double lon_deriv_val, lat_deriv_val;
+    std::vector<const std::vector<double>*> deriv_fields;
+    std::vector<double*> lon_deriv_vals, lat_deriv_vals;
+
+    deriv_fields.push_back(&field);
+    lon_deriv_vals.push_back(&lon_deriv_val);
+    lat_deriv_vals.push_back(&lat_deriv_val);
+
+    int index;
     for (int Ilat = 0; Ilat < Nlat; Ilat++) {
         for (int Ilon = 0; Ilon < Nlon; Ilon++) {
             index = Ilat * Nlon + Ilon;
 
-            // Compute longitudinal derivative
-            tmp = spher_derivative_at_point(field, longitude, "lon", 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
-            numer_lon_deriv.at(index) = tmp;
+            spher_derivative_at_point(
+                    lon_deriv_vals, deriv_fields, longitude, "lon",
+                    0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon,
+                    mask);
 
-            // Compute latitudinal derivative
-            tmp = spher_derivative_at_point(field, latitude, "lat", 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
-            numer_lat_deriv.at(index) = tmp;
+            spher_derivative_at_point(
+                    lat_deriv_vals, deriv_fields, latitude, "lat",
+                    0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon,
+                    mask);
+
+            numer_lon_deriv.at(index) = lon_deriv_val;
+            numer_lat_deriv.at(index) = lat_deriv_val;
         }
     }
 
@@ -110,6 +123,9 @@ void apply_test(double & err2_lon, double & err2_lat,
 }
 
 int main(int argc, char *argv[]) {
+
+    // Only if we're not set on a Cartesian grid
+    assert(!constants::CARTESIAN);
 
     fprintf(stdout, "Beginning tests for differentiation routines.\n");
 

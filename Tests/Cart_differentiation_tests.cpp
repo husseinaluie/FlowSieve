@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <math.h>
 #include <vector>
+#include <assert.h>
 #include "../differentiation_tools.hpp"
 #include "../functions.hpp"
 #include "../constants.hpp"
@@ -49,21 +50,36 @@ double true_deriv_lat(const double lat, const double lon) {
 }
 
 double true_deriv_x(const double lat, const double lon) {
-    double ret_val = 
-        - true_deriv_lon(lat, lon) * sin(lon) / (cos(lat) * constants::R_earth)
-        - true_deriv_lat(lat, lon) * cos(lon) *  sin(lat) / constants::R_earth;
+    double ret_val;
+    if (constants::CARTESIAN) {
+        ret_val = true_deriv_lon(lat, lon);
+    } else {
+        ret_val = 
+            - true_deriv_lon(lat, lon) * sin(lon) / (cos(lat) * constants::R_earth)
+            - true_deriv_lat(lat, lon) * cos(lon) *  sin(lat) / constants::R_earth;
+    }
     return ret_val;
 }
 
 double true_deriv_y(const double lat, const double lon) {
-    double ret_val = 
-          true_deriv_lon(lat, lon) * cos(lon) / (cos(lat) * constants::R_earth)
-        - true_deriv_lat(lat, lon) * sin(lon) *  sin(lat) / constants::R_earth;
+    double ret_val;
+    if (constants::CARTESIAN) {
+        ret_val = true_deriv_lat(lat, lon);
+    } else {
+        ret_val = 
+              true_deriv_lon(lat, lon) * cos(lon) / (cos(lat) * constants::R_earth)
+            - true_deriv_lat(lat, lon) * sin(lon) *  sin(lat) / constants::R_earth;
+    }
     return ret_val;
 }
 
 double true_deriv_z(const double lat, const double lon) {
-    double ret_val = true_deriv_lat(lat, lon) * cos(lat) / constants::R_earth;
+    double ret_val;
+    if (constants::CARTESIAN) {
+        ret_val = 0.;
+    } else {
+        ret_val = true_deriv_lat(lat, lon) * cos(lat) / constants::R_earth;
+    }
     return ret_val;
 }
 
@@ -81,8 +97,6 @@ void apply_test(
     std::vector<double> numer_x_deriv( Nlat * Nlon );
     std::vector<double> numer_y_deriv( Nlat * Nlon );
     std::vector<double> numer_z_deriv( Nlat * Nlon );
-    double tmp;
-    int index;
 
     #if SAVE_TO_FILE
     std::vector<double> true_x_deriv( Nlat * Nlon );
@@ -90,24 +104,33 @@ void apply_test(
     std::vector<double> true_z_deriv( Nlat * Nlon );
     #endif
 
+    double x_deriv_val, y_deriv_val, z_deriv_val;
+    std::vector<double*> x_deriv_vals, y_deriv_vals, z_deriv_vals;
+    std::vector<const std::vector<double>*> deriv_fields;
+
+    deriv_fields.push_back(&field);
+    x_deriv_vals.push_back(&x_deriv_val);
+    y_deriv_vals.push_back(&y_deriv_val);
+    z_deriv_vals.push_back(&z_deriv_val);
+
+    int index;
     for (int Ilat = 0; Ilat < Nlat; Ilat++) {
         for (int Ilon = 0; Ilon < Nlon; Ilon++) {
             index = Ilat * Nlon + Ilon;
 
-            // Compute x derivative
-            tmp = Cart_derivative_at_point(field, latitude, longitude, 
-                    "x", 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
-            numer_x_deriv.at(index) = tmp; // / constants::R_earth;
+            // Compute derivatives
+            Cart_derivatives_at_point(
+                    x_deriv_vals, y_deriv_vals,
+                    z_deriv_vals, deriv_fields,
+                    latitude, longitude,
+                    0, 0, Ilat, Ilon,
+                    1, 1, Nlat, Nlon,
+                    mask);
 
-            // Compute y derivative
-            tmp = Cart_derivative_at_point(field, latitude, longitude, 
-                    "y", 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
-            numer_y_deriv.at(index) = tmp; // / constants::R_earth;
-
-            // Compute z derivative
-            tmp = Cart_derivative_at_point(field, latitude, longitude, 
-                    "z", 0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon, mask);
-            numer_z_deriv.at(index) = tmp; // / constants::R_earth;
+            // Store them
+            numer_x_deriv.at(index) = x_deriv_val;
+            numer_y_deriv.at(index) = y_deriv_val;
+            numer_z_deriv.at(index) = z_deriv_val;
 
             #if SAVE_TO_FILE
             true_x_deriv.at(index) = true_deriv_x(latitude.at(Ilat), longitude.at(Ilon));
@@ -184,7 +207,17 @@ int main(int argc, char *argv[]) {
 
     fprintf(stdout, "Beginning tests for differentiation routines.\n");
 
-    const int num_tests = 10;
+    int thread_safety_provided;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_safety_provided);
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI::ERRORS_THROW_EXCEPTIONS);
+
+    int wRank=-1, wSize=-1;
+    MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
+    MPI_Comm_size( MPI_COMM_WORLD, &wSize );
+
+    assert(wSize==1);
+
+    const int num_tests = 6;
     const int base_nlon = 32;
     const int base_nlat = 32;
 
@@ -357,6 +390,12 @@ int main(int argc, char *argv[]) {
 
     //// Second for the l2 - by lat
 
+    mean_x_x = 0.;
+    mean_x_y = 0.;
+    mean_x_z = 0.;
+    mean_y_x = 0.;
+    mean_y_y = 0.;
+    mean_y_z = 0.;
     // First, get means
     for (int test_ind = 0; test_ind < num_tests; test_ind++) {
         mean_x_x += log2(lat_points.at(test_ind));
@@ -374,6 +413,12 @@ int main(int argc, char *argv[]) {
     mean_y_y *= 1./num_tests;
     mean_y_z *= 1./num_tests;
 
+    var_x_x = 0.;
+    var_x_y = 0.;
+    var_x_z = 0.;
+    cov_xy_x = 0.;
+    cov_xy_y = 0.;
+    cov_xy_z = 0.;
     // Now compute variance / covariances
     for (int test_ind = 0; test_ind < num_tests; test_ind++) {
         var_x_x += pow(log2(lat_points.at(test_ind)) - mean_x_x, 2);
@@ -407,7 +452,7 @@ int main(int argc, char *argv[]) {
         fprintf(stdout, "      ( %03d    %.04g  %.3g )  :      ( %03d    %.04g  %.3g )  :      ( %03d    %.04g  %.3g )\n", 
             (int)log2(lat_points.at(test_ind)), log2(x2_errors.at(test_ind)), ord_x,
             (int)log2(lat_points.at(test_ind)), log2(y2_errors.at(test_ind)), ord_y,
-            (int)log2(lat_points.at(test_ind)), log2(z2_errors.at(test_ind)), ord_y);
+            (int)log2(lat_points.at(test_ind)), log2(z2_errors.at(test_ind)), ord_z);
     }
 
     return 0;
