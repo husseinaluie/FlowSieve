@@ -165,8 +165,8 @@ void compute_div_transport(
         y_deriv_vals.push_back(&uz_y);
         y_deriv_vals.push_back(NULL);
         y_deriv_vals.push_back(&uxuy_y);
-        y_deriv_vals.push_back(&uyuy_y);
         y_deriv_vals.push_back(NULL);
+        y_deriv_vals.push_back(&uyuy_y);
         y_deriv_vals.push_back(&uzuy_y);
         y_deriv_vals.push_back(NULL);
         if (constants::COMP_BC_TRANSFERS) {
