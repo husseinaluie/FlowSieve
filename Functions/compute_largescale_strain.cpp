@@ -36,6 +36,10 @@ void compute_largescale_strain(
     double ux_y, uy_y, uz_y;
     double ux_z, uy_z, uz_z;
 
+    deriv_fields.push_back(&u_x);
+    deriv_fields.push_back(&u_y);
+    deriv_fields.push_back(&u_z);
+
     x_deriv_vals.push_back(&ux_x);
     x_deriv_vals.push_back(&uy_x);
     x_deriv_vals.push_back(&uz_x);
@@ -47,10 +51,6 @@ void compute_largescale_strain(
     z_deriv_vals.push_back(&ux_z);
     z_deriv_vals.push_back(&uy_z);
     z_deriv_vals.push_back(&uz_z);
-
-    deriv_fields.push_back(&u_x);
-    deriv_fields.push_back(&u_y);
-    deriv_fields.push_back(&u_z);
     
     Cart_derivatives_at_point(
             x_deriv_vals, y_deriv_vals,
