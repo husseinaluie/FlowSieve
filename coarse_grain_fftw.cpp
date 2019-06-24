@@ -11,6 +11,7 @@
 #include "netcdf_io.hpp"
 #include "functions.hpp"
 #include "constants.hpp"
+#include "fft_based.hpp"
 
 int main(int argc, char *argv[]) {
 
@@ -33,7 +34,15 @@ int main(int argc, char *argv[]) {
     //   include scales as a comma-separated list
     //   scales are given in metres
     // A zero scale will cause everything to nan out
-    std::vector<double> filter_scales {250e3};
+    /*
+    std::vector<double> filter_scales { 250e3 };
+    */
+    std::vector<double> filter_scales {
+        25.28e3, 31.6e3, 39.5e3, 49.375e3, 
+        63.2e3, 80e3, 100e3, 150e3,
+        158e3, 200e3, 250e3, 252.8e3, 395e3,
+        400e3, 632e3, 790e3, 1580e3, 6320e3
+    };
 
     // Parse command-line flags
     char buffer [50];
@@ -73,10 +82,10 @@ int main(int argc, char *argv[]) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     // Print processor assignments
-    const int max_threads = omp_get_max_threads();
-    omp_set_num_threads( max_threads );
     #if DEBUG >= 2
     int tid, nthreads;
+    const int max_threads = omp_get_max_threads();
+    omp_set_num_threads( max_threads );
     #pragma omp parallel default(none) private(tid, nthreads) \
         shared(stdout) firstprivate(wRank, wSize)
     {
@@ -153,7 +162,7 @@ int main(int argc, char *argv[]) {
             }
 
             #pragma omp for collapse(1) schedule(static)
-            for (ii = 0; ii < Nlat; ii++) {
+            for (ii = 0; ii < Nlat; ii++) { 
                 latitude.at(ii) = latitude.at(ii) * D2R;
             }
         }
@@ -170,13 +179,14 @@ int main(int argc, char *argv[]) {
 
     // Now pass the arrays along to the filtering routines
     const double pre_filter_time = MPI_Wtime();
-    filtering(u_r, u_lon, u_lat,
-              rho, p,
-              filter_scales,
-              areas, 
-              time, depth,
-              longitude, latitude,
-              mask, myCounts, myStarts);
+    filtering_fftw(
+            u_r, u_lon, u_lat,
+            rho, p,
+            filter_scales,
+            areas, 
+            time, depth,
+            longitude, latitude,
+            mask, myCounts, myStarts);
     const double post_filter_time = MPI_Wtime();
 
     // Done!

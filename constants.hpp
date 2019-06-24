@@ -1,40 +1,9 @@
 #ifndef CONSTANTS_HPP
 #define CONSTANTS_HPP 1
 
+// Default debug value
 #ifndef DEBUG
     #define DEBUG 0
-#endif
-
-#ifndef CARTESIAN
-    #define CARTESIAN false
-#endif
-
-#ifndef PERIODIC_X
-    #define PERIODIC_X true
-#endif
-
-#ifndef PERIODIC_Y
-    #define PERIODIC_Y false
-#endif
-
-#ifndef COMP_VORT
-    #define COMP_VORT true
-#endif
-
-#ifndef COMP_TRANSFERS
-    #define COMP_TRANSFERS true
-#endif
-
-#ifndef COMP_BC_TRANSFERS
-    #define COMP_BC_TRANSFERS true
-#endif
-
-//  0 = tophat
-//  1 = Hyper gaus (exp(-x^4))
-//  2 = Gaus  (exp(-x^2))
-//  3 = sinc (sharp-spectral)
-#ifndef KERNEL_OPT
-    #define KERNEL_OPT 1
 #endif
 
 /*!
@@ -80,25 +49,85 @@ namespace constants
 
     /*!
      * \param g
-     * \brief (constant) acceleration due to gravity
+     * \brief (constant) acceleration due to gravity.
      * @ingroup constants
      */
     const double g = 9.81;
 
     /*!
      * \param DiffOrd
-     * \brief Differentiation order for finite differencing (currently must be 2, 4, or 6)
+     * \brief Differentiation order for finite differencing (currently must be 2, 4, or 6).
      * @ingroup constants
      */
     const int DiffOrd = 6;
 
     /*!
      * \param fill_value
-     * \brief Fill value used to indicate land values in output files
+     * \brief Fill value used to indicate land values in output files.
      * @ingroup constants
      */
     const double fill_value = -32767;
-    //const double fill_value = -1e8;
+
+    /*!
+     * \param CARTESIAN
+     * \brief Boolean indicating if the coordinate system is Cartesian. (If false, then spherical)
+     * @ingroup constants
+     */
+    const bool CARTESIAN = false;
+
+    /*!
+     * \param PERIODIC_X
+     * \brief Boolean indicating if the coordinate system is periodic in x / longitude.
+     * @ingroup constants
+     */
+    const bool PERIODIC_X = true;
+
+    /*!
+     * \param PERIODIC_Y
+     * \brief Boolean indicating if the coordinate system is periodic in y / latitute.
+     * @ingroup constants
+     */
+    const bool PERIODIC_Y = false;
+
+    /*!
+     * \param COMP_VORT
+     * \brief Boolean indicating if vorticity should be computed.
+     * @ingroup constants
+     */
+    const bool COMP_VORT = true;
+
+    /*!
+     * \param COMP_TRANSFERS
+     * \brief Boolean indicating if non-linear transfers (Pi) should be computed.
+     * @ingroup constants
+     */
+    const bool COMP_TRANSFERS = true;
+
+    /*!
+     * \param COMP_BC_TRANSFERS
+     * \brief Boolean indicating if baroclinic transfers (Lambda^m) should be computed.
+     * @ingroup constants
+     */
+    const bool COMP_BC_TRANSFERS = true;
+
+    /*!
+     * \param DO_TIMING
+     * \brief Boolean indicating if we want to output internal timings
+     * @ingroup constants
+     */
+    const bool DO_TIMING = true;
+
+    /*!
+     * \param KERNEL_OPT
+     * \brief Integer flag indicating the choice of kernel
+     *
+     *  0 = tophat
+     *  1 = Hyper gaus (exp(-x^4))
+     *  2 = Gaus  (exp(-x^2))
+     *  3 = sinc (sharp-spectral)
+     * @ingroup constants
+     */
+    const int KERNEL_OPT = 1;
 
     /*!
      * \param KernPad
@@ -108,15 +137,15 @@ namespace constants
      *
      * @ingroup constants
      */
-    #if KERNEL_OPT == 0
-    const double KernPad = 1.1;
-    #elif KERNEL_OPT == 1
     const double KernPad = 2.5;
-    #elif KERNEL_OPT == 2
-    const double KernPad = 5.;
-    #elif KERNEL_OPT == 3
-    const double KernPad = -1; // negative indicate 'infinity'
-    #endif
+    /*
+    switch (KERNEL_OPT) {
+        case 0: const double KernPad =  1.1;
+        case 1: const double KernPad =  2.5;  // exp(-2.5^4) ~1e-17
+        case 2: const double KernPad =  5.;   // exp(-5^2)   ~1e-11
+        case 3: const double KernPad = -1.;
+    }
+    */
 
 }
 /*! @} End of Doxygen Groups*/

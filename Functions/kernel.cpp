@@ -3,13 +3,13 @@
 #include <math.h>
 
 double sinc(const double &x) {
-    if (x == 0.) {
-        return 1; // account for zero
-    } else if (fabs(x) < 1e-10) {
-        return 1 - x*x/6; // to avoid some numerical issues, use series expansion for small x
-    } else {
-        return sin(x) / x;
-    }
+    double s;
+
+    // to avoid some numerical issues, use series expansion for small x
+    if (fabs(x) < 1e-9) { s = 1. - x*x/6.; }
+    else                { s = sin(x) / x; }
+
+    return s;
 }
 
 double kernel(
@@ -18,20 +18,18 @@ double kernel(
         ) {
    
     double kern;
+    const double D = dist / ( scale / 2. );
 
-    #if KERNEL_OPT == 0
-    if ( dist < (scale / 2) ) {
-        kern =  1.;
-    } else {
-        kern =  0.;
+    switch (constants::KERNEL_OPT) {
+        case 0: kern = D < 1 ? 1. : 0;
+                break;
+        case 1: kern = exp( -pow( D, 4) );
+                break;
+        case 2: kern = exp( -pow( D, 2) );
+                break;
+        case 3: kern = sinc( M_PI * D );
+                break;
     }
-    #elif KERNEL_OPT == 1
-    kern = exp( -pow( dist / (scale/2)  , 4) );
-    #elif KERNEL_OPT == 2
-    kern = exp( -pow( dist / (scale/2)  , 2) );
-    #elif KERNEL_OPT == 3
-    kern = sinc( dist / (scale/2) );
-    #endif
 
     #if DEBUG >= 6
     fprintf(stdout, "Kernel(dist=%.4g, scale=%.4g) = %.4g\n",

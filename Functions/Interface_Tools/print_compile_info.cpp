@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <vector>
-#include "../constants.hpp"
+#include "../../constants.hpp"
+#include "../../functions.hpp"
 
 void print_compile_info(
         const std::vector<double> &scales   /**< [in] Scales used for filtering */
@@ -48,15 +49,15 @@ void print_compile_info(
     }
     fprintf(stdout, "\n");
 
-    fprintf(stdout, "Pre-processor flags\n");
+    fprintf(stdout, "Flags\n");
     fprintf(stdout, "  DEBUG             = %d\n", DEBUG);
-    fprintf(stdout, "  KERNEL_OPT        = %d\n", KERNEL_OPT);
-    fprintf(stdout, "  CARTESIAN         = %s\n", CARTESIAN ? "true" : "false");
-    fprintf(stdout, "  PERIODIC_X        = %s\n", PERIODIC_X ? "true" : "false");
-    fprintf(stdout, "  PERIODIC_Y        = %s\n", PERIODIC_Y ? "true" : "false");
-    fprintf(stdout, "  COMP_VORT         = %s\n", COMP_VORT ? "true" : "false");
-    fprintf(stdout, "  COMP_TRANSFERS    = %s\n", COMP_TRANSFERS ? "true" : "false");
-    fprintf(stdout, "  COMP_BC_TRANSFERS = %s\n", COMP_BC_TRANSFERS ? "true" : "false");
+    fprintf(stdout, "  KERNEL_OPT        = %d\n", constants::KERNEL_OPT);
+    fprintf(stdout, "  CARTESIAN         = %s\n", constants::CARTESIAN         ? "true" : "false");
+    fprintf(stdout, "  PERIODIC_X        = %s\n", constants::PERIODIC_X        ? "true" : "false");
+    fprintf(stdout, "  PERIODIC_Y        = %s\n", constants::PERIODIC_Y        ? "true" : "false");
+    fprintf(stdout, "  COMP_VORT         = %s\n", constants::COMP_VORT         ? "true" : "false");
+    fprintf(stdout, "  COMP_TRANSFERS    = %s\n", constants::COMP_TRANSFERS    ? "true" : "false");
+    fprintf(stdout, "  COMP_BC_TRANSFERS = %s\n", constants::COMP_BC_TRANSFERS ? "true" : "false");
     fprintf(stdout, "\n");
 
     fprintf(stdout, "Constants\n");

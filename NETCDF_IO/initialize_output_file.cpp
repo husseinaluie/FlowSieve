@@ -34,6 +34,14 @@ void initialize_output_file(
     retval = nc_put_att_double(ncid, NC_GLOBAL, "rho0", NC_FLOAT, 1, &constants::rho0);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
+    // Record coordinate type
+    if (constants::CARTESIAN) {
+        retval = nc_put_att_text(ncid, NC_GLOBAL, "coord-type", 10, "cartesian");
+    } else {
+        retval = nc_put_att_text(ncid, NC_GLOBAL, "coord-type", 10, "spherical");
+    }
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
     // Extract dimension sizes
     const int Ntime   = time.size();
     const int Ndepth  = depth.size();
@@ -62,11 +70,13 @@ void initialize_output_file(
     if ((retval = nc_def_var(ncid, "longitude", NC_FLOAT, 1, &lon_dimid,   &lon_varid)))
         NC_ERR(retval, __LINE__, __FILE__);
 
-    const double rad_to_degree = 180. / M_PI;
-    retval = nc_put_att_double(ncid, lon_varid, "scale_factor", NC_FLOAT, 1, &rad_to_degree);
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    retval = nc_put_att_double(ncid, lat_varid, "scale_factor", NC_FLOAT, 1, &rad_to_degree);
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    if (not(constants::CARTESIAN)) {
+        const double rad_to_degree = 180. / M_PI;
+        retval = nc_put_att_double(ncid, lon_varid, "scale_factor", NC_FLOAT, 1, &rad_to_degree);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+        retval = nc_put_att_double(ncid, lat_varid, "scale_factor", NC_FLOAT, 1, &rad_to_degree);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    }
 
     int mask_dimids[2];
     mask_dimids[0] = lat_dimid;

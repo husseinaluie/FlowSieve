@@ -28,53 +28,37 @@ void compute_largescale_strain(
         const std::vector<double> & mask        /**< [in] Mask array (2D) to distinguish land from water*/
         ) {
 
-    //// For the sake of convenience, compute all of the derivatives first
-    
-    // x derivatives
+    // For the sake of convenience, compute all of the derivatives first
+    std::vector<double*> x_deriv_vals, y_deriv_vals, z_deriv_vals;
+    std::vector<const std::vector<double>*> deriv_fields;
+
     double ux_x, uy_x, uz_x;
-    ux_x = Cart_derivative_at_point(u_x, latitude, longitude, "x",
-            Itime, Idepth, Ilat, Ilon,
-            Ntime, Ndepth, Nlat, Nlon,
-            mask);
-    uy_x = Cart_derivative_at_point(u_y, latitude, longitude, "x",
-            Itime, Idepth, Ilat, Ilon,
-            Ntime, Ndepth, Nlat, Nlon,
-            mask);
-    uz_x = Cart_derivative_at_point(u_z, latitude, longitude, "x",
-            Itime, Idepth, Ilat, Ilon,
-            Ntime, Ndepth, Nlat, Nlon,
-            mask);
-
-    // y derivatives
     double ux_y, uy_y, uz_y;
-    ux_y = Cart_derivative_at_point(u_x, latitude, longitude, "y",
-            Itime, Idepth, Ilat, Ilon,
-            Ntime, Ndepth, Nlat, Nlon,
-            mask);
-    uy_y = Cart_derivative_at_point(u_y, latitude, longitude, "y",
-            Itime, Idepth, Ilat, Ilon,
-            Ntime, Ndepth, Nlat, Nlon,
-            mask);
-    uz_y = Cart_derivative_at_point(u_z, latitude, longitude, "y",
-            Itime, Idepth, Ilat, Ilon,
-            Ntime, Ndepth, Nlat, Nlon,
-            mask);
-
-    // z derivatives
     double ux_z, uy_z, uz_z;
-    ux_z = Cart_derivative_at_point(u_x, latitude, longitude, "z",
-            Itime, Idepth, Ilat, Ilon,
-            Ntime, Ndepth, Nlat, Nlon,
-            mask);
-    uy_z = Cart_derivative_at_point(u_y, latitude, longitude, "z",
-            Itime, Idepth, Ilat, Ilon,
-            Ntime, Ndepth, Nlat, Nlon,
-            mask);
-    uz_z = Cart_derivative_at_point(u_z, latitude, longitude, "z",
-            Itime, Idepth, Ilat, Ilon,
-            Ntime, Ndepth, Nlat, Nlon,
-            mask);
 
+    deriv_fields.push_back(&u_x);
+    deriv_fields.push_back(&u_y);
+    deriv_fields.push_back(&u_z);
+
+    x_deriv_vals.push_back(&ux_x);
+    x_deriv_vals.push_back(&uy_x);
+    x_deriv_vals.push_back(&uz_x);
+
+    y_deriv_vals.push_back(&ux_y);
+    y_deriv_vals.push_back(&uy_y);
+    y_deriv_vals.push_back(&uz_y);
+
+    z_deriv_vals.push_back(&ux_z);
+    z_deriv_vals.push_back(&uy_z);
+    z_deriv_vals.push_back(&uz_z);
+    
+    Cart_derivatives_at_point(
+            x_deriv_vals, y_deriv_vals,
+            z_deriv_vals, deriv_fields,
+            latitude, longitude,
+            Itime, Idepth, Ilat, Ilon,
+            Ntime, Ndepth, Nlat, Nlon,
+            mask);
 
     // Now actually compute the strain terms
     S_xx = ux_x;
@@ -85,4 +69,3 @@ void compute_largescale_strain(
     S_yz = 0.5 * (uy_z + uz_y);
 
 }
-
