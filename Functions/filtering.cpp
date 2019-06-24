@@ -270,7 +270,7 @@ void filtering(
         scale = scales.at(Iscale);
         perc  = perc_base;
 
-        #if DEBUG >= 0
+        #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "  filtering: "); }
         fflush(stdout);
         #endif

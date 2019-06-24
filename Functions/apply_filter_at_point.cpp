@@ -24,7 +24,6 @@ void apply_filter_at_point(
         const std::vector<double> * local_kernel    /**< [in] Array of local_kernel (if not NULL) */
         ) {
 
-
     double dist, kern, area;
     int index, mask_index;
     int curr_lon, curr_lat;
@@ -40,6 +39,8 @@ void apply_filter_at_point(
 
     double dlat_m, dlon_m; 
     int    dlat_N, dlon_N;
+    int LAT_lb, LAT_ub, LON_lb, LON_ub;
+
     // The spacing (in metres and points) betwee latitude gridpoints
     //   The factor of 2 is diameter->radius 
     if (constants::CARTESIAN) { dlat_m = dlat; } 
@@ -50,7 +51,6 @@ void apply_filter_at_point(
 
     dlat_N = std::min(Nlat, dlat_N);
 
-    int LAT_lb, LAT_ub, LON_lb, LON_ub;
     // Latitude periodicity is a little different / awkward
     //   for the moment, hope it doesn't become an issue
     if (constants::PERIODIC_Y) {

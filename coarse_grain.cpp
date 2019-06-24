@@ -73,10 +73,10 @@ int main(int argc, char *argv[]) {
     MPI_Barrier(MPI_COMM_WORLD);
 
     // Print processor assignments
-    #if DEBUG >= 2
-    int tid, nthreads;
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
+    #if DEBUG >= 2
+    int tid, nthreads;
     #pragma omp parallel default(none) private(tid, nthreads) \
         shared(stdout) firstprivate(wRank, wSize)
     {
