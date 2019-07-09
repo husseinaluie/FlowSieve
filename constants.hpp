@@ -14,7 +14,7 @@
  *
  * Usage:
  * @code
- * #include "functions.hpp"
+ * #include "constants.hpp"
  * ...
  * double R_earth = constants::R_earth;
  * @endcode
@@ -69,6 +69,13 @@ namespace constants
     const double fill_value = -32767;
 
     /*!
+     * \param fill_value_s
+     * \brief Fill value used to indicate land values in output files (signed short)
+     * @ingroup constants
+     */
+    const signed short fill_value_s = -32767;
+
+    /*!
      * \param CARTESIAN
      * \brief Boolean indicating if the coordinate system is Cartesian. (If false, then spherical)
      * @ingroup constants
@@ -90,11 +97,18 @@ namespace constants
     const bool PERIODIC_Y = false;
 
     /*!
+     * \param UNIFORM_LAT_GRID
+     * \brief Boolean indicating if the latitude grid is uniform
+     * @ingroup constants
+     */
+    const bool UNIFORM_LAT_GRID = true;
+
+    /*!
      * \param COMP_VORT
      * \brief Boolean indicating if vorticity should be computed.
      * @ingroup constants
      */
-    const bool COMP_VORT = true;
+    const bool COMP_VORT = false;
 
     /*!
      * \param COMP_TRANSFERS
@@ -108,14 +122,33 @@ namespace constants
      * \brief Boolean indicating if baroclinic transfers (Lambda^m) should be computed.
      * @ingroup constants
      */
-    const bool COMP_BC_TRANSFERS = true;
+    const bool COMP_BC_TRANSFERS = false;
+
+    /*!
+     * \param MINIMAL_OUTPUT
+     * \brief Boolean indicating if user wants a minimal output
+     *
+     * Removes: fine velocities, coarse/fine KE, divergences, transport
+     *
+     * @ingroup constants
+     */
+    const bool MINIMAL_OUTPUT = true;
+
+    /*!
+     * \param CAST_TO_INT
+     * \brief Boolean indicating if user wants to cast to int output
+     * (reduces output size by factor 2, but also reduces precision)
+     *
+     * @ingroup constants
+     */
+    const bool CAST_TO_INT = true;
 
     /*!
      * \param DO_TIMING
      * \brief Boolean indicating if we want to output internal timings
      * @ingroup constants
      */
-    const bool DO_TIMING = true;
+    const bool DO_TIMING = false;
 
     /*!
      * \param KERNEL_OPT

@@ -58,6 +58,16 @@ void initialize_output_file(
         const double filter_scale,
         MPI_Comm = MPI_COMM_WORLD);
 
+void initialize_subset_file(
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & windows,
+        const int & Nsamples,
+        const std::vector<std::string> & vars,
+        const char * filename,
+        const double filter_scale,
+        MPI_Comm = MPI_COMM_WORLD);
+
 /*!
  * \brief Write on scales worth of a single field.
  *
@@ -74,6 +84,7 @@ void write_field_to_output(
         const size_t * start, 
         const size_t * count,
         const char * filename,
+        const std::vector<double> * mask = NULL,
         MPI_Comm = MPI_COMM_WORLD);
 
 /*!
@@ -90,7 +101,9 @@ void read_var_from_file(
         std::vector<double> *mask = NULL,
         std::vector<int> *myCounts = NULL,
         std::vector<int> *myStarts = NULL,
+        const bool do_splits = true,
         const MPI_Comm = MPI_COMM_WORLD );
+
 
 /*!
  *  \brief Add a new variable to a netcdf file
@@ -103,5 +116,19 @@ void add_var_to_file(
         const char ** dim_list,
         const int num_dims,
         const char * filename);
+
+
+/*!
+ *  \brief Convert a vector<double> to a vector<signed short> for output
+ *
+ *  This decreases the storage size by a factor of 2 (with, of course, a
+ *  corresponding decrease in precision).
+ */
+void package_field(
+        std::vector<signed short> & packaged,
+        double & scale_factor,
+        double & add_offset,
+        const std::vector<double> & original,
+        const std::vector<double> * mask);
 
 #endif

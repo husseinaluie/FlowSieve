@@ -19,6 +19,11 @@ void add_var_to_file(
     retval = nc_open(buffer, FLAG, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
+    // Determine data type
+    int datatype;
+    if (constants::CAST_TO_INT) { datatype = NC_SHORT; }
+    else                        { datatype = NC_FLOAT; }
+
     // Extract dimension ids sizes
     int dim_ids[num_dims];
     for (int dim_ind = 0; dim_ind < num_dims; dim_ind++) {
@@ -29,11 +34,18 @@ void add_var_to_file(
     // Declare the variable
     int var_id;
     char varname [50];
-    double fill_value = constants::fill_value;
     snprintf(varname, 50, var_name.c_str());
-    retval = nc_def_var(ncid, varname, NC_FLOAT, num_dims, dim_ids, &var_id);
+    retval = nc_def_var(ncid, varname, datatype, num_dims, dim_ids, &var_id);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    retval = nc_put_att_double(ncid, var_id, "_FillValue", NC_FLOAT, 1, &fill_value);
+
+    // Add the fill value
+    const double fill_value = constants::fill_value;
+    const signed short fill_value_s = constants::fill_value_s;
+    if (constants::CAST_TO_INT) {
+        retval = nc_put_att_short( ncid, var_id, "_FillValue", datatype, 1, &fill_value_s);
+    } else {
+        retval = nc_put_att_double(ncid, var_id, "_FillValue", datatype, 1, &fill_value);
+    }
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Close the file
