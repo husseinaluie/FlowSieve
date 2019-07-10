@@ -139,6 +139,29 @@ void filtering(const std::vector<double> & u_r,
                const MPI_Comm comm = MPI_COMM_WORLD);
 
 /*!
+ * \brief Alternate filtering driver for subsetting
+ *
+ */
+void filtering_subsets(
+        const std::vector<double> & u_r, 
+        const std::vector<double> & u_lon, 
+        const std::vector<double> & u_lat,
+        const std::vector<double> & rho,
+        const std::vector<double> & p,
+        const std::vector<double> & scales, 
+        const std::vector<double> & windows,
+        const int & Nsamples,
+        const std::vector<double> & dAreas, 
+        const std::vector<double> & time, 
+        const std::vector<double> & depth,
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude,
+              std::vector<double> & mask,
+        const std::vector<int>    & myCounts,
+        const std::vector<int>    & myStarts,
+        const MPI_Comm comm = MPI_COMM_WORLD);
+
+/*!
  * \brief Compute filtered field at a single point
  *
  * Computes the integral of the provided field with the
@@ -153,6 +176,8 @@ void apply_filter_at_point(
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
         const std::vector<double> & longitude, 
         const std::vector<double> & latitude,
+        const int LAT_lb,
+        const int LAT_ub,
         const std::vector<double> & dAreas, 
         const double scale,
         const std::vector<double> & mask,
@@ -223,6 +248,8 @@ void apply_filter_at_point_for_quadratics(
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
         const std::vector<double> & longitude, 
         const std::vector<double> & latitude,
+        const int LAT_lb,
+        const int LAT_ub,
         const std::vector<double> & dAreas, 
         const double scale,
         const std::vector<double> & mask,
@@ -382,6 +409,28 @@ void compute_div_vel(
         const int Nlat,
         const int Nlon,
         const std::vector<double> & mask);
+
+/*!
+ * \brief Get latitude integratation bounds
+ */
+void get_lat_bounds(
+        int & LAT_lb,
+        int & LAT_ub,
+        const std::vector<double> & latitude,
+        const int Ilat,
+        const double scale);
+
+/*!
+ * \brief Get longitude integratation bounds
+ */
+void get_lon_bounds(
+        int & LON_lb,
+        int & LON_ub,
+        const std::vector<double> & longitude,
+        const int Ilon,
+        const double centre_lat,
+        const double curr_lat,
+        const double scale);
 
 /*!
  * \brief Print summary of compile-time variables.
