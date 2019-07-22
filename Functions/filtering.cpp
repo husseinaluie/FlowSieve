@@ -254,7 +254,7 @@ void filtering(
     }
 
     int perc_base = 5;
-    int perc;
+    int perc, perc_count=0;
 
     //
     //// Begin the main filtering loop
@@ -307,7 +307,7 @@ void filtering(
                 uyuy_tmp, uyuz_tmp, uzuz_tmp,\
                 KE_tmp, rho_tmp, p_tmp,\
                 LAT_lb, LAT_ub, tid) \
-        firstprivate(perc, wRank, local_kernel)
+        firstprivate(perc, wRank, local_kernel, perc_count)
         {
             #pragma omp for collapse(2) schedule(dynamic)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -322,7 +322,9 @@ void filtering(
                     if ( (tid == 0) and (wRank == 0) ) {
                         // Every perc_base percent, print a dot, but only the first thread
                         if ( ((double)(mask_index+1) / (Nlon*Nlat)) * 100 >= perc ) {
-                            fprintf(stdout, ".");
+                            perc_count++;
+                            if (perc_count % 5 == 0) { fprintf(stdout, "|"); }
+                            else                     { fprintf(stdout, "."); }
                             fflush(stdout);
                             perc += perc_base;
                         }

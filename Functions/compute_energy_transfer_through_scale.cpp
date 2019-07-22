@@ -74,8 +74,8 @@ void compute_energy_transfer_through_scale(
                                     longitude, latitude, mask);
 
                             pi_tmp = -constants::rho0 * 
-                                (          S_xx * tau_xx + S_yy * tau_yy + S_zz * tau_zz
-                                  +  2 * ( S_xy * tau_xy + S_xz * tau_xz + S_yz * tau_yz  )
+                                (         S_xx * tau_xx + S_yy * tau_yy + S_zz * tau_zz
+                                  + 2 * ( S_xy * tau_xy + S_xz * tau_xz + S_yz * tau_yz )
                                 );
 
                         } else {

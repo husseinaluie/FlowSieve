@@ -61,6 +61,7 @@ void apply_filter_at_point(
         }
         lat_at_curr = latitude.at(curr_lat);
 
+        // Get the longitude grid spacing (in m) at this latitude
         if (constants::CARTESIAN) { dlon_m = dlon; } 
         else { dlon_m = dlon * constants::R_earth * cos(lat_at_curr); }
 
@@ -97,11 +98,9 @@ void apply_filter_at_point(
                 kern = local_kernel->at(mask_index);
             }
 
-            area    = dAreas.at(mask_index);
-            kA_sum += kern * area;
-
-            if (use_mask) { mask_val = mask.at(mask_index); }
-            else          { mask_val = 1.; }
+            area      = dAreas.at(mask_index);
+            kA_sum   += kern * area;
+            mask_val  = use_mask ? mask.at(mask_index) : 1.;
 
             coarse_val_tmp += field.at(index) * kern * area * mask_val;
 
