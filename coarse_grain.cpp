@@ -7,12 +7,19 @@
 #include <vector>
 #include <mpi.h>
 #include <omp.h>
+#include <cassert>
 
 #include "netcdf_io.hpp"
 #include "functions.hpp"
 #include "constants.hpp"
 
 int main(int argc, char *argv[]) {
+    
+    if (constants::PERIODIC_Y) {
+        // The non-uniform lat routine cannot handle
+        //   periodic lat (y) grids
+        assert(constants::UNIFORM_LAT_GRID);
+    }
 
     // Enable all floating point exceptions but FE_INEXACT
     //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
