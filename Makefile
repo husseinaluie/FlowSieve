@@ -5,7 +5,7 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=0 $(CFLAGS)
+CFLAGS:=-DDEBUG=1 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
@@ -107,47 +107,54 @@ ALGLIB/%.o: ALGLIB/%.cpp
 	$(CXX) -I ./ALGLIB -c -O3 -DAE_CPU=AE_INTEL -o $@ $<
 
 # The core coarse_graining functions use the same compile flags
-Functions/Differentiation_Tools/%.o: Functions/Differentiation_Tools/%.cpp
+Functions/Differentiation_Tools/%.o: Functions/Differentiation_Tools/%.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Functions/Interface_Tools/%.o: Functions/Interface_Tools/%.cpp
+Functions/Interface_Tools/%.o: Functions/Interface_Tools/%.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Functions/FFTW_versions/%.o: Functions/FFTW_versions/%.cpp
+Functions/FFTW_versions/%.o: Functions/FFTW_versions/%.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< -lfftw3 -lm $(LINKS) 
 
-Functions/%.o: Functions/%.cpp
+Functions/%.o: Functions/%.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-NETCDF_IO/%.o: NETCDF_IO/%.cpp
+NETCDF_IO/%.o: NETCDF_IO/%.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Preprocess/%.o: Preprocess/%.cpp
+Preprocess/%.o: Preprocess/%.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 # Building test scripts
-Tests/%.o: Tests/%.cpp
+Tests/%.o: Tests/%.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
 	$(MPICXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building coarse_grain executable
-coarse_grain.o: coarse_grain.cpp
+coarse_grain.o: coarse_grain.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} coarse_grain.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
+# Building coarse_grain_subset executable
+coarse_grain_subset.o: coarse_grain_subset.cpp constants.hpp
+	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+coarse_grain_subset.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} coarse_grain_subset.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
+
 # Building fftw-based coarse_grain executable
-coarse_grain_fftw.o: coarse_grain_fftw.cpp
+coarse_grain_fftw.o: coarse_grain_fftw.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< -lfftw3 -lm $(LINKS) 
 
 coarse_grain_fftw.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} ${FFT_BASED_OBJS} coarse_grain_fftw.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ -lfftw3 -lm $(LINKS) 
 
 # Interpolator needs to link in ALGLIB
-interpolator.o: interpolator.cpp
+interpolator.o: interpolator.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 interpolator.x: ${NETCDF_IO_OBJS} ${ALGLIB_OBJS} ${PREPROCESS_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} interpolator.o
