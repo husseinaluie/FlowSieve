@@ -29,6 +29,8 @@ double kernel(
                 break;
         case 3: kern = sinc( M_PI * D );
                 break;
+        case 4: kern = 0.5 * (1 - tanh( (D - 1) / (0.1) ));
+                break;
     }
 
     #if DEBUG >= 6

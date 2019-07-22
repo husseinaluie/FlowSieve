@@ -108,7 +108,7 @@ namespace constants
      * \brief Boolean indicating if vorticity should be computed.
      * @ingroup constants
      */
-    const bool COMP_VORT = false;
+    const bool COMP_VORT = true;
 
     /*!
      * \param COMP_TRANSFERS
@@ -141,7 +141,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool CAST_TO_INT = true;
+    const bool CAST_TO_INT = false;
 
     /*!
      * \param DO_TIMING
@@ -155,12 +155,13 @@ namespace constants
      * \brief Integer flag indicating the choice of kernel
      *
      *  0 = tophat
-     *  1 = Hyper gaus (exp(-x^4))
-     *  2 = Gaus  (exp(-x^2))
-     *  3 = sinc (sharp-spectral)
+     *  1 = Hyper gaus  ( exp( -x^4 )                  )
+     *  2 = Gaus        ( exp( -x^2 )                  )
+     *  3 = sinc        ( sinc( pi * x )               )
+     *  4 = tanh        ( 1 - tanh( (x - 1) / (0.1) )  )
      * @ingroup constants
      */
-    const int KERNEL_OPT = 1;
+    const int KERNEL_OPT = 4;
 
     /*!
      * \param KernPad
@@ -177,6 +178,7 @@ namespace constants
         case 1: const double KernPad =  2.5;  // exp(-2.5^4) ~1e-17
         case 2: const double KernPad =  5.;   // exp(-5^2)   ~1e-11
         case 3: const double KernPad = -1.;
+        case 4: const double KernPad =  2.5;
     }
     */
 
