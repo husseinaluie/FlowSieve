@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <vector>
 #include <string>
+#include "constants.hpp"
 
 /*!
  * \file
@@ -24,7 +25,8 @@
 void differentiation_vector(
         std::vector<double> & diff_array, 
         const double delta, 
-        const int index);
+        const int index,
+        const int diff_ord = constants::DiffOrd);
 
 /*!
  * \brief Computes latitudinal derivative at a specific point.
@@ -50,7 +52,8 @@ void spher_derivative_at_point(
         const std::string & dim,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & mask);
+        const std::vector<double> & mask,
+        const int diff_ord = constants::DiffOrd);
 
 
 /*!

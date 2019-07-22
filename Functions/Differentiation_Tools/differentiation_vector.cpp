@@ -9,7 +9,8 @@
 void differentiation_vector(
         std::vector<double> & diff_array,   /**< [in] the array into which the differentiation coefficients should be placed */
         const double delta,                 /**< [in] the uniform grid spacing */
-        const int index                     /**< [in] at which position in the five-point stencil do we want the derivative */
+        const int index,                    /**< [in] at which position in the five-point stencil do we want the derivative */
+        const int diff_ord
         ) {
 
     std::vector<double>::iterator start;
@@ -17,7 +18,7 @@ void differentiation_vector(
 
     double scale_factor = 1.;
 
-    if (constants::DiffOrd == 2) {
+    if (diff_ord == 2) {
         scale_factor = 1.;
         // Use second order
         switch (index) {
@@ -31,7 +32,7 @@ void differentiation_vector(
                 diff_array.insert(start, {  0.5, -2.,  1.5});
                 break;
         }
-    } else if (constants::DiffOrd == 4) {
+    } else if (diff_ord == 4) {
         scale_factor = 3.;
         // Use fourth order
         switch (index) {
@@ -51,7 +52,7 @@ void differentiation_vector(
                 diff_array.insert(start, { 0.75, - 4.,   9.,  -12.,  6.25 });
                 break;
         }
-    } else if (constants::DiffOrd == 6) {
+    } else if (diff_ord == 6) {
         scale_factor = 6.;
         // Use sixth order
         switch (index) {
@@ -77,7 +78,7 @@ void differentiation_vector(
                 diff_array.insert(start, {  1. ,  -7.2,  22.5, -40. ,  45. , -36. ,  14.7});
                 break;
         }
-    } else if (constants::DiffOrd == 8) {
+    } else if (diff_ord == 8) {
         scale_factor = 42.;
         // Use eighth order
         //   Not well tested. Do not use.
@@ -112,7 +113,7 @@ void differentiation_vector(
         }
     }
 
-    for (int II = 0; II < constants::DiffOrd+1; II++) {
+    for (size_t II = 0; II < diff_array.size(); II++) {
         diff_array.at(II) = diff_array.at(II) / ( delta * scale_factor);
     }
 
