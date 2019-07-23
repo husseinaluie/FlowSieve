@@ -17,7 +17,7 @@
 
 
 double field_func(const double lat, const double lon) {
-    double ret_val =       cos(8 * lon + 10 * lat) * exp( - pow( lat / (M_PI / 6), 2));
+    double ret_val = cos(2 * M_PI * lon) * sin(2 * M_PI * lat);
     return ret_val;
 }
 
@@ -26,27 +26,10 @@ double mask_func(const double lat, const double lon) {
     double ret_val = 1.;
     
     // Make a circular island, radius pi/6
-    if ( sqrt( lat*lat + lon*lon ) < M_PI/6 ) {
+    if ( lat + lon > 1 ) {
         ret_val *= 0.;
     }
 
-    // Add a square island poking out in the corners
-    // Essentially, just don't make the island too smooth
-    if ( (fabs(lat) < M_PI/7) and (fabs(lon) < M_PI/7) ) {
-        ret_val *= 0.;
-    }
-    
-    // Add some circular bits on the East and West ends of previous bit
-    double sm_r = M_PI / 12;
-    double lon_c = M_PI / 6 + 0.8 * sm_r;
-    if ( sqrt( lat*lat + (lon - lon_c)*(lon - lon_c) ) < sm_r ) {
-        ret_val *= 0.;
-    }
-    if ( sqrt( lat*lat + (lon + lon_c)*(lon + lon_c) ) < sm_r ) {
-        ret_val *= 0.;
-    }
-
-    // Randomly flip to make some noise
     //double r_val = (double)rand() / RAND_MAX;
     //if (r_val > 0.995) { ret_val *= 0.; }
 
@@ -54,16 +37,12 @@ double mask_func(const double lat, const double lon) {
 }
 
 double true_deriv_lon(const double lat, const double lon) {
-    double ret_val = - 8 * sin(8 * lon + 10 * lat) * exp( - pow( lat / (M_PI / 6), 2));
+    double ret_val = -2 * M_PI * sin(2 * M_PI * lon) * sin(2 * M_PI * lat);
     return ret_val;
 }
 
 double true_deriv_lat(const double lat, const double lon) {
-    double ret_val =        cos(8 * lon + 10 * lat) 
-                                * exp( - pow( lat / (M_PI / 6), 2)) 
-                                * (- 2 * lat / pow(M_PI/6, 2))
-                     - 10 * sin(8 * lon + 10 * lat) 
-                                * exp( - pow( lat / (M_PI / 6), 2));
+    double ret_val = 2 * M_PI * cos(2 * M_PI * lon) * cos(2 * M_PI * lat);
     return ret_val;
 }
 
@@ -199,9 +178,9 @@ int main(int argc, char *argv[]) {
     // Only if we're not set on a Cartesian grid
     assert(!constants::CARTESIAN);
 
-    const int num_tests = 8;
-    const int base_nlon = 32;
-    const int base_nlat = 16;
+    const int num_tests = 1;
+    const int base_nlon = 128;
+    const int base_nlat = 128;
 
     std::vector<double> lon2_errors(num_tests);
     std::vector<double> lat2_errors(num_tests);
@@ -231,11 +210,11 @@ int main(int argc, char *argv[]) {
         lon_points.at(test_ind) = Nlon;
         lat_points.at(test_ind) = Nlat;
 
-        lon_min = -M_PI;
-        lon_max =  M_PI;
+        lon_min = 0;
+        lon_max = 1;
 
-        lat_min = -M_PI / 3;
-        lat_max =  M_PI / 3;
+        lat_min = 0;
+        lat_max = 1;
 
         dlat = (lat_max - lat_min) / Nlat;
         dlon = (lon_max - lon_min) / Nlon;

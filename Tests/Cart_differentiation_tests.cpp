@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -286,7 +285,8 @@ int main(int argc, char *argv[]) {
             }
         }
         if (test_ind == num_tests - 1) {
-            fprintf(stdout, "At highest resolution, %.3g%% of tiles were land.\n", 100 * ( (double) num_land) / (Nlat * Nlon));
+            fprintf(stdout, "At highest resolution, %.3g%% of tiles were land.\n", 
+                    100 * ( (double) num_land) / (Nlat * Nlon));
         }
 
         #if SAVE_TO_FILE
@@ -304,7 +304,8 @@ int main(int argc, char *argv[]) {
                 vars_to_write, fname, 0.);
         #endif
 
-        apply_test(x2_err, y2_err, z2_err, xinf_err, yinf_err, zinf_err, longitude, latitude, field, dArea, mask, Nlat, Nlon); 
+        apply_test(x2_err, y2_err, z2_err, xinf_err, yinf_err, zinf_err, 
+                longitude, latitude, field, dArea, mask, Nlat, Nlon); 
 
         x2_errors.at(test_ind) = x2_err;
         y2_errors.at(test_ind) = y2_err;
