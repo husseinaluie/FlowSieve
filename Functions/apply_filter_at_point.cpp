@@ -34,17 +34,8 @@ void apply_filter_at_point(
     double coarse_val_tmp = 0.;
     double mask_val = 0.;
 
-    // Grid spacing: assume uniform grid
-    const double dlat = latitude.at( 1) - latitude.at( 0);
-    const double dlon = longitude.at(1) - longitude.at(0);
-
     double dlat_m, dlon_m; 
     int LON_lb, LON_ub;
-
-    // The spacing (in metres and points) betwee latitude gridpoints
-    //   The factor of 2 is diameter->radius 
-    if (constants::CARTESIAN) { dlat_m = dlat; } 
-    else                      { dlat_m = dlat * constants::R_earth; }
 
     double lat_at_curr, lat_at_ilat;
     lat_at_ilat = latitude.at(Ilat);
@@ -60,10 +51,6 @@ void apply_filter_at_point(
             curr_lat = LAT;
         }
         lat_at_curr = latitude.at(curr_lat);
-
-        // Get the longitude grid spacing (in m) at this latitude
-        if (constants::CARTESIAN) { dlon_m = dlon; } 
-        else { dlon_m = dlon * constants::R_earth * cos(lat_at_curr); }
 
         get_lon_bounds(LON_lb, LON_ub, longitude, Ilon, 
                 lat_at_ilat, lat_at_curr, scale);
@@ -86,6 +73,8 @@ void apply_filter_at_point(
 
             if (local_kernel == NULL) {
                 if (constants::CARTESIAN) {
+                    dlat_m = latitude.at( 1) - latitude.at( 0);
+                    dlon_m = longitude.at(1) - longitude.at(0);
                     dist = distance(longitude.at(Ilon),     lat_at_ilat,
                                     longitude.at(curr_lon), lat_at_curr,
                                     dlon_m * Nlon, dlat_m * Nlat);
