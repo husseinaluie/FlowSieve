@@ -31,7 +31,7 @@ void filtering(
 
     double timing_filt_main, timing_land, timing_kern_precomp,
            timing_filt_comp_transfers, timing_filt_bc_transfers,
-           timing_comp_vorticity, timing_comp_pi,
+           timing_comp_vorticity, timing_comp_pi, timing_writing,
            timing_comp_Lambda, timing_comp_transport,
            clock_on, clock_off;
     //double timing_initialize, timing_writing, timing_comp_vel;
@@ -44,6 +44,7 @@ void filtering(
         timing_filt_bc_transfers = 0.;
         timing_comp_vorticity = 0.;
         timing_comp_pi = 0.;
+        timing_writing = 0.;
         timing_comp_Lambda = 0.;
         timing_comp_transport = 0.;
     }
@@ -558,9 +559,11 @@ void filtering(
 
         #if DEBUG >= 2
         fprintf(stdout, "  = Rank %d finished filtering loop =\n", wRank);
+        fflush(stdout);
         #endif
 
         // Write to file
+        if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
         write_field_to_output(coarse_u_r,   "coarse_u_r",   starts, counts, fname, &mask);
         write_field_to_output(coarse_u_lon, "coarse_u_lon", starts, counts, fname, &mask);
         write_field_to_output(coarse_u_lat, "coarse_u_lat", starts, counts, fname, &mask);
@@ -573,13 +576,19 @@ void filtering(
             write_field_to_output(fine_KE,   "fine_KE",   starts, counts, fname, &mask);
             write_field_to_output(coarse_KE, "coarse_KE", starts, counts, fname, &mask);
         }
+        if ((constants::DO_TIMING) and (wRank == 0)) { 
+            clock_off = MPI_Wtime();
+            timing_writing += clock_off - clock_on;
+        }
 
         if (constants::COMP_VORT) {
             // Compute and write vorticity
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_on = MPI_Wtime(); 
-            }
+            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
 
+            #if DEBUG >= 1
+            if (wRank == 0) { fprintf(stdout, "Starting compute_vorticity\n"); }
+            fflush(stdout);
+            #endif
             if (not(constants::MINIMAL_OUTPUT)) {
                 compute_vorticity(fine_vort_r, fine_vort_lon, fine_vort_lat,
                         fine_u_r, fine_u_lon, fine_u_lat,
@@ -597,17 +606,24 @@ void filtering(
                 timing_comp_vorticity += clock_off - clock_on;
             }
 
+            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
             if (not(constants::MINIMAL_OUTPUT)) {
                 write_field_to_output(fine_vort_r, "fine_vort_r", starts, counts, fname, &mask);
             }
             write_field_to_output(coarse_vort_r, "coarse_vort_r", starts, counts, fname, &mask);
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_off = MPI_Wtime();
+                timing_writing += clock_off - clock_on;
+            }
         }
 
         if (constants::COMP_TRANSFERS) {
             // Compute the energy transfer through the filter scale
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_on = MPI_Wtime(); 
-            }
+            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+            #if DEBUG >= 1
+            if (wRank == 0) { fprintf(stdout, "Starting compute_energy_transfer_through_scale\n"); }
+            fflush(stdout);
+            #endif
             compute_energy_transfer_through_scale(
                     energy_transfer, 
                     coarse_u_x,  coarse_u_y,  coarse_u_z,
@@ -619,7 +635,13 @@ void filtering(
                 clock_off = MPI_Wtime();
                 timing_comp_pi += clock_off - clock_on;
             }
+
+            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
             write_field_to_output(energy_transfer, "energy_transfer", starts, counts, fname, &mask);
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_off = MPI_Wtime();
+                timing_writing += clock_off - clock_on;
+            }
 
             // Compute the divergence of the coarse field and full field (for comparison)
             if (not(constants::MINIMAL_OUTPUT)) {
@@ -628,24 +650,33 @@ void filtering(
                 #endif
                 compute_div_vel(div, coarse_u_x, coarse_u_y, coarse_u_z, longitude, latitude,
                         Ntime, Ndepth, Nlat, Nlon, mask);
+                if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
                 write_field_to_output(div, "coarse_vel_div", starts, counts, fname, &mask);
+                if ((constants::DO_TIMING) and (wRank == 0)) { 
+                    clock_off = MPI_Wtime();
+                    timing_writing += clock_off - clock_on;
+                }
 
                 #if DEBUG >= 1
                 if (wRank == 0) { fprintf(stdout, "Starting compute_div_vel (full)\n"); }
                 #endif
                 compute_div_vel(div, u_x, u_y, u_z, longitude, latitude,
                         Ntime, Ndepth, Nlat, Nlon, mask);
+                if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
                 write_field_to_output(div, "full_vel_div", starts, counts, fname, &mask);
+                if ((constants::DO_TIMING) and (wRank == 0)) { 
+                    clock_off = MPI_Wtime();
+                    timing_writing += clock_off - clock_on;
+                }
             }
         }
 
         if (constants::COMP_BC_TRANSFERS) {
             #if DEBUG >= 1
             if (wRank == 0) { fprintf(stdout, "Starting compute_baroclinic_transfers\n"); }
+            fflush(stdout);
             #endif
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_on = MPI_Wtime(); 
-            }
+            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
             compute_baroclinic_transfer(lambda_m,
                     coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
                     coarse_rho, coarse_p,
@@ -656,6 +687,7 @@ void filtering(
                 timing_comp_Lambda += clock_off - clock_on;
             }
 
+            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
             write_field_to_output(lambda_m,   "Lambda_m",   starts, counts, fname, &mask);
             write_field_to_output(PEtoKE,     "PEtoKE",     starts, counts, fname, &mask);
             write_field_to_output(coarse_rho, "coarse_rho", starts, counts, fname, &mask);
@@ -664,16 +696,17 @@ void filtering(
                 write_field_to_output(fine_rho,   "fine_rho",   starts, counts, fname, &mask);
                 write_field_to_output(fine_p,     "fine_p",     starts, counts, fname, &mask);
             }
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_off = MPI_Wtime();
+                timing_writing += clock_off - clock_on;
+            }
         }
 
-        #if DEBUG >= 1
-        if (wRank == 0) { fprintf(stdout, "Starting compute_div_transport\n"); }
-        #endif
-
-        if ((constants::DO_TIMING) and (wRank == 0)) { 
-            clock_on = MPI_Wtime(); 
-        }
         if (not(constants::MINIMAL_OUTPUT)) {
+            #if DEBUG >= 1
+            if (wRank == 0) { fprintf(stdout, "Starting compute_div_transport\n"); }
+            #endif
+            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
             compute_div_transport(
                     div_J,
                     coarse_u_x,  coarse_u_y,  coarse_u_z,
@@ -682,11 +715,17 @@ void filtering(
                     coarse_p, longitude, latitude,
                     Ntime, Ndepth, Nlat, Nlon,
                     mask);
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_off = MPI_Wtime();
+                timing_comp_transport += clock_off - clock_on;
+            }
+
+            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
             write_field_to_output(div_J, "div_Jtransport", starts, counts, fname, &mask);
-        }
-        if ((constants::DO_TIMING) and (wRank == 0)) { 
-            clock_off = MPI_Wtime();
-            timing_comp_transport += clock_off - clock_on;
+            if ((constants::DO_TIMING) and (wRank == 0)) { 
+                clock_off = MPI_Wtime();
+                timing_writing += clock_off - clock_on;
+            }
         }
 
         #if DEBUG >= 0
@@ -703,6 +742,8 @@ void filtering(
             fprintf(stdout, "    filt_for_pi       = %.13g\n", timing_filt_comp_transfers);
             fprintf(stdout, "    filt_for_lambda   = %.13g\n", timing_filt_bc_transfers);
             fprintf(stdout, "    filt_land         = %.13g\n", timing_land);
+            fprintf(stdout, "\n");
+            fprintf(stdout, "    writing           = %.13g\n", timing_writing);
             fprintf(stdout, "\n");
             fprintf(stdout, "    comp_vort         = %.13g\n", timing_comp_vorticity);
             fprintf(stdout, "    comp_pi           = %.13g\n", timing_comp_pi);
