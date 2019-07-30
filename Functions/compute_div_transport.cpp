@@ -190,7 +190,6 @@ void compute_div_transport(
         for (Ilat = 0; Ilat < Nlat; Ilat++) {
             for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
-                div_J_tmp = 0.;
                 mask_index = Index(0,     0,      Ilat, Ilon,
                                    Ntime, Ndepth, Nlat, Nlon);
 
@@ -201,6 +200,7 @@ void compute_div_transport(
                                       Ntime, Ndepth, Nlat, Nlon);
 
                         if (mask.at(mask_index) == 1) { // Skip land areas
+                            div_J_tmp = 0.;
 
                             // Compute the desired derivatives
                             Cart_derivatives_at_point(
