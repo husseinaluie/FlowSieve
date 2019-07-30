@@ -28,6 +28,15 @@ void differentiation_vector(
         const int index,
         const int diff_ord = constants::DiffOrd);
 
+
+void non_uniform_diff_vector(
+        std::vector<double> & diff_array,
+        const std::vector<double> & grid,
+        const int Iref,
+        const int LB,
+        const int UB,
+        const int diff_ord);
+
 /*!
  * \brief Computes latitudinal derivative at a specific point.
  *

@@ -91,7 +91,17 @@ void spher_derivative_at_point(
     //   diff_ord + 1.
     if (UB - LB + 1 == diff_ord + 1) {
         // If we have enough cells for differentiation, do it
-        differentiation_vector(ddl, dl, Iref - LB, diff_ord);
+        if ( do_lon or (constants::UNIFORM_LAT_GRID)) {
+            // Since we're on a uniform grid, we can use pre-computed
+            //   differentiation coefficients
+            differentiation_vector(ddl, dl, Iref - LB, diff_ord);
+        } else {
+            // We're on a non-uniform grid, so we can guarantee the
+            //   differentiation coefficients a priori, so we need
+            //   to actually compute them now.
+            // This will get expensive (or ugly...) for higher orders of accuracy.
+            non_uniform_diff_vector(ddl, grid, Iref, LB, UB, diff_ord);
+        }
         for (int IND = LB; IND <= UB; IND++) {
 
             if (do_lon) { index = Index(Itime, Idepth, Ilat, IND,  
