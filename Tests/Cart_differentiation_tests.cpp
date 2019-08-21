@@ -127,14 +127,26 @@ void apply_test(
                     mask);
 
             // Store them
-            numer_x_deriv.at(index) = x_deriv_val;
-            numer_y_deriv.at(index) = y_deriv_val;
-            numer_z_deriv.at(index) = z_deriv_val;
+            if ( mask.at(index) == 0 ) {
+                numer_x_deriv.at(index) = constants::fill_value;
+                numer_y_deriv.at(index) = constants::fill_value;
+                numer_z_deriv.at(index) = constants::fill_value;
+            } else {
+                numer_x_deriv.at(index) = x_deriv_val;
+                numer_y_deriv.at(index) = y_deriv_val;
+                numer_z_deriv.at(index) = z_deriv_val;
+            }
 
             #if SAVE_TO_FILE
-            true_x_deriv.at(index) = true_deriv_x(latitude.at(Ilat), longitude.at(Ilon));
-            true_y_deriv.at(index) = true_deriv_y(latitude.at(Ilat), longitude.at(Ilon));
-            true_z_deriv.at(index) = true_deriv_z(latitude.at(Ilat), longitude.at(Ilon));
+            if ( mask.at(index) == 0 ) {
+                true_x_deriv.at(index) = constants::fill_value;
+                true_y_deriv.at(index) = constants::fill_value;
+                true_z_deriv.at(index) = constants::fill_value;
+            } else {
+                true_x_deriv.at(index) = true_deriv_x(latitude.at(Ilat), longitude.at(Ilon));
+                true_y_deriv.at(index) = true_deriv_y(latitude.at(Ilat), longitude.at(Ilon));
+                true_z_deriv.at(index) = true_deriv_z(latitude.at(Ilat), longitude.at(Ilon));
+            }
             #endif
         }
     }
@@ -215,6 +227,9 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
     assert(wSize==1);
+    assert( constants::CARTESIAN);
+    assert( constants::PERIODIC_X);
+    assert(!constants::PERIODIC_Y);
 
     const int num_tests = 6;
     const int base_nlon = 32;
@@ -280,6 +295,8 @@ int main(int argc, char *argv[]) {
                 index = Ilat * Nlon + Ilon;
                 mask.at(index)  = mask_func( latitude.at(Ilat), longitude.at(Ilon));
                 field.at(index) = field_func(latitude.at(Ilat), longitude.at(Ilon));
+
+                if ( mask.at(index) == 0 ) { field.at(index) = constants::fill_value; }
 
                 num_land += 1 - mask.at(index);
             }

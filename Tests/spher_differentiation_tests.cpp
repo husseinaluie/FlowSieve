@@ -198,6 +198,8 @@ int main(int argc, char *argv[]) {
 
     // Only if we're not set on a Cartesian grid
     assert(!constants::CARTESIAN);
+    assert(!constants::PERIODIC_Y);
+    assert( constants::PERIODIC_X);
 
     const int num_tests = 8;
     const int base_nlon = 32;
@@ -276,6 +278,8 @@ int main(int argc, char *argv[]) {
                 index = Ilat * Nlon + Ilon;
                 mask.at(index)  = mask_func( latitude.at(Ilat), longitude.at(Ilon));
                 field.at(index) = field_func(latitude.at(Ilat), longitude.at(Ilon));
+
+                if (mask.at(index) == 0) { field.at(index) = constants::fill_value; }
 
                 num_land += 1 - mask.at(index);
             }
