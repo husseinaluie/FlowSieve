@@ -92,7 +92,9 @@ void compute_div_transport(
     
     double dpdx, dpdy, dpdz;
 
-    int Itime, Idepth, Ilat, Ilon, index, mask_index;
+    int Itime, Idepth, Ilat, Ilon;
+    size_t index;
+    const size_t Npts = u_x.size();
 
     double ux, uy, uz;
 
@@ -132,7 +134,7 @@ void compute_div_transport(
             u_x, u_y, u_z, uxux, uxuy, uxuz,\
             uyuy, uyuz, uzuz,\
             deriv_fields)\
-    private(Itime, Idepth, Ilat, Ilon, index, mask_index, \
+    private(Itime, Idepth, Ilat, Ilon, index, \
             ux,   uy,   uz,\
             ux_x, uy_x, uz_x,\
             ux_y, uy_y, uz_y,\
@@ -186,98 +188,87 @@ void compute_div_transport(
             z_deriv_vals.push_back(&dpdz);
         }
 
-        #pragma omp for collapse(2) schedule(guided)
-        for (Ilat = 0; Ilat < Nlat; Ilat++) {
-            for (Ilon = 0; Ilon < Nlon; Ilon++) {
+        #pragma omp for collapse(1) schedule(guided)
+        for (index = 0; index < Npts; index++) {
 
-                mask_index = Index(0,     0,      Ilat, Ilon,
-                                   Ntime, Ndepth, Nlat, Nlon);
+            div_J_tmp = constants::fill_value;
 
-                for (Itime = 0; Itime < Ntime; Itime++) {
-                    for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+            if (mask.at(index) == 1) { // Skip land areas
 
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                      Ntime, Ndepth, Nlat, Nlon);
+                Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                                 Ntime, Ndepth, Nlat, Nlon);
 
-                        if (mask.at(mask_index) == 1) { // Skip land areas
-                            div_J_tmp = 0.;
+                div_J_tmp = 0.;
 
-                            // Compute the desired derivatives
-                            Cart_derivatives_at_point(
-                                    x_deriv_vals, y_deriv_vals,
-                                    z_deriv_vals, deriv_fields,
-                                    latitude, longitude,
-                                    Itime, Idepth, Ilat, Ilon,
-                                    Ntime, Ndepth, Nlat, Nlon,
-                                    mask);
+                // Compute the desired derivatives
+                Cart_derivatives_at_point(
+                        x_deriv_vals, y_deriv_vals,
+                        z_deriv_vals, deriv_fields,
+                        latitude, longitude,
+                        Itime, Idepth, Ilat, Ilon,
+                        Ntime, Ndepth, Nlat, Nlon,
+                        mask);
 
-                            // u_i
-                            ux = u_x.at(index);
-                            uy = u_y.at(index);
-                            uz = u_z.at(index);
+                // u_i
+                ux = u_x.at(index);
+                uy = u_y.at(index);
+                uz = u_z.at(index);
 
-                            // u_iu_j
-                            uxux_loc = uxux.at(index);
-                            uxuy_loc = uxuy.at(index);
-                            uxuz_loc = uxuz.at(index);
-                            uyux_loc = uxuy.at(index);
-                            uyuy_loc = uyuy.at(index);
-                            uyuz_loc = uyuz.at(index);
-                            uzux_loc = uxuz.at(index);
-                            uzuy_loc = uyuz.at(index);
-                            uzuz_loc = uzuz.at(index);
+                // u_iu_j
+                uxux_loc = uxux.at(index);
+                uxuy_loc = uxuy.at(index);
+                uxuz_loc = uxuz.at(index);
+                uyux_loc = uxuy.at(index);
+                uyuy_loc = uyuy.at(index);
+                uyuz_loc = uyuz.at(index);
+                uzux_loc = uxuz.at(index);
+                uzuy_loc = uyuz.at(index);
+                uzuz_loc = uzuz.at(index);
 
-
-                            // Advection by coarse velocity field
-                            //    0.5 * rho0 * [ (u_i*u_i) * u_j ],j
-                            //  =       rho0 * u_i * u_i,j * u_j
-                            div_J_tmp += constants::rho0 *
-                                ( // j across, i down
-                                    ux*ux_x*ux  +  ux*ux_y*uy + ux*ux_z*uz
-                                  + uy*uy_x*ux  +  uy*uy_y*uy + uy*uy_z*uz
-                                  + uz*uz_x*ux  +  uz*uz_y*uy + uz*uz_z*uz
-                                );
+                // Advection by coarse velocity field
+                //    0.5 * rho0 * [ (u_i*u_i) * u_j ],j
+                //  =       rho0 * u_i * u_i,j * u_j
+                div_J_tmp += constants::rho0 *
+                    ( // j across, i down
+                        ux*ux_x*ux  +  ux*ux_y*uy + ux*ux_z*uz
+                      + uy*uy_x*ux  +  uy*uy_y*uy + uy*uy_z*uz
+                      + uz*uz_x*ux  +  uz*uz_y*uy + uz*uz_z*uz
+                    );
 
 
-                            // Advection by small scale velocity field
-                            // rho0 * [ u_i * tau_ij ],j
-                            // = rho0 (   u_i,j * ( bar(u_i*u_j)   - bar(u_i  )*bar(u_j) )
-                            //          + u_i   * ( bar(u_i*u_j),j - bar(u_i,j)*bar(u_j) )
-                            //        )
+                // Advection by small scale velocity field
+                // rho0 * [ u_i * tau_ij ],j
+                // = rho0 (   u_i,j * ( bar(u_i*u_j)   - bar(u_i  )*bar(u_j) )
+                //          + u_i   * ( bar(u_i*u_j),j - bar(u_i,j)*bar(u_j) )
+                //        )
 
-                            // rho0 * ( u_i,j * ( bar(u_i*u_j) - bar(u_i)*bar(u_j) ) )
-                            div_J_tmp += constants::rho0 *
-                                ( // j across, i down
-                                   ux_x * ( uxux_loc - ux*ux ) + ux_y * ( uxuy_loc - ux*uy ) + ux_z * ( uxuz_loc - ux*uz )
-                                 + uy_x * ( uyux_loc - uy*ux ) + uy_y * ( uyuy_loc - uy*uy ) + uy_z * ( uyuz_loc - uy*uz )
-                                 + uz_x * ( uzux_loc - uz*ux ) + uz_y * ( uzuy_loc - uz*uy ) + uz_z * ( uzuz_loc - uz*uz )
-                                );
+                // rho0 * ( u_i,j * ( bar(u_i*u_j) - bar(u_i)*bar(u_j) ) )
+                div_J_tmp += constants::rho0 *
+                    ( // j across, i down
+                        ux_x * ( uxux_loc - ux*ux ) + ux_y * ( uxuy_loc - ux*uy ) + ux_z * ( uxuz_loc - ux*uz )
+                      + uy_x * ( uyux_loc - uy*ux ) + uy_y * ( uyuy_loc - uy*uy ) + uy_z * ( uyuz_loc - uy*uz )
+                      + uz_x * ( uzux_loc - uz*ux ) + uz_y * ( uzuy_loc - uz*uy ) + uz_z * ( uzuz_loc - uz*uz )
+                    );
 
-                            // rho0 * ( u_i * ( bar(u_i*u_j),j - bar(u_i,j)*bar(u_j) ) )
-                            div_J_tmp += constants::rho0 *
-                                ( // j across, i down
-                                   ux * ( (uxux_x - ux_x*ux) + (uxuy_y - ux_y*uy) + ( uxuz_z - ux_z*uz) )
-                                 + uy * ( (uyux_x - uy_x*ux) + (uyuy_y - uy_y*uy) + ( uyuz_z - uy_z*uz) )
-                                 + uz * ( (uzux_x - uz_x*ux) + (uzuy_y - uz_y*uy) + ( uzuz_z - uz_z*uz) )
-                                );
+                // rho0 * ( u_i * ( bar(u_i*u_j),j - bar(u_i,j)*bar(u_j) ) )
+                div_J_tmp += constants::rho0 *
+                    ( // j across, i down
+                        ux * ( (uxux_x - ux_x*ux) + (uxuy_y - ux_y*uy) + ( uxuz_z - ux_z*uz) )
+                      + uy * ( (uyux_x - uy_x*ux) + (uyuy_y - uy_y*uy) + ( uyuz_z - uy_z*uz) )
+                      + uz * ( (uzux_x - uz_x*ux) + (uzuy_y - uz_y*uy) + ( uzuz_z - uz_z*uz) )
+                    );
 
 
-                            // Pressure term
-                            // (p * u_j),j = u_j * p_,j
-                            if (constants::COMP_BC_TRANSFERS) {
-                                div_J_tmp += ux * dpdx + uy * dpdy + uz * dpdz;
-                            }
+                // Pressure term
+                // (p * u_j),j = u_j * p_,j
+                if (constants::COMP_BC_TRANSFERS) {
+                    div_J_tmp += ux * dpdx + uy * dpdy + uz * dpdz;
+                }
 
-                        } // end if(water) block
-                        else { // if(land)
-                            div_J_tmp = constants::fill_value;
-                        } // end if(land)
+            } // end if(water) block
 
-                        div_J.at(index) = div_J_tmp;
+            div_J.at(index) = div_J_tmp;
 
-                    } // end Idepth loop
-                } // end Itime loop
-            } // end Ilon loop
-        } // end Ilat loop
+        } // end index loop
     } // end pragma
 }
