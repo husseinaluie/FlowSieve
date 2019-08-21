@@ -33,12 +33,14 @@ void spher_derivative_at_point(
         }
     }
 
+    // Check which derivative we're taking
     int index, Iref;
     const int Nref = grid.size();
     const bool do_lat = (dim == "lat");
     const bool do_lon = (dim == "lon");
     assert( do_lat ^ do_lon ); // xor
 
+    // Verify input
     if      (do_lon) { Iref = Ilon; }
     else if (do_lat) { Iref = Ilat; }
     else { 
@@ -47,6 +49,11 @@ void spher_derivative_at_point(
         assert(false);
     }
 
+    // Determine lowest lower bound (LLB) and upperest upper bound (UUB)
+    //   for the integration region. This essentially just depends on periodicity.
+    const bool periodic = do_lat ? constants::PERIODIC_Y : constants::PERIODIC_X ;
+    const int LLB = periodic ? Iref - Nref : 0 ;
+    const int UUB = periodic ? Iref + Nref : Nref - 1 ;
 
     // Differentiation vector
     std::vector<double> ddl(diff_ord + 1);
@@ -56,29 +63,40 @@ void spher_derivative_at_point(
 
     // Build outwards to try and build the stencil, but stop when
     //   we either hit a land cell or have gone far enough.
-    int LB = Iref;
-    while (LB > 0) {
+    // lb (lower case) will be the periodicity-adjusted value of LB 
+    int LB = Iref, lb;
+    while (LB > LLB) {
+
         if ( (Iref - LB) > diff_ord ) { break; }
        
-        if (do_lon) { index = Index(0, 0, Ilat, LB,   Ntime, Ndepth, Nlat, Nlon); }
-        else        { index = Index(0, 0, LB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        lb = ( LB < 0 ) ? LB + Nref : LB ;
+        if (do_lon) { index = Index(0, 0, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
+        else        { index = Index(0, 0, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
         
         if (mask.at(index) == 0) { LB++; break; }
 
         LB--;
     }
 
-    int UB = Iref;
-    while (UB < Nref-1) {
+    // ub (lower case) will be the periodicity-adjusted value of UB 
+    int UB = Iref, ub;
+    while (UB < UUB) {
         if ( (UB - Iref) > diff_ord ) { break; }
        
-        if (do_lon) { index = Index(0, 0, Ilat, UB,   Ntime, Ndepth, Nlat, Nlon); }
-        else        { index = Index(0, 0, UB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        ub = ( UB > Nref - 1 ) ? UB - Nref : UB ;
+        if (do_lon) { index = Index(0, 0, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
+        else        { index = Index(0, 0, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
         if (mask.at(index) == 0) { UB--; break; }
 
         UB++;
     }
+
+    // NOTE
+    //   In the case of periodicity, LB may be negative and UB may exceed Nref
+    //     this means that subtraction still gives the correct number of points
+    //     in the stencil, but that a periodicity-adjusted value will be needed
+    //     when determining logical indices.
 
     // We've possibly made too large of a stencil, so now collapse it back down
     while (UB - LB > diff_ord) {
@@ -89,6 +107,8 @@ void spher_derivative_at_point(
     // We're including LB and UB in our stencil, so the stencil
     //   has UB - LB + 1 points. The requisit number of points is
     //   diff_ord + 1.
+    // Again, lower case (ind) will be the periodicty-adjusted value
+    int ind; 
     if (UB - LB + 1 == diff_ord + 1) {
         // If we have enough cells for differentiation, do it
         if ( do_lon or (constants::UNIFORM_LAT_GRID)) {
@@ -100,13 +120,19 @@ void spher_derivative_at_point(
             //   differentiation coefficients a priori, so we need
             //   to actually compute them now.
             // This will get expensive (or ugly...) for higher orders of accuracy.
+            // NOTE: This CANNOT handle periodicity
             non_uniform_diff_vector(ddl, grid, Iref, LB, UB, diff_ord);
         }
         for (int IND = LB; IND <= UB; IND++) {
 
-            if (do_lon) { index = Index(Itime, Idepth, Ilat, IND,  
+            // Apply periodicity adjustment
+            if      (IND < 0    )   { ind = IND + Nref; }
+            else if (IND >= Nref)   { ind = IND - Nref; }
+            else                    { ind = IND; }
+
+            if (do_lon) { index = Index(Itime, Idepth, Ilat, ind,  
                                         Ntime, Ndepth, Nlat, Nlon); }
-            else        { index = Index(Itime, Idepth, IND,  Ilon, 
+            else        { index = Index(Itime, Idepth, ind,  Ilon, 
                                         Ntime, Ndepth, Nlat, Nlon); }
 
             for (int ii = 0; ii < num_deriv; ii++) {
