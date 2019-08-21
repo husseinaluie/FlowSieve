@@ -1,37 +1,41 @@
 #include <math.h>
 #include <algorithm>
 #include <vector>
+#include <cassert>
 #include "../functions.hpp"
 #include "../constants.hpp"
 
 void apply_filter_at_point(
-        double & coarse_val,                    /**< [in] where to store filtered value */
-        const std::vector<double> & field,      /**< [in] field to filter */
-        const int Ntime,                        /**< [in] Length of time dimension */
-        const int Ndepth,                       /**< [in] Length of depth dimension */
-        const int Nlat,                         /**< [in] Length of latitude dimension */
-        const int Nlon,                         /**< [in] Length of longitude dimension */
-        const int Itime,                        /**< [in] Current position in time dimension */
-        const int Idepth,                       /**< [in] Current position in depth dimension */
-        const int Ilat,                         /**< [in] Current position in latitude dimension */
-        const int Ilon,                         /**< [in] Current position in longitude dimension */
-        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
-        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
+        std::vector<double*> & coarse_vals,
+        const std::vector<const std::vector<double>*> & fields,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const int Itime,
+        const int Idepth,
+        const int Ilat,
+        const int Ilon,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
         const int LAT_lb,
         const int LAT_ub,
-        const std::vector<double> & dAreas,     /**< [in] Array of cell areas (2D) (compute_areas())*/
-        const double scale,                     /**< [in] The filtering scale */
-        const std::vector<double> & mask,       /**< [in] Array to distinguish between land and water cells (2D) */
-        const bool use_mask,                    /**< [in] Whether or not to mask (zero) out land cells when integrating */
-        const std::vector<double> * local_kernel    /**< [in] Array of local_kernel (if not NULL) */
+        const std::vector<double> & dAreas,
+        const double scale,
+        const std::vector<double> & mask,
+        const bool use_mask,
+        const std::vector<double> * local_kernel
         ) {
+
+    assert(coarse_vals.size() == fields.size());
+    const size_t Nfields = fields.size();
 
     double dist, kern, area;
     int index, mask_index;
     int curr_lon, curr_lat;
 
     double kA_sum = 0.;
-    double coarse_val_tmp = 0.;
+    std::vector<double> tmp_vals(Nfields);
     double mask_val = 0.;
 
     double dlat_m, dlon_m; 
@@ -91,10 +95,15 @@ void apply_filter_at_point(
             kA_sum   += kern * area;
             mask_val  = use_mask ? mask.at(mask_index) : 1.;
 
-            coarse_val_tmp += field.at(index) * kern * area * mask_val;
+            for (size_t II = 0; II < Nfields; ++II) {
+                tmp_vals.at(II) += fields.at(II)->at(index) * kern * area * mask_val;
+            }
 
         }
     }
-    if (kA_sum != 0) { coarse_val = coarse_val_tmp / kA_sum; }
-    else { coarse_val = 0.; }
+
+    // On the off chance that the kernel was null (size zero), just return zero
+    for (size_t II = 0; II < Nfields; ++II) {
+        *(coarse_vals.at(II)) = (kA_sum == 0) ? 0. : tmp_vals.at(II) / kA_sum;
+    }
 }
