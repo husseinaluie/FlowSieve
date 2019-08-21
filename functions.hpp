@@ -35,6 +35,19 @@ int Index( const int Itime, const int Idepth, const int Ilat, const int Ilon,
            const int Ntime, const int Ndepth, const int Nlat, const int Nlon  );
 
 /*!
+ * \brief Convenience tool to convert logical index to physical index (time, depth, lat, lon).
+ *
+ * Index is a function to convert a one-point (logical) index
+ *   into a four-point (physical) index (Itime, Idepth, Ilat, Ilon)
+ *   to access the double arrays.
+ *
+ * Assumes standard CF ordering: time-depth-lat-lon
+ */
+void Index1to4( const size_t index, 
+        int & Itime, int & Idepth, int & Ilat, int & Ilon,
+        const int & Ntime, const int & Ndepth, const int & Nlat, const int & Nlon  );
+
+/*!
  * \brief Compute the distance (in metres) between two points on a sphere.
  *
  * This function computes the distance between two points on
@@ -138,6 +151,22 @@ void filtering(const std::vector<double> & u_r,
                const std::vector<int>    & myStarts,
                const MPI_Comm comm = MPI_COMM_WORLD);
 
+
+void filtering_sw(
+        const std::vector<double> & u, 
+        const std::vector<double> & v, 
+        const std::vector<double> & h,
+        const std::vector<double> & scales, 
+        const std::vector<double> & dAreas, 
+        const std::vector<double> & time, 
+        const std::vector<double> & depth,
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask,
+        const std::vector<int>    & myCounts,
+        const std::vector<int>    & myStarts,
+        const MPI_Comm comm = MPI_COMM_WORLD);
+
 /*!
  * \brief Alternate filtering driver for subsetting
  *
@@ -168,10 +197,31 @@ void filtering_subsets(
  * kernel().
  *
  * dArea for integration computed in compute_areas() 
+ *
+ * \param where to store filtered value
+ * \param fields to filter
+ * \param length of time dimension
+ * \param length of depth dimension
+ * \param length of latitude dimension
+ * \param length of longitude dimension
+ * \param current position in time dimension
+ * \param current position in depth dimension
+ * \param current position in latitude dimension
+ * \param current position in longitude dimension
+ * \param longitude vector (1D)
+ * \param latitude vector (1D)
+ * \param lower bound on latitude for kernel
+ * \param upper bound on latitude for kernel
+ * \param array of cell areas (2D - lat,lon)
+ * \param filtering scale
+ * \param array to distinguish land from water
+ * \param boolean indicating whether or not to use mask (i.e. zero out land)
+ * \param pointer to pre-computed kernel (NULL indicates not provided)
+ *
  */
 void apply_filter_at_point(
-        double & coarse_val,   
-        const std::vector<double> & field, 
+        std::vector<double*> & coarse_val,   
+        const std::vector<const std::vector<double>*> & fields,
         const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
         const std::vector<double> & longitude, 
@@ -259,6 +309,22 @@ void apply_filter_at_point_for_quadratics(
  * \brief Compute the energy transfer through the current filter scale
  */
 void compute_energy_transfer_through_scale(
+        std::vector<double> & energy_transfer,
+        const std::vector<double> & ux,   
+        const std::vector<double> & uy,   
+        const std::vector<double> & uz,
+        const std::vector<double> & uxux, 
+        const std::vector<double> & uxuy, 
+        const std::vector<double> & uxuz,
+        const std::vector<double> & uyuy, 
+        const std::vector<double> & uyuz, 
+        const std::vector<double> & uzuz,
+        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+        const std::vector<double> & longitude, 
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask);
+
+void compute_Pi_v2(
         std::vector<double> & energy_transfer,
         const std::vector<double> & ux,   
         const std::vector<double> & uy,   
