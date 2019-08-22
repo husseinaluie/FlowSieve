@@ -23,7 +23,7 @@ void apply_filter_at_point(
         const std::vector<double> & dAreas,
         const double scale,
         const std::vector<double> & mask,
-        const bool use_mask,
+        const std::vector<bool> & use_mask,
         const std::vector<double> * local_kernel
         ) {
 
@@ -93,9 +93,9 @@ void apply_filter_at_point(
 
             area      = dAreas.at(mask_index);
             kA_sum   += kern * area;
-            mask_val  = use_mask ? mask.at(mask_index) : 1.;
 
             for (size_t II = 0; II < Nfields; ++II) {
+                mask_val = use_mask.at(II) ? mask.at(mask_index) : 1.;
                 tmp_vals.at(II) += fields.at(II)->at(index) * kern * area * mask_val;
             }
 

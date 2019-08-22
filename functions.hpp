@@ -215,7 +215,7 @@ void filtering_subsets(
  * \param array of cell areas (2D - lat,lon)
  * \param filtering scale
  * \param array to distinguish land from water
- * \param boolean indicating whether or not to use mask (i.e. zero out land)
+ * \param array of booleans indicating whether or not to use mask (i.e. zero out land)
  * \param pointer to pre-computed kernel (NULL indicates not provided)
  *
  */
@@ -231,7 +231,7 @@ void apply_filter_at_point(
         const std::vector<double> & dAreas, 
         const double scale,
         const std::vector<double> & mask,
-        const bool use_mask,
+        const std::vector<bool> & use_mask,
         const std::vector<double> * local_kernel);
 
 /*!
