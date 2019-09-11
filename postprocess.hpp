@@ -32,6 +32,7 @@ void Apply_Postprocess_Routines(
 namespace RegionTest 
 {
     const double D2R = M_PI / 180.;
+    const double R2D = 180. / M_PI;
 
     extern bool Global(double latitude, double longitude);
     extern bool GulfofMexico(double latitude, double longitude);
