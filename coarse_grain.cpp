@@ -15,11 +15,23 @@
 
 int main(int argc, char *argv[]) {
     
-    if (constants::PERIODIC_Y) {
-        // The non-uniform lat routine cannot handle
-        //   periodic lat (y) grids
-        assert(constants::UNIFORM_LAT_GRID);
-    }
+    // PERIODIC_Y implies UNIFORM_LAT_GRID
+    static_assert( (constants::UNIFORM_LAT_GRID) or (not(constants::PERIODIC_Y)),
+            "PERIODIC_Y requires UNIFORM_LAT_GRID.\n"
+            "Please update constants.hpp accordingly.\n");
+
+    // NO_FULL_OUTPUTS implies APPLY_POSTPROCESS
+    static_assert( (constants::APPLY_POSTPROCESS) or (not(constants::NO_FULL_OUTPUTS)),
+            "If NO_FULL_OUTPUTS is true, then APPLY_POSTPROCESS must also be true, "
+            "otherwise no outputs will be produced.\n"
+            "Please update constants.hpp accordingly.");
+
+    // NO_FULL_OUTPUTS implies MINIMAL_OUTPUT
+    static_assert( (constants::MINIMAL_OUTPUT) or (not(constants::NO_FULL_OUTPUTS)),
+            "NO_FULL_OUTPUTS implies MINIMAL_OUTPUT. "
+            "You must either change NO_FULL_OUTPUTS to false, "
+            "or MINIMAL_OUTPUT to true.\n" 
+            "Please update constants.hpp accordingly.");
 
     // Enable all floating point exceptions but FE_INEXACT
     //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
@@ -40,7 +52,7 @@ int main(int argc, char *argv[]) {
     //   include scales as a comma-separated list
     //   scales are given in metres
     // A zero scale will cause everything to nan out
-    std::vector<double> filter_scales {250e3};
+    std::vector<double> filter_scales { 100e3 };
 
     // Parse command-line flags
     char buffer [50];

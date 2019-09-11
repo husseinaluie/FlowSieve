@@ -28,9 +28,9 @@ void filtering_fftw(
         const MPI_Comm comm                         /**< [in] MPI Communicator */
         ) {
 
-    assert(constants::CARTESIAN);
-    assert(constants::PERIODIC_X);
-    assert(constants::PERIODIC_Y);
+    static_assert( constants::CARTESIAN  );
+    static_assert( constants::PERIODIC_X );
+    static_assert( constants::PERIODIC_Y );
 
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );

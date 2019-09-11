@@ -58,8 +58,8 @@ int main(int argc, char *argv[]) {
     int thread_safety_provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_safety_provided);
 
-    assert( constants::PERIODIC_X);
-    assert(!constants::PERIODIC_Y);
+    static_assert( constants::PERIODIC_X);
+    static_assert(!constants::PERIODIC_Y);
 
     const int Ntime  = 1;
     const int Ndepth = 1;

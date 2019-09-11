@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 
     fprintf(stdout, "Beginning filtering tests.\n");
 
-    assert(constants::CARTESIAN);
+    static_assert(constants::CARTESIAN);
 
     int thread_safety_provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_safety_provided);

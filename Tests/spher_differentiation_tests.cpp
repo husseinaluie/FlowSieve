@@ -197,9 +197,9 @@ int main(int argc, char *argv[]) {
     assert(wSize==1);
 
     // Only if we're not set on a Cartesian grid
-    assert(!constants::CARTESIAN);
-    assert(!constants::PERIODIC_Y);
-    assert( constants::PERIODIC_X);
+    static_assert(!constants::CARTESIAN);
+    static_assert(!constants::PERIODIC_Y);
+    static_assert( constants::PERIODIC_X);
 
     const int num_tests = 8;
     const int base_nlon = 32;

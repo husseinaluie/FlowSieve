@@ -227,9 +227,9 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
     assert(wSize==1);
-    assert( constants::CARTESIAN);
-    assert( constants::PERIODIC_X);
-    assert(!constants::PERIODIC_Y);
+    static_assert( constants::CARTESIAN);
+    static_assert( constants::PERIODIC_X);
+    static_assert(!constants::PERIODIC_Y);
 
     const int num_tests = 6;
     const int base_nlon = 32;
