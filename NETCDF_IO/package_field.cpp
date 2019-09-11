@@ -12,14 +12,7 @@ void package_field(
         const std::vector<double> * mask) {
 
     int index, mask_index;
-    fprintf(stdout, "    Getting mask size\n");
     const int mask_len = (int) mask->size();
-    fprintf(stdout, "      size is %d\n", mask_len);
-
-    #if DEBUG >= 2
-    fprintf(stdout, "    Computing the data range.\n");
-    fflush(stdout);
-    #endif
 
     // First, we need to compute the min and max values 
     //   to allow us to convert to signed shorts
@@ -41,11 +34,6 @@ void package_field(
     // Number of Discrete Representable Values
     //   (less two for numerical reasons)
     int ndrv = pow(2, 16) - 2;
-
-    #if DEBUG >= 2
-    fprintf(stdout, "    Rescaling the data (fmin, fmax) = (%g, %g)\n", fmin, fmax);
-    fflush(stdout);
-    #endif
 
     // Now that we have the min/max, we go ahead and do the conversion
     double fmean  = 0.5 * (fmax + fmin);
