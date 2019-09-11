@@ -1,7 +1,13 @@
 import matplotlib as mpl
 import numpy as np
 
-def ScientificCbar(cbar, units='', orientation='vertical'):
+def ScientificCbar(cbar, units='',
+        orientation='vertical', centre=True):
+
+    # If requested, centre the colour bar
+    if centre:
+        cv = np.max(np.abs(cbar.mappable.get_clim()))
+        cbar.mappable.set_clim(-cv, cv)
 
     # Limit the number of ticks on the colour bar
     tick_locator = mpl.ticker.MaxNLocator(nbins=5)
