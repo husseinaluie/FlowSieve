@@ -324,7 +324,7 @@ void compute_energy_transfer_through_scale(
         const std::vector<double> & latitude,
         const std::vector<double> & mask);
 
-void compute_Pi_v2(
+void compute_Pi(
         std::vector<double> & energy_transfer,
         const std::vector<double> & ux,   
         const std::vector<double> & uy,   

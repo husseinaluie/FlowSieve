@@ -72,10 +72,6 @@ POSTPROCESS_OBJS := $(addprefix Postprocess/,$(notdir $(POSTPROCESS_CPPS:.cpp=.o
 TEST_CPPS := $(wildcard Tests/*.cpp)
 TEST_EXES := $(addprefix Tests/,$(notdir $(TEST_CPPS:.cpp=.x)))
 
-# Get list of postprocess executables
-POST_CPPS := $(wildcard Postprocess/*.cpp)
-POST_EXES := $(addprefix Postprocess/,$(notdir $(POST_CPPS:.cpp=.x)))
-
 .PHONY: clean hardclean docs cleandocs tests all ALGLIB
 clean:
 	rm -f *.o 
@@ -107,11 +103,9 @@ cleandocs:
 	rm -r docs/html
 	rm -r docs/latex
 
-all: coarse_grain.x ${TEST_EXES} ${POST_EXES}
+all: coarse_grain.x integrator.x ${TEST_EXES}
 
 tests: ${TEST_EXES}
-
-posts: ${POST_EXES}
 
 ALGLIB: ${ALGLIB_OBJS}
 

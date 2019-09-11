@@ -128,11 +128,24 @@ namespace constants
      * \param MINIMAL_OUTPUT
      * \brief Boolean indicating if user wants a minimal output
      *
-     * Removes: fine velocities, coarse/fine KE, divergences, transport
+     * Removes: fine velocities, coarse/fine KE, divergences
      *
      * @ingroup constants
      */
     const bool MINIMAL_OUTPUT = true;
+
+    /*! 
+     * \param NO_FULL_OUTPUTS
+     * \brief Indicates that no full fields should be produced.
+     *   
+     * Only results from APPLY_POSTPROCESS will be produced.
+     *
+     * If NO_FULL_OUTPUTS and not(APPLY_POSTPROCESS), the no outputs
+     * at all will be produced, so the code will simply halt immediately.
+     *
+     * @ingroup constants
+     */
+    const bool NO_FULL_OUTPUTS = true;
 
     /*!
      * \param CAST_TO_INT

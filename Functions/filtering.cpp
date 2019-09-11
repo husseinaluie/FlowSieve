@@ -84,9 +84,11 @@ void filtering(
     std::vector<double> coarse_u_r(  num_pts);
     std::vector<double> coarse_u_lon(num_pts);
     std::vector<double> coarse_u_lat(num_pts);
-    vars_to_write.push_back("coarse_u_r");
-    vars_to_write.push_back("coarse_u_lon");
-    vars_to_write.push_back("coarse_u_lat");
+    if (not(constants::NO_FULL_OUTPUTS)) {
+        vars_to_write.push_back("coarse_u_r");
+        vars_to_write.push_back("coarse_u_lon");
+        vars_to_write.push_back("coarse_u_lat");
+    }
 
     std::vector<double> full_KE(num_pts);
 
@@ -144,7 +146,9 @@ void filtering(
         div_J, fine_KE, coarse_KE;
 
     div_J.resize(num_pts);
-    vars_to_write.push_back("div_Jtransport");
+    if (not(constants::NO_FULL_OUTPUTS)) {
+        vars_to_write.push_back("div_Jtransport");
+    }
 
     if (not(constants::MINIMAL_OUTPUT)) {
         fine_u_r.resize(  num_pts);
@@ -172,7 +176,9 @@ void filtering(
         coarse_vort_r.resize(  num_pts);
         coarse_vort_lon.resize(num_pts);
         coarse_vort_lat.resize(num_pts);
-        vars_to_write.push_back("coarse_vort_r");
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            vars_to_write.push_back("coarse_vort_r");
+        }
 
         if (not(constants::MINIMAL_OUTPUT)) {
             fine_vort_r.resize(  num_pts);
@@ -217,7 +223,9 @@ void filtering(
 
         // Also an array for the transfer itself
         energy_transfer.resize(num_pts);
-        vars_to_write.push_back("energy_transfer");
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            vars_to_write.push_back("energy_transfer");
+        }
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
         #endif
@@ -233,8 +241,10 @@ void filtering(
         #endif
         coarse_rho.resize(num_pts);
         coarse_p.resize(  num_pts);
-        vars_to_write.push_back("coarse_rho");
-        vars_to_write.push_back("coarse_p");
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            vars_to_write.push_back("coarse_rho");
+            vars_to_write.push_back("coarse_p");
+        }
 
         if (not(constants::MINIMAL_OUTPUT)) {
             fine_rho.resize(  num_pts);
@@ -244,7 +254,9 @@ void filtering(
         }
 
         lambda_m.resize(num_pts);
-        vars_to_write.push_back("Lambda_m");
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            vars_to_write.push_back("Lambda_m");
+        }
 
         // We'll need vorticity, so go ahead and compute it
         compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
@@ -255,7 +267,9 @@ void filtering(
         // We also have what we need to compute the PEtoKE term
         //    rho_bar * g * w_bar
         PEtoKE.resize(num_pts);
-        vars_to_write.push_back("PEtoKE");
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            vars_to_write.push_back("PEtoKE");
+        }
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
         #endif
@@ -301,8 +315,10 @@ void filtering(
 
         // Create the output file
         snprintf(fname, 50, "filter_%.6gkm.nc", scales.at(Iscale)/1e3);
-        initialize_output_file(time, depth, longitude, latitude, 
-                mask, vars_to_write, fname, scales.at(Iscale));
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            initialize_output_file(time, depth, longitude, latitude, 
+                    mask, vars_to_write, fname, scales.at(Iscale));
+        }
 
         #if DEBUG >= 0
         if (wRank == 0) { 
@@ -586,9 +602,14 @@ void filtering(
 
         // Write to file
         if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
-        write_field_to_output(coarse_u_r,   "coarse_u_r",   starts, counts, fname, &mask);
-        write_field_to_output(coarse_u_lon, "coarse_u_lon", starts, counts, fname, &mask);
-        write_field_to_output(coarse_u_lat, "coarse_u_lat", starts, counts, fname, &mask);
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            write_field_to_output(coarse_u_r,   "coarse_u_r",   
+                    starts, counts, fname, &mask);
+            write_field_to_output(coarse_u_lon, "coarse_u_lon", 
+                    starts, counts, fname, &mask);
+            write_field_to_output(coarse_u_lat, "coarse_u_lat", 
+                    starts, counts, fname, &mask);
+        }
 
         if (not(constants::MINIMAL_OUTPUT)) {
             write_field_to_output(fine_u_r,   "fine_u_r",   starts, counts, fname, &mask);
@@ -633,8 +654,10 @@ void filtering(
                 write_field_to_output(fine_vort_r, "fine_vort_r", 
                         starts, counts, fname, &mask);
             }
-            write_field_to_output(coarse_vort_r, "coarse_vort_r", 
-                    starts, counts, fname, &mask);
+            if (not(constants::NO_FULL_OUTPUTS)) {
+                write_field_to_output(coarse_vort_r, "coarse_vort_r", 
+                        starts, counts, fname, &mask);
+            }
             if ((constants::DO_TIMING) and (wRank == 0)) { 
                 clock_off = MPI_Wtime();
                 timing_writing += clock_off - clock_on;
@@ -663,8 +686,10 @@ void filtering(
             }
 
             if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
-            write_field_to_output(energy_transfer, "energy_transfer", 
-                    starts, counts, fname, &mask);
+            if (not(constants::NO_FULL_OUTPUTS)) {
+                write_field_to_output(energy_transfer, "energy_transfer", 
+                        starts, counts, fname, &mask);
+            }
             if ((constants::DO_TIMING) and (wRank == 0)) { 
                 clock_off = MPI_Wtime();
                 timing_writing += clock_off - clock_on;
@@ -715,10 +740,16 @@ void filtering(
             }
 
             if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
-            write_field_to_output(lambda_m,   "Lambda_m",   starts, counts, fname, &mask);
-            write_field_to_output(PEtoKE,     "PEtoKE",     starts, counts, fname, &mask);
-            write_field_to_output(coarse_rho, "coarse_rho", starts, counts, fname, &mask);
-            write_field_to_output(coarse_p,   "coarse_p",   starts, counts, fname, &mask);
+            if (not(constants::NO_FULL_OUTPUTS)) {
+                write_field_to_output(lambda_m,   "Lambda_m",   
+                        starts, counts, fname, &mask);
+                write_field_to_output(PEtoKE,     "PEtoKE",     
+                        starts, counts, fname, &mask);
+                write_field_to_output(coarse_rho, "coarse_rho", 
+                        starts, counts, fname, &mask);
+                write_field_to_output(coarse_p,   "coarse_p",   
+                        starts, counts, fname, &mask);
+            }
             if (not(constants::MINIMAL_OUTPUT)) {
                 write_field_to_output(fine_rho, "fine_rho", starts, counts, fname, &mask);
                 write_field_to_output(fine_p,   "fine_p",   starts, counts, fname, &mask);
@@ -747,7 +778,9 @@ void filtering(
         }
 
         if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
-        write_field_to_output(div_J, "div_Jtransport", starts, counts, fname, &mask);
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            write_field_to_output(div_J, "div_Jtransport", starts, counts, fname, &mask);
+        }
         if ((constants::DO_TIMING) and (wRank == 0)) { 
             clock_off = MPI_Wtime();
             timing_writing += clock_off - clock_on;
