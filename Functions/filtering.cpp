@@ -6,6 +6,7 @@
 #include "../functions.hpp"
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
+#include "../postprocess.hpp"
 
 void filtering(
         const std::vector<double> & full_u_r,       /**< [in] Full u_r velocity array */
@@ -141,6 +142,10 @@ void filtering(
 
     std::vector<double> fine_u_r, fine_u_lon, fine_u_lat,
         div_J, fine_KE, coarse_KE;
+
+    div_J.resize(num_pts);
+    vars_to_write.push_back("div_Jtransport");
+
     if (not(constants::MINIMAL_OUTPUT)) {
         fine_u_r.resize(  num_pts);
         fine_u_lon.resize(num_pts);
@@ -148,9 +153,6 @@ void filtering(
         vars_to_write.push_back("fine_u_r");
         vars_to_write.push_back("fine_u_lon");
         vars_to_write.push_back("fine_u_lat");
-
-        div_J.resize(num_pts);
-        vars_to_write.push_back("div_Jtransport");
 
         // If we're computing transfers, then we already have what
         //   we need to computed band-filtered KE, so might as well do it
@@ -189,7 +191,7 @@ void filtering(
     double KE_tmp;
     std::vector<double> coarse_uxux, coarse_uxuy, coarse_uxuz,
         coarse_uyuy, coarse_uyuz, coarse_uzuz, coarse_u_x,
-        coarse_u_y, coarse_u_z, div, energy_transfer, energy_transfer_v2;
+        coarse_u_y, coarse_u_z, div, energy_transfer;
     if (constants::COMP_TRANSFERS) {
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "Initializing COMP_TRANSFERS fields.\n"); }
@@ -215,9 +217,7 @@ void filtering(
 
         // Also an array for the transfer itself
         energy_transfer.resize(num_pts);
-        energy_transfer_v2.resize(num_pts);
         vars_to_write.push_back("energy_transfer");
-        vars_to_write.push_back("energy_transfer_v2");
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
         #endif
@@ -246,6 +246,7 @@ void filtering(
         lambda_m.resize(num_pts);
         vars_to_write.push_back("Lambda_m");
 
+        // We'll need vorticity, so go ahead and compute it
         compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
                 full_u_r, full_u_lon, full_u_lat,
                 Ntime, Ndepth, Nlat, Nlon,
@@ -645,19 +646,12 @@ void filtering(
             if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
             #if DEBUG >= 1
             if (wRank == 0) { 
-                fprintf(stdout, "Starting compute_energy_transfer_through_scale\n"); 
+                fprintf(stdout, "Starting compute_Pi\n"); 
             }
             fflush(stdout);
             #endif
-            compute_energy_transfer_through_scale(
+            compute_Pi(
                     energy_transfer, 
-                    coarse_u_x,  coarse_u_y,  coarse_u_z,
-                    coarse_uxux, coarse_uxuy, coarse_uxuz,
-                    coarse_uyuy, coarse_uyuz, coarse_uzuz,
-                    Ntime, Ndepth, Nlat, Nlon,
-                    longitude, latitude, mask);
-            compute_Pi_v2(
-                    energy_transfer_v2, 
                     coarse_u_x,  coarse_u_y,  coarse_u_z,
                     coarse_uxux, coarse_uxuy, coarse_uxuz,
                     coarse_uyuy, coarse_uyuz, coarse_uzuz,
@@ -670,8 +664,6 @@ void filtering(
 
             if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
             write_field_to_output(energy_transfer, "energy_transfer", 
-                    starts, counts, fname, &mask);
-            write_field_to_output(energy_transfer_v2, "energy_transfer_v2", 
                     starts, counts, fname, &mask);
             if ((constants::DO_TIMING) and (wRank == 0)) { 
                 clock_off = MPI_Wtime();
@@ -737,30 +729,28 @@ void filtering(
             }
         }
 
-        if (not(constants::MINIMAL_OUTPUT)) {
-            #if DEBUG >= 1
-            if (wRank == 0) { fprintf(stdout, "Starting compute_div_transport\n"); }
-            #endif
-            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
-            compute_div_transport(
-                    div_J,
-                    coarse_u_x,  coarse_u_y,  coarse_u_z,
-                    coarse_uxux, coarse_uxuy, coarse_uxuz,
-                    coarse_uyuy, coarse_uyuz, coarse_uzuz,
-                    coarse_p, longitude, latitude,
-                    Ntime, Ndepth, Nlat, Nlon,
-                    mask);
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_off = MPI_Wtime();
-                timing_comp_transport += clock_off - clock_on;
-            }
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "Starting compute_div_transport\n"); }
+        #endif
+        if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+        compute_div_transport(
+                div_J,
+                coarse_u_x,  coarse_u_y,  coarse_u_z,
+                coarse_uxux, coarse_uxuy, coarse_uxuz,
+                coarse_uyuy, coarse_uyuz, coarse_uzuz,
+                coarse_p, longitude, latitude,
+                Ntime, Ndepth, Nlat, Nlon,
+                mask);
+        if ((constants::DO_TIMING) and (wRank == 0)) { 
+            clock_off = MPI_Wtime();
+            timing_comp_transport += clock_off - clock_on;
+        }
 
-            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
-            write_field_to_output(div_J, "div_Jtransport", starts, counts, fname, &mask);
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_off = MPI_Wtime();
-                timing_writing += clock_off - clock_on;
-            }
+        if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+        write_field_to_output(div_J, "div_Jtransport", starts, counts, fname, &mask);
+        if ((constants::DO_TIMING) and (wRank == 0)) { 
+            clock_off = MPI_Wtime();
+            timing_writing += clock_off - clock_on;
         }
 
         #if DEBUG >= 0
@@ -795,6 +785,17 @@ void filtering(
             timing_comp_pi             = 0.;
             timing_comp_Lambda         = 0.;
             timing_comp_transport      = 0.;
+        }
+
+        if (constants::APPLY_POSTPROCESS) {
+            Apply_Postprocess_Routines(
+                    coarse_u_r, coarse_u_lon, coarse_u_lat, 
+                    coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
+                    div_J, energy_transfer, lambda_m, PEtoKE,
+                    time, depth, latitude, longitude,
+                    mask, dAreas,
+                    myCounts, myStarts,
+                    scales.at(Iscale));
         }
 
     }  // end for(scale) block

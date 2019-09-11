@@ -68,6 +68,17 @@ void initialize_subset_file(
         const double filter_scale,
         MPI_Comm = MPI_COMM_WORLD);
 
+void initialize_postprocess_file(
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & latitude,
+        const std::vector<double> & longitude,
+        const std::vector<std::string> & regions,
+        const std::vector<std::string> & int_vars,
+        const char * filename,
+        const double & filter_scale,
+        const MPI_Comm comm = MPI_COMM_WORLD);
+
 /*!
  * \brief Write on scales worth of a single field.
  *
@@ -87,6 +98,23 @@ void write_field_to_output(
         const std::vector<double> * mask = NULL,
         MPI_Comm = MPI_COMM_WORLD);
 
+
+
+void write_integral_to_post(
+        const std::vector<
+            std::vector<double> > & field,
+        const char * field_name,
+        size_t * start,
+        size_t * count,
+        const char * filename,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void write_regions_to_post(
+        const char * filename,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 /*!
  *  \brief Read a specific variable from a specific file.
  *
@@ -103,6 +131,15 @@ void read_var_from_file(
         std::vector<int> *myStarts = NULL,
         const bool do_splits = true,
         const MPI_Comm = MPI_COMM_WORLD );
+
+
+
+void read_attr_from_file(
+        double &attr,
+        const char * attr_name,
+        const char * filename,
+        const char * var_name = NULL,
+        const MPI_Comm comm = MPI_COMM_WORLD );
 
 
 /*!

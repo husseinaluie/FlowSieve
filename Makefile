@@ -64,9 +64,17 @@ ALGLIB_OBJS := $(addprefix ALGLIB/,$(notdir $(ALGLIB_CPPS:.cpp=.o)))
 PREPROCESS_CPPS := $(wildcard Preprocess/*.cpp)
 PREPROCESS_OBJS := $(addprefix Preprocess/,$(notdir $(PREPROCESS_CPPS:.cpp=.o)))
 
+# Get the list of post-processing  cpp files
+POSTPROCESS_CPPS := $(wildcard Postprocess/*.cpp)
+POSTPROCESS_OBJS := $(addprefix Postprocess/,$(notdir $(POSTPROCESS_CPPS:.cpp=.o)))
+
 # Get list of test executables
 TEST_CPPS := $(wildcard Tests/*.cpp)
 TEST_EXES := $(addprefix Tests/,$(notdir $(TEST_CPPS:.cpp=.x)))
+
+# Get list of postprocess executables
+POST_CPPS := $(wildcard Postprocess/*.cpp)
+POST_EXES := $(addprefix Postprocess/,$(notdir $(POST_CPPS:.cpp=.x)))
 
 .PHONY: clean hardclean docs cleandocs tests all ALGLIB
 clean:
@@ -78,13 +86,14 @@ clean:
 	rm -f Functions/FFTW_versions/*.o 
 	rm -f Tests/*.o 
 	rm -f Preprocess/*.o
+	rm -f Postprocess/*.o
 hardclean:
 	rm -f *.o 
+	rm -f *.x
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
-	rm -f Tests/*.o 
-	rm -f Tests/*.x
+	rm -f Tests/*.[o,x] 
 	rm -f Functions/Interface_Tools/*.o 
 	rm -f Functions/FFTW_versions/*.o 
 	rm -f coarse_grain.x 
@@ -92,13 +101,17 @@ hardclean:
 	rm ALGLIB/*.o
 	rm -r docs/html
 	rm -r docs/latex
+	rm -f Preprocess/*.[o,x]
+	rm -f Postprocess/*.[o,x]
 cleandocs:
 	rm -r docs/html
 	rm -r docs/latex
 
-all: coarse_grain.x
+all: coarse_grain.x ${TEST_EXES} ${POST_EXES}
 
 tests: ${TEST_EXES}
+
+posts: ${POST_EXES}
 
 ALGLIB: ${ALGLIB_OBJS}
 
@@ -125,6 +138,9 @@ NETCDF_IO/%.o: NETCDF_IO/%.cpp constants.hpp
 Preprocess/%.o: Preprocess/%.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
+Postprocess/%.o: Postprocess/%.cpp constants.hpp
+	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
 # Building test scripts
 Tests/%.o: Tests/%.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
@@ -132,11 +148,25 @@ Tests/%.o: Tests/%.cpp constants.hpp
 Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
 	$(MPICXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
+# Building postprocessing scripts
+Postprocess/%.o: Postprocess/%.cpp constants.hpp
+	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+Postprocess/%.x: Postprocess/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} ${POSTPROCESS_OBJS}
+	$(MPICXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
+
 # Building coarse_grain executable
 coarse_grain.o: coarse_grain.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} coarse_grain.o
+coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} ${POSTPROCESS_OBJS} coarse_grain.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
+
+# Building coarse_grain_sw executable
+coarse_grain_sw.o: coarse_grain_sw.cpp constants.hpp
+	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+coarse_grain_sw.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} coarse_grain_sw.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building coarse_grain_subset executable

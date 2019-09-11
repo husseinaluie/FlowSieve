@@ -3,7 +3,7 @@
 
 // Default debug value
 #ifndef DEBUG
-    #define DEBUG 0
+    #define DEBUG 1
 #endif
 
 /*!
@@ -59,7 +59,7 @@ namespace constants
      * \brief Differentiation order for finite differencing (currently must be 2, 4, or 6).
      * @ingroup constants
      */
-    const int DiffOrd = 6;
+    const int DiffOrd = 2;
 
     /*!
      * \param fill_value
@@ -87,7 +87,7 @@ namespace constants
      * \brief Boolean indicating if the coordinate system is periodic in x / longitude.
      * @ingroup constants
      */
-    const bool PERIODIC_X = true;
+    const bool PERIODIC_X = false;
 
     /*!
      * \param PERIODIC_Y
@@ -108,7 +108,7 @@ namespace constants
      * \brief Boolean indicating if vorticity should be computed.
      * @ingroup constants
      */
-    const bool COMP_VORT = true;
+    const bool COMP_VORT = false;
 
     /*!
      * \param COMP_TRANSFERS
@@ -149,6 +149,13 @@ namespace constants
      * @ingroup constants
      */
     const bool DO_TIMING = false;
+
+    /*!
+     * \param APPLY_POSTPROCESS
+     * \brief Boolean indicating whether or not the postprocess routines should be applied
+     * @ingroup constants
+     */
+    const bool APPLY_POSTPROCESS = true;
 
     /*!
      * \param KERNEL_OPT
