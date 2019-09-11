@@ -31,10 +31,10 @@ void Apply_Postprocess_Routines(
         const MPI_Comm comm
         ) {
 
-    const int Ntime   = myCounts.at(0);
-    const int Ndepth  = myCounts.at(1);
-    const int Nlat    = myCounts.at(2);
-    const int Nlon    = myCounts.at(3);
+    const int Ntime  = myCounts.at(0);
+    const int Ndepth = myCounts.at(1);
+    const int Nlat   = myCounts.at(2);
+    const int Nlon   = myCounts.at(3);
 
     const int Stime   = myStarts.at(0);
     const int Sdepth  = myStarts.at(1);
@@ -55,11 +55,11 @@ void Apply_Postprocess_Routines(
     std::vector<std::string> integrated_vars;
     integrated_vars.push_back("Pi");
     integrated_vars.push_back("KE");
+    integrated_vars.push_back("Transport");
     if (constants::COMP_BC_TRANSFERS) {
         integrated_vars.push_back("lambda_m");
         integrated_vars.push_back("PEtoKE");
     }
-
 
     initialize_postprocess_file(
             time, depth, latitude, longitude, 
@@ -73,14 +73,15 @@ void Apply_Postprocess_Routines(
     //
     //// Domain integrals
     //
-    
     double initial_value = 0;
     const int num_regions = RegionTest::all_regions.size();
 
-    std::vector<std::vector<double>> Pi_integrals, KE_integrals, 
+    std::vector<std::vector<double>> 
+        Pi_integrals, KE_integrals, Transport_integrals,
         Lambda_integrals, PEtoKE_integrals;
     Pi_integrals.resize(num_regions, std::vector<double>(Ntime * Ndepth, initial_value));
     KE_integrals.resize(num_regions, std::vector<double>(Ntime * Ndepth, initial_value));
+    Transport_integrals.resize(num_regions, std::vector<double>(Ntime * Ndepth, initial_value));
     if (constants::COMP_BC_TRANSFERS) {
         Lambda_integrals.resize(num_regions, 
                 std::vector<double>(Ntime * Ndepth, initial_value));
@@ -90,18 +91,19 @@ void Apply_Postprocess_Routines(
 
     std::vector<double> region_areas(num_regions);
 
-    double curr_Pi, curr_KE, curr_Lambda, curr_PEtoKE, dA;
+    double curr_Pi, curr_KE, curr_Lambda, curr_PEtoKE, curr_divJ, dA;
     int Ilat, Ilon, Itime, Idepth, Iregion, area_index, int_index;
     size_t index;
     #pragma omp parallel default(none)\
     private(Ilat, Ilon, Itime, Idepth, Iregion, \
             index, curr_Pi, curr_KE, curr_Lambda, curr_PEtoKE, \
+            curr_divJ, \
             dA, area_index, int_index )\
     shared(latitude, longitude, energy_transfer, \
             coarse_u_r, coarse_u_lon, coarse_u_lat, \
             Pi_integrals, KE_integrals, areas, mask,\
-            Lambda_integrals, PEtoKE_integrals,\
-            region_areas, lambda_m, PEtoKE) \
+            Lambda_integrals, PEtoKE_integrals, Transport_integrals,\
+            region_areas, lambda_m, PEtoKE, div_J) \
     firstprivate(wRank)
     { 
         #pragma omp for collapse(1) schedule(dynamic)
@@ -125,6 +127,7 @@ void Apply_Postprocess_Routines(
                     curr_Lambda = lambda_m.at(index);
                     curr_PEtoKE = PEtoKE.at(index);
                 }
+                curr_divJ = div_J.at(index);
                 dA = areas.at(area_index);
 
                 for (Iregion = 0; Iregion < num_regions; ++Iregion) {
@@ -133,6 +136,8 @@ void Apply_Postprocess_Routines(
                     {
                         Pi_integrals.at(Iregion).at(int_index) += curr_Pi * dA;
                         KE_integrals.at(Iregion).at(int_index) += curr_KE * dA;
+
+                        Transport_integrals.at(Iregion).at(int_index) += curr_divJ * dA;
 
                         if (constants::COMP_BC_TRANSFERS) {
                             Lambda_integrals.at(Iregion).at(int_index) += curr_Lambda * dA;
@@ -158,8 +163,9 @@ void Apply_Postprocess_Routines(
 
     count[2] = 1;
 
-    write_integral_to_post(Pi_integrals, "Pi", start, count, filename);
-    write_integral_to_post(KE_integrals, "KE", start, count, filename);
+    write_integral_to_post(Pi_integrals,        "Pi",        start, count, filename);
+    write_integral_to_post(KE_integrals,        "KE",        start, count, filename);
+    write_integral_to_post(Transport_integrals, "Transport", start, count, filename);
     if (constants::COMP_BC_TRANSFERS) {
         write_integral_to_post(Lambda_integrals, "lambda_m", start, count, filename);
         write_integral_to_post(PEtoKE_integrals, "PEtoKE",   start, count, filename);
