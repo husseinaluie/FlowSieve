@@ -11,6 +11,7 @@ void read_var_from_file(
         std::vector<double> *mask,  /**< [in] Pointer to mask array to be created */
         std::vector<int> *myCounts, /**< [in] Vector into which to store sizes (if not NULL) */
         std::vector<int> *myStarts, /**< [in] Vector into which to store sizes (if not NULL) */
+        const bool do_splits,       /**< [in] Boolean indicating if arrays should be split over MPI processes */
         const MPI_Comm comm         /**< [in] MPI Communicator */
         ) {
 
@@ -72,25 +73,28 @@ void read_var_from_file(
         if (wRank == 0) { fprintf(stdout, "%zu ", count[II]); }
         #endif
 
-        // If we're split on multiple MPI procs and have > 2 dimensions, 
-        //   then divide all but the last two we don't split the last 
-        //   two because those are assumed to be lat/lon
-        if ( (num_dims > 2) and (wSize > 1) and (II == 0) ) {
-            // For now, just split in time (assumed to be the first dimension)
-            my_count = ((int)count[II]) / wSize;
-            overflow = (int)( count[II] - my_count * wSize );
+        if (do_splits) {
+            // If we're split on multiple MPI procs and have > 2 dimensions, 
+            //   then divide all but the last two we don't split the last 
+            //   two because those are assumed to be lat/lon
+            if ( (num_dims > 2) and (wSize > 1) and (II == 0) ) {
+                // For now, just split in time (assumed to be the first dimension)
+                my_count = ((int)count[II]) / wSize;
+                overflow = (int)( count[II] - my_count * wSize );
 
-            start[II] = (size_t) (   
-                    std::min(wRank,            overflow) * (my_count + 1)
-                  + std::max(wRank - overflow, 0       ) *  my_count
-                  );
+                start[II] = (size_t) (   
+                          std::min(wRank,            overflow) * (my_count + 1)
+                        + std::max(wRank - overflow, 0       ) *  my_count
+                        );
 
-            // Distribute the remainder over the first chunk of processors
-            if (wRank < overflow) { my_count++; }
-            count[II] = (size_t) my_count;
+                // Distribute the remainder over the first chunk of processors
+                if (wRank < overflow) { my_count++; }
+                count[II] = (size_t) my_count;
 
+            }
         }
         num_pts *= count[II];
+
         if (myCounts != NULL) { myCounts->at(II) = (int) count[II]; }
         if (myStarts != NULL) { myStarts->at(II) = (int) start[II]; }
     }
@@ -148,22 +152,24 @@ void read_var_from_file(
     }
 
     // Determine masking, if desired
-    double fill_val = 1e100;
+    double fill_val = 1e100;  // backup value
     int num_land = 0;
     int num_water = 0;
-    size_t Nlat, Nlon;
     if ( (mask != NULL) and (num_dims == 4) ) {
-        // Assuming CF dimension order: time - depth - lat - lon
-        Nlat = count[2];
-        Nlon = count[3];
-        mask->resize(Nlat*Nlon);
-        if ((retval = nc_get_att_double(ncid, var_id, "_FillValue", &fill_val))) 
-            NC_ERR(retval, __LINE__, __FILE__);
+
+        mask->resize(var.size());
+
+        // Get the relevant fill value
+        nc_get_att_double(ncid, var_id, "_FillValue", &fill_val);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
         #if DEBUG >= 2
         if (wRank == 0) { fprintf(stdout, "  fill value = %g\n", fill_val); }
         #endif
-        for (size_t II = 0; II < Nlat * Nlon; II++) {
-            if (fabs(var.at(II)) > 0.95 * fabs(fill_val*scale)) {
+
+        // If we're at 99% of the fill_val, call it land
+        for (size_t II = 0; II < mask->size(); II++) {
+            if (fabs(var.at(II)) > 0.99 * fabs(fill_val*scale)) {
                 mask->at(II) = 0;
                 num_land++;
             } else {
@@ -171,6 +177,7 @@ void read_var_from_file(
                 num_water++;
             }
         }
+
         #if DEBUG >= 1
         if (wRank == 0) {
             fprintf(stdout, "  Land cover = %.4g%%\n", 
@@ -184,6 +191,6 @@ void read_var_from_file(
     #endif
 
     MPI_Barrier(comm);
-    if (( retval = nc_close(ncid) ))
-        NC_ERR(retval, __LINE__, __FILE__); 
+    retval = nc_close(ncid);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 }
