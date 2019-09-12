@@ -7,17 +7,43 @@ This file will outline some of the computational methodologies.
 
 ### Region Selection for Filtering
 
-Suppose that we are computing the filter at longitude \f$\lambda_0\f$ and latitude \f$\phi_0\f$ (at indices \f$I_{\lambda_0}\f$ and \f$I_{\phi_0}\f$ respectively) over length scale \f$L\f$. 
-Further, suppose that we have uniform (spherical) grid spacing \f$\Delta\lambda\f$ and \f$\Delta\phi\f$. 
-Let \f$R_E\f$ be the mean radius of the earth. 
+Suppose that we are computing the filter at longitude \f$\lambda_0\f$ and latitude \f$\varphi_0\f$ (at indices \f$I_{\lambda_0}\f$ and \f$I_{\varphi_0}\f$ respectively) over length scale \f$L\f$. 
+Let \f$R_E\f$ be the mean radius of the earth (in metres). 
 
-The spacing between latitude bands, in *metres*, is then \f$\Delta\phi_m=\Delta\phi R_E\f$.
-The number of points that we'll include in either latitude side is then \f$\Delta\phi_N=\mathrm{ceil}\left(1.1 (L/2) / \Delta\phi_m\right)\f$
-Note that the 1.1 factor is to take a region slightly larger than the kernel (assuming a compact support kernel).
+The integral is performed as a double for-loop, with the outer loop going through latitude and the inner loop going through longitude.
+In order to optimize the computation time, we would like to restrict the bounds on each of the for loops as much as possible.
 
-The outer loop in the integral is then from \f$I_{\phi_0} - \Delta\phi_N\f$ to \f$I_{\phi_0}+\Delta\phi_N\f$.
-Next, at each latitude \f$\phi\f$ within that loop, the same process is applied to compute the bounds for the longitude loop, with
-the spacing between longitude band, in *metres*, given by \f$\Delta\lambda_m=\Delta\lambda R_E \cos(\phi)\f$.
+#### Restricting the latitudinal (outer) loop
+
+This is implemented in **Functions/get_lat_bounds.cpp**
+
+##### Uniform grid spacing
+
+Suppose that we have uniform (spherical) grid spacing \f$\Delta\varphi\f$. 
+
+The spacing between latitude bands, in *metres*, is then \f$\Delta\varphi_m=\Delta\varphi R_E\f$.
+The number of points that we'll include in either latitude side is then \f$\Delta\phi_N=\mathrm{ceil}\left( L^{pad} (L/2) / \Delta\phi_m\right)\f$
+The scale factor \f$L^{pad}\f$ is a user-specified scaling to indicate how large of an integration region should be used. This is specified as *KernPad* in constants.hpp.
+
+The outer loop in the integral is then from \f$I_{\varphi_0} - \Delta\varphi_N\f$ to \f$I_{\varphi_0}+\Delta\varphi_N\f$.
+
+##### Non-uniform grid spacing
+
+In this event, we simply use a binary search routine to search the (logical) interval 
+\f$ [0, I_{\varphi_0}-1 ] \f$ for the point whose distance from the reference point is nearest to, but not less than, \f$ L^{pad} L/2  \f$
+
+#### Restricting the longitudinal (inner) loop
+
+This is implemented in **Functions/get_lon_bounds.cpp**
+
+*The currently implementation requires the longitudinal grid to be uniform.*
+
+Suppose that we have uniform (spherical) grid spacing \f$\Delta\lambda\f$. 
+
+Next, at each latitude \f$\varphi\f$ within that loop, the same process is applied to compute the bounds for the longitude loop, with
+the spacing between longitude band, in *metres*, given by \f$\Delta\lambda_m=\Delta\lambda R_E \cos(\varphi)\f$.
+
+An identical equation is then used to compute \f$ \Delta\lambda_N \f$, which then gives the width of the integration region (in logical indexing) at that specific latitude.
 
 ## Evolution of Kinetic Energy of Filter Velocities
 
@@ -224,6 +250,8 @@ The filter scales are also *NOT* parallelized with OpenMPI.
 This is because it would be difficult to load balance, particularly with non-sharp spectral kernels, where different filter scales would require very different amounts of time / work. 
 Accounting for this would be non-trivial and, unless there were a large number of filter scales, not practical or efficient. 
 
+If parallelization across filter scales is truly desired, the simplest way would simply be to produce multiple executables and run them separately.
+
 ### OpenMP
 
 The horizontal (lat/lon) loops are threaded (openmp) in `for` loops. 
@@ -253,7 +281,7 @@ This means that there's almost no modifications required, except for:
 
 ### SLURM
 
-If you're running on a SLURM-managed cluster (such as the ComputeCanada clusters, Bluehive, etc), then you can submit using hybridized parallelization using the following.
+If you're running on a SLURM-managed cluster (such as the ComputeCanada clusters, Bluehive, etc), then you can submit using hybridized parallelization using the following submit script.
 
 <pre>
 #!/bin/bash
@@ -267,5 +295,5 @@ If you're running on a SLURM-managed cluster (such as the ComputeCanada clusters
 #SBATCH --job-name="job-name-here"
 
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
-mpirun -n ${SLURM_NTASKS} ./coarse_grain.x
+srun -n ${SLURM_NTASKS} ./coarse_grain.x
 </pre>
