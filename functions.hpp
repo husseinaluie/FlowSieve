@@ -506,4 +506,39 @@ void get_lon_bounds(
 void print_compile_info(
         const std::vector<double> &scales);
 
+
+/*!
+ * \brief Class for storing internal timings.
+ *
+ * This class is used to wrap the interal timings into
+ *   clean expressions. 
+ */
+class Timing_Records {
+    /*! Main dictionary for storing timings
+     * 
+     * Keys are strings, which are human-readable labels.
+     * Values are doubles, which are the amount of time that falls under the label
+     */
+    std::map< std::string, double  > time_records;
+
+    public:
+        //! Constructor. Simply initializes entries to time_records as zero
+        Timing_Records();
+
+        //! Zero out each value in time_records.
+        void reset();
+
+        /*! 
+         * \brief Add delta to the record given by record_name: time_records[record_name] += delta
+         * @param delta a double indicating the amount of time to add to the record
+         * @param record_name a string indicating which record should be updating
+         */
+        void add_to_record(double delta, std::string record_name);
+
+        //! Print the timing information in a human-readable format.
+        void print();
+};
+
+
+
 #endif

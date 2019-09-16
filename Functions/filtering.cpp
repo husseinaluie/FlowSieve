@@ -9,46 +9,30 @@
 #include "../postprocess.hpp"
 
 void filtering(
-        const std::vector<double> & full_u_r,       /**< [in] Full u_r velocity array */
-        const std::vector<double> & full_u_lon,     /**< [in] Full u_lon velocity array */
-        const std::vector<double> & full_u_lat,     /**< [in] Full u_lat velocity array */
-        const std::vector<double> & full_rho,       /**< [in] Full density array */
-        const std::vector<double> & full_p,         /**< [in] Full pressure array */
-        const std::vector<double> & scales,         /**< [in] Array of filtering scales */
-        const std::vector<double> & dAreas,         /**< [in] Array of cell areas (2D) (compute_areas()) */
-        const std::vector<double> & time,           /**< [in] Time dimension (1D) */
-        const std::vector<double> & depth,          /**< [in] Depth dimension (1D) */
-        const std::vector<double> & longitude,      /**< [in] Longitude dimension (1D) */
-        const std::vector<double> & latitude,       /**< [in] Latitude dimension (1D) */
-        const std::vector<double> & mask,           /**< [in] Array to distinguish between land and water cells (2D) */
-        const std::vector<int>    & myCounts,       /**< [in] Array of dimension sizes */
-        const std::vector<int>    & myStarts,       /**< [in] Array of dimension sizes */
-        const MPI_Comm comm                         /**< [in] MPI Communicator */
+        const std::vector<double> & full_u_r,   /**< [in] Full u_r velocity array */
+        const std::vector<double> & full_u_lon, /**< [in] Full u_lon velocity array */
+        const std::vector<double> & full_u_lat, /**< [in] Full u_lat velocity array */
+        const std::vector<double> & full_rho,   /**< [in] Full density array */
+        const std::vector<double> & full_p,     /**< [in] Full pressure array */
+        const std::vector<double> & scales,     /**< [in] Array of filtering scales */
+        const std::vector<double> & dAreas,     /**< [in] Array of cell areas (2D)  */
+        const std::vector<double> & time,       /**< [in] Time dimension (1D) */
+        const std::vector<double> & depth,      /**< [in] Depth dimension (1D) */
+        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
+        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
+        const std::vector<double> & mask,       /**< [in] Array to tell land from water */
+        const std::vector<int>    & myCounts,   /**< [in] Array of dimension sizes */
+        const std::vector<int>    & myStarts,   /**< [in] Array of dimension sizes */
+        const MPI_Comm comm                     /**< [in] MPI Communicator */
         ) {
 
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
 
-    double timing_filt_main, timing_land, timing_kern_precomp,
-           timing_filt_comp_transfers, timing_filt_bc_transfers,
-           timing_comp_vorticity, timing_comp_pi, timing_writing,
-           timing_comp_Lambda, timing_comp_transport,
-           clock_on, clock_off;
-    //double timing_initialize, timing_writing, timing_comp_vel;
-    if (constants::DO_TIMING) {
-        // If we've passed the DO_TIMING flag, then create some timing vars
-        timing_filt_main = 0.;
-        timing_land = 0.;
-        timing_kern_precomp = 0.;
-        timing_filt_comp_transfers = 0.;
-        timing_filt_bc_transfers = 0.;
-        timing_comp_vorticity = 0.;
-        timing_comp_pi = 0.;
-        timing_writing = 0.;
-        timing_comp_Lambda = 0.;
-        timing_comp_transport = 0.;
-    }
+    // If we've passed the DO_TIMING flag, then create some timing vars
+    Timing_Records timing_records;
+    double clock_on;
 
     // Get dimension sizes
     const int Nscales = scales.size();
@@ -338,10 +322,8 @@ void filtering(
         #pragma omp parallel \
         default(none) \
         shared(mask, u_x, u_y, u_z, stdout, \
-                filter_fields, filt_use_mask,\
-                timing_filt_main, timing_filt_comp_transfers,\
-                timing_filt_bc_transfers, clock_on, clock_off,\
-                timing_land, timing_kern_precomp,\
+                filter_fields, filt_use_mask, \
+                timing_records, clock_on, \
                 longitude, latitude, dAreas, scale,\
                 full_KE, coarse_KE, fine_KE,\
                 full_u_r, full_u_lon, full_u_lat,\
@@ -385,7 +367,7 @@ void filtering(
                     mask_index = Index(0,     0,      Ilat, Ilon,
                                        Ntime, Ndepth, Nlat, Nlon);
 
-                    #if DEBUG >= 1
+                    #if DEBUG >= 0
                     tid = omp_get_thread_num();
                     if ( (tid == 0) and (wRank == 0) ) {
                         // Every perc_base percent, print a dot, but only the first thread
@@ -401,15 +383,13 @@ void filtering(
 
                     if (mask.at(mask_index) == 1) { // Skip land areas
 
-                        if ((constants::DO_TIMING) and (wRank == 0)) { 
-                            clock_on = MPI_Wtime(); 
-                        }
+                        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                         compute_local_kernel(
                                 local_kernel, scale, longitude, latitude,
                                 Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
-                        if ((constants::DO_TIMING) and (wRank == 0)) { 
-                            clock_off = MPI_Wtime();
-                            timing_kern_precomp += clock_off - clock_on;
+                        if (constants::DO_TIMING) { 
+                            timing_records.add_to_record(MPI_Wtime() - clock_on,
+                                   "kernel_precomputation");
                         }
 
                         for (Itime = 0; Itime < Ntime; Itime++) {
@@ -420,9 +400,7 @@ void filtering(
                                               Ntime, Ndepth, Nlat, Nlon);
     
                                 // Apply the filter at the point
-                                if ((constants::DO_TIMING) and (wRank == 0)) { 
-                                    clock_on = MPI_Wtime(); 
-                                }
+                                if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                                 #if DEBUG >= 3
                                 if (wRank == 0) { 
                                     fprintf(stdout, "    Line %d of %s\n", 
@@ -471,16 +449,14 @@ void filtering(
                                         full_KE.at(index) - coarse_KE.at(index);
                                 }
 
-                                if ((constants::DO_TIMING) and (wRank == 0)) { 
-                                    clock_off = MPI_Wtime();
-                                    timing_filt_main += clock_off - clock_on;
+                                if (constants::DO_TIMING) { 
+                                    timing_records.add_to_record(MPI_Wtime() - clock_on,
+                                            "filter_main");
                                 }
 
                                 // If we want energy transfers (Pi), 
                                 // then do those calculations now
-                                if ((constants::DO_TIMING) and (wRank == 0)) { 
-                                    clock_on = MPI_Wtime(); 
-                                }
+                                if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                                 if (constants::COMP_TRANSFERS) {
                                     apply_filter_at_point_for_quadratics(
                                             uxux_tmp, uxuy_tmp, uxuz_tmp,
@@ -508,16 +484,14 @@ void filtering(
                                     coarse_u_y.at(index) = u_y_tmp;
                                     coarse_u_z.at(index) = u_z_tmp;
                                 }
-                                if ((constants::DO_TIMING) and (wRank == 0)) { 
-                                    clock_off = MPI_Wtime();
-                                    timing_filt_comp_transfers += clock_off - clock_on;
+                                if (constants::DO_TIMING) { 
+                                    timing_records.add_to_record(MPI_Wtime() - clock_on,
+                                            "filter_for_Pi");
                                 }
 
                                 // If we want baroclinic transfers (Lambda^m), 
                                 //    then do those calculations now
-                                if ((constants::DO_TIMING) and (wRank == 0)) { 
-                                    clock_on = MPI_Wtime(); 
-                                }
+                                if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                                 if (constants::COMP_BC_TRANSFERS) {
                                     coarse_rho.at(index) = rho_tmp;
                                     coarse_p.at(  index) = p_tmp;
@@ -534,18 +508,16 @@ void filtering(
                                         * (-constants::g)
                                         * coarse_u_r.at(index);
                                 }
-                                if ((constants::DO_TIMING) and (wRank == 0)) { 
-                                    clock_off = MPI_Wtime();
-                                    timing_filt_bc_transfers += clock_off - clock_on;
+                                if (constants::DO_TIMING) { 
+                                    timing_records.add_to_record(MPI_Wtime() - clock_on,
+                                            "filter_for_Lambda");
                                 }
 
                             }  // end for(depth) block
                         }  // end for(time) block
                     }  // end if(masked) block
                     else { // if not masked
-                        if ((constants::DO_TIMING) and (wRank == 0)) { 
-                            clock_on = MPI_Wtime(); 
-                        }
+                        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                         for (Itime = 0; Itime < Ntime; Itime++) {
                             for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
@@ -583,15 +555,14 @@ void filtering(
                                 }
                             }  // end for(depth) block
                         }  // end for(time) block
-                        if ((constants::DO_TIMING) and (wRank == 0)) { 
-                            clock_off = MPI_Wtime();
-                            timing_land += clock_off - clock_on;
+                        if (constants::DO_TIMING) { 
+                            timing_records.add_to_record(MPI_Wtime() - clock_on, "land");
                         }
                     }  // end not(masked) block
                 }  // end for(longitude) block
             }  // end for(latitude) block
         }  // end pragma parallel block
-        #if DEBUG >= 1
+        #if DEBUG >= 0
         if (wRank == 0) { fprintf(stdout, "\n"); }
         #endif
 
@@ -601,7 +572,7 @@ void filtering(
         #endif
 
         // Write to file
-        if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         if (not(constants::NO_FULL_OUTPUTS)) {
             write_field_to_output(coarse_u_r,   "coarse_u_r",   
                     starts, counts, fname, &mask);
@@ -619,14 +590,13 @@ void filtering(
             write_field_to_output(fine_KE,   "fine_KE",   starts, counts, fname, &mask);
             write_field_to_output(coarse_KE, "coarse_KE", starts, counts, fname, &mask);
         }
-        if ((constants::DO_TIMING) and (wRank == 0)) { 
-            clock_off = MPI_Wtime();
-            timing_writing += clock_off - clock_on;
+        if (constants::DO_TIMING) { 
+            timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
         }
 
         if (constants::COMP_VORT) {
             // Compute and write vorticity
-            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
 
             #if DEBUG >= 1
             if (wRank == 0) { fprintf(stdout, "Starting compute_vorticity\n"); }
@@ -644,12 +614,11 @@ void filtering(
                     Ntime, Ndepth, Nlat, Nlon,
                     longitude, latitude, mask);
 
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_off = MPI_Wtime();
-                timing_comp_vorticity += clock_off - clock_on;
+            if (constants::DO_TIMING) { 
+                timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_vorticity");
             }
 
-            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             if (not(constants::MINIMAL_OUTPUT)) {
                 write_field_to_output(fine_vort_r, "fine_vort_r", 
                         starts, counts, fname, &mask);
@@ -658,19 +627,16 @@ void filtering(
                 write_field_to_output(coarse_vort_r, "coarse_vort_r", 
                         starts, counts, fname, &mask);
             }
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_off = MPI_Wtime();
-                timing_writing += clock_off - clock_on;
+            if (constants::DO_TIMING) { 
+                timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
             }
         }
 
         if (constants::COMP_TRANSFERS) {
             // Compute the energy transfer through the filter scale
-            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             #if DEBUG >= 1
-            if (wRank == 0) { 
-                fprintf(stdout, "Starting compute_Pi\n"); 
-            }
+            if (wRank == 0) { fprintf(stdout, "Starting compute_Pi\n"); }
             fflush(stdout);
             #endif
             compute_Pi(
@@ -680,45 +646,43 @@ void filtering(
                     coarse_uyuy, coarse_uyuz, coarse_uzuz,
                     Ntime, Ndepth, Nlat, Nlon,
                     longitude, latitude, mask);
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_off = MPI_Wtime();
-                timing_comp_pi += clock_off - clock_on;
+            if (constants::DO_TIMING) { 
+                timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_Pi");
             }
 
-            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             if (not(constants::NO_FULL_OUTPUTS)) {
                 write_field_to_output(energy_transfer, "energy_transfer", 
                         starts, counts, fname, &mask);
             }
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_off = MPI_Wtime();
-                timing_writing += clock_off - clock_on;
+            if (constants::DO_TIMING) { 
+                timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
             }
 
             // Compute the divergence of the coarse field and full field (for comparison)
             if (not(constants::MINIMAL_OUTPUT)) {
                 #if DEBUG >= 1
                 if (wRank == 0) { fprintf(stdout, "Starting compute_div_vel (coarse)\n"); }
+                fflush(stdout);
                 #endif
                 compute_div_vel(div, coarse_u_x, coarse_u_y, coarse_u_z, 
                         longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
-                if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+                if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                 write_field_to_output(div, "coarse_vel_div", starts, counts, fname, &mask);
-                if ((constants::DO_TIMING) and (wRank == 0)) { 
-                    clock_off = MPI_Wtime();
-                    timing_writing += clock_off - clock_on;
+                if (constants::DO_TIMING) { 
+                    timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
                 }
 
                 #if DEBUG >= 1
                 if (wRank == 0) { fprintf(stdout, "Starting compute_div_vel (full)\n"); }
+                fflush(stdout);
                 #endif
                 compute_div_vel(div, u_x, u_y, u_z, longitude, latitude,
                         Ntime, Ndepth, Nlat, Nlon, mask);
-                if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+                if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                 write_field_to_output(div, "full_vel_div", starts, counts, fname, &mask);
-                if ((constants::DO_TIMING) and (wRank == 0)) { 
-                    clock_off = MPI_Wtime();
-                    timing_writing += clock_off - clock_on;
+                if (constants::DO_TIMING) { 
+                    timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
                 }
             }
         }
@@ -728,18 +692,17 @@ void filtering(
             if (wRank == 0) { fprintf(stdout, "Starting compute_baroclinic_transfers\n"); }
             fflush(stdout);
             #endif
-            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             compute_baroclinic_transfer(lambda_m,
                     coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
                     coarse_rho, coarse_p,
                     Ntime, Ndepth, Nlat, Nlon,
                     longitude, latitude, mask);
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_off = MPI_Wtime();
-                timing_comp_Lambda += clock_off - clock_on;
+            if (constants::DO_TIMING) { 
+                timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_Lambda");
             }
 
-            if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             if (not(constants::NO_FULL_OUTPUTS)) {
                 write_field_to_output(lambda_m,   "Lambda_m",   
                         starts, counts, fname, &mask);
@@ -754,16 +717,16 @@ void filtering(
                 write_field_to_output(fine_rho, "fine_rho", starts, counts, fname, &mask);
                 write_field_to_output(fine_p,   "fine_p",   starts, counts, fname, &mask);
             }
-            if ((constants::DO_TIMING) and (wRank == 0)) { 
-                clock_off = MPI_Wtime();
-                timing_writing += clock_off - clock_on;
+            if (constants::DO_TIMING) { 
+                timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
             }
         }
 
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "Starting compute_div_transport\n"); }
+        fflush(stdout);
         #endif
-        if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         compute_div_transport(
                 div_J,
                 coarse_u_x,  coarse_u_y,  coarse_u_z,
@@ -772,54 +735,23 @@ void filtering(
                 coarse_p, longitude, latitude,
                 Ntime, Ndepth, Nlat, Nlon,
                 mask);
-        if ((constants::DO_TIMING) and (wRank == 0)) { 
-            clock_off = MPI_Wtime();
-            timing_comp_transport += clock_off - clock_on;
+        if (constants::DO_TIMING) { 
+            timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_transport");
         }
 
-        if ((constants::DO_TIMING) and (wRank == 0)) { clock_on = MPI_Wtime(); }
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         if (not(constants::NO_FULL_OUTPUTS)) {
             write_field_to_output(div_J, "div_Jtransport", starts, counts, fname, &mask);
         }
-        if ((constants::DO_TIMING) and (wRank == 0)) { 
-            clock_off = MPI_Wtime();
-            timing_writing += clock_off - clock_on;
+        if (constants::DO_TIMING) { 
+            timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
         }
 
-        #if DEBUG >= 0
-        // Flushing stdout is necessary for SLURM outputs.
-        fflush(stdout);
-        #endif
+        //
+        //// on-line postprocessing, if desired
+        //
 
-        // If we're doing timings, then print out and reset values now
-        if ((constants::DO_TIMING) and (wRank == 0)) { 
-            fprintf(stdout, "  ::Timings::\n");
-            fprintf(stdout, "    filt_kern_precomp = %.13g\n", timing_kern_precomp);
-            fprintf(stdout, "\n");
-            fprintf(stdout, "    filt_main         = %.13g\n", timing_filt_main);
-            fprintf(stdout, "    filt_for_pi       = %.13g\n", timing_filt_comp_transfers);
-            fprintf(stdout, "    filt_for_lambda   = %.13g\n", timing_filt_bc_transfers);
-            fprintf(stdout, "    filt_land         = %.13g\n", timing_land);
-            fprintf(stdout, "\n");
-            fprintf(stdout, "    writing           = %.13g\n", timing_writing);
-            fprintf(stdout, "\n");
-            fprintf(stdout, "    comp_vort         = %.13g\n", timing_comp_vorticity);
-            fprintf(stdout, "    comp_pi           = %.13g\n", timing_comp_pi);
-            fprintf(stdout, "    comp_lambda       = %.13g\n", timing_comp_Lambda);
-            fprintf(stdout, "    comp_transport    = %.13g\n", timing_comp_transport);
-            fprintf(stdout, "\n");
-
-            timing_filt_main           = 0.;
-            timing_land                = 0.;
-            timing_kern_precomp        = 0.;
-            timing_filt_comp_transfers = 0.;
-            timing_filt_bc_transfers   = 0.;
-            timing_comp_vorticity      = 0.;
-            timing_comp_pi             = 0.;
-            timing_comp_Lambda         = 0.;
-            timing_comp_transport      = 0.;
-        }
-
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         if (constants::APPLY_POSTPROCESS) {
             Apply_Postprocess_Routines(
                     coarse_u_r, coarse_u_lon, coarse_u_lat, 
@@ -829,6 +761,21 @@ void filtering(
                     mask, dAreas,
                     myCounts, myStarts,
                     scales.at(Iscale));
+        }
+        if (constants::DO_TIMING) { 
+            timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess");
+        }
+
+        #if DEBUG >= 0
+        // Flushing stdout is necessary for SLURM outputs.
+        fflush(stdout);
+        #endif
+
+        // If we're doing timings, then print out and reset values now
+        if (constants::DO_TIMING) { 
+            timing_records.print();
+            timing_records.reset();
+            fflush(stdout);
         }
 
     }  // end for(scale) block
