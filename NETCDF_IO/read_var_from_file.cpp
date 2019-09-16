@@ -5,14 +5,14 @@
 
 // Write to netcdf file
 void read_var_from_file(
-        std::vector<double> &var,   /**< [in] Vector into which to store the variable */
-        const char * var_name,      /**< [in] Name of the variable */
-        const char * filename,      /**< [in] Name of the file */
-        std::vector<double> *mask,  /**< [in] Pointer to mask array to be created */
-        std::vector<int> *myCounts, /**< [in] Vector into which to store sizes (if not NULL) */
-        std::vector<int> *myStarts, /**< [in] Vector into which to store sizes (if not NULL) */
-        const bool do_splits,       /**< [in] Boolean indicating if arrays should be split over MPI processes */
-        const MPI_Comm comm         /**< [in] MPI Communicator */
+        std::vector<double> &var,
+        const char * var_name,
+        const char * filename,
+        std::vector<double> *mask,
+        std::vector<int> *myCounts,
+        std::vector<int> *myStarts,
+        const bool do_splits,
+        const MPI_Comm comm
         ) {
 
     int wRank, wSize;

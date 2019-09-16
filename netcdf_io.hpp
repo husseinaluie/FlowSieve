@@ -121,6 +121,16 @@ void write_regions_to_post(
  *  Accounts for variable attributes 'scale_factor' and 'add_offset'.
  *
  *  If mask != NULL, then determine the mask based on variable attribute '_FillValue'
+ *
+ *  @param var[in,out] vector into which to store the loaded variable
+ *  @param var_name[in] name of the variable to be read
+ *  @param filename[in] name of the file from which to load the variable
+ *  @param mask[in,out] point to where a mask array should be stored (if not NULL)
+ *  @param myCounts[in,out] the sizes of each dimension (on this MPI process) if not NULL
+ *  @param myStarts[in,out] the starting index for each dimension, if not NULL
+ *  @param do_splits[in] boolean indicating if the arrays should be split over MPI procs.
+ *  @param comm[in] the MPI communicator world
+ *
  */
 void read_var_from_file(
         std::vector<double> &var,
