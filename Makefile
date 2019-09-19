@@ -10,7 +10,7 @@ CFLAGS:=-DDEBUG=1 $(CFLAGS)
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
 DEBUG:=false
-EXTRA_OPT:=false
+EXTRA_OPT:=true
 
 ##
 ## Shouldn't need to modify anything beyond this point
@@ -72,6 +72,7 @@ POSTPROCESS_OBJS := $(addprefix Postprocess/,$(notdir $(POSTPROCESS_CPPS:.cpp=.o
 TEST_CPPS := $(wildcard Tests/*.cpp)
 TEST_EXES := $(addprefix Tests/,$(notdir $(TEST_CPPS:.cpp=.x)))
 
+
 .PHONY: clean hardclean docs cleandocs tests all ALGLIB
 clean:
 	rm -f *.o 
@@ -109,31 +110,45 @@ tests: ${TEST_EXES}
 
 ALGLIB: ${ALGLIB_OBJS}
 
+
+#
+# Commands for building object files (does not include those for executables)
+#
+
 # ALGLIB requires a different set of compile flags
 ALGLIB/%.o: ALGLIB/%.cpp
 	$(CXX) -I ./ALGLIB -c -O3 -DAE_CPU=AE_INTEL -o $@ $<
 
-# The core coarse_graining functions use the same compile flags
-Functions/Differentiation_Tools/%.o: Functions/Differentiation_Tools/%.cpp constants.hpp
+# Group together object files with similar compilation requirements
+CORE_OBJS := ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} ${POSTPROCESS_OBJS}
+
+$(CORE_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Functions/Interface_Tools/%.o: Functions/Interface_Tools/%.cpp constants.hpp
+$(INTERFACE_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Functions/FFTW_versions/%.o: Functions/FFTW_versions/%.cpp constants.hpp
+FFT_BASED_OBJS:= ${FFT_BASED_OBJS} coarse_grain_fftw.o
+$(FFT_BASED_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< -lfftw3 -lm $(LINKS) 
 
-Functions/%.o: Functions/%.cpp constants.hpp
-	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
-
-NETCDF_IO/%.o: NETCDF_IO/%.cpp constants.hpp
-	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
-
-Preprocess/%.o: Preprocess/%.cpp constants.hpp
+$(PREPROCESS_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Postprocess/%.o: Postprocess/%.cpp constants.hpp
-	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+# 
+# Commands for building executables (and related object files)
+#
+
+# Group together executables with similar compilations
+CORE_TARGET_EXES := coarse_grain.x integrator.x coarse_grain_sw.x coarse_grain_subset.x
+CORE_TARGET_OBJS := coarse_grain.o integrator.o coarse_grain_sw.o coarse_grain_subset.o
+
+$(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+$(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} %.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building test scripts
 Tests/%.o: Tests/%.cpp constants.hpp
@@ -142,39 +157,8 @@ Tests/%.o: Tests/%.cpp constants.hpp
 Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
 	$(MPICXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
-# Building postprocessing scripts
-Postprocess/%.o: Postprocess/%.cpp constants.hpp
-	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
-
-Postprocess/%.x: Postprocess/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} ${POSTPROCESS_OBJS}
-	$(MPICXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
-
-# Building coarse_grain executable
-coarse_grain.o: coarse_grain.cpp constants.hpp
-	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
-
-coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} ${POSTPROCESS_OBJS} coarse_grain.o
-	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
-
-# Building coarse_grain_sw executable
-coarse_grain_sw.o: coarse_grain_sw.cpp constants.hpp
-	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
-
-coarse_grain_sw.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} coarse_grain_sw.o
-	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
-
-# Building coarse_grain_subset executable
-coarse_grain_subset.o: coarse_grain_subset.cpp constants.hpp
-	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
-
-coarse_grain_subset.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} coarse_grain_subset.o
-	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
-
 # Building fftw-based coarse_grain executable
-coarse_grain_fftw.o: coarse_grain_fftw.cpp constants.hpp
-	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< -lfftw3 -lm $(LINKS) 
-
-coarse_grain_fftw.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} ${FFT_BASED_OBJS} coarse_grain_fftw.o
+coarse_grain_fftw.x: ${CORE_OBJS} ${INTERFACE_OBJS} ${FFT_BASED_OBJS} coarse_grain_fftw.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ -lfftw3 -lm $(LINKS) 
 
 # Interpolator needs to link in ALGLIB
@@ -183,6 +167,12 @@ interpolator.o: interpolator.cpp constants.hpp
 
 interpolator.x: ${NETCDF_IO_OBJS} ${ALGLIB_OBJS} ${PREPROCESS_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} interpolator.o
 	$(MPICXX) $(CFLAGS) -I ./ALGLIB $(LDFLAGS) -o $@ $^ $(LINKS) 
+
+
+#
+# Documentation
+#
+
 
 # Documentation build with Doxygen
 docs:
