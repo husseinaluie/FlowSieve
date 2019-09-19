@@ -9,10 +9,10 @@
 #include <omp.h>
 #include <cassert>
 
-#include "../netcdf_io.hpp"
-#include "../functions.hpp"
-#include "../constants.hpp"
-#include "../postprocess.hpp"
+#include "netcdf_io.hpp"
+#include "functions.hpp"
+#include "constants.hpp"
+#include "postprocess.hpp"
 
 int main(int argc, char *argv[]) {
     
