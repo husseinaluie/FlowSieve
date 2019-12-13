@@ -49,7 +49,7 @@ void write_regions_to_post(
         for (size_t Iregion = 0; Iregion < num_regions; ++Iregion) {
             start[0] = Iregion;
 
-            sprintf(curr_name, "%30s", RegionTest::region_names.at(Iregion).c_str());
+            sprintf(curr_name, "%20s", RegionTest::region_names.at(Iregion).c_str());
 
             retval = nc_put_vara_string(ncid, region_varid, start, count, &ptr_to_name);
             if (retval) { NC_ERR(retval, __LINE__, __FILE__); }

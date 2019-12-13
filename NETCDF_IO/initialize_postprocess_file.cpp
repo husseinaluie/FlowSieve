@@ -30,10 +30,10 @@ void initialize_postprocess_file(
     retval = nc_create_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
-    retval = nc_put_att_double(ncid, NC_GLOBAL, "filter_scale", NC_FLOAT, 1, &filter_scale);
+    retval = nc_put_att_double(ncid, NC_GLOBAL, "filter_scale", NC_DOUBLE, 1, &filter_scale);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
-    retval = nc_put_att_double(ncid, NC_GLOBAL, "rho0", NC_FLOAT, 1, &constants::rho0);
+    retval = nc_put_att_double(ncid, NC_GLOBAL, "rho0", NC_DOUBLE, 1, &constants::rho0);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Record coordinate type
@@ -66,22 +66,24 @@ void initialize_postprocess_file(
 
     // Define coordinate variables
     int time_varid, depth_varid, lat_varid, lon_varid, reg_varid;
-    retval = nc_def_var(ncid, "time",      NC_FLOAT,  1, &time_dimid,  &time_varid);
+    retval = nc_def_var(ncid, "time",      NC_DOUBLE,  1, &time_dimid,  &time_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    retval = nc_def_var(ncid, "depth",     NC_FLOAT,  1, &depth_dimid, &depth_varid);
+    retval = nc_def_var(ncid, "depth",     NC_DOUBLE,  1, &depth_dimid, &depth_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    retval = nc_def_var(ncid, "latitude",  NC_FLOAT,  1, &lat_dimid,   &lat_varid);
+    retval = nc_def_var(ncid, "latitude",  NC_DOUBLE,  1, &lat_dimid,   &lat_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    retval = nc_def_var(ncid, "longitude", NC_FLOAT,  1, &lon_dimid,   &lon_varid);
+    retval = nc_def_var(ncid, "longitude", NC_DOUBLE,  1, &lon_dimid,   &lon_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     retval = nc_def_var(ncid, "region",    NC_STRING, 1, &reg_dimid,   &reg_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     if (not(constants::CARTESIAN)) {
         const double rad_to_degree = 180. / M_PI;
-        retval = nc_put_att_double(ncid, lon_varid, "scale_factor", NC_FLOAT, 1, &rad_to_degree);
+        retval = nc_put_att_double(ncid, lon_varid, "scale_factor", 
+                NC_DOUBLE, 1, &rad_to_degree);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-        retval = nc_put_att_double(ncid, lat_varid, "scale_factor", NC_FLOAT, 1, &rad_to_degree);
+        retval = nc_put_att_double(ncid, lat_varid, "scale_factor", 
+                NC_DOUBLE, 1, &rad_to_degree);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     }
 
@@ -106,7 +108,7 @@ void initialize_postprocess_file(
 
     // We're also going to store the region areas
     int reg_area_varid;
-    retval = nc_def_var(ncid, "region_areas", NC_FLOAT, 1, &reg_dimid, &reg_area_varid);
+    retval = nc_def_var(ncid, "region_areas", NC_DOUBLE, 1, &reg_dimid, &reg_area_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Close the file
@@ -120,10 +122,23 @@ void initialize_postprocess_file(
     if (wRank == 0) {
         // Loop through and add the desired variables
         // Dimension names (in order!)
+
+        // region averages
         const char* dim_names[] = {"time", "depth", "region"};
         const int ndims = 3;
         for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
-            add_var_to_file(int_vars.at(varInd), dim_names, ndims, buffer);
+            add_var_to_file(int_vars.at(varInd)+"_avg", dim_names, ndims, buffer);
+            add_var_to_file(int_vars.at(varInd)+"_std", dim_names, ndims, buffer);
+        }
+
+        // time averages
+        const char* dim_names_time_ave[] = {"depth", "latitude", "longitude"};
+        const int ndims_time_ave = 3;
+        for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
+            add_var_to_file(int_vars.at(varInd)+"_time_average", 
+                    dim_names_time_ave, ndims_time_ave, buffer);
+            add_var_to_file(int_vars.at(varInd)+"_time_std_dev", 
+                    dim_names_time_ave, ndims_time_ave, buffer);
         }
     }
 

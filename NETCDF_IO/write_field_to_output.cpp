@@ -86,6 +86,9 @@ void write_field_to_output(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "  - wrote %s to %s -\n", field_name, filename); }
+    if (wRank == 0) { 
+        fprintf(stdout, "  - wrote %s to %s -\n", field_name, filename); 
+        fflush(stdout);
+    }
     #endif
 }

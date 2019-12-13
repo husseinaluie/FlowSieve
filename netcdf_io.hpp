@@ -98,12 +98,22 @@ void write_field_to_output(
         const std::vector<double> * mask = NULL,
         MPI_Comm = MPI_COMM_WORLD);
 
-
-
 void write_integral_to_post(
         const std::vector<
             std::vector<double> > & field,
-        const char * field_name,
+        //const char * field_name,
+        std::string field_name,
+        std::string field_suffix,
+        size_t * start,
+        size_t * count,
+        const char * filename,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void write_time_average_to_post(
+        const std::vector< double > & field,
+        std::string field_name,
+        std::string field_suffix,
         size_t * start,
         size_t * count,
         const char * filename,
@@ -162,7 +172,21 @@ void add_var_to_file(
         const std::string var_name,
         const char ** dim_list,
         const int num_dims,
-        const char * filename);
+        const char * filename
+        );
+
+
+/*!
+ *  \brief Add a new (double) attribute to a netcdf file
+ *
+ *  This assumes that the attribute is a double
+ */
+void add_attr_to_file(
+        const char * varname,
+        const double value,
+        const char * filename,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
 
 
 /*!

@@ -11,6 +11,21 @@ void add_var_to_file(
         const char * filename       /**< [in] file name */
         ) {
 
+    static_assert( 
+                   not(     (constants::CAST_TO_SINGLE) 
+                        and (constants::CAST_TO_INT) 
+                       ) 
+                 );
+
+    int datatype;
+    if (constants::CAST_TO_SINGLE) {
+        datatype = NC_FLOAT;
+    } else if (constants::CAST_TO_INT) {
+        datatype = NC_SHORT;
+    } else {
+        datatype = NC_DOUBLE;
+    }
+
     // Open the NETCDF file
     int FLAG = NC_WRITE;
     int ncid=0, retval;
@@ -18,11 +33,6 @@ void add_var_to_file(
     snprintf(buffer, 50, filename);
     retval = nc_open(buffer, FLAG, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-
-    // Determine data type
-    int datatype;
-    if (constants::CAST_TO_INT) { datatype = NC_SHORT; }
-    else                        { datatype = NC_FLOAT; }
 
     // Extract dimension ids sizes
     int dim_ids[num_dims];
@@ -55,5 +65,4 @@ void add_var_to_file(
     #if DEBUG >= 2
     fprintf(stdout, "  - added %s to %s -\n", varname, buffer);
     #endif
-
 }

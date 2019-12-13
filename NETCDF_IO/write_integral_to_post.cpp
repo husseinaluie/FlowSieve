@@ -8,7 +8,9 @@
 void write_integral_to_post(
         const std::vector<
             std::vector<double> > & field,  /**< [in] data to be written to the file*/
-        const char * field_name,            /**< [in] name of the variable in the netcdf file */
+        std::string field_name,            /**< [in] name of the variable in the netcdf file */
+        std::string field_suffix,          /**< [in] name of the variable in the netcdf file */
+        //const char * field_name,            /**< [in] name of the variable in the netcdf file */
         size_t * start,                     /**< [in] starting indices for the write */
         size_t * count,                     /**< [in] size of the write in each dimension */
         const char * filename,              /**< [in] name of the netcdf file */
@@ -31,7 +33,7 @@ void write_integral_to_post(
 
     // Get the variable ID for the field
     int field_varid;
-    retval = nc_inq_varid(ncid, field_name, &field_varid );
+    retval = nc_inq_varid(ncid, (field_name + field_suffix).c_str(), &field_varid );
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Write the integral for each region
@@ -49,6 +51,7 @@ void write_integral_to_post(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "  - wrote %s to %s -\n", field_name, filename); }
+    if (wRank == 0) { fprintf(stdout, "  - wrote %s to %s -\n", 
+            (field_name + field_suffix).c_str(), filename); }
     #endif
 }

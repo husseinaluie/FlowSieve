@@ -48,6 +48,12 @@ void read_attr_from_file(
 
     nc_get_att(ncid, var_id, attrname, &attr);
 
+    #if DEBUG >= 1
+    if (wRank == 0) {
+        fprintf(stdout, "    %s = %g\n", attr_name, attr);
+    }
+    #endif
+
     MPI_Barrier(comm);
     retval = nc_close(ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
