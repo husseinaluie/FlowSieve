@@ -61,13 +61,9 @@ void filtering(
 
     std::vector<double> local_kernel(Nlat * Nlon);
 
-    std::vector<double> u_x(num_pts);
-    std::vector<double> u_y(num_pts);
-    std::vector<double> u_z(num_pts);
+    std::vector<double> u_x(num_pts), u_y(num_pts), u_z(num_pts);
+    std::vector<double> coarse_u_r(num_pts), coarse_u_lon(num_pts), coarse_u_lat(num_pts);
 
-    std::vector<double> coarse_u_r(  num_pts);
-    std::vector<double> coarse_u_lon(num_pts);
-    std::vector<double> coarse_u_lat(num_pts);
     if (not(constants::NO_FULL_OUTPUTS)) {
         vars_to_write.push_back("coarse_u_r");
         vars_to_write.push_back("coarse_u_lon");
@@ -80,7 +76,7 @@ void filtering(
     //   (although we will still be on a spherical
     //     coordinate system)
     int index, mask_index, Itime, Idepth, Ilat, Ilon, tid;
-    #pragma omp parallel private(Itime, Idepth, Ilat, Ilon, index, mask_index)
+    #pragma omp parallel private(Itime, Idepth, Ilat, Ilon, index)
     {
         #pragma omp for collapse(4) schedule(guided)
         for (Itime = 0; Itime < Ntime; Itime++) {
@@ -92,10 +88,7 @@ void filtering(
                         index = Index(Itime, Idepth, Ilat, Ilon,
                                       Ntime, Ndepth, Nlat, Nlon);
 
-                        mask_index = Index(0,     0,      Ilat, Ilon,
-                                           Ntime, Ndepth, Nlat, Nlon);
-
-                        if (mask.at(mask_index) == 1) { // Skip land areas
+                        if (mask.at(index) == 1) { // Skip land areas
                             vel_Spher_to_Cart(     
                                 u_x.at(index),      
                                 u_y.at(index),      
@@ -344,7 +337,7 @@ void filtering(
         firstprivate(perc, wRank, local_kernel, perc_count)
         {
 
-            filtered_vals.resize(0);
+            filtered_vals.clear();
 
             filtered_vals.push_back(&u_x_tmp);
             filtered_vals.push_back(&u_y_tmp);
@@ -363,7 +356,7 @@ void filtering(
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
                 for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
-                    get_lat_bounds(LAT_lb, LAT_ub, latitude, Ilat, scale); 
+                    get_lat_bounds(LAT_lb, LAT_ub, latitude,  Ilat, scale); 
                     mask_index = Index(0,     0,      Ilat, Ilon,
                                        Ntime, Ndepth, Nlat, Nlon);
 
@@ -384,9 +377,11 @@ void filtering(
                     if (mask.at(mask_index) == 1) { // Skip land areas
 
                         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+                        std::fill(local_kernel.begin(), local_kernel.end(), 0);
                         compute_local_kernel(
                                 local_kernel, scale, longitude, latitude,
-                                Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                                Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
+                                LAT_lb, LAT_ub);
                         if (constants::DO_TIMING) { 
                             timing_records.add_to_record(MPI_Wtime() - clock_on,
                                    "kernel_precomputation");
