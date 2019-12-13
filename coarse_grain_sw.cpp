@@ -11,6 +11,7 @@
 
 #include "netcdf_io.hpp"
 #include "functions.hpp"
+#include "functions_sw.hpp"
 #include "constants.hpp"
 
 int main(int argc, char *argv[]) {
@@ -44,8 +45,9 @@ int main(int argc, char *argv[]) {
     //   include scales as a comma-separated list
     //   scales are given in metres
     // A zero scale will cause everything to nan out
-    const double Lx = 25e3;
-    std::vector<double> filter_scales { 10., 0.1*Lx, 0.25*Lx };
+    double Lx = 25e3;
+    //read_attr_from_file(Lx, "Lx", "input.nc");
+    std::vector<double> filter_scales { 10., 0.01*Lx, 0.05*Lx, 0.1*Lx, 0.25*Lx, 0.5*Lx };
 
     // Parse command-line flags
     char buffer [50];
@@ -77,7 +79,7 @@ int main(int argc, char *argv[]) {
     MPI_Barrier(MPI_COMM_WORLD);
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
-    #if DEBUG >= 2
+    #if DEBUG >= 1
     int tid, nthreads;
     #pragma omp parallel default(none) private(tid, nthreads) \
         shared(stdout) firstprivate(wRank, wSize)
@@ -121,6 +123,19 @@ int main(int argc, char *argv[]) {
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
+    // Read layer densities
+    double rho0, rho1;
+    read_attr_from_file(rho0, "rho0", "input.nc", NULL);
+    read_attr_from_file(rho1, "rho1", "input.nc", NULL);
+    const std::vector<double> rho_vec { rho0, rho1 };
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf(stdout, "rho0 = %g, rho1 = %g\n\n", rho0, rho1); }
+    #endif
+
+    // Get viscosity
+    double nu;
+    read_attr_from_file(nu, "nu", "input.nc", NULL);
+
     // Compute the area of each 'cell'
     //   which will be necessary for integration
     #if DEBUG >= 1
@@ -131,10 +146,10 @@ int main(int argc, char *argv[]) {
     compute_areas(areas, longitude, latitude);
 
     // Now pass the arrays along to the filtering routines
-    filtering_sw(u, v, h,
-              filter_scales, areas, 
-              time, depth, longitude, latitude,
-              mask, myCounts, myStarts);
+    filtering_sw_2L(u, v, h,
+            rho_vec, nu, filter_scales, areas, 
+            time, depth, longitude, latitude,
+            mask, myCounts, myStarts);
 
     // Done!
     fprintf(stdout, "Processor %d / %d waiting to finalize.\n", wRank + 1, wSize);

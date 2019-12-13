@@ -40,8 +40,7 @@ int main(int argc, char *argv[]) {
     //   and initialize the MPI world
     int thread_safety_provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_safety_provided);
-    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI::ERRORS_THROW_EXCEPTIONS);
-    //MPI_Status status;
+    //MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI::ERRORS_THROW_EXCEPTIONS);
     const double start_time = MPI_Wtime();
 
     int wRank=-1, wSize=-1;
@@ -52,7 +51,12 @@ int main(int argc, char *argv[]) {
     //   include scales as a comma-separated list
     //   scales are given in metres
     // A zero scale will cause everything to nan out
-    std::vector<double> filter_scales { 100e3 };
+    std::vector<double> filter_scales { 
+        1e3, 1.58e3, 2.51e3, 3.98e3, 6.31e3,
+        1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
+        1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
+        1e6, 1.58e6, 2.51e6, 3.98e6, 6.31e6,
+    };
 
     // Parse command-line flags
     char buffer [50];
@@ -77,6 +81,7 @@ int main(int argc, char *argv[]) {
         fprintf(stdout, "  Version %d.%d.%d \n", 
                 MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
         fprintf(stdout, "\n");
+        fflush(stdout);
     }
     #endif
 
@@ -87,6 +92,7 @@ int main(int argc, char *argv[]) {
         } else {
             fprintf(stdout, "Using spherical coordinates.\n");
         }
+        fflush(stdout);
     }
     #endif
     MPI_Barrier(MPI_COMM_WORLD);
@@ -104,21 +110,12 @@ int main(int argc, char *argv[]) {
         fprintf(stdout, "Hello from thread %d of %d on processor %d of %d.\n", 
                 tid+1, nthreads, wRank+1, wSize);
     }
+    fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
     #endif
 
-    std::vector<double> longitude;
-    std::vector<double> latitude;
-    std::vector<double> time;
-    std::vector<double> depth;
-
-    std::vector<double> u_r;
-    std::vector<double> u_lon;
-    std::vector<double> u_lat;
-
-    std::vector<double> rho;
-    std::vector<double> p;
-
+    std::vector<double> longitude, latitude, time, depth;
+    std::vector<double> u_r, u_lon, u_lat, rho, p;
     std::vector<double> mask;
     std::vector<int> myCounts, myStarts;
     size_t II;
@@ -154,10 +151,19 @@ int main(int argc, char *argv[]) {
         read_var_from_file(p,   "p",   "input.nc");
     }
 
-    //const int Ntime  = time.size();
-    //const int Ndepth = depth.size();
+    const int Ntime  = time.size();
+    const int Ndepth = depth.size();
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
+
+    #if DEBUG >= 1
+    fprintf(stdout, "Processor %d has (%d, %d, %d, %d) from (%d, %d, %d, %d)\n", 
+            wRank, 
+            myCounts[0], myCounts[1], myCounts[2], myCounts[3],
+            Ntime, Ndepth, Nlat, Nlon);
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
+    #endif
 
     if (not(constants::CARTESIAN)) {
         // Convert coordinate to radians
@@ -189,12 +195,9 @@ int main(int argc, char *argv[]) {
 
     // Now pass the arrays along to the filtering routines
     const double pre_filter_time = MPI_Wtime();
-    filtering(u_r, u_lon, u_lat,
-              rho, p,
-              filter_scales,
-              areas, 
-              time, depth,
-              longitude, latitude,
+    filtering(u_r, u_lon, u_lat, rho, p,
+              filter_scales, areas, 
+              time, depth, longitude, latitude,
               mask, myCounts, myStarts);
     const double post_filter_time = MPI_Wtime();
 

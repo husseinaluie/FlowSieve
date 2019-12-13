@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <string>
+#include <map>
 #include <mpi.h>
 #include "constants.hpp"
 
@@ -79,8 +81,10 @@ void compute_local_kernel(
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
         const int ref_ilat, const int ref_ilon,
-        const int Ntime, const int Ndepth,
-        const int Nlat,  const int Nlon);
+        const int Ntime,    const int Ndepth,
+        const int Nlat,     const int Nlon,
+        const int LAT_lb,   const int LAT_ub);
+
 
 /*!
  * \brief Convert single spherical velocity to Cartesian velocity
@@ -150,22 +154,6 @@ void filtering(const std::vector<double> & u_r,
                const std::vector<int>    & myCounts,
                const std::vector<int>    & myStarts,
                const MPI_Comm comm = MPI_COMM_WORLD);
-
-
-void filtering_sw(
-        const std::vector<double> & u, 
-        const std::vector<double> & v, 
-        const std::vector<double> & h,
-        const std::vector<double> & scales, 
-        const std::vector<double> & dAreas, 
-        const std::vector<double> & time, 
-        const std::vector<double> & depth,
-        const std::vector<double> & longitude, 
-        const std::vector<double> & latitude,
-        const std::vector<double> & mask,
-        const std::vector<int>    & myCounts,
-        const std::vector<int>    & myStarts,
-        const MPI_Comm comm = MPI_COMM_WORLD);
 
 /*!
  * \brief Alternate filtering driver for subsetting
@@ -238,6 +226,11 @@ void apply_filter_at_point(
  * \brief Primary kernel function coarse-graining procedure (G in publications)
  */
 double kernel(const double distance, const double scale);
+
+/*!
+ * \brief Compute alpha value for kernel (for baroclinic transfer)
+ */
+double kernel_alpha(void);
 
 /*!
  * \brief Compute the vorticity at a given point.

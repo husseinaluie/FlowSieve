@@ -59,7 +59,7 @@ namespace constants
      * \brief Differentiation order for finite differencing (currently must be 2, 4, or 6).
      * @ingroup constants
      */
-    const int DiffOrd = 2;
+    const int DiffOrd = 4;
 
     /*!
      * \param fill_value
@@ -148,9 +148,18 @@ namespace constants
     const bool NO_FULL_OUTPUTS = true;
 
     /*!
+     * \param CAST_TO_SINGLE
+     * \brief Boolean indicating if user wants to cast to float (single) output
+     * (reduces output size by factor 2, but also reduces precision)
+     *
+     * @ingroup constants
+     */
+    const bool CAST_TO_SINGLE = false;
+
+    /*!
      * \param CAST_TO_INT
      * \brief Boolean indicating if user wants to cast to int output
-     * (reduces output size by factor 2, but also reduces precision)
+     * (further reduces output size by factor 2, but also reduces precision)
      *
      * @ingroup constants
      */
@@ -161,7 +170,7 @@ namespace constants
      * \brief Boolean indicating if we want to output internal timings
      * @ingroup constants
      */
-    const bool DO_TIMING = false;
+    const bool DO_TIMING = true;
 
     /*!
      * \param APPLY_POSTPROCESS
