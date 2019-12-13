@@ -19,6 +19,7 @@ void spher_derivative_at_point(
         const int Nlat,
         const int Nlon,
         const std::vector<double> & mask,
+        const int order_of_deriv,
         const int diff_ord
         ) {
 
@@ -56,7 +57,8 @@ void spher_derivative_at_point(
     const int UUB = periodic ? Iref + Nref : Nref - 1 ;
 
     // Differentiation vector
-    std::vector<double> ddl(diff_ord + 1);
+    const int num_deriv_pts = diff_ord + order_of_deriv;
+    std::vector<double> ddl(num_deriv_pts);
 
     // Assuming uniform grid
     const double dl = grid.at(1) - grid.at(0);
@@ -99,22 +101,22 @@ void spher_derivative_at_point(
     //     when determining logical indices.
 
     // We've possibly made too large of a stencil, so now collapse it back down
-    while (UB - LB > diff_ord) {
+    while (UB - LB + 1 > num_deriv_pts) {
         if ((UB - Iref > Iref - LB) and (UB >= Iref)) { UB--; }
         else { LB++; }
     }
 
     // We're including LB and UB in our stencil, so the stencil
     //   has UB - LB + 1 points. The requisit number of points is
-    //   diff_ord + 1.
+    //   num_deriv_pts.
     // Again, lower case (ind) will be the periodicty-adjusted value
     int ind; 
-    if (UB - LB + 1 == diff_ord + 1) {
+    if (UB - LB + 1 == num_deriv_pts) {
         // If we have enough cells for differentiation, do it
         if ( do_lon or (constants::UNIFORM_LAT_GRID)) {
             // Since we're on a uniform grid, we can use pre-computed
             //   differentiation coefficients
-            differentiation_vector(ddl, dl, Iref - LB, diff_ord);
+            differentiation_vector(ddl, dl, Iref - LB, order_of_deriv, diff_ord);
         } else {
             // We're on a non-uniform grid, so we can guarantee the
             //   differentiation coefficients a priori, so we need
@@ -150,6 +152,6 @@ void spher_derivative_at_point(
                 deriv_vals, fields, grid, dim,
                 Itime, Idepth, Ilat, Ilon,
                 Ntime, Ndepth, Nlat, Nlon,
-                mask, diff_ord - 2);
+                mask, order_of_deriv, diff_ord - 2);
     }
 }

@@ -21,7 +21,9 @@ void Cart_derivatives_at_point(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<double> & mask,
+        const int order_of_deriv,
+        const int diff_ord
         ) {
 
     // Confirm that input sizes match
@@ -45,12 +47,12 @@ void Cart_derivatives_at_point(
     spher_derivative_at_point(
         dfields_dlon_p, fields, longitude, "lon",
         Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
-        mask);
+        mask, order_of_deriv, diff_ord);
 
     spher_derivative_at_point(
         dfields_dlat_p, fields, latitude, "lat",
         Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
-        mask);
+        mask, order_of_deriv, diff_ord);
 
     // Define conversion coefficients
     double cx_lon, cx_lat, 
