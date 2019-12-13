@@ -15,6 +15,7 @@ const std::vector< bool(*)(double, double) > RegionTest::all_regions = {
 };
 
 // MUST BE IN THE SAME ORDER AS ABOVE!!!
+//   name length should not exceed 20 characters
 const std::vector< std::string > RegionTest::region_names = {
     "Global", 
     "Gulf_of_Mexico",
@@ -63,7 +64,7 @@ bool RegionTest::GulfStream(double latitude, double longitude){
 bool RegionTest::Equator(double latitude, double longitude){
     const double lat = latitude * R2D;
 
-    if ( fabs(lat) < 13 ) { return true;  }
+    if ( fabs(lat) < 15 ) { return true;  }
     else                  { return false; }
 
 }
@@ -73,7 +74,7 @@ bool RegionTest::Equator(double latitude, double longitude){
 bool RegionTest::NorthofEquator(double latitude, double longitude){
     const double lat = latitude * R2D;
 
-    if ( lat >= 13 ) { return true;  }
+    if ( lat >= 15 ) { return true;  }
     else             { return false; }
 }
 
@@ -82,7 +83,7 @@ bool RegionTest::NorthofEquator(double latitude, double longitude){
 bool RegionTest::SouthofEquator(double latitude, double longitude){
     const double lat = latitude * R2D;
 
-    if ( lat <= -13 ) { return true;  }
+    if ( lat <= -15 ) { return true;  }
     else              { return false; }
 }
 
