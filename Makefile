@@ -44,6 +44,10 @@ NETCDF_IO_OBJS := $(addprefix NETCDF_IO/,$(notdir $(NETCDF_IO_CPPS:.cpp=.o)))
 FUNCTIONS_CPPS := $(wildcard Functions/*.cpp)
 FUNCTIONS_OBJS := $(addprefix Functions/,$(notdir $(FUNCTIONS_CPPS:.cpp=.o)))
 
+# Get list of SW cpp files
+SW_TOOL_CPPS := $(wildcard Functions/SW_Tools/*.cpp)
+SW_TOOL_OBJS := $(addprefix Functions/SW_Tools/,$(notdir $(SW_TOOL_CPPS:.cpp=.o)))
+
 # Get list of differentation cpp files
 DIFF_TOOL_CPPS := $(wildcard Functions/Differentiation_Tools/*.cpp)
 DIFF_TOOL_OBJS := $(addprefix Functions/Differentiation_Tools/,$(notdir $(DIFF_TOOL_CPPS:.cpp=.o)))
@@ -79,6 +83,7 @@ clean:
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
+	rm -f Functions/SW_Tools/*.o 
 	rm -f Functions/Interface_Tools/*.o 
 	rm -f Functions/FFTW_versions/*.o 
 	rm -f Tests/*.o 
@@ -90,6 +95,7 @@ hardclean:
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
+	rm -f Functions/SW_Tools/*.o 
 	rm -f Tests/*.[o,x] 
 	rm -f Functions/Interface_Tools/*.o 
 	rm -f Functions/FFTW_versions/*.o 
@@ -125,6 +131,9 @@ CORE_OBJS := ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} ${POSTPROCESS
 $(CORE_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
+$(SW_TOOL_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
 $(INTERFACE_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
@@ -141,13 +150,23 @@ $(PREPROCESS_OBJS): %.o : %.cpp constants.hpp
 #
 
 # Group together executables with similar compilations
-CORE_TARGET_EXES := coarse_grain.x integrator.x coarse_grain_sw.x coarse_grain_subset.x
-CORE_TARGET_OBJS := coarse_grain.o integrator.o coarse_grain_sw.o coarse_grain_subset.o
+CORE_TARGET_EXES := coarse_grain.x integrator.x coarse_grain_subset.x
+CORE_TARGET_OBJS := coarse_grain.o integrator.o coarse_grain_subset.o
 
 $(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 $(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} %.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
+
+# Building shallow water
+SW_TARGET_EXES := coarse_grain_sw.x
+SW_TARGET_OBJS := coarse_grain_sw.o 
+
+$(SW_TARGET_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+$(SW_TARGET_EXES): %.x : ${SW_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building test scripts
