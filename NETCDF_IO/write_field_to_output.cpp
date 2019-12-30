@@ -41,7 +41,13 @@ void write_field_to_output(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     std::vector<signed short> reduced_field; 
-    double add_offset, scale_factor;
+    std::vector<double> output_field;
+    int index;
+    double fmin, fmax, fmiddle, frange = 0, 
+           fmin_loc = 1e100, fmax_loc = -1e100, add_offset, scale_factor;
+    double max_val =   constants::fill_value < 0 
+                     ? constants::fill_value + 2 
+                     : constants::fill_value - 2;
     if (constants::CAST_TO_INT) {
         // If we want to reduce output size, pack into short ints
         //   floats are 32bit, short ints are 16bit, so we can cut
@@ -62,11 +68,11 @@ void write_field_to_output(
 
         // We need to record the scale and translation used to encode in signed shorts
         retval = nc_put_att_double(
-                ncid, field_varid, "scale_factor", NC_FLOAT, 1, &scale_factor);
+                ncid, field_varid, "scale_factor", NC_DOUBLE, 1, &scale_factor);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
         retval = nc_put_att_double(
-                ncid, field_varid, "add_offset", NC_FLOAT, 1, &add_offset);
+                ncid, field_varid, "add_offset",   NC_DOUBLE, 1, &add_offset);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
         retval = nc_put_vara_short(ncid, field_varid, start, count, &reduced_field[0]);
@@ -74,8 +80,52 @@ void write_field_to_output(
 
     } else {
 
+        // Get the median value to let us use offsets
+        #pragma omp parallel \
+        default(none) shared(field, mask) private(index) \
+        reduction(max : fmax_loc) reduction(min : fmin_loc)
+        {
+            #pragma omp for collapse(1) schedule(guided)
+            for (index = 0; index < (int) field.size(); index++) {
+                if (mask->at(index) == 1) {
+                    fmax_loc = std::max(fmax_loc, field.at(index));
+                    fmin_loc = std::min(fmin_loc, field.at(index));
+                }
+            }
+        }
+        MPI_Allreduce(&fmax_loc, &fmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+        MPI_Allreduce(&fmin_loc, &fmin, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+        fmiddle = 0.5 * ( fmax + fmin );
+        frange  = fmax - fmin;
+
+        scale_factor = frange / max_val;
+
+        retval = nc_put_att_double(
+                ncid, field_varid, "scale_factor", NC_DOUBLE, 1, &scale_factor);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+        retval = nc_put_att_double(ncid, field_varid, 
+                        "add_offset", NC_DOUBLE, 1, &fmiddle);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+        output_field.resize(field.size());
+        #pragma omp parallel \
+        default(none) shared(output_field, field, mask, fmiddle, scale_factor) \
+        private(index)
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for (index = 0; index < (int) field.size(); index++) {
+                if (mask->at(index) == 1) {
+                    output_field.at(index) = ( field.at(index) - fmiddle ) / scale_factor;
+                } else {
+                    output_field.at(index) = constants::fill_value;
+                }
+            }
+        }
+
         // Otherwise, just write the 32-bit float field to the file
-        retval = nc_put_vara_double(ncid, field_varid, start, count, &field[0]);
+        retval = nc_put_vara_double(ncid, field_varid, start, count, &output_field[0]);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     }
