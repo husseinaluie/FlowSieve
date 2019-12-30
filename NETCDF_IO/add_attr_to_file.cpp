@@ -8,7 +8,7 @@ void add_attr_to_file(
         const char * varname,
         const double value,
         const char * filename,
-        const MPI_Comm comm                     /**< [in] MPI Communicator */
+        const MPI_Comm comm
         ) {
 
     int wRank=-1, wSize=-1;

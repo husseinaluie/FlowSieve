@@ -56,7 +56,8 @@ void initialize_output_file(
         const std::vector<std::string> & vars,
         const char * filename,
         const double filter_scale,
-        MPI_Comm = MPI_COMM_WORLD);
+        MPI_Comm = MPI_COMM_WORLD
+        );
 
 void initialize_subset_file(
         const std::vector<double> & time,
@@ -66,7 +67,8 @@ void initialize_subset_file(
         const std::vector<std::string> & vars,
         const char * filename,
         const double filter_scale,
-        MPI_Comm = MPI_COMM_WORLD);
+        MPI_Comm = MPI_COMM_WORLD
+        );
 
 void initialize_postprocess_file(
         const std::vector<double> & time,
@@ -77,7 +79,8 @@ void initialize_postprocess_file(
         const std::vector<std::string> & int_vars,
         const char * filename,
         const double & filter_scale,
-        const MPI_Comm comm = MPI_COMM_WORLD);
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
 
 /*!
  * \brief Write on scales worth of a single field.
@@ -96,7 +99,8 @@ void write_field_to_output(
         const size_t * count,
         const char * filename,
         const std::vector<double> * mask = NULL,
-        MPI_Comm = MPI_COMM_WORLD);
+        MPI_Comm = MPI_COMM_WORLD
+        );
 
 void write_integral_to_post(
         const std::vector<
@@ -150,7 +154,8 @@ void read_var_from_file(
         std::vector<int> *myCounts = NULL,
         std::vector<int> *myStarts = NULL,
         const bool do_splits = true,
-        const MPI_Comm = MPI_COMM_WORLD );
+        const MPI_Comm = MPI_COMM_WORLD 
+        );
 
 
 
@@ -159,7 +164,8 @@ void read_attr_from_file(
         const char * attr_name,
         const char * filename,
         const char * var_name = NULL,
-        const MPI_Comm comm = MPI_COMM_WORLD );
+        const MPI_Comm comm = MPI_COMM_WORLD 
+        );
 
 
 /*!
@@ -200,6 +206,8 @@ void package_field(
         double & scale_factor,
         double & add_offset,
         const std::vector<double> & original,
-        const std::vector<double> * mask);
+        const std::vector<double> * mask,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
 
 #endif

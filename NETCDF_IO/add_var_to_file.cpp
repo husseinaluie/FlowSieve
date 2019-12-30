@@ -18,13 +18,9 @@ void add_var_to_file(
                  );
 
     int datatype;
-    if (constants::CAST_TO_SINGLE) {
-        datatype = NC_FLOAT;
-    } else if (constants::CAST_TO_INT) {
-        datatype = NC_SHORT;
-    } else {
-        datatype = NC_DOUBLE;
-    }
+    if      (constants::CAST_TO_SINGLE) { datatype = NC_FLOAT;  }
+    else if (constants::CAST_TO_INT   ) { datatype = NC_SHORT;  }
+    else                                { datatype = NC_DOUBLE; }
 
     // Open the NETCDF file
     int FLAG = NC_WRITE;

@@ -482,7 +482,7 @@ void Apply_Postprocess_Routines(
         }
         write_time_average_to_post(time_average.at(Ifield), vars_to_process.at(Ifield), 
                 "_time_average", start, count, filename);
-        write_time_average_to_post(time_average.at(Ifield), vars_to_process.at(Ifield), 
+        write_time_average_to_post(time_std_dev.at(Ifield), vars_to_process.at(Ifield), 
                 "_time_std_dev", start, count, filename);
     }
 }
