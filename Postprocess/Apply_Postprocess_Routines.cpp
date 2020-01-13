@@ -19,6 +19,7 @@ void Apply_Postprocess_Routines(
         const std::vector<double> & energy_transfer, 
         const std::vector<double> & lambda_m, 
         const std::vector<double> & PEtoKE,
+        const std::vector<double> & div_vel,
         const std::vector<double> & time,
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
@@ -62,6 +63,7 @@ void Apply_Postprocess_Routines(
         vars_to_process.push_back("lambda_m");
         vars_to_process.push_back("PEtoKE");
     }
+    vars_to_process.push_back("div_vel");
 
     initialize_postprocess_file(
             time, depth, latitude, longitude, 
@@ -92,6 +94,9 @@ void Apply_Postprocess_Routines(
     std::vector<double> field_values(num_fields, 0.);
 
     // Compute the area of each region
+    if (wRank == 0) { fprintf(stdout, "  .. computing the area of each region\n"); }
+    fflush(stdout);
+
     double dA, tmp, local_area;
     int Ifield, Ilat, Ilon, Itime, Idepth, Iregion, 
         area_index, int_index, ave_index;
@@ -137,13 +142,16 @@ void Apply_Postprocess_Routines(
 
 
     // Compute region averages
+    if (wRank == 0) { fprintf(stdout, "  .. computing region integrals\n"); }
+    fflush(stdout);
+
     #pragma omp parallel default(none)\
     private(Ifield, Ilat, Ilon, Itime, Idepth, Iregion, \
             index, tmp, dA, area_index, int_index )\
     shared(latitude, longitude, energy_transfer, \
             coarse_u_r, coarse_u_lon, coarse_u_lat, \
             areas, mask, field_averages, field_values, region_areas, \
-            lambda_m, PEtoKE, div_J, vars_to_process)
+            lambda_m, PEtoKE, div_J, div_vel, vars_to_process)
     { 
 
         #pragma omp for collapse(1) schedule(dynamic)
@@ -177,7 +185,10 @@ void Apply_Postprocess_Routines(
                         tmp = lambda_m.at(index);
                     } else if (vars_to_process.at(Ifield) == "PEtoKE") {
                         tmp = PEtoKE.at(index);
+                    } else if (vars_to_process.at(Ifield) == "div_vel") {
+                        tmp = div_vel.at(index);
                     }
+
 
                     field_values.at(Ifield) = tmp;
 
@@ -200,13 +211,16 @@ void Apply_Postprocess_Routines(
     }
 
     // Now that we have region averages, get region standard deviations
+    if (wRank == 0) { fprintf(stdout, "  .. computing region standard deviations\n"); }
+    fflush(stdout);
+
     #pragma omp parallel default(none)\
     private(Ifield, Ilat, Ilon, Itime, Idepth, Iregion, \
             index, tmp, dA, area_index, int_index )\
     shared(latitude, longitude, energy_transfer, \
             coarse_u_r, coarse_u_lon, coarse_u_lat, \
             areas, mask, field_averages, field_std_devs, field_values, \
-            lambda_m, PEtoKE, div_J, region_areas, vars_to_process) 
+            lambda_m, PEtoKE, div_J, div_vel, region_areas, vars_to_process) 
     { 
         #pragma omp for collapse(1) schedule(dynamic)
         for (index = 0; index < energy_transfer.size(); index++) {
@@ -239,6 +253,8 @@ void Apply_Postprocess_Routines(
                         tmp = lambda_m.at(index);
                     } else if (vars_to_process.at(Ifield) == "PEtoKE") {
                         tmp = PEtoKE.at(index);
+                    } else if (vars_to_process.at(Ifield) == "div_vel") {
+                        tmp = div_vel.at(index);
                     }
 
                     field_values.at(Ifield) = tmp;
@@ -276,6 +292,8 @@ void Apply_Postprocess_Routines(
         }
     }
 
+    if (wRank == 0) { fprintf(stdout, "  .. writing region averages and deviations\n"); }
+    fflush(stdout);
 
     // Dimension order: time - depth - region
     size_t start[3], count[3];
@@ -287,12 +305,17 @@ void Apply_Postprocess_Routines(
 
     count[2] = 1;
 
-    for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
+    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
         write_integral_to_post(field_averages.at(Ifield), vars_to_process.at(Ifield), 
                 "_avg", start, count, filename);
         write_integral_to_post(field_std_devs.at(Ifield), vars_to_process.at(Ifield), 
                 "_std", start, count, filename);
+
+        if (wRank == 0) { fprintf(stdout, "  .. .. wrote field index %d\n", Ifield); }
+        fflush(stdout);
     }
+    if (wRank == 0) { fprintf(stdout, "  .. done writing fields %d\n", Ifield); }
+    fflush(stdout);
 
     // Write the region areas (needed for reference, etc)
     size_t start_r[1], count_r[1];
@@ -300,16 +323,29 @@ void Apply_Postprocess_Routines(
     count_r[0] = (size_t) num_regions;
     write_field_to_output(region_areas, "region_areas", start_r, count_r, filename, NULL);
 
+    if (wRank == 0) { fprintf(stdout, "  .. .. wrote region areas\n"); }
+    fflush(stdout);
+
     // Write region names
     //   this has to be done separately for reasons
     write_regions_to_post(filename);
+
+    if (wRank == 0) { fprintf(stdout, "  .. .. wrote region names\n"); }
+    fflush(stdout);
 
 
     //
     //// Time averages
     //
 
-    // Time-average the domain integrals
+    if (wRank == 0) { fprintf(stdout, "  .. computing time-averages of fields\n"); }
+    fflush(stdout);
+
+    // Get full number of time points
+    int full_Ntime;
+    MPI_Allreduce(&Ntime, &full_Ntime, 1, MPI_INT, MPI_SUM, comm);
+
+    // Time-average the fields
     std::vector<std::vector<double>> 
         time_average_loc(num_fields), time_average(num_fields), 
         time_std_dev_loc(num_fields), time_std_dev(num_fields);
@@ -327,7 +363,8 @@ void Apply_Postprocess_Routines(
     shared(latitude, longitude, energy_transfer, \
             coarse_u_r, coarse_u_lon, coarse_u_lat, \
             areas, mask, time_average_loc,\
-            lambda_m, PEtoKE, div_J, vars_to_process)
+            lambda_m, PEtoKE, div_J, div_vel, vars_to_process,\
+            full_Ntime)
     { 
         #pragma omp for collapse(4) schedule(dynamic)
         for (Itime = 0; Itime < Ntime; ++Itime){
@@ -361,15 +398,18 @@ void Apply_Postprocess_Routines(
                                     tmp = lambda_m.at(index);
                                 } else if (vars_to_process.at(Ifield) == "PEtoKE") {
                                     tmp = PEtoKE.at(index);
+                                } else if (vars_to_process.at(Ifield) == "div_vel") {
+                                    tmp = div_vel.at(index);
                                 }
 
                                 // compute the time average for the part on this processor
-                                time_average_loc.at(Ifield).at(ave_index) += tmp;
+                                time_average_loc.at(Ifield).at(ave_index) 
+                                    += tmp / full_Ntime;
                             }
                         } else {
                             for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-                                time_average_loc.at(Ifield).at(ave_index) = 
-                                    Ntime * constants::fill_value;
+                                time_average_loc.at(Ifield).at(ave_index) 
+                                    += constants::fill_value / full_Ntime;
                             }
                         }
                     }
@@ -379,23 +419,26 @@ void Apply_Postprocess_Routines(
     }
 
     // Now communicate with other processors to get the full time average
+    if (wRank == 0) { fprintf(stdout, "  .. .. reducing across processors\n"); }
+    fflush(stdout);
+
     for (Ifield = 0; Ifield < num_fields; ++Ifield) {
         MPI_Allreduce(&(time_average_loc.at(Ifield)[0]),
                       &(time_average.at(    Ifield)[0]),
                       Ndepth * Nlat * Nlon, MPI_DOUBLE, MPI_SUM, comm);
     }
-    int full_Ntime;
-    MPI_Allreduce(&Ntime, &full_Ntime, 1, MPI_INT, MPI_SUM, comm);
-
 
     // Compute the standard deviation
+    if (wRank == 0) { fprintf(stdout, "  .. computing time standard deviations\n"); }
+    fflush(stdout);
+
     #pragma omp parallel default(none)\
     private(Ifield, Ilat, Ilon, Itime, Idepth, \
             index, tmp, ave_index )\
     shared(latitude, longitude, full_Ntime, wSize, energy_transfer, \
             coarse_u_r, coarse_u_lon, coarse_u_lat, \
             areas, mask, time_average_loc, time_std_dev_loc, time_average, \
-            lambda_m, PEtoKE, div_J, vars_to_process)
+            lambda_m, PEtoKE, div_J, div_vel, vars_to_process)
     { 
         #pragma omp for collapse(4) schedule(dynamic)
         for (Itime = 0; Itime < Ntime; ++Itime){
@@ -429,6 +472,8 @@ void Apply_Postprocess_Routines(
                                     tmp = lambda_m.at(index);
                                 } else if (vars_to_process.at(Ifield) == "PEtoKE") {
                                     tmp = PEtoKE.at(index);
+                                } else if (vars_to_process.at(Ifield) == "div_vel") {
+                                    tmp = div_vel.at(index);
                                 }
 
                                 // compute the time average for the part on this processor
@@ -438,8 +483,8 @@ void Apply_Postprocess_Routines(
                             }
                         } else {
                             for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-                                time_std_dev_loc.at(Ifield).at(ave_index) = 
-                                    pow(constants::fill_value, 2.) / wSize;
+                                // We'll handle these later to avoid over-flow issues
+                                time_std_dev_loc.at(Ifield).at(ave_index) = 0.; 
                             }
                         }
                     }
@@ -448,11 +493,33 @@ void Apply_Postprocess_Routines(
         }
     }
 
+    if (wRank == 0) { fprintf(stdout, "  .. writing time averages and deviations\n"); }
+    fflush(stdout);
+
     // Now communicate with other processors to get the full time average
     for (Ifield = 0; Ifield < num_fields; ++Ifield) {
         MPI_Allreduce(&(time_std_dev_loc.at(Ifield)[0]),
                       &(time_std_dev.at(    Ifield)[0]),
                       Ndepth * Nlat * Nlon, MPI_DOUBLE, MPI_SUM, comm);
+    }
+
+    // Re-mask to fill in land areas / apply sqrt to water
+    for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
+        #pragma omp parallel default(none)\
+        private(index)\
+        shared(Ifield, time_average, time_std_dev, full_Ntime, mask)
+        { 
+            #pragma omp for collapse(1) schedule(dynamic)
+            for (index = 0; index < time_average.at(Ifield).size(); ++index) {
+                if (mask.at(index) == 1) { 
+                    time_std_dev.at(Ifield).at(index) = 
+                        sqrt(time_std_dev.at(Ifield).at(index));
+                } else {
+                    time_std_dev.at(Ifield).at(index) = constants::fill_value;
+                    time_average.at(Ifield).at(index) = constants::fill_value;
+                }
+            }
+        }
     }
 
 
@@ -468,18 +535,6 @@ void Apply_Postprocess_Routines(
     count[2] = Nlon;
 
     for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
-        // Scale by full_Ntime
-        #pragma omp parallel default(none)\
-        private(index)\
-        shared(Ifield, time_average, time_std_dev, full_Ntime, mask)
-        { 
-            #pragma omp for collapse(1) schedule(dynamic)
-            for (index = 0; index < time_average.at(Ifield).size(); ++index) {
-                time_average.at(Ifield).at(index) *= 1./full_Ntime;
-                time_std_dev.at(Ifield).at(index) *= 
-                    sqrt(time_std_dev.at(Ifield).at(index));
-            }
-        }
         write_time_average_to_post(time_average.at(Ifield), vars_to_process.at(Ifield), 
                 "_time_average", start, count, filename);
         write_time_average_to_post(time_std_dev.at(Ifield), vars_to_process.at(Ifield), 
