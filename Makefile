@@ -60,6 +60,10 @@ INTERFACE_OBJS := $(addprefix Functions/Interface_Tools/,$(notdir $(INTERFACE_CP
 FFT_BASED_CPPS := $(wildcard Functions/FFTW_versions/*.cpp)
 FFT_BASED_OBJS := $(addprefix Functions/FFTW_versions/,$(notdir $(FFT_BASED_CPPS:.cpp=.o)))
 
+# Get list of toroidal projection files
+TOROIDAL_CPPS := $(wildcard Functions/Toroidal_Projection/*.cpp)
+TOROIDAL_OBJS := $(addprefix Functions/Toroidal_Projection/,$(notdir $(TOROIDAL_CPPS:.cpp=.o)))
+
 # Get list of ALGLIB object files
 ALGLIB_CPPS := $(wildcard ALGLIB/*.cpp)
 ALGLIB_OBJS := $(addprefix ALGLIB/,$(notdir $(ALGLIB_CPPS:.cpp=.o)))
@@ -131,6 +135,9 @@ CORE_OBJS := ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} ${POSTPROCESS
 $(CORE_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
+$(TOROIDAL_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
 $(SW_TOOL_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
@@ -167,6 +174,16 @@ $(SW_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 $(SW_TARGET_EXES): %.x : ${SW_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS} %.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
+
+# Building toroidal projection
+TOROID_TARGET_EXES := toroidal_projection.x
+TOROID_TARGET_OBJS := toroidal_projection.o
+
+$(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+$(TOROID_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${TOROIDAL_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building test scripts
