@@ -192,11 +192,8 @@ void filtering(
         coarse_u_y.resize(num_pts);
         coarse_u_z.resize(num_pts);
 
-        if (not(constants::MINIMAL_OUTPUT)) {
-            div.resize(num_pts);
-            vars_to_write.push_back("full_vel_div");
-            vars_to_write.push_back("coarse_vel_div");
-        }
+        div.resize(num_pts);
+        vars_to_write.push_back("coarse_vel_div");
 
         // Also an array for the transfer itself
         energy_transfer.resize(num_pts);
@@ -654,28 +651,18 @@ void filtering(
                 timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
             }
 
-            // Compute the divergence of the coarse field and full field (for comparison)
+            // Compute the divergence of the coarse field
+            //      but only output if not minimalized
+            #if DEBUG >= 1
+            if (wRank == 0) { fprintf(stdout, "Starting compute_div_vel (coarse)\n"); }
+            fflush(stdout);
+            #endif
+            compute_div_vel(div, coarse_u_x, coarse_u_y, coarse_u_z, 
+                    longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+
             if (not(constants::MINIMAL_OUTPUT)) {
-                #if DEBUG >= 1
-                if (wRank == 0) { fprintf(stdout, "Starting compute_div_vel (coarse)\n"); }
-                fflush(stdout);
-                #endif
-                compute_div_vel(div, coarse_u_x, coarse_u_y, coarse_u_z, 
-                        longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
                 if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                 write_field_to_output(div, "coarse_vel_div", starts, counts, fname, &mask);
-                if (constants::DO_TIMING) { 
-                    timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
-                }
-
-                #if DEBUG >= 1
-                if (wRank == 0) { fprintf(stdout, "Starting compute_div_vel (full)\n"); }
-                fflush(stdout);
-                #endif
-                compute_div_vel(div, u_x, u_y, u_z, longitude, latitude,
-                        Ntime, Ndepth, Nlat, Nlon, mask);
-                if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-                write_field_to_output(div, "full_vel_div", starts, counts, fname, &mask);
                 if (constants::DO_TIMING) { 
                     timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
                 }
@@ -748,10 +735,12 @@ void filtering(
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         if (constants::APPLY_POSTPROCESS) {
+            if (wRank == 0) { fprintf(stdout, "Beginning post-process routines\n"); }
+            fflush(stdout);
             Apply_Postprocess_Routines(
                     coarse_u_r, coarse_u_lon, coarse_u_lat, 
                     coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
-                    div_J, energy_transfer, lambda_m, PEtoKE,
+                    div_J, energy_transfer, lambda_m, PEtoKE, div,
                     time, depth, latitude, longitude,
                     mask, dAreas,
                     myCounts, myStarts,
