@@ -75,7 +75,7 @@ void write_field_to_output(
                 ncid, field_varid, "add_offset",   NC_DOUBLE, 1, &add_offset);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
-        retval = nc_put_vara_short(ncid, field_varid, start, count, &reduced_field[0]);
+        retval = nc_put_vara_short(ncid, field_varid, start, count, &(reduced_field[0]));
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     } else {
@@ -87,7 +87,7 @@ void write_field_to_output(
         {
             #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < (int) field.size(); index++) {
-                if (mask->at(index) == 1) {
+                if ( (mask == NULL) or (mask->at(index) == 1) ) {
                     fmax_loc = std::max(fmax_loc, field.at(index));
                     fmin_loc = std::min(fmin_loc, field.at(index));
                 }
@@ -100,6 +100,7 @@ void write_field_to_output(
         frange  = fmax - fmin;
 
         scale_factor = frange / max_val;
+        if (scale_factor < 1e-15) { scale_factor = 1.; }
 
         retval = nc_put_att_double(
                 ncid, field_varid, "scale_factor", NC_DOUBLE, 1, &scale_factor);
@@ -116,7 +117,7 @@ void write_field_to_output(
         {
             #pragma omp for collapse(1) schedule(static)
             for (index = 0; index < (int) field.size(); index++) {
-                if (mask->at(index) == 1) {
+                if ( (mask == NULL) or (mask->at(index) == 1) ) {
                     output_field.at(index) = ( field.at(index) - fmiddle ) / scale_factor;
                 } else {
                     output_field.at(index) = constants::fill_value;
@@ -125,7 +126,7 @@ void write_field_to_output(
         }
 
         // Otherwise, just write the 32-bit float field to the file
-        retval = nc_put_vara_double(ncid, field_varid, start, count, &output_field[0]);
+        retval = nc_put_vara_double(ncid, field_varid, start, count, &(output_field[0]));
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     }
