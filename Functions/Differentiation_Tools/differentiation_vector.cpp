@@ -1,5 +1,6 @@
 #include <vector>
 #include <math.h>
+#include <cassert>
 #include "../../differentiation_tools.hpp"
 #include "../../constants.hpp"
 
@@ -14,6 +15,17 @@ void differentiation_vector(
         const int order_of_deriv,
         const int diff_ord
         ) {
+
+    // Check that the diff_ord / order_of_deriv choice is valid
+    assert( (order_of_deriv == 1) or (order_of_deriv == 2) );
+    if (order_of_deriv == 1) {
+        // First order derivatives can have 2nd, 4th, or 6th order convergence
+        assert( (diff_ord == 2) or (diff_ord == 4) or (diff_ord == 6) );
+    }
+    if (order_of_deriv == 2) {
+        // Second order derivatives can have 2nd or 4th order convergence
+        assert( (diff_ord == 2) or (diff_ord == 4) );
+    }
 
     std::vector<double>::iterator i0;
     i0 = diff_array.begin();
