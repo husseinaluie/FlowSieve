@@ -5,7 +5,7 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=1 $(CFLAGS)
+CFLAGS:=-DDEBUG=0 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
@@ -146,10 +146,10 @@ $(INTERFACE_OBJS): %.o : %.cpp constants.hpp
 
 FFT_BASED_OBJS:= ${FFT_BASED_OBJS} coarse_grain_fftw.o
 $(FFT_BASED_OBJS): %.o : %.cpp constants.hpp
-	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< -lfftw3 -lm $(LINKS) 
+	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< -lfftw3 -lm $(LINKS) 
 
 $(PREPROCESS_OBJS): %.o : %.cpp constants.hpp
-	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
+	$(MPICXX) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 
 # 
@@ -181,10 +181,11 @@ TOROID_TARGET_EXES := toroidal_projection.x
 TOROID_TARGET_OBJS := toroidal_projection.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
-	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-$(TOROID_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${TOROIDAL_OBJS} %.o
-	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
+#$(TOROID_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${TOROIDAL_OBJS} %.o
+$(TOROID_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} ${ALGLIB_OBJS} %.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -I ./ALGLIB -o $@ $^ $(LINKS) 
 
 # Building test scripts
 Tests/%.o: Tests/%.cpp constants.hpp
