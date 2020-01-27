@@ -83,8 +83,10 @@ int main(int argc, char *argv[]) {
     read_var_from_file(u_lon, "uo",  "input.nc", &mask, &myCounts, &myStarts);
     read_var_from_file(u_lat, "vo",  "input.nc", &mask, &myCounts, &myStarts);
 
+    #if DEBUG >= 1
     const int Ntime  = time.size();
     const int Ndepth = depth.size();
+    #endif
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
@@ -129,10 +131,16 @@ int main(int argc, char *argv[]) {
     compute_areas(areas, longitude, latitude);
 
     // Now pass the arrays along to the filtering routines
-    apply_toroidal_projection(
-              u_lon_tor, u_lat_tor, u_lon, u_lat, areas,
-              longitude, latitude, depth, time,
-              mask, myCounts, myStarts);
+    //apply_toroidal_projection(
+    //          u_lon_tor, u_lat_tor, u_lon, u_lat, areas,
+    //          longitude, latitude, depth, time,
+    //          mask, myCounts, myStarts);
+
+    Apply_Toroidal_Projection(
+            u_lon, u_lat, time, depth, latitude, longitude,
+            mask, myCounts, myStarts
+            );
+
 
     // Done!
     #if DEBUG >= 0
