@@ -106,4 +106,23 @@ void Cart_derivatives_at_point(
         const int order_of_deriv = 1,
         const int diff_ord = constants::DiffOrd);
 
+// Return the differentiation vector
+void get_diff_vector(
+        std::vector<double> & diff_vector,
+        int & LB_ret,
+        const std::vector<double> & grid,
+        const std::string & dim,
+        const int Itime,
+        const int Idepth,
+        const int Ilat,
+        const int Ilon,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const std::vector<double> & mask,
+        const int order_of_deriv,
+        const int diff_ord
+        );
+
 #endif

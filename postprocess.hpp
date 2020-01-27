@@ -17,6 +17,7 @@ void Apply_Postprocess_Routines(
         const std::vector<double> & div_J, 
         const std::vector<double> & lambda_m, 
         const std::vector<double> & PEtoKE,
+        const std::vector<double> & div,
         const std::vector<double> & time,
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
