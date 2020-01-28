@@ -93,9 +93,12 @@ clean:
 	rm -f Tests/*.o 
 	rm -f Preprocess/*.o
 	rm -f Postprocess/*.o
+	rm -f Case_Files/*.o
 hardclean:
 	rm -f *.o 
 	rm -f *.x
+	rm -f Case_Files/*.o
+	rm -f Case_Files/*.x
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
@@ -157,8 +160,8 @@ $(PREPROCESS_OBJS): %.o : %.cpp constants.hpp
 #
 
 # Group together executables with similar compilations
-CORE_TARGET_EXES := coarse_grain.x integrator.x coarse_grain_subset.x
-CORE_TARGET_OBJS := coarse_grain.o integrator.o coarse_grain_subset.o
+CORE_TARGET_EXES := Case_Files/coarse_grain.x Case_Files/integrator.x Case_Files/coarse_grain_subset.x Case_Files/do_filtering.x
+CORE_TARGET_OBJS := Case_Files/coarse_grain.o Case_Files/integrator.o Case_Files/coarse_grain_subset.o Case_Files/do_filtering.o
 
 $(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
@@ -167,8 +170,8 @@ $(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building shallow water
-SW_TARGET_EXES := coarse_grain_sw.x
-SW_TARGET_OBJS := coarse_grain_sw.o 
+SW_TARGET_EXES := Case_Files/coarse_grain_sw.x
+SW_TARGET_OBJS := Case_Files/coarse_grain_sw.o 
 
 $(SW_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
@@ -177,8 +180,8 @@ $(SW_TARGET_EXES): %.x : ${SW_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building toroidal projection
-TOROID_TARGET_EXES := toroidal_projection.x
-TOROID_TARGET_OBJS := toroidal_projection.o
+TOROID_TARGET_EXES := Case_Files/toroidal_projection.x
+TOROID_TARGET_OBJS := Case_Files/toroidal_projection.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
@@ -195,11 +198,11 @@ Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
 	$(MPICXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building fftw-based coarse_grain executable
-coarse_grain_fftw.x: ${CORE_OBJS} ${INTERFACE_OBJS} ${FFT_BASED_OBJS} coarse_grain_fftw.o
+coarse_grain_fftw.x: ${CORE_OBJS} ${INTERFACE_OBJS} ${FFT_BASED_OBJS} Case_Files/coarse_grain_fftw.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ -lfftw3 -lm $(LINKS) 
 
 # Interpolator needs to link in ALGLIB
-interpolator.o: interpolator.cpp constants.hpp
+interpolator.o: Case_Files/interpolator.cpp Case_Files/constants.hpp
 	$(MPICXX) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 interpolator.x: ${NETCDF_IO_OBJS} ${ALGLIB_OBJS} ${PREPROCESS_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} interpolator.o

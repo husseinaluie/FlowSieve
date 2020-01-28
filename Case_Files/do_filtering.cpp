@@ -9,9 +9,9 @@
 #include <omp.h>
 #include <cassert>
 
-#include "netcdf_io.hpp"
-#include "functions.hpp"
-#include "constants.hpp"
+#include "../netcdf_io.hpp"
+#include "../functions.hpp"
+#include "../constants.hpp"
 
 int main(int argc, char *argv[]) {
     
@@ -52,10 +52,9 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales { 
-        1e3, 1.58e3, 2.51e3, 3.98e3, 6.31e3,
-        1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
-        1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
         1e6, 1.58e6, 2.51e6, 3.98e6, 6.31e6,
+        1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
+        1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
     };
 
     // Parse command-line flags
@@ -63,16 +62,23 @@ int main(int argc, char *argv[]) {
     if (wRank == 0) {
         for(int ii = 1; ii < argc; ++ii) {  
             fprintf(stdout, "Argument %d : %s\n", ii, argv[ii]);
+
+            // check if we passed the '--version falg'
             snprintf(buffer, 50, "--version");
             if (strcmp(argv[ii], buffer) == 0) {
                 print_compile_info(filter_scales);
                 return 0;
+
+            // otherwise, flag unrecognized
             } else {
                 fprintf(stderr, "Flag %s not recognized.\n", argv[ii]);
                 return -1;
             }
         }
     }
+
+    char input_fname [50];
+    snprintf(input_fname, 50, "input.nc");
 
     #if DEBUG >= 0
     if (wRank == 0) {
@@ -118,7 +124,6 @@ int main(int argc, char *argv[]) {
     std::vector<double> u_r, u_lon, u_lat, rho, p;
     std::vector<double> mask;
     std::vector<int> myCounts, myStarts;
-    size_t II;
 
     // Read in source data / get size information
     #if DEBUG >= 1
@@ -126,33 +131,25 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Read in the grid coordinates
-    read_var_from_file(longitude, "longitude", "input.nc");
-    read_var_from_file(latitude,  "latitude",  "input.nc");
-    read_var_from_file(time,      "time",      "input.nc");
-    read_var_from_file(depth,     "depth",     "input.nc");
+    read_var_from_file(longitude, "longitude", input_fname);
+    read_var_from_file(latitude,  "latitude",  input_fname);
+    read_var_from_file(time,      "time",      input_fname);
+    read_var_from_file(depth,     "depth",     input_fname);
 
-    // Read in the velocity fields
-    read_var_from_file(u_lon, "uo", "input.nc", &mask, &myCounts, &myStarts);
-    read_var_from_file(u_lat, "vo", "input.nc", &mask, &myCounts, &myStarts);
+    // Load in the variables that we want to filter
+    std::vector<const std::vector<double>* > fields_to_filter;
+    std::vector<std::string> var_names;
 
-    // No u_r in inputs, so initialize as zero
-    u_r.resize(u_lon.size());
-    #pragma omp parallel default(none) private(II) shared(u_r)
-    { 
-        #pragma omp for collapse(1) schedule(static)
-        for (II = 0; II < u_r.size(); II++) {
-            u_r.at(II) = 0.;
-        }
-    }
+    std::vector<double> eta;
+    read_var_from_file(eta, "eta", input_fname);
+    fields_to_filter.push_back(&eta);
+    var_names.push_back("eta");
 
-    if (constants::COMP_BC_TRANSFERS) {
-        // If desired, read in rho and p
-        read_var_from_file(rho, "rho", "input.nc");
-        read_var_from_file(p,   "p",   "input.nc");
-    }
 
+    #if DEBUG >= 1
     const int Ntime  = time.size();
     const int Ndepth = depth.size();
+    #endif
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
@@ -195,10 +192,11 @@ int main(int argc, char *argv[]) {
 
     // Now pass the arrays along to the filtering routines
     const double pre_filter_time = MPI_Wtime();
-    filtering(u_r, u_lon, u_lat, rho, p,
-              filter_scales, areas, 
-              time, depth, longitude, latitude,
-              mask, myCounts, myStarts);
+    filter_fields(
+            fields_to_filter, var_names,    
+            filter_scales, areas, 
+            time, depth, longitude, latitude,
+            mask, myCounts, myStarts);
     const double post_filter_time = MPI_Wtime();
 
     // Done!

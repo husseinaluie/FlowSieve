@@ -9,10 +9,9 @@
 #include <omp.h>
 #include <cassert>
 
-#include "netcdf_io.hpp"
-#include "functions.hpp"
-#include "constants.hpp"
-#include "preprocess.hpp"
+#include "../netcdf_io.hpp"
+#include "../functions.hpp"
+#include "../constants.hpp"
 
 int main(int argc, char *argv[]) {
     
@@ -20,6 +19,19 @@ int main(int argc, char *argv[]) {
     static_assert( (constants::UNIFORM_LAT_GRID) or (not(constants::PERIODIC_Y)),
             "PERIODIC_Y requires UNIFORM_LAT_GRID.\n"
             "Please update constants.hpp accordingly.\n");
+
+    // NO_FULL_OUTPUTS implies APPLY_POSTPROCESS
+    static_assert( (constants::APPLY_POSTPROCESS) or (not(constants::NO_FULL_OUTPUTS)),
+            "If NO_FULL_OUTPUTS is true, then APPLY_POSTPROCESS must also be true, "
+            "otherwise no outputs will be produced.\n"
+            "Please update constants.hpp accordingly.");
+
+    // NO_FULL_OUTPUTS implies MINIMAL_OUTPUT
+    static_assert( (constants::MINIMAL_OUTPUT) or (not(constants::NO_FULL_OUTPUTS)),
+            "NO_FULL_OUTPUTS implies MINIMAL_OUTPUT. "
+            "You must either change NO_FULL_OUTPUTS to false, "
+            "or MINIMAL_OUTPUT to true.\n" 
+            "Please update constants.hpp accordingly.");
 
     // Enable all floating point exceptions but FE_INEXACT
     //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
@@ -29,6 +41,7 @@ int main(int argc, char *argv[]) {
     int thread_safety_provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_safety_provided);
     //MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI::ERRORS_THROW_EXCEPTIONS);
+    const double start_time = MPI_Wtime();
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
@@ -64,9 +77,10 @@ int main(int argc, char *argv[]) {
     #endif
 
     std::vector<double> longitude, latitude, time, depth;
-    std::vector<double> u_lon, u_lat, u_lon_tor, u_lat_tor;
+    std::vector<double> u_lon, u_lat, ssa;
     std::vector<double> mask;
     std::vector<int> myCounts, myStarts;
+    size_t II;
 
     // Read in source data / get size information
     #if DEBUG >= 1
@@ -82,16 +96,12 @@ int main(int argc, char *argv[]) {
     // Read in the velocity fields
     read_var_from_file(u_lon, "uo",  "input.nc", &mask, &myCounts, &myStarts);
     read_var_from_file(u_lat, "vo",  "input.nc", &mask, &myCounts, &myStarts);
+    read_var_from_file(u_lat, "zos", "input.nc", &mask, &myCounts, &myStarts);
 
-    #if DEBUG >= 1
     const int Ntime  = time.size();
     const int Ndepth = depth.size();
-    #endif
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
-
-    u_lon_tor.resize(u_lon.size());
-    u_lat_tor.resize(u_lat.size());
 
     #if DEBUG >= 1
     fprintf(stdout, "Processor %d has (%d, %d, %d, %d) from (%d, %d, %d, %d)\n", 
@@ -121,26 +131,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Compute the area of each 'cell'
-    //   which will be necessary for integration
-    #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "Computing the cell areas.\n\n"); }
-    #endif
-
-    std::vector<double> areas(Nlon * Nlat);
-    compute_areas(areas, longitude, latitude);
-
     // Now pass the arrays along to the filtering routines
-    //apply_toroidal_projection(
-    //          u_lon_tor, u_lat_tor, u_lon, u_lat, areas,
-    //          longitude, latitude, depth, time,
-    //          mask, myCounts, myStarts);
-
-    Apply_Toroidal_Projection(
-            u_lon, u_lat, time, depth, latitude, longitude,
-            mask, myCounts, myStarts
-            );
-
+    apply_geostrophy(u_lon, u_lat, ssa,
+              longitude, latitude,
+              mask, myCounts, myStarts);
 
     // Done!
     #if DEBUG >= 0

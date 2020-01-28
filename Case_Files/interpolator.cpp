@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <math.h>
 #include <vector>
-#include "netcdf_io.hpp"
-#include "preprocess.hpp"
-#include "constants.hpp"
-#include "functions.hpp"
+
+#include "../netcdf_io.hpp"
+#include "../preprocess.hpp"
+#include "../constants.hpp"
+#include "../functions.hpp"
 
 #ifndef DEBUG
     #define DEBUG 0

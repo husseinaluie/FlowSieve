@@ -7,13 +7,25 @@
 #include <vector>
 #include <mpi.h>
 #include <omp.h>
+#include <cassert>
 
-#include "netcdf_io.hpp"
-#include "functions.hpp"
-#include "constants.hpp"
-#include "fft_based.hpp"
+#include "../netcdf_io.hpp"
+#include "../functions.hpp"
+#include "../functions_sw.hpp"
+#include "../constants.hpp"
 
 int main(int argc, char *argv[]) {
+    
+    if (constants::PERIODIC_Y) {
+        // The non-uniform lat routine cannot handle
+        //   periodic lat (y) grids
+        assert(constants::UNIFORM_LAT_GRID);
+    }
+
+    static_assert(constants::CARTESIAN);
+    static_assert(constants::PERIODIC_X);
+    static_assert(constants::PERIODIC_Y);
+    static_assert(constants::UNIFORM_LAT_GRID);
 
     // Enable all floating point exceptions but FE_INEXACT
     //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
@@ -24,7 +36,6 @@ int main(int argc, char *argv[]) {
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_safety_provided);
     MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI::ERRORS_THROW_EXCEPTIONS);
     //MPI_Status status;
-    const double start_time = MPI_Wtime();
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
@@ -34,15 +45,10 @@ int main(int argc, char *argv[]) {
     //   include scales as a comma-separated list
     //   scales are given in metres
     // A zero scale will cause everything to nan out
-    /*
-    std::vector<double> filter_scales { 250e3 };
-    */
-    std::vector<double> filter_scales {
-        25.28e3, 31.6e3, 39.5e3, 49.375e3, 
-        63.2e3, 80e3, 100e3, 150e3,
-        158e3, 200e3, 250e3, 252.8e3, 395e3,
-        400e3, 632e3, 790e3, 1580e3, 6320e3
-    };
+    double Lx;// = 25e3;
+    read_attr_from_file(Lx, "Lx", "input.nc");
+    //std::vector<double> filter_scales { 10., 0.01*Lx, 0.05*Lx, 0.1*Lx, 0.25*Lx, 0.5*Lx };
+    std::vector<double> filter_scales { 0.01*Lx };
 
     // Parse command-line flags
     char buffer [50];
@@ -70,22 +76,12 @@ int main(int argc, char *argv[]) {
     }
     #endif
 
-    #if DEBUG >= 0
-    if (wRank == 0) {
-        if (constants::CARTESIAN) { 
-            fprintf(stdout, "Using Cartesian coordinates.\n");
-        } else {
-            fprintf(stdout, "Using spherical coordinates.\n");
-        }
-    }
-    #endif
-    MPI_Barrier(MPI_COMM_WORLD);
-
     // Print processor assignments
-    #if DEBUG >= 2
-    int tid, nthreads;
+    MPI_Barrier(MPI_COMM_WORLD);
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
+    #if DEBUG >= 1
+    int tid, nthreads;
     #pragma omp parallel default(none) private(tid, nthreads) \
         shared(stdout) firstprivate(wRank, wSize)
     {
@@ -102,16 +98,10 @@ int main(int argc, char *argv[]) {
     std::vector<double> time;
     std::vector<double> depth;
 
-    std::vector<double> u_r;
-    std::vector<double> u_lon;
-    std::vector<double> u_lat;
-
-    std::vector<double> rho;
-    std::vector<double> p;
+    std::vector<double> u, v, h;
 
     std::vector<double> mask;
     std::vector<int> myCounts, myStarts;
-    size_t II;
 
     // Read in source data / get size information
     #if DEBUG >= 1
@@ -125,48 +115,27 @@ int main(int argc, char *argv[]) {
     read_var_from_file(depth,     "depth",     "input.nc");
 
     // Read in the velocity fields
-    read_var_from_file(u_lon, "uo", "input.nc", &mask, &myCounts, &myStarts);
-    read_var_from_file(u_lat, "vo", "input.nc", &mask, &myCounts, &myStarts);
-
-    // No u_r in inputs, so initialize as zero
-    u_r.resize(u_lon.size());
-    #pragma omp parallel default(none) private(II) shared(u_r)
-    { 
-        #pragma omp for collapse(1) schedule(static)
-        for (II = 0; II < u_r.size(); II++) {
-            u_r.at(II) = 0.;
-        }
-    }
-
-    if (constants::COMP_BC_TRANSFERS) {
-        // If desired, read in rho and p
-        read_var_from_file(rho, "rho", "input.nc");
-        read_var_from_file(p,   "p",   "input.nc");
-    }
+    read_var_from_file(u, "u", "input.nc", &mask, &myCounts, &myStarts);
+    read_var_from_file(v, "v", "input.nc", &mask, &myCounts, &myStarts);
+    read_var_from_file(h, "h", "input.nc", &mask, &myCounts, &myStarts);
 
     //const int Ntime  = time.size();
     //const int Ndepth = depth.size();
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
-    if (not(constants::CARTESIAN)) {
-        // Convert coordinate to radians
-        if (wRank == 0) { fprintf(stdout, "Converting to radians.\n\n"); }
-        int ii;
-        const double D2R = M_PI / 180.;
-        #pragma omp parallel default(none) private(ii) shared(longitude, latitude)
-        { 
-            #pragma omp for collapse(1) schedule(static)
-            for (ii = 0; ii < Nlon; ii++) {
-                longitude.at(ii) = longitude.at(ii) * D2R;
-            }
+    // Read layer densities
+    double rho0, rho1;
+    read_attr_from_file(rho0, "rho0", "input.nc", NULL);
+    read_attr_from_file(rho1, "rho1", "input.nc", NULL);
+    const std::vector<double> rho_vec { rho0, rho1 };
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf(stdout, "rho0 = %g, rho1 = %g\n\n", rho0, rho1); }
+    #endif
 
-            #pragma omp for collapse(1) schedule(static)
-            for (ii = 0; ii < Nlat; ii++) { 
-                latitude.at(ii) = latitude.at(ii) * D2R;
-            }
-        }
-    }
+    // Get viscosity
+    double nu;
+    read_attr_from_file(nu, "nu", "input.nc", NULL);
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration
@@ -178,30 +147,12 @@ int main(int argc, char *argv[]) {
     compute_areas(areas, longitude, latitude);
 
     // Now pass the arrays along to the filtering routines
-    const double pre_filter_time = MPI_Wtime();
-    filtering_fftw(
-            u_r, u_lon, u_lat,
-            rho, p,
-            filter_scales,
-            areas, 
-            time, depth,
-            longitude, latitude,
+    filtering_sw_2L(u, v, h,
+            rho_vec, nu, filter_scales, areas, 
+            time, depth, longitude, latitude,
             mask, myCounts, myStarts);
-    const double post_filter_time = MPI_Wtime();
 
     // Done!
-    #if DEBUG >= 0
-    const double delta_clock = MPI_Wtick();
-    if (wRank == 0) {
-        fprintf(stdout, "\n\n");
-        fprintf(stdout, "Process completed.\n");
-        fprintf(stdout, "\n");
-        fprintf(stdout, "Start-up time  = %.13g\n", pre_filter_time - start_time);
-        fprintf(stdout, "Filtering time = %.13g\n", post_filter_time - pre_filter_time);
-        fprintf(stdout, "   (clock resolution = %.13g)\n", delta_clock);
-    }
-    #endif
-
     fprintf(stdout, "Processor %d / %d waiting to finalize.\n", wRank + 1, wSize);
     MPI_Finalize();
     return 0;
