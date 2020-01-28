@@ -52,9 +52,7 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales { 
-        1e6, 1.58e6, 2.51e6, 3.98e6, 6.31e6,
-        1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
-        1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
+        10e3
     };
 
     // Parse command-line flags
@@ -121,7 +119,6 @@ int main(int argc, char *argv[]) {
     #endif
 
     std::vector<double> longitude, latitude, time, depth;
-    std::vector<double> u_r, u_lon, u_lat, rho, p;
     std::vector<double> mask;
     std::vector<int> myCounts, myStarts;
 
@@ -141,7 +138,7 @@ int main(int argc, char *argv[]) {
     std::vector<std::string> var_names;
 
     std::vector<double> eta;
-    read_var_from_file(eta, "eta", input_fname);
+    read_var_from_file(eta, "eta", input_fname, &mask, &myCounts, &myStarts);
     fields_to_filter.push_back(&eta);
     var_names.push_back("eta");
 
