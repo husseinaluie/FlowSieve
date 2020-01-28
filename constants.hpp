@@ -59,14 +59,14 @@ namespace constants
      * \brief Differentiation order for finite differencing (currently must be 2, 4, or 6).
      * @ingroup constants
      */
-    const int DiffOrd = 4;
+    const int DiffOrd = 2;
 
     /*!
      * \param fill_value
      * \brief Fill value used to indicate land values in output files.
      * @ingroup constants
      */
-    const double fill_value = -32767;
+    const double fill_value = -1e10;
 
     /*!
      * \param fill_value_s
@@ -87,7 +87,7 @@ namespace constants
      * \brief Boolean indicating if the coordinate system is periodic in x / longitude.
      * @ingroup constants
      */
-    const bool PERIODIC_X = false;
+    const bool PERIODIC_X = true;
 
     /*!
      * \param PERIODIC_Y
@@ -145,7 +145,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool NO_FULL_OUTPUTS = true;
+    const bool NO_FULL_OUTPUTS = false;
 
     /*!
      * \param CAST_TO_SINGLE

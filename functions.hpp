@@ -155,6 +155,30 @@ void filtering(const std::vector<double> & u_r,
                const std::vector<int>    & myStarts,
                const MPI_Comm comm = MPI_COMM_WORLD);
 
+
+
+/*!
+ * \brief Alternate filtering driver
+ *
+ * This function applies straight filtering to the input fields.
+ * No secondary fields (Pi, etc.) are computed. Does NOT handle velocites
+ * (i.e. does not convert to Cartesian velocities), just handles scalars.
+ */
+void filter_fields(
+        const std::vector<const std::vector<double>*> & fields,
+        const std::vector<std::string> var_names,
+        const std::vector<double> & scales,
+        const std::vector<double> & dAreas,
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask,
+        const std::vector<int>    & myCounts,
+        const std::vector<int>    & myStarts,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 /*!
  * \brief Alternate filtering driver for subsetting
  *
