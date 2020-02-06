@@ -19,7 +19,7 @@ This repository stores source code for running coarse graining procedures on net
 1. The interpolator requires the ALGLIB package. 
  * Compile via `make ALGLIB`
  * only needs to be done once (unless you call `make hardclean`)
-2. Call `make interpolator.x`
+2. Call `make Case_Files/interpolator.x`
 
 ### Postprocessing
 
@@ -29,6 +29,8 @@ These scripts can be found in the _Postprocess_ directory.
 * Postprocesss/integrator.cpp
  * compile via _make Postprocess/integrator.x_
  * run via _integrator.x <file-to-process.nc> <file-to-create.nc>_ 
+
+**!!THIS IS VERY OUTDATED!! Use on-line routines if possible until this is updated.**
 
 ### System File
 
@@ -62,10 +64,8 @@ See the function map for [filtering] to get an overview of the function dependen
  * This removes all object files (\*.o) in the source tree
 * `make hardclean`
  * In addition to the `clean` removals, also removes the executables, symbol table (dSYM), and documentation
-* `make all`
- * Makes coarse_grain.x
-* `make coarse_grain.x`
- * Makes coarse_grain.x
+* `make Case_Files/<filename>.x`
+ * Makes the specified executable. `Case_Files` contains the main files that can be compiled into executables.
 * `make docs`
  * Makes the doxygen-produced documentation. **Note: `doxygen` and `dot` must be installed and on the path**
 * `make cleandocs`
