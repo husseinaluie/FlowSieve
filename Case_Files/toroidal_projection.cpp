@@ -20,6 +20,9 @@ int main(int argc, char *argv[]) {
     static_assert( (constants::UNIFORM_LAT_GRID) or (not(constants::PERIODIC_Y)),
             "PERIODIC_Y requires UNIFORM_LAT_GRID.\n"
             "Please update constants.hpp accordingly.\n");
+    static_assert( not(constants::CARTESIAN),
+            "Toroidal projection now set to handle Cartesian coordinates.\n"
+            );
 
     // Enable all floating point exceptions but FE_INEXACT
     //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
@@ -64,7 +67,7 @@ int main(int argc, char *argv[]) {
     #endif
 
     std::vector<double> longitude, latitude, time, depth;
-    std::vector<double> u_lon, u_lat, u_lon_tor, u_lat_tor;
+    std::vector<double> u_lon, u_lat, seed;
     std::vector<double> mask;
     std::vector<int> myCounts, myStarts;
 
@@ -83,15 +86,22 @@ int main(int argc, char *argv[]) {
     read_var_from_file(u_lon, "uo",  "input.nc", &mask, &myCounts, &myStarts);
     read_var_from_file(u_lat, "vo",  "input.nc", &mask, &myCounts, &myStarts);
 
+    // Read in the seed
+    double seed_count;
+    read_attr_from_file(seed_count, "seed_count", "seed.nc");
+    const bool single_seed = (seed_count < 2);
+    if (wRank == 0) { 
+        fprintf(stdout, " single_seed = %s\n", single_seed ? "true" : "false"); 
+    }
+    //read_var_from_file(seed, "seed",  "seed.nc", NULL, NULL, NULL, false);
+    read_var_from_file(seed, "seed",  "seed.nc", NULL, NULL, NULL, not(single_seed));
+
     #if DEBUG >= 1
     const int Ntime  = time.size();
     const int Ndepth = depth.size();
     #endif
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
-
-    u_lon_tor.resize(u_lon.size());
-    u_lat_tor.resize(u_lat.size());
 
     #if DEBUG >= 1
     fprintf(stdout, "Processor %d has (%d, %d, %d, %d) from (%d, %d, %d, %d)\n", 
@@ -130,15 +140,9 @@ int main(int argc, char *argv[]) {
     std::vector<double> areas(Nlon * Nlat);
     compute_areas(areas, longitude, latitude);
 
-    // Now pass the arrays along to the filtering routines
-    //apply_toroidal_projection(
-    //          u_lon_tor, u_lat_tor, u_lon, u_lat, areas,
-    //          longitude, latitude, depth, time,
-    //          mask, myCounts, myStarts);
-
     Apply_Toroidal_Projection(
             u_lon, u_lat, time, depth, latitude, longitude,
-            mask, myCounts, myStarts
+            mask, myCounts, myStarts, seed, single_seed
             );
 
 
