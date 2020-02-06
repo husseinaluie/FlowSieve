@@ -47,11 +47,19 @@ void Apply_Postprocess_Routines(
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
     //
+    //// Write a file that defines the regions
+    //
+    char filename[50];
+    snprintf(filename, 50, "postprocess_regions.nc");
+    write_regions(filename, latitude, longitude, mask, areas, myCounts, myStarts);
+    write_regions_to_post(filename);
+
+
+    //
     //// Start by initializing the postprocess file
     //
     
     // Filename
-    char filename[50];
     snprintf(filename, 50, "postprocess_%.6gkm.nc", filter_scale/1e3);
 
     // Variables to integrate
@@ -115,7 +123,7 @@ void Apply_Postprocess_Routines(
             Itime  = 0;
             Idepth = 0;
 
-            #pragma omp for collapse(2) schedule(dynamic)
+            #pragma omp for collapse(2) schedule(guided)
             for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                 for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 
@@ -154,7 +162,7 @@ void Apply_Postprocess_Routines(
             lambda_m, PEtoKE, div_J, div_vel, vars_to_process)
     { 
 
-        #pragma omp for collapse(1) schedule(dynamic)
+        #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < energy_transfer.size(); index++) {
             if (mask.at(index) == 1) { // Skip land areas
 
@@ -222,7 +230,7 @@ void Apply_Postprocess_Routines(
             areas, mask, field_averages, field_std_devs, field_values, \
             lambda_m, PEtoKE, div_J, div_vel, region_areas, vars_to_process) 
     { 
-        #pragma omp for collapse(1) schedule(dynamic)
+        #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < energy_transfer.size(); index++) {
             if (mask.at(index) == 1) { // Skip land areas
 
@@ -366,7 +374,7 @@ void Apply_Postprocess_Routines(
             lambda_m, PEtoKE, div_J, div_vel, vars_to_process,\
             full_Ntime)
     { 
-        #pragma omp for collapse(4) schedule(dynamic)
+        #pragma omp for collapse(4) schedule(guided)
         for (Itime = 0; Itime < Ntime; ++Itime){
             for (Idepth = 0; Idepth < Ndepth; ++Idepth){
                 for (Ilat = 0; Ilat < Nlat; ++Ilat){
@@ -440,7 +448,7 @@ void Apply_Postprocess_Routines(
             areas, mask, time_average_loc, time_std_dev_loc, time_average, \
             lambda_m, PEtoKE, div_J, div_vel, vars_to_process)
     { 
-        #pragma omp for collapse(4) schedule(dynamic)
+        #pragma omp for collapse(4) schedule(guided)
         for (Itime = 0; Itime < Ntime; ++Itime){
             for (Idepth = 0; Idepth < Ndepth; ++Idepth){
                 for (Ilat = 0; Ilat < Nlat; ++Ilat){
@@ -509,7 +517,7 @@ void Apply_Postprocess_Routines(
         private(index)\
         shared(Ifield, time_average, time_std_dev, full_Ntime, mask)
         { 
-            #pragma omp for collapse(1) schedule(dynamic)
+            #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < time_average.at(Ifield).size(); ++index) {
                 if (mask.at(index) == 1) { 
                     time_std_dev.at(Ifield).at(index) = 

@@ -40,7 +40,7 @@ void compute_vorticity(
     private(Itime, Idepth, Ilat, Ilon, index, \
             vort_r_tmp, vort_lon_tmp, vort_lat_tmp)
     {
-        #pragma omp for collapse(1) schedule(dynamic)
+        #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < Npts; index++) {
 
             vort_r_tmp   = constants::fill_value;

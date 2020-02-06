@@ -121,7 +121,7 @@ void filter_fields(
                 filtered_vals_ptrs.push_back(&filtered_vals.at(Ifield));
             }
 
-            #pragma omp for collapse(2) schedule(dynamic)
+            #pragma omp for collapse(2) schedule(guided)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
                 for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
