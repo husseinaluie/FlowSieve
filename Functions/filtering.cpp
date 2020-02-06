@@ -9,21 +9,21 @@
 #include "../postprocess.hpp"
 
 void filtering(
-        const std::vector<double> & full_u_r,   /**< [in] Full u_r velocity array */
-        const std::vector<double> & full_u_lon, /**< [in] Full u_lon velocity array */
-        const std::vector<double> & full_u_lat, /**< [in] Full u_lat velocity array */
-        const std::vector<double> & full_rho,   /**< [in] Full density array */
-        const std::vector<double> & full_p,     /**< [in] Full pressure array */
-        const std::vector<double> & scales,     /**< [in] Array of filtering scales */
-        const std::vector<double> & dAreas,     /**< [in] Array of cell areas (2D)  */
-        const std::vector<double> & time,       /**< [in] Time dimension (1D) */
-        const std::vector<double> & depth,      /**< [in] Depth dimension (1D) */
-        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
-        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
-        const std::vector<double> & mask,       /**< [in] Array to tell land from water */
-        const std::vector<int>    & myCounts,   /**< [in] Array of dimension sizes */
-        const std::vector<int>    & myStarts,   /**< [in] Array of dimension sizes */
-        const MPI_Comm comm                     /**< [in] MPI Communicator */
+        const std::vector<double> & full_u_r,
+        const std::vector<double> & full_u_lon,
+        const std::vector<double> & full_u_lat,
+        const std::vector<double> & full_rho,
+        const std::vector<double> & full_p,
+        const std::vector<double> & scales,
+        const std::vector<double> & dAreas,
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask,
+        const std::vector<int>    & myCounts,
+        const std::vector<int>    & myStarts,
+        const MPI_Comm comm
         ) {
 
     int wRank, wSize;
@@ -349,7 +349,7 @@ void filtering(
                 filtered_vals.push_back(&p_tmp);
             }
 
-            #pragma omp for collapse(2) schedule(dynamic)
+            #pragma omp for collapse(2) schedule(guided)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
                 for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
@@ -733,10 +733,13 @@ void filtering(
         //// on-line postprocessing, if desired
         //
 
-        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         if (constants::APPLY_POSTPROCESS) {
+            MPI_Barrier(MPI_COMM_WORLD);
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+
             if (wRank == 0) { fprintf(stdout, "Beginning post-process routines\n"); }
             fflush(stdout);
+
             Apply_Postprocess_Routines(
                     coarse_u_r, coarse_u_lon, coarse_u_lat, 
                     coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
@@ -745,9 +748,10 @@ void filtering(
                     mask, dAreas,
                     myCounts, myStarts,
                     scales.at(Iscale));
-        }
-        if (constants::DO_TIMING) { 
-            timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess");
+
+            if (constants::DO_TIMING) { 
+                timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess");
+            }
         }
 
         #if DEBUG >= 0
