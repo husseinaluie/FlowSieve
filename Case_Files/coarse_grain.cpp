@@ -52,26 +52,45 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales { 
-        1e6, 1.58e6, 2.51e6, 3.98e6, 6.31e6,
-        1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
-        1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
-        1e3, 1.58e3, 2.51e3, 3.98e3, 6.31e3,
+        //1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4
+        //1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
+        //1e6, 1.58e6, 2.51e6, 3.98e6, 6.31e6,
+        //1e7, 1.58e7, 2.51e7, 3.98e7, 6.31e7,
+        1.
     };
 
+    // Default input file name
+    char input_fname[50], flag_version[50], flag_input[50];
+    snprintf(input_fname,  50, "input.nc");
+    snprintf(flag_version, 50, "--version");
+    snprintf(flag_input,   50, "--input_file");
+
     // Parse command-line flags
-    char buffer [50];
-    if (wRank == 0) {
-        for(int ii = 1; ii < argc; ++ii) {  
-            fprintf(stdout, "Argument %d : %s\n", ii, argv[ii]);
-            snprintf(buffer, 50, "--version");
-            if (strcmp(argv[ii], buffer) == 0) {
+    int ii = 1;
+    //for(int ii = 1; ii < argc; ++ii) {  
+    while(ii < argc) {  
+        fprintf(stdout, "Argument %d : %s\n", ii, argv[ii]);
+
+        // check if the flag is 'version'
+        if (strcmp(argv[ii], flag_version) == 0) {
+            if (wRank == 0) {
                 print_compile_info(filter_scales);
-                return 0;
-            } else {
-                fprintf(stderr, "Flag %s not recognized.\n", argv[ii]);
-                return -1;
             }
+            return 0;
+
+            // check if the flag is 'input_file' and, if it is
+            //   the next input is then used as the filename
+            //   of the input
+        } else if (strcmp(argv[ii], flag_input) == 0) {
+            snprintf(input_fname, 50, argv[ii+1]);
+            ++ii;
+
+            // Otherwise, the flag is unrecognized
+        } else {
+            fprintf(stderr, "Flag %s not recognized.\n", argv[ii]);
+            return -1;
         }
+        ++ii;
     }
 
     #if DEBUG >= 0
@@ -126,14 +145,14 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Read in the grid coordinates
-    read_var_from_file(longitude, "longitude", "input.nc");
-    read_var_from_file(latitude,  "latitude",  "input.nc");
-    read_var_from_file(time,      "time",      "input.nc");
-    read_var_from_file(depth,     "depth",     "input.nc");
+    read_var_from_file(longitude, "longitude", input_fname);
+    read_var_from_file(latitude,  "latitude",  input_fname);
+    read_var_from_file(time,      "time",      input_fname);
+    read_var_from_file(depth,     "depth",     input_fname);
 
     // Read in the velocity fields
-    read_var_from_file(u_lon, "uo", "input.nc", &mask, &myCounts, &myStarts);
-    read_var_from_file(u_lat, "vo", "input.nc", &mask, &myCounts, &myStarts);
+    read_var_from_file(u_lon, "uo", input_fname, &mask, &myCounts, &myStarts);
+    read_var_from_file(u_lat, "vo", input_fname, &mask, &myCounts, &myStarts);
 
     // No u_r in inputs, so initialize as zero
     u_r.resize(u_lon.size());
@@ -147,12 +166,14 @@ int main(int argc, char *argv[]) {
 
     if (constants::COMP_BC_TRANSFERS) {
         // If desired, read in rho and p
-        read_var_from_file(rho, "rho", "input.nc");
-        read_var_from_file(p,   "p",   "input.nc");
+        read_var_from_file(rho, "rho", input_fname);
+        read_var_from_file(p,   "p",   input_fname);
     }
 
+    #if DEBUG >= 1
     const int Ntime  = time.size();
     const int Ndepth = depth.size();
+    #endif
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 

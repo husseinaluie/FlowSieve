@@ -41,29 +41,51 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
+    // 
+    char input_fname[50], flag_version[50], flag_input[50];
+    snprintf(input_fname,  50, "input.nc");
+    snprintf(flag_version, 50, "--version");
+    snprintf(flag_input,   50, "--input_file");
+
+    // these values are scaled by Ljet below
+    std::vector<double> filter_scales { 0.1, 0.25, 0.5, 1., 2. };
+
+    // Parse command-line flags
+    int ii = 1;
+    while(ii < argc) {  
+        fprintf(stdout, "Argument %d : %s\n", ii, argv[ii]);
+
+        // check if the flag is 'version'
+        if (strcmp(argv[ii], flag_version) == 0) {
+            if (wRank == 0) {
+                print_compile_info(filter_scales);
+            }
+            return 0;
+
+            // check if the flag is 'input_file' and, if it is
+            //   the next input is then used as the filename
+            //   of the input
+        } else if (strcmp(argv[ii], flag_input) == 0) {
+            snprintf(input_fname, 50, argv[ii+1]);
+            ++ii;
+
+            // Otherwise, the flag is unrecognized
+        } else {
+            fprintf(stderr, "Flag %s not recognized.\n", argv[ii]);
+            return -1;
+        }
+        ++ii;
+    }
+
     // For the time being, hard-code the filter scales
     //   include scales as a comma-separated list
     //   scales are given in metres
     // A zero scale will cause everything to nan out
-    double Lx;// = 25e3;
-    read_attr_from_file(Lx, "Lx", "input.nc");
-    //std::vector<double> filter_scales { 10., 0.01*Lx, 0.05*Lx, 0.1*Lx, 0.25*Lx, 0.5*Lx };
-    std::vector<double> filter_scales { 0.01*Lx };
-
-    // Parse command-line flags
-    char buffer [50];
-    if (wRank == 0) {
-        for(int ii = 1; ii < argc; ++ii) {  
-            fprintf(stdout, "Argument %d : %s\n", ii, argv[ii]);
-            snprintf(buffer, 50, "--version");
-            if (strcmp(argv[ii], buffer) == 0) {
-                print_compile_info(filter_scales);
-                return 0;
-            } else {
-                fprintf(stderr, "Flag %s not recognized.\n", argv[ii]);
-                return -1;
-            }
-        }
+    double Lx, Ljet;
+    read_attr_from_file(Lx,   "Lx", input_fname);
+    read_attr_from_file(Ljet, "Lj", input_fname);
+    for (size_t Is = 0; Is < filter_scales.size(); ++Is) {
+        filter_scales.at(Is) *= Ljet;
     }
 
     #if DEBUG >= 0
@@ -109,15 +131,15 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Read in the grid coordinates
-    read_var_from_file(longitude, "longitude", "input.nc");
-    read_var_from_file(latitude,  "latitude",  "input.nc");
-    read_var_from_file(time,      "time",      "input.nc");
-    read_var_from_file(depth,     "depth",     "input.nc");
+    read_var_from_file(time,      "time",  input_fname);
+    read_var_from_file(depth,     "layer", input_fname);
+    read_var_from_file(latitude,  "y",     input_fname);
+    read_var_from_file(longitude, "x",     input_fname);
 
     // Read in the velocity fields
-    read_var_from_file(u, "u", "input.nc", &mask, &myCounts, &myStarts);
-    read_var_from_file(v, "v", "input.nc", &mask, &myCounts, &myStarts);
-    read_var_from_file(h, "h", "input.nc", &mask, &myCounts, &myStarts);
+    read_var_from_file(u, "u", input_fname, &mask, &myCounts, &myStarts);
+    read_var_from_file(v, "v", input_fname, &mask, &myCounts, &myStarts);
+    read_var_from_file(h, "h", input_fname, &mask, &myCounts, &myStarts);
 
     //const int Ntime  = time.size();
     //const int Ndepth = depth.size();
@@ -126,8 +148,8 @@ int main(int argc, char *argv[]) {
 
     // Read layer densities
     double rho0, rho1;
-    read_attr_from_file(rho0, "rho0", "input.nc", NULL);
-    read_attr_from_file(rho1, "rho1", "input.nc", NULL);
+    read_attr_from_file(rho0, "rho0", input_fname, NULL);
+    read_attr_from_file(rho1, "rho1", input_fname, NULL);
     const std::vector<double> rho_vec { rho0, rho1 };
     #if DEBUG >= 1
     if (wRank == 0) { fprintf(stdout, "rho0 = %g, rho1 = %g\n\n", rho0, rho1); }
@@ -135,7 +157,7 @@ int main(int argc, char *argv[]) {
 
     // Get viscosity
     double nu;
-    read_attr_from_file(nu, "nu", "input.nc", NULL);
+    read_attr_from_file(nu, "nu", input_fname, NULL);
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration
@@ -156,4 +178,5 @@ int main(int argc, char *argv[]) {
     fprintf(stdout, "Processor %d / %d waiting to finalize.\n", wRank + 1, wSize);
     MPI_Finalize();
     return 0;
+
 }
