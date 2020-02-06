@@ -19,7 +19,7 @@ void toroidal_sparse_Lap(
         const std::vector<double> & mask
         ) {
 
-    int Ilat, Ilon, Idiff, Ndiff,
+    int Ilat, Ilon, IDIFF, Idiff, Ndiff,
         diff_index, index, LB;
     double old_val, tmp, cos2_lat_inv, tan_lat;
     std::vector<double> diff_vec;
@@ -46,13 +46,33 @@ void toroidal_sparse_Lap(
 
             Ndiff = diff_vec.size();
 
-            for ( Idiff = 0; Idiff < Ndiff; Idiff++ ) {
-                diff_index = Index(0, 0, Ilat, LB + Idiff,
+            for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
+
+                if (constants::PERIODIC_X) {
+                    if      (IDIFF < 0    ) { Idiff = IDIFF + Nlon; }
+                    else if (IDIFF >= Nlon) { Idiff = IDIFF - Nlon; }
+                    else                    { Idiff = IDIFF; }
+                } else {
+                    Idiff = IDIFF;
+                }
+
+                diff_index = Index(0, 0, Ilat, Idiff,
                                    1, 1, Nlat, Nlon);
+
+                if ( (diff_index >= Nlat*Nlon) or (diff_index < 0) ) {
+                    fprintf(stdout, 
+                            "  LON(2) index out of bounds"
+                            " : (lat,lon) = (%d, %d)"
+                            " : (index, diff_index) = (%d, %d)"
+                            " : IDIFF, Idiff = (%d, %d)"
+                            " : LB = %d\n",
+                            Ilat, Ilon, index, diff_index, IDIFF, Idiff, LB);
+                    fflush(stdout);
+                }
 
                 old_val = sparseget(Lap, index, diff_index);
 
-                tmp = diff_vec.at(Idiff) * cos2_lat_inv * R2_inv;
+                tmp = diff_vec.at(IDIFF-LB) * cos2_lat_inv * R2_inv;
 
                 alglib::sparseset(Lap, index, diff_index, old_val + tmp);
             }
@@ -69,13 +89,33 @@ void toroidal_sparse_Lap(
 
             Ndiff = diff_vec.size();
 
-            for ( Idiff = 0; Idiff < Ndiff; Idiff++ ) {
-                diff_index = Index(0, 0, LB + Idiff, Ilon,
-                                   1, 1, Nlat,       Nlon);
+            for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
+
+                if (constants::PERIODIC_Y) {
+                    if      (IDIFF < 0    ) { Idiff = IDIFF + Nlat; }
+                    else if (IDIFF >= Nlat) { Idiff = IDIFF - Nlat; }
+                    else                    { Idiff = IDIFF; }
+                } else {
+                    Idiff = IDIFF;
+                }
+
+                diff_index = Index(0, 0, Idiff, Ilon,
+                                   1, 1, Nlat,  Nlon);
+
+                if ( (diff_index >= Nlat*Nlon) or (diff_index < 0) ) {
+                    fprintf(stdout, 
+                            "  LAT(2) index out of bounds"
+                            " : (lat,lon) = (%d, %d)"
+                            " : (index, diff_index) = (%d, %d)"
+                            " : IDIFF, Idiff = (%d, %d)"
+                            " : LB = %d\n",
+                            Ilat, Ilon, index, diff_index, IDIFF, Idiff, LB);
+                    fflush(stdout);
+                }
 
                 old_val = sparseget(Lap, index, diff_index);
 
-                tmp = diff_vec.at(Idiff) * R2_inv;
+                tmp = diff_vec.at(IDIFF-LB) * R2_inv;
 
                 alglib::sparseset(Lap, index, diff_index, old_val + tmp);
             }
@@ -92,13 +132,33 @@ void toroidal_sparse_Lap(
 
             Ndiff = diff_vec.size();
 
-            for ( Idiff = 0; Idiff < Ndiff; Idiff++ ) {
-                diff_index = Index(0, 0, LB + Idiff, Ilon,
-                                   1, 1, Nlat,       Nlon);
+            for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
+
+                if (constants::PERIODIC_Y) {
+                    if      (IDIFF < 0    ) { Idiff = IDIFF + Nlat; }
+                    else if (IDIFF >= Nlat) { Idiff = IDIFF - Nlat; }
+                    else                    { Idiff = IDIFF; }
+                } else {
+                    Idiff = IDIFF;
+                }
+
+                diff_index = Index(0, 0, Idiff, Ilon,
+                                   1, 1, Nlat,  Nlon);
+
+                if ( (diff_index >= Nlat*Nlon) or (diff_index < 0) ) {
+                    fprintf(stdout, 
+                            "  LAT(1) index out of bounds"
+                            " : (lat,lon) = (%d, %d)"
+                            " : (index, diff_index) = (%d, %d)"
+                            " : IDIFF, Idiff = (%d, %d)"
+                            " : LB = %d\n",
+                            Ilat, Ilon, index, diff_index, IDIFF, Idiff, LB);
+                    fflush(stdout);
+                }
 
                 old_val = sparseget(Lap, index, diff_index);
 
-                tmp = - diff_vec.at(Idiff) * tan_lat * R2_inv;
+                tmp = - diff_vec.at(IDIFF-LB) * tan_lat * R2_inv;
 
                 alglib::sparseset(Lap, index, diff_index, old_val + tmp);
             }
