@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
             region_areas) \
     firstprivate(wRank)
     { 
-        #pragma omp for collapse(1) schedule(dynamic)
+        #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < Npts; index++) {
             if (mask.at(index) == 1) { // Skip land areas
 
