@@ -19,8 +19,8 @@ void get_diff_vector(
         const int Nlat,
         const int Nlon,
         const std::vector<double> & mask,
-        const int order_of_deriv,           // derivative order (first deriv, second deriv)
-        const int diff_ord                  // order of accuracy
+        const int order_of_deriv,
+        const int diff_ord
         ) {
 
     // Check which derivative we're taking

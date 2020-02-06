@@ -4,10 +4,6 @@
 #include "../../differentiation_tools.hpp"
 #include "../../constants.hpp"
 
-// differentaition_vector sets the vector needed to compute 
-//   a fourth-order derivative on a five-point stencil.
-// index specifies the index at which we want the derivative to be computed
-
 void differentiation_vector(
         std::vector<double> & diff_array,
         const double delta,

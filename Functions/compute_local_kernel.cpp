@@ -4,17 +4,17 @@
 #include "../constants.hpp"
 
 void compute_local_kernel(
-        std::vector<double> & local_kernel,     /**< [in] where to store the local kernel */
-        const double scale,                     /**< [in] Filtering scale */
-        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
-        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
+        std::vector<double> & local_kernel,
+        const double scale,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
         const int Ilat,
         const int Ilon,
-        const int Ntime,                        /**< [in] Length of time dimension */
-        const int Ndepth,                       /**< [in] Length of depth dimension */
-        const int Nlat,                         /**< [in] Length of latitude dimension */
-        const int Nlon,                         /**< [in] Length of longitude dimension */
-        const int LAT_lb, 
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const int LAT_lb,
         const int LAT_ub
         ){
 

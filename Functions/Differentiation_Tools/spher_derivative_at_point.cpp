@@ -19,8 +19,8 @@ void spher_derivative_at_point(
         const int Nlat,
         const int Nlon,
         const std::vector<double> & mask,
-        const int order_of_deriv,           // derivative order (first deriv, second deriv)
-        const int diff_ord                  // order of accuracy
+        const int order_of_deriv,
+        const int diff_ord
         ) {
 
     // Confirm that input sizes match

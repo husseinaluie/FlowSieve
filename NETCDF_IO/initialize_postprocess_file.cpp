@@ -7,15 +7,15 @@
 #include "../postprocess.hpp"
 
 void initialize_postprocess_file(
-        const std::vector<double> & time,           /**< [in] time vector (1D) */
-        const std::vector<double> & depth,          /**< [in] depth vector (1D) */
-        const std::vector<double> & latitude,       /**< [in] longitude vector (1D) */
-        const std::vector<double> & longitude,      /**< [in] longitude vector (1D) */
-        const std::vector<std::string> & regions,   /**< [in] name of regions */
-        const std::vector<std::string> & int_vars,  /**< [in] name of variables to write */
-        const char * filename,                      /**< [in] name for the output file */
-        const double & filter_scale,                /**< [in] filter scale */
-        const MPI_Comm comm                         /**< [in] MPI Communicator */
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & latitude,
+        const std::vector<double> & longitude,
+        const std::vector<std::string> & regions,
+        const std::vector<std::string> & int_vars,
+        const char * filename,
+        const double & filter_scale,
+        const MPI_Comm comm
         ) {
 
     int wRank=-1, wSize=-1;

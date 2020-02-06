@@ -6,9 +6,9 @@
 #include "../constants.hpp"
 
 void compute_areas(
-        std::vector<double> &areas,             /**< [in] array in which areas will be stored */
-        const std::vector<double> &longitude,   /**< [in] array containing longitude dimension (1D) */
-        const std::vector<double> &latitude     /**< [in] array containing latitude dimension (1D) */
+        std::vector<double> &areas,
+        const std::vector<double> &longitude,
+        const std::vector<double> &latitude
         ) {
 
     double dlat, dlon, coeff;
@@ -75,4 +75,5 @@ void compute_areas(
             }
         }
     }
+
 }

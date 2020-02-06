@@ -2,14 +2,14 @@
 #include "../constants.hpp"
 
 int Index( 
-        const int Itime,  /**< [in] Time index */
-        const int Idepth, /**< [in] Depth index */
-        const int Ilat,   /**< [in] Latitude index */
-        const int Ilon,   /**< [in] Longitude index */
-        const int Ntime,  /**< [in] Length of time dimension */
-        const int Ndepth, /**< [in] Length of depth dimension */
-        const int Nlat,   /**< [in] Length of latitude dimension */
-        const int Nlon    /**< [in] Length of longitude dimension */
+        const int Itime,
+        const int Idepth,
+        const int Ilat,
+        const int Ilon,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon
         ){
 
     /*

@@ -17,7 +17,13 @@
 /*! 
  * \brief Compute the area of each computational cell
  *
- * Currently assumes spherical coordinates.
+ * Works for both spherical and Cartesian coordinated (based on constants.hpp)
+ * as well as uniform and non-uniform grids (also based on constants.hpp).
+ *
+ * @param[in,out]   areas       array in which areas will be stored
+ * @param[in]       longitude   longitude vector (1D)
+ * @param[in]       latitude    latitude vector (1D)
+ *
  */
 void compute_areas(
         std::vector<double> & areas, 
@@ -32,6 +38,12 @@ void compute_areas(
  *   to access the double arrays.
  *
  * Assumes standard CF ordering: time-depth-lat-lon
+ *
+ * @param[in] Itime,Idepth,Ilat,Ilon    4-indices to be converted to a 1-index
+ * @param[in] Ntime,Ndepth,Nlat,Nlon    dimension sizes
+ *
+ * @returns The effective 1-index that corresponds to the 4-index tuplet
+ *
  */
 int Index( const int Itime, const int Idepth, const int Ilat, const int Ilon,
            const int Ntime, const int Ndepth, const int Nlat, const int Nlon  );
@@ -44,15 +56,20 @@ int Index( const int Itime, const int Idepth, const int Ilat, const int Ilon,
  *   to access the double arrays.
  *
  * Assumes standard CF ordering: time-depth-lat-lon
+ *
+ * @param[in]       index                   logical index to be converted to a 4-index
+ * @param[in,out]   Itime,Idepth,Ilat,Ilon  4-indices to be returned
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon  dimension sizes
+ *
  */
 void Index1to4( const size_t index, 
         int & Itime, int & Idepth, int & Ilat, int & Ilon,
         const int & Ntime, const int & Ndepth, const int & Nlat, const int & Nlon  );
 
 /*!
- * \brief Compute the distance (in metres) between two points on a sphere.
+ * \brief Compute the distance (in metres) between two points in the domain.
  *
- * This function computes the distance between two points on
+ * In spherical coordinates,computes the distance between two points on
  *   a spherical shell along a great circle.
  *   (see https://en.wikipedia.org/wiki/Great-circle_distance)
  * It should avoid floating point issues for the grid scales that
@@ -62,6 +79,12 @@ void Index1to4( const size_t index,
  * The last two arguments (Llon and Llat) give the physical 
  *   length of the two dimensions. This is used in the case
  *   of periodic Cartesian grids. They are otherwise unused.
+ *
+ * @param[in]   lon1,lat1   coordinates for the first position
+ * @param[in]   lon2,lat2   coordinates for the second position
+ * @param[in]   Llon,Llat   physical length of the dimensions
+ *
+ * @returns returns the distance (in metres) between two points.
  *
  */
 double distance(const double lon1,     const double lat1, 
@@ -74,6 +97,16 @@ double distance(const double lon1,     const double lat1,
  *
  * (ref_ilat, ref_ilon) is the reference point from which 
  *   the kernel values are computed.
+ *
+ * LAT_lb and LAT_ub are the (pre-computed) latitudinal bounds for the kernel.
+ *
+ * @param[in,out]   local_kernel            where to store the local kernel
+ * @param[in]       scale                   Filtering scale
+ * @param[in]       longitude,latitude      grid vectors (1D)
+ * @param[in]       ref_ilat,ref_ilon       reference coordinate (kernel centre)
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon  dimension sizes
+ * @param[in]       LAT_lb,LAT_ub           upper and lower latitudinal bounds for kernel
+ *
  */
 void compute_local_kernel(
         std::vector<double> & local_kernel,
@@ -103,6 +136,11 @@ void compute_local_kernel(
  * Note: we are still using a Spherical
  *   coordinate system, we are only converting
  *   the velocity fields.
+ *
+ * @param[in,out]   u_x,u_y,u_z         Computed Cartesian velocities
+ * @param[in]       u_r,u_lon,u_lat     Spherical velocities to be converted
+ * @param[in]       lon,lat             coordinates of the location of conversion
+ *
  */
 void vel_Spher_to_Cart(
             double & u_x, double & u_y, double & u_z,
@@ -126,6 +164,11 @@ void vel_Spher_to_Cart(
  * Note: we are still using a Spherical
  *   coordinate system, we are only converting
  *   the velocity fields.
+ *
+ * @param[in,out]   u_r,u_lon,u_lat     Computed Spherical velocities
+ * @param[in]       u_x,u_y,u_z         Cartesian velocities to be converted
+ * @param[in]       lon,lat             coordinates of the location of conversion
+ *
  */
 void vel_Cart_to_Spher(
             double & u_r, double & u_lon, double & u_lat,
@@ -138,6 +181,18 @@ void vel_Cart_to_Spher(
  * This function is the main filtering driver. It sets up the appropriate
  * loop sequences, calls the other funcations (velocity conversions), and
  * calls the IO functionality.
+ *
+ * @param[in]   u_r,u_lon,u_lat                     full velocity components
+ * @param[in]   rho                                 full density
+ * @param[in]   p                                   full pressure
+ * @param[in]   scales                              scales at which to filter the data
+ * @param[in]   dAreas                              cell areas (2D)
+ * @param[in]   time, depth, longitude, latitude    dimension vectors (1D)
+ * @param[in]   mask                                vector to distinguish land/water
+ * @param[in]   myCounts                            Local (to MPI process) dimension sizes
+ * @param[in]   myStarts                            Vector indicating where the local (to MPI process) region fits in the whole
+ * @param[in]   comm                                MPI communicator (default MPI_COMM_WORLD)
+ *
  */
 void filtering(const std::vector<double> & u_r, 
                const std::vector<double> & u_lon, 
@@ -210,25 +265,17 @@ void filtering_subsets(
  *
  * dArea for integration computed in compute_areas() 
  *
- * \param where to store filtered value
- * \param fields to filter
- * \param length of time dimension
- * \param length of depth dimension
- * \param length of latitude dimension
- * \param length of longitude dimension
- * \param current position in time dimension
- * \param current position in depth dimension
- * \param current position in latitude dimension
- * \param current position in longitude dimension
- * \param longitude vector (1D)
- * \param latitude vector (1D)
- * \param lower bound on latitude for kernel
- * \param upper bound on latitude for kernel
- * \param array of cell areas (2D - lat,lon)
- * \param filtering scale
- * \param array to distinguish land from water
- * \param array of booleans indicating whether or not to use mask (i.e. zero out land)
- * \param pointer to pre-computed kernel (NULL indicates not provided)
+ * @param[in,out]   coarse_val              where to store filtered value
+ * @param[in]       fields                  fields to filter
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon  length of time dimension
+ * @param[in]       Itime,Idepth,Ilat,Ilon  current position in time dimension
+ * @param[in]       longitude,latitude      grid vectors (lon,lat)
+ * @param[in]       LAT_lb,LAT_ub           lower/upper boundd on latitude for kernel
+ * @param[in]       dAreas                  array of cell areas (2D - lat,lon)
+ * @param[in]       scale                   filtering scale
+ * @param[in]       mask                    array to distinguish land from water
+ * @param[in]       use_mask                array of booleans indicating whether or not to use mask (i.e. zero out land) or to use the array value
+ * @param[in]       local_kernel            pointer to pre-computed kernel (NULL indicates not provided)
  *
  */
 void apply_filter_at_point(
@@ -248,11 +295,21 @@ void apply_filter_at_point(
 
 /*!
  * \brief Primary kernel function coarse-graining procedure (G in publications)
+ *
+ * @param[in]   distance    distance for evaluating the kernel
+ * @param[in]   scale       filter scale (in metres)
+ * 
+ * @returns The kernel value for a given distance and filter scale
+ *
  */
 double kernel(const double distance, const double scale);
 
+
 /*!
  * \brief Compute alpha value for kernel (for baroclinic transfer)
+ *
+ * @returns Returns a 'size' coefficient for the kernel. 
+ *
  */
 double kernel_alpha(void);
 

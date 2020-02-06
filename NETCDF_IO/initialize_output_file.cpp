@@ -5,15 +5,15 @@
 #include "../constants.hpp"
 
 void initialize_output_file(
-        const std::vector<double> & time,       /**< [in] time vector (1D) */
-        const std::vector<double> & depth,      /**< [in] depth vector (1D) */
-        const std::vector<double> & longitude,  /**< [in] longitude vector (1D) */
-        const std::vector<double> & latitude,   /**< [in] longitude vector (1D) */
-        const std::vector<double> & mask,       /**< [in] masking (land vs water, 2D) */
-        const std::vector<std::string> & vars,  /**< [in] name of variables to write */
-        const char * filename,                  /**< [in] name for the output file */
-        const double filter_scale,              /**< [in] lengthscale used in the filter */
-        const MPI_Comm comm                     /**< [in] MPI Communicator */
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask,
+        const std::vector<std::string> & vars,
+        const char * filename,
+        const double filter_scale,
+        const MPI_Comm comm
         ) {
 
     int wRank=-1, wSize=-1;

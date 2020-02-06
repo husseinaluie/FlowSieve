@@ -2,15 +2,15 @@
 #include "../constants.hpp"
 
 void Index1to4( 
-        const size_t index,    /**< [in]  1-index */
-        int & Itime,        /**< [out] Time index */
-        int & Idepth,       /**< [out] Depth index */
-        int & Ilat,         /**< [out] Latitude index */
-        int & Ilon,         /**< [out] Longitude index */
-        const int & Ntime,        /**< [out] Length of time dimension */
-        const int & Ndepth,       /**< [out] Length of depth dimension */
-        const int & Nlat,         /**< [out] Length of latitude dimension */
-        const int & Nlon          /**< [out] Length of longitude dimension */
+        const size_t index,
+        int & Itime,
+        int & Idepth,
+        int & Ilat,
+        int & Ilon,
+        const int & Ntime,
+        const int & Ndepth,
+        const int & Nlat,
+        const int & Nlon
         ){
 
     /*

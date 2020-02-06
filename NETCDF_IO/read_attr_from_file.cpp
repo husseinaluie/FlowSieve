@@ -5,11 +5,11 @@
 
 // Write to netcdf file
 void read_attr_from_file(
-        double &attr,           /**< [in] var into which to store the variable */
-        const char * attr_name, /**< [in] Name of the attribute */
-        const char * filename,  /**< [in] Name of the file */
-        const char * var_name,  /**< [in] Name of associated variable */
-        const MPI_Comm comm     /**< [in] MPI Communicator */
+        double &attr,
+        const char * attr_name,
+        const char * filename,
+        const char * var_name,
+        const MPI_Comm comm
         ) {
 
     int wRank, wSize;

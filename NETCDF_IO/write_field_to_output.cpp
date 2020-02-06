@@ -6,13 +6,13 @@
 #include "../constants.hpp"
 
 void write_field_to_output(
-        const std::vector<double> & field,  /**< [in] data to be written to the file*/
-        const char * field_name,            /**< [in] name of the variable in the netcdf file */
-        const size_t * start,               /**< [in] starting indices for the write */
-        const size_t * count,               /**< [in] size of the write in each dimension */
-        const char * filename,              /**< [in] name of the netcdf file */
-        const std::vector<double> * mask,   /**< [in] (pointer to) mask */
-        MPI_Comm comm                       /**< [in] MPI Communicator */
+        const std::vector<double> & field,
+        const char * field_name,
+        const size_t * start,
+        const size_t * count,
+        const char * filename,
+        const std::vector<double> * mask,
+        MPI_Comm comm
         ) {
 
     int wRank, wSize;
