@@ -38,11 +38,11 @@ bool RegionTest::Global(double latitude, double longitude) {
 bool RegionTest::GulfofMexico(double latitude, double longitude){
     const double lon = longitude * R2D;
     const double lat = latitude  * R2D;
-    if (     (lon > -100)
-         and (lon < -83) 
-         and (lat > 15) 
-         and (lat < 32) 
-         and (lat - 21 > -0.68 * (lon + 100))
+    if (     (lon > -100.)
+         and (lon < -83.) 
+         and (lat > 15.) 
+         and (lat < 32.) 
+         and (lat - 21. > -0.68 * (lon + 100.))
        ) { return true;  }
     else { return false; }
 }
@@ -52,9 +52,9 @@ bool RegionTest::GulfofMexico(double latitude, double longitude){
 bool RegionTest::GulfStream(double latitude, double longitude){
     const double lon = longitude * R2D;
     const double lat = latitude  * R2D;
-    if (     ( lon <= -35 )
+    if (     ( lon <= -35. )
          and ( lon >= -80.75 )
-         and ( fabs( lat - 0.4 * lon - 62 ) <= 6 ) 
+         and ( fabs( lat - 0.4 * lon - 62. ) <= 6. ) 
        ) { return true;  }
     else { return false; }
 }
@@ -64,8 +64,8 @@ bool RegionTest::GulfStream(double latitude, double longitude){
 bool RegionTest::Equator(double latitude, double longitude){
     const double lat = latitude * R2D;
 
-    if ( fabs(lat) < 15 ) { return true;  }
-    else                  { return false; }
+    if ( fabs(lat) < 15. ) { return true;  }
+    else                   { return false; }
 
 }
 
@@ -74,8 +74,8 @@ bool RegionTest::Equator(double latitude, double longitude){
 bool RegionTest::NorthofEquator(double latitude, double longitude){
     const double lat = latitude * R2D;
 
-    if ( lat >= 15 ) { return true;  }
-    else             { return false; }
+    if ( lat >= 15. ) { return true;  }
+    else              { return false; }
 }
 
 
@@ -83,8 +83,8 @@ bool RegionTest::NorthofEquator(double latitude, double longitude){
 bool RegionTest::SouthofEquator(double latitude, double longitude){
     const double lat = latitude * R2D;
 
-    if ( lat <= -15 ) { return true;  }
-    else              { return false; }
+    if ( lat <= -15. ) { return true;  }
+    else               { return false; }
 }
 
 
@@ -92,13 +92,13 @@ bool RegionTest::SouthofEquator(double latitude, double longitude){
 bool RegionTest::Kuroshio(double latitude, double longitude) {
     const double lon = longitude * R2D;
     const double lat = latitude  * R2D;
-    if (     (lon > 120)
-         and (lon < 170)
-         and (lat > 17)
-         and (lat < 45)
-         and not( (lat - 30 > (lon - 120) * ( 15/20 )) )
-         and not( (lat - 17 < (lon - 120) * (  8/20 )) and (lon <= 140) )
-         and not( (lat < 25) and (lon >= 140))
+    if (     (lon > 120.)
+         and (lon < 170.)
+         and (lat > 17.)
+         and (lat < 45.)
+         and not( (  (lat - 30.) > ( (lon - 120.) * ( 15./20. ) ) ) )
+         and not( (  (lat - 17.) < ( (lon - 120.) * (  8./20. ) ) ) and (lon <= 140.) )
+         and not( (lat < 25.) and (lon >= 140.))
        ) { return true;  }
     else { return false; }
 }
@@ -108,10 +108,11 @@ bool RegionTest::Kuroshio(double latitude, double longitude) {
 bool RegionTest::AntarcticCircumpolar(double latitude, double longitude){
     const double lon = longitude * R2D;
     const double lat = latitude  * R2D;
-    if (     (lat < -33) 
-         and (lat > -70) 
-         and not( (lat + 45 > (lon + 180) * (- 5/108)) and (lon < -72) ) 
-         and not( (lat + 33 > (lon -  20) * (-12/160)) and (lon >  20) )
+    if (     (lat < -33.) 
+         and (lat > -70.) 
+         and not( ( (lat + 45.) > ( (lon + 180.) * (- 5./108.) ) ) and (lon < -72.) ) 
+         and not( ( (lat + 33.) > ( (lon -  20.) * (-12./160.) ) ) and (lon >  20.) )
        ) { return true;  }
     else { return false; }
 }
+
