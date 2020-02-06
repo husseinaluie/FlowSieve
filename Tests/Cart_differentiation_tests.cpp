@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -128,14 +127,26 @@ void apply_test(
                     mask);
 
             // Store them
-            numer_x_deriv.at(index) = x_deriv_val;
-            numer_y_deriv.at(index) = y_deriv_val;
-            numer_z_deriv.at(index) = z_deriv_val;
+            if ( mask.at(index) == 0 ) {
+                numer_x_deriv.at(index) = constants::fill_value;
+                numer_y_deriv.at(index) = constants::fill_value;
+                numer_z_deriv.at(index) = constants::fill_value;
+            } else {
+                numer_x_deriv.at(index) = x_deriv_val;
+                numer_y_deriv.at(index) = y_deriv_val;
+                numer_z_deriv.at(index) = z_deriv_val;
+            }
 
             #if SAVE_TO_FILE
-            true_x_deriv.at(index) = true_deriv_x(latitude.at(Ilat), longitude.at(Ilon));
-            true_y_deriv.at(index) = true_deriv_y(latitude.at(Ilat), longitude.at(Ilon));
-            true_z_deriv.at(index) = true_deriv_z(latitude.at(Ilat), longitude.at(Ilon));
+            if ( mask.at(index) == 0 ) {
+                true_x_deriv.at(index) = constants::fill_value;
+                true_y_deriv.at(index) = constants::fill_value;
+                true_z_deriv.at(index) = constants::fill_value;
+            } else {
+                true_x_deriv.at(index) = true_deriv_x(latitude.at(Ilat), longitude.at(Ilon));
+                true_y_deriv.at(index) = true_deriv_y(latitude.at(Ilat), longitude.at(Ilon));
+                true_z_deriv.at(index) = true_deriv_z(latitude.at(Ilat), longitude.at(Ilon));
+            }
             #endif
         }
     }
@@ -216,6 +227,9 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
     assert(wSize==1);
+    static_assert( constants::CARTESIAN);
+    static_assert( constants::PERIODIC_X);
+    static_assert(!constants::PERIODIC_Y);
 
     const int num_tests = 6;
     const int base_nlon = 32;
@@ -282,11 +296,14 @@ int main(int argc, char *argv[]) {
                 mask.at(index)  = mask_func( latitude.at(Ilat), longitude.at(Ilon));
                 field.at(index) = field_func(latitude.at(Ilat), longitude.at(Ilon));
 
+                if ( mask.at(index) == 0 ) { field.at(index) = constants::fill_value; }
+
                 num_land += 1 - mask.at(index);
             }
         }
         if (test_ind == num_tests - 1) {
-            fprintf(stdout, "At highest resolution, %.3g%% of tiles were land.\n", 100 * ( (double) num_land) / (Nlat * Nlon));
+            fprintf(stdout, "At highest resolution, %.3g%% of tiles were land.\n", 
+                    100 * ( (double) num_land) / (Nlat * Nlon));
         }
 
         #if SAVE_TO_FILE
@@ -304,7 +321,8 @@ int main(int argc, char *argv[]) {
                 vars_to_write, fname, 0.);
         #endif
 
-        apply_test(x2_err, y2_err, z2_err, xinf_err, yinf_err, zinf_err, longitude, latitude, field, dArea, mask, Nlat, Nlon); 
+        apply_test(x2_err, y2_err, z2_err, xinf_err, yinf_err, zinf_err, 
+                longitude, latitude, field, dArea, mask, Nlat, Nlon); 
 
         x2_errors.at(test_ind) = x2_err;
         y2_errors.at(test_ind) = y2_err;

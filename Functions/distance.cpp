@@ -3,12 +3,12 @@
 #include "../constants.hpp"
 
 double distance(
-        const double lon1,  /**< [in] Longitude of first position */
-        const double lat1,  /**< [in] Latitude of first position */
-        const double lon2,  /**< [in] Longitude of second position */
-        const double lat2,  /**< [in] Latitude of second position */
-        const double Llon,  /**< [in] Physical length of the longitude (first) dimension */
-        const double Llat   /**< [in] Physical length of the latitude (second) dimension */
+        const double lon1,
+        const double lat1,
+        const double lon2,
+        const double lat2,
+        const double Llon,
+        const double Llat
         ) {
 
     double distance;

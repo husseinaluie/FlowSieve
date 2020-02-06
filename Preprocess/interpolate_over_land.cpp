@@ -54,8 +54,10 @@ void interpolate_over_land(
     int cntr;
     double R;
     int index, mask_index, num_seed_points = 0, num_interp_points = 0;
+    #if DEBUG >= 1
     double perc_base = 10;
     double perc;
+    #endif
 
     double x, y, z, lat, lon;
     const double D2R = M_PI / 180;
@@ -86,8 +88,8 @@ void interpolate_over_land(
             R = constants::R_earth - depth.at(Idepth);
             #if DEBUG >= 1
             fprintf(stdout, "      Adding seed data to the interpolator object.\n");
-            #endif
             perc = perc_base;
+            #endif
             cntr = 0;
             for (int Ilat = 0; Ilat < Nlat; Ilat++) {
                 lat = latitude.at(Ilat);
@@ -167,8 +169,8 @@ void interpolate_over_land(
             //
             #if DEBUG >= 1
             fprintf(stdout, "      Filling land points with the interpolator object.\n");
-            #endif
             perc = perc_base;
+            #endif
 
             for (int Ilat = 0; Ilat < Nlat; Ilat++) {
                 lat = latitude.at(Ilat);

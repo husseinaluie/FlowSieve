@@ -25,7 +25,9 @@ void compute_vorticity(
     MPI_Comm_size( comm, &wSize );
 
     double vort_r_tmp, vort_lon_tmp, vort_lat_tmp;
-    int index, mask_index, Itime, Idepth, Ilat, Ilon;
+    int Itime, Idepth, Ilat, Ilon;
+    size_t index; 
+    const size_t Npts = u_r.size();
 
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  Starting vorticity computation.\n"); }
@@ -35,49 +37,35 @@ void compute_vorticity(
     default(none) \
     shared(mask, u_r, u_lon, u_lat, longitude, latitude,\
             vort_r, vort_lon, vort_lat)\
-    private(Itime, Idepth, Ilat, Ilon, index, mask_index, \
+    private(Itime, Idepth, Ilat, Ilon, index, \
             vort_r_tmp, vort_lon_tmp, vort_lat_tmp)
     {
-        #pragma omp for collapse(2) schedule(dynamic)
-        for (Ilat = 0; Ilat < Nlat; Ilat++) {
-            for (Ilon = 0; Ilon < Nlon; Ilon++) {
+        #pragma omp for collapse(1) schedule(guided)
+        for (index = 0; index < Npts; index++) {
 
-                mask_index = Index(0,     0,      Ilat, Ilon,
-                                   Ntime, Ndepth, Nlat, Nlon);
+            vort_r_tmp   = constants::fill_value;
+            vort_lon_tmp = constants::fill_value;
+            vort_lat_tmp = constants::fill_value;
 
-                for (Itime = 0; Itime < Ntime; Itime++) {
-                    for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+            if (mask.at(index) == 1) { // Skip land areas
 
-                        vort_r_tmp = 0.;
-                        vort_lon_tmp = 0.;
-                        vort_lat_tmp = 0.;
+                Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                                 Ntime, Ndepth, Nlat, Nlon);
 
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                      Ntime, Ndepth, Nlat, Nlon);
+                compute_vorticity_at_point(
+                        vort_r_tmp, vort_lon_tmp, vort_lat_tmp,
+                        u_r,        u_lon,        u_lat,
+                        Ntime, Ndepth, Nlat, Nlon,
+                        Itime, Idepth, Ilat, Ilon,
+                        longitude, latitude,
+                        mask);
+            }
 
-                        if (mask.at(mask_index) == 1) { // Skip land areas
-                            compute_vorticity_at_point(
-                                    vort_r_tmp, vort_lon_tmp, vort_lat_tmp,
-                                    u_r,        u_lon,        u_lat,
-                                    Ntime, Ndepth, Nlat, Nlon,
-                                    Itime, Idepth, Ilat, Ilon,
-                                    longitude, latitude,
-                                    mask);
-                        }
-                        else { // if not masked
-                            vort_r_tmp   = constants::fill_value;
-                            vort_lon_tmp = constants::fill_value;
-                            vort_lat_tmp = constants::fill_value;
-                        }  // end not(masked) block
+            vort_r.at(  index) = vort_r_tmp;
+            vort_lon.at(index) = vort_lon_tmp;
+            vort_lat.at(index) = vort_lat_tmp;
 
-                        vort_r.at(  index) = vort_r_tmp;
-                        vort_lon.at(index) = vort_lon_tmp;
-                        vort_lat.at(index) = vort_lat_tmp;
-
-                    } // end depth loop
-                } // end time loop
-            } // end lon loop
-        } // end lat loop
+        } // end index loop
     } // end pragma
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "     ... done.\n"); }

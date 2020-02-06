@@ -5,13 +5,14 @@
 
 // Write to netcdf file
 void read_var_from_file(
-        std::vector<double> &var,   /**< [in] Vector into which to store the variable */
-        const char * var_name,      /**< [in] Name of the variable */
-        const char * filename,      /**< [in] Name of the file */
-        std::vector<double> *mask,  /**< [in] Pointer to mask array to be created */
-        std::vector<int> *myCounts, /**< [in] Vector into which to store sizes (if not NULL) */
-        std::vector<int> *myStarts, /**< [in] Vector into which to store sizes (if not NULL) */
-        const MPI_Comm comm         /**< [in] MPI Communicator */
+        std::vector<double> &var,
+        const char * var_name,
+        const char * filename,
+        std::vector<double> *mask,
+        std::vector<int> *myCounts,
+        std::vector<int> *myStarts,
+        const bool do_splits,
+        const MPI_Comm comm
         ) {
 
     int wRank, wSize;
@@ -30,8 +31,8 @@ void read_var_from_file(
     int ncid=0, retval;
     char buffer [50];
     snprintf(buffer, 50, filename);
-    if (( retval = nc_open_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid) ))
-        NC_ERR(retval, __LINE__, __FILE__); 
+    retval = nc_open_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     char varname [50];
     snprintf(varname, 50, var_name);
@@ -40,12 +41,12 @@ void read_var_from_file(
     int dim_ids[NC_MAX_VAR_DIMS];
 
     // Get the ID for the variable
-    if ((retval = nc_inq_varid(ncid, varname, &var_id ))) 
-        NC_ERR(retval, __LINE__, __FILE__);
+    retval = nc_inq_varid(ncid, varname, &var_id );
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Get information about the variable
-    if ((retval = nc_inq_var(ncid, var_id, NULL, NULL, &num_dims, dim_ids, NULL ))) 
-        NC_ERR(retval, __LINE__, __FILE__);
+    retval = nc_inq_var(ncid, var_id, NULL, NULL, &num_dims, dim_ids, NULL );
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     #if DEBUG >= 2
     if (wRank == 0) {
         if (num_dims == 1) {
@@ -66,31 +67,35 @@ void read_var_from_file(
     }
     for (int II = 0; II < num_dims; II++) {
         start[II] = 0;
-        if ((retval = nc_inq_dim(ncid, dim_ids[II] , NULL, &count[II]  ))) 
-            NC_ERR(retval, __LINE__, __FILE__);
+        retval = nc_inq_dim(ncid, dim_ids[II] , NULL, &count[II]);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
         #if DEBUG >= 2
         if (wRank == 0) { fprintf(stdout, "%zu ", count[II]); }
         #endif
 
-        // If we're split on multiple MPI procs and have > 2 dimensions, 
-        //   then divide all but the last two we don't split the last 
-        //   two because those are assumed to be lat/lon
-        if ( (num_dims > 2) and (wSize > 1) and (II == 0) ) {
-            // For now, just split in time (assumed to be the first dimension)
-            my_count = ((int)count[II]) / wSize;
-            overflow = (int)( count[II] - my_count * wSize );
+        if (do_splits) {
+            // If we're split on multiple MPI procs and have > 2 dimensions, 
+            //   then divide all but the last two 
+            //
+            //   we don't split the last two because those 
+            //   are assumed to be lat/lon
+            if ( (num_dims > 2) and (wSize > 1) and (II == 0) ) {
+                // For now, just split in time (assumed to be the first dimension)
+                my_count = ((int)count[II]) / wSize;
+                overflow = (int)( count[II] - my_count * wSize );
 
-            start[II] = (size_t) (   
-                    std::min(wRank,            overflow) * (my_count + 1)
-                  + std::max(wRank - overflow, 0       ) *  my_count
-                  );
+                start[II] = (size_t) (   
+                          std::min(wRank,            overflow) * (my_count + 1)
+                        + std::max(wRank - overflow, 0       ) *  my_count
+                        );
 
-            // Distribute the remainder over the first chunk of processors
-            if (wRank < overflow) { my_count++; }
-            count[II] = (size_t) my_count;
-
+                // Distribute the remainder over the first chunk of processors
+                if (wRank < overflow) { my_count++; }
+                count[II] = (size_t) my_count;
+            }
         }
         num_pts *= count[II];
+
         if (myCounts != NULL) { myCounts->at(II) = (int) count[II]; }
         if (myStarts != NULL) { myStarts->at(II) = (int) start[II]; }
     }
@@ -118,52 +123,50 @@ void read_var_from_file(
     var.resize(num_pts);
 
     // Now read in the data
-    if ((retval = nc_get_vara_double(ncid, var_id, start, count, &var[0]))) 
-        NC_ERR(retval, __LINE__, __FILE__);
+    retval = nc_get_vara_double(ncid, var_id, start, count, &var[0]);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Apply scale factor if appropriate
     double scale = 1.;
-    if ((retval = nc_get_att_double(ncid, var_id, "scale_factor", &scale))) 
-        NC_ERR(retval, __LINE__, __FILE__);
+    retval = nc_get_att_double(ncid, var_id, "scale_factor", &scale);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     if (scale != 1.) {
         #if DEBUG >= 2
         if (wRank == 0) { fprintf(stdout, "  scale factor = %g\n", scale); }
         #endif
-        for (size_t II = 0; II < num_pts; II++) {
-            var.at(II) = var.at(II) * scale;
-        }
+        for (size_t II = 0; II < num_pts; II++) { var.at(II) = var.at(II) * scale; }
     }
 
     // Apply offset if appropriate
     double offset = 0.;
-    if ((retval = nc_get_att_double(ncid, var_id, "add_offset", &offset))) 
-        NC_ERR(retval, __LINE__, __FILE__);
+    retval = nc_get_att_double(ncid, var_id, "add_offset", &offset);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     if (offset != 0.) {
         #if DEBUG >= 2
         if (wRank == 0) { fprintf(stdout, "  additive offset = %g\n", offset); }
         #endif
-        for (size_t II = 0; II < num_pts; II++) {
-            var.at(II) = var.at(II) + offset;
-        }
+        for (size_t II = 0; II < num_pts; II++) { var.at(II) = var.at(II) + offset; }
     }
 
     // Determine masking, if desired
-    double fill_val = 1e100;
+    double fill_val = 1e100;  // backup value
     int num_land = 0;
     int num_water = 0;
-    size_t Nlat, Nlon;
     if ( (mask != NULL) and (num_dims == 4) ) {
-        // Assuming CF dimension order: time - depth - lat - lon
-        Nlat = count[2];
-        Nlon = count[3];
-        mask->resize(Nlat*Nlon);
-        if ((retval = nc_get_att_double(ncid, var_id, "_FillValue", &fill_val))) 
-            NC_ERR(retval, __LINE__, __FILE__);
+
+        mask->resize(var.size());
+
+        // Get the relevant fill value
+        nc_get_att_double(ncid, var_id, "_FillValue", &fill_val);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
         #if DEBUG >= 2
         if (wRank == 0) { fprintf(stdout, "  fill value = %g\n", fill_val); }
         #endif
-        for (size_t II = 0; II < Nlat * Nlon; II++) {
-            if (fabs(var.at(II)) > 0.95 * fabs(fill_val*scale)) {
+
+        // If we're at 99% of the fill_val, call it land
+        for (size_t II = 0; II < mask->size(); II++) {
+            if (fabs(var.at(II)) > 0.99 * fabs(fill_val*scale)) {
                 mask->at(II) = 0;
                 num_land++;
             } else {
@@ -171,6 +174,7 @@ void read_var_from_file(
                 num_water++;
             }
         }
+
         #if DEBUG >= 1
         if (wRank == 0) {
             fprintf(stdout, "  Land cover = %.4g%%\n", 
@@ -184,6 +188,6 @@ void read_var_from_file(
     #endif
 
     MPI_Barrier(comm);
-    if (( retval = nc_close(ncid) ))
-        NC_ERR(retval, __LINE__, __FILE__); 
+    retval = nc_close(ncid);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 }

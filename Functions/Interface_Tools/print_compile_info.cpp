@@ -45,7 +45,6 @@ void print_compile_info(
         default :
             fprintf(stdout, "  c++ version: unknown (%zu)\n", __cplusplus);
             break;
-
     }
     fprintf(stdout, "\n");
 
@@ -53,11 +52,19 @@ void print_compile_info(
     fprintf(stdout, "  DEBUG             = %d\n", DEBUG);
     fprintf(stdout, "  KERNEL_OPT        = %d\n", constants::KERNEL_OPT);
     fprintf(stdout, "  CARTESIAN         = %s\n", constants::CARTESIAN         ? "true" : "false");
+    fprintf(stdout, "\n");
     fprintf(stdout, "  PERIODIC_X        = %s\n", constants::PERIODIC_X        ? "true" : "false");
     fprintf(stdout, "  PERIODIC_Y        = %s\n", constants::PERIODIC_Y        ? "true" : "false");
+    fprintf(stdout, "  UNIFORM_LAT_GRID  = %s\n", constants::UNIFORM_LAT_GRID  ? "true" : "false");
+    fprintf(stdout, "\n");
     fprintf(stdout, "  COMP_VORT         = %s\n", constants::COMP_VORT         ? "true" : "false");
     fprintf(stdout, "  COMP_TRANSFERS    = %s\n", constants::COMP_TRANSFERS    ? "true" : "false");
     fprintf(stdout, "  COMP_BC_TRANSFERS = %s\n", constants::COMP_BC_TRANSFERS ? "true" : "false");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "  MINIMAL_OUTPUT    = %s\n", constants::MINIMAL_OUTPUT    ? "true" : "false");
+    fprintf(stdout, "  CAST_TO_INT       = %s\n", constants::CAST_TO_INT       ? "true" : "false");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "  DO_TIMING         = %s\n", constants::DO_TIMING         ? "true" : "false");
     fprintf(stdout, "\n");
 
     fprintf(stdout, "Constants\n");
@@ -75,5 +82,4 @@ void print_compile_info(
         if (II < scales.size() - 1) { fprintf(stdout, ",  "); }
     }
     fprintf(stdout, "\n\n");
-
 }

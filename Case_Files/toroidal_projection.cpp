@@ -7,12 +7,22 @@
 #include <vector>
 #include <mpi.h>
 #include <omp.h>
+#include <cassert>
 
-#include "netcdf_io.hpp"
-#include "functions.hpp"
-#include "constants.hpp"
+#include "../netcdf_io.hpp"
+#include "../functions.hpp"
+#include "../constants.hpp"
+#include "../preprocess.hpp"
 
 int main(int argc, char *argv[]) {
+    
+    // PERIODIC_Y implies UNIFORM_LAT_GRID
+    static_assert( (constants::UNIFORM_LAT_GRID) or (not(constants::PERIODIC_Y)),
+            "PERIODIC_Y requires UNIFORM_LAT_GRID.\n"
+            "Please update constants.hpp accordingly.\n");
+    static_assert( not(constants::CARTESIAN),
+            "Toroidal projection now set to handle Cartesian coordinates.\n"
+            );
 
     // Enable all floating point exceptions but FE_INEXACT
     //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
@@ -21,45 +31,11 @@ int main(int argc, char *argv[]) {
     //   and initialize the MPI world
     int thread_safety_provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_safety_provided);
-    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI::ERRORS_THROW_EXCEPTIONS);
-    //MPI_Status status;
-    const double start_time = MPI_Wtime();
+    //MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI::ERRORS_THROW_EXCEPTIONS);
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
-
-    // For the time being, hard-code the filter scales
-    //   include scales as a comma-separated list
-    //   scales are given in metres
-    // A zero scale will cause everything to nan out
-    std::vector<double> filter_scales {250e3};
-
-    // Parse command-line flags
-    char buffer [50];
-    if (wRank == 0) {
-        for(int ii = 1; ii < argc; ++ii) {  
-            fprintf(stdout, "Argument %d : %s\n", ii, argv[ii]);
-            snprintf(buffer, 50, "--version");
-            if (strcmp(argv[ii], buffer) == 0) {
-                print_compile_info(filter_scales);
-                return 0;
-            } else {
-                fprintf(stderr, "Flag %s not recognized.\n", argv[ii]);
-                return -1;
-            }
-        }
-    }
-
-    #if DEBUG >= 0
-    if (wRank == 0) {
-        fprintf(stdout, "\n\n");
-        fprintf(stdout, "Compiled at %s on %s.\n", __TIME__, __DATE__);
-        fprintf(stdout, "  Version %d.%d.%d \n", 
-                MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
-        fprintf(stdout, "\n");
-    }
-    #endif
 
     #if DEBUG >= 0
     if (wRank == 0) {
@@ -68,6 +44,7 @@ int main(int argc, char *argv[]) {
         } else {
             fprintf(stdout, "Using spherical coordinates.\n");
         }
+        fflush(stdout);
     }
     #endif
     MPI_Barrier(MPI_COMM_WORLD);
@@ -85,24 +62,14 @@ int main(int argc, char *argv[]) {
         fprintf(stdout, "Hello from thread %d of %d on processor %d of %d.\n", 
                 tid+1, nthreads, wRank+1, wSize);
     }
+    fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
     #endif
 
-    std::vector<double> longitude;
-    std::vector<double> latitude;
-    std::vector<double> time;
-    std::vector<double> depth;
-
-    std::vector<double> u_r;
-    std::vector<double> u_lon;
-    std::vector<double> u_lat;
-
-    std::vector<double> rho;
-    std::vector<double> p;
-
+    std::vector<double> longitude, latitude, time, depth;
+    std::vector<double> u_lon, u_lat, seed;
     std::vector<double> mask;
     std::vector<int> myCounts, myStarts;
-    size_t II;
 
     // Read in source data / get size information
     #if DEBUG >= 1
@@ -116,29 +83,34 @@ int main(int argc, char *argv[]) {
     read_var_from_file(depth,     "depth",     "input.nc");
 
     // Read in the velocity fields
-    read_var_from_file(u_lon, "uo", "input.nc", &mask, &myCounts, &myStarts);
-    read_var_from_file(u_lat, "vo", "input.nc", &mask, &myCounts, &myStarts);
+    read_var_from_file(u_lon, "uo",  "input.nc", &mask, &myCounts, &myStarts);
+    read_var_from_file(u_lat, "vo",  "input.nc", &mask, &myCounts, &myStarts);
 
-    // No u_r in inputs, so initialize as zero
-    u_r.resize(u_lon.size());
-    #pragma omp parallel default(none) private(II) shared(u_r)
-    { 
-        #pragma omp for collapse(1) schedule(static)
-        for (II = 0; II < u_r.size(); II++) {
-            u_r.at(II) = 0.;
-        }
+    // Read in the seed
+    double seed_count;
+    read_attr_from_file(seed_count, "seed_count", "seed.nc");
+    const bool single_seed = (seed_count < 2);
+    if (wRank == 0) { 
+        fprintf(stdout, " single_seed = %s\n", single_seed ? "true" : "false"); 
     }
+    //read_var_from_file(seed, "seed",  "seed.nc", NULL, NULL, NULL, false);
+    read_var_from_file(seed, "seed",  "seed.nc", NULL, NULL, NULL, not(single_seed));
 
-    if (constants::COMP_BC_TRANSFERS) {
-        // If desired, read in rho and p
-        read_var_from_file(rho, "rho", "input.nc");
-        read_var_from_file(p,   "p",   "input.nc");
-    }
-
-    //const int Ntime  = time.size();
-    //const int Ndepth = depth.size();
+    #if DEBUG >= 1
+    const int Ntime  = time.size();
+    const int Ndepth = depth.size();
+    #endif
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
+
+    #if DEBUG >= 1
+    fprintf(stdout, "Processor %d has (%d, %d, %d, %d) from (%d, %d, %d, %d)\n", 
+            wRank, 
+            myCounts[0], myCounts[1], myCounts[2], myCounts[3],
+            Ntime, Ndepth, Nlat, Nlon);
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
+    #endif
 
     if (not(constants::CARTESIAN)) {
         // Convert coordinate to radians
@@ -168,27 +140,18 @@ int main(int argc, char *argv[]) {
     std::vector<double> areas(Nlon * Nlat);
     compute_areas(areas, longitude, latitude);
 
-    // Now pass the arrays along to the filtering routines
-    const double pre_filter_time = MPI_Wtime();
-    filtering(u_r, u_lon, u_lat,
-              rho, p,
-              filter_scales,
-              areas, 
-              time, depth,
-              longitude, latitude,
-              mask, myCounts, myStarts);
-    const double post_filter_time = MPI_Wtime();
+    Apply_Toroidal_Projection(
+            u_lon, u_lat, time, depth, latitude, longitude,
+            mask, myCounts, myStarts, seed, single_seed
+            );
+
 
     // Done!
     #if DEBUG >= 0
-    const double delta_clock = MPI_Wtick();
     if (wRank == 0) {
         fprintf(stdout, "\n\n");
         fprintf(stdout, "Process completed.\n");
         fprintf(stdout, "\n");
-        fprintf(stdout, "Start-up time  = %.13g\n", pre_filter_time - start_time);
-        fprintf(stdout, "Filtering time = %.13g\n", post_filter_time - pre_filter_time);
-        fprintf(stdout, "   (clock resolution = %.13g)\n", delta_clock);
     }
     #endif
 

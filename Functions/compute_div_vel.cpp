@@ -22,7 +22,9 @@ void compute_div_vel(
 
     double div_tmp;
 
-    int Itime, Idepth, Ilat, Ilon, index, mask_index;
+    int Itime, Idepth, Ilat, Ilon;
+    size_t index;
+    const size_t Npts = u_x.size();
 
     double ux_x, uy_y, uz_z;
     std::vector<double*> x_deriv_vals, y_deriv_vals, z_deriv_vals;
@@ -34,9 +36,9 @@ void compute_div_vel(
     
     #pragma omp parallel \
     default(none) \
-    shared( div, stdout, latitude, longitude, mask,\
+    shared( div, latitude, longitude, mask,\
             u_x, u_y, u_z, deriv_fields)\
-    private(Itime, Idepth, Ilat, Ilon, index, mask_index, \
+    private(Itime, Idepth, Ilat, Ilon, index,\
             ux_x, uy_y, uz_z, x_deriv_vals, y_deriv_vals, z_deriv_vals,\
             div_tmp)
     {
@@ -53,43 +55,31 @@ void compute_div_vel(
         z_deriv_vals.push_back(NULL);
         z_deriv_vals.push_back(&uz_z);
 
-        #pragma omp for collapse(2) schedule(dynamic)
-        for (Ilat = 0; Ilat < Nlat; Ilat++) {
-            for (Ilon = 0; Ilon < Nlon; Ilon++) {
+        #pragma omp for collapse(1) schedule(guided)
+        for (index = 0; index < Npts; index++) {
 
-                mask_index = Index(
-                        0,     0,      Ilat, Ilon,
-                        Ntime, Ndepth, Nlat, Nlon);
+            div_tmp = constants::fill_value;
 
-                for (Itime = 0; Itime < Ntime; Itime++) {
-                    for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+            if (mask.at(index) == 1) { // Skip land areas
 
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                      Ntime, Ndepth, Nlat, Nlon);
+                Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                                 Ntime, Ndepth, Nlat, Nlon);
 
-                        if (mask.at(mask_index) == 1) { // Skip land areas
+                Cart_derivatives_at_point(
+                        x_deriv_vals, y_deriv_vals,
+                        z_deriv_vals, deriv_fields,
+                        latitude, longitude,
+                        Itime, Idepth, Ilat, Ilon,
+                        Ntime, Ndepth, Nlat, Nlon,
+                        mask);
 
-                            Cart_derivatives_at_point(
-                                    x_deriv_vals, y_deriv_vals,
-                                    z_deriv_vals, deriv_fields,
-                                    latitude, longitude,
-                                    Itime, Idepth, Ilat, Ilon,
-                                    Ntime, Ndepth, Nlat, Nlon,
-                                    mask);
+                // u_i,i
+                div_tmp = ux_x + uy_y + uz_z;
 
-                            // u_i,i
-                            div_tmp = ux_x + uy_y + uz_z;
+            }
 
-                        } // end if(water) block
-                        else { // if(land)
-                            div_tmp = constants::fill_value;
-                        } // end if(land)
+            div.at(index) = div_tmp;
 
-                        div.at(index) = div_tmp;
-
-                    } // end Idepth loop
-                } // end Itime loop
-            } // end Ilon loop
-        } // end Ilat loop
+        } // end index
     } // end pragma
 } // end function

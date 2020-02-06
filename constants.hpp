@@ -3,7 +3,7 @@
 
 // Default debug value
 #ifndef DEBUG
-    #define DEBUG 0
+    #define DEBUG 1
 #endif
 
 /*!
@@ -14,7 +14,7 @@
  *
  * Usage:
  * @code
- * #include "functions.hpp"
+ * #include "constants.hpp"
  * ...
  * double R_earth = constants::R_earth;
  * @endcode
@@ -59,14 +59,21 @@ namespace constants
      * \brief Differentiation order for finite differencing (currently must be 2, 4, or 6).
      * @ingroup constants
      */
-    const int DiffOrd = 6;
+    const int DiffOrd = 2;
 
     /*!
      * \param fill_value
      * \brief Fill value used to indicate land values in output files.
      * @ingroup constants
      */
-    const double fill_value = -32767;
+    const double fill_value = -1e10;
+
+    /*!
+     * \param fill_value_s
+     * \brief Fill value used to indicate land values in output files (signed short)
+     * @ingroup constants
+     */
+    const signed short fill_value_s = -32767;
 
     /*!
      * \param CARTESIAN
@@ -90,11 +97,18 @@ namespace constants
     const bool PERIODIC_Y = false;
 
     /*!
+     * \param UNIFORM_LAT_GRID
+     * \brief Boolean indicating if the latitude grid is uniform
+     * @ingroup constants
+     */
+    const bool UNIFORM_LAT_GRID = true;
+
+    /*!
      * \param COMP_VORT
      * \brief Boolean indicating if vorticity should be computed.
      * @ingroup constants
      */
-    const bool COMP_VORT = true;
+    const bool COMP_VORT = false;
 
     /*!
      * \param COMP_TRANSFERS
@@ -108,7 +122,48 @@ namespace constants
      * \brief Boolean indicating if baroclinic transfers (Lambda^m) should be computed.
      * @ingroup constants
      */
-    const bool COMP_BC_TRANSFERS = true;
+    const bool COMP_BC_TRANSFERS = false;
+
+    /*!
+     * \param MINIMAL_OUTPUT
+     * \brief Boolean indicating if user wants a minimal output
+     *
+     * Removes: fine velocities, coarse/fine KE, divergences
+     *
+     * @ingroup constants
+     */
+    const bool MINIMAL_OUTPUT = true;
+
+    /*! 
+     * \param NO_FULL_OUTPUTS
+     * \brief Indicates that no full fields should be produced.
+     *   
+     * Only results from APPLY_POSTPROCESS will be produced.
+     *
+     * If NO_FULL_OUTPUTS and not(APPLY_POSTPROCESS), the no outputs
+     * at all will be produced, so the code will simply halt immediately.
+     *
+     * @ingroup constants
+     */
+    const bool NO_FULL_OUTPUTS = false;
+
+    /*!
+     * \param CAST_TO_SINGLE
+     * \brief Boolean indicating if user wants to cast to float (single) output
+     * (reduces output size by factor 2, but also reduces precision)
+     *
+     * @ingroup constants
+     */
+    const bool CAST_TO_SINGLE = false;
+
+    /*!
+     * \param CAST_TO_INT
+     * \brief Boolean indicating if user wants to cast to int output
+     * (further reduces output size by factor 2, but also reduces precision)
+     *
+     * @ingroup constants
+     */
+    const bool CAST_TO_INT = false;
 
     /*!
      * \param DO_TIMING
@@ -118,16 +173,24 @@ namespace constants
     const bool DO_TIMING = true;
 
     /*!
+     * \param APPLY_POSTPROCESS
+     * \brief Boolean indicating whether or not the postprocess routines should be applied
+     * @ingroup constants
+     */
+    const bool APPLY_POSTPROCESS = true;
+
+    /*!
      * \param KERNEL_OPT
      * \brief Integer flag indicating the choice of kernel
      *
      *  0 = tophat
-     *  1 = Hyper gaus (exp(-x^4))
-     *  2 = Gaus  (exp(-x^2))
-     *  3 = sinc (sharp-spectral)
+     *  1 = Hyper gaus  ( exp( -x^4 )                  )
+     *  2 = Gaus        ( exp( -x^2 )                  )
+     *  3 = sinc        ( sinc( pi * x )               )
+     *  4 = tanh        ( 1 - tanh( (x - 1) / (0.1) )  )
      * @ingroup constants
      */
-    const int KERNEL_OPT = 1;
+    const int KERNEL_OPT = 4;
 
     /*!
      * \param KernPad
@@ -144,6 +207,7 @@ namespace constants
         case 1: const double KernPad =  2.5;  // exp(-2.5^4) ~1e-17
         case 2: const double KernPad =  5.;   // exp(-5^2)   ~1e-11
         case 3: const double KernPad = -1.;
+        case 4: const double KernPad =  2.5;
     }
     */
 

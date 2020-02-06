@@ -18,7 +18,9 @@ void spher_derivative_at_point(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<double> & mask,
+        const int order_of_deriv,
+        const int diff_ord
         ) {
 
     // Confirm that input sizes match
@@ -32,11 +34,14 @@ void spher_derivative_at_point(
         }
     }
 
+    // Check which derivative we're taking
     int index, Iref;
     const int Nref = grid.size();
     const bool do_lat = (dim == "lat");
     const bool do_lon = (dim == "lon");
+    assert( do_lat ^ do_lon ); // xor
 
+    // Verify input
     if      (do_lon) { Iref = Ilon; }
     else if (do_lat) { Iref = Ilat; }
     else { 
@@ -45,53 +50,91 @@ void spher_derivative_at_point(
         assert(false);
     }
 
-    int LB = Iref;
-    int UB = Iref;
+    // Determine lowest lower bound (LLB) and upperest upper bound (UUB)
+    //   for the integration region. This essentially just depends on periodicity.
+    const bool periodic = do_lat ? constants::PERIODIC_Y : constants::PERIODIC_X ;
+    const int LLB = periodic ? Iref - Nref : 0 ;
+    const int UUB = periodic ? Iref + Nref : Nref - 1 ;
 
     // Differentiation vector
-    std::vector<double> ddl(constants::DiffOrd + 1);
+    const int num_deriv_pts = diff_ord + order_of_deriv;
+    std::vector<double> ddl(num_deriv_pts);
 
     // Assuming uniform grid
     const double dl = grid.at(1) - grid.at(0);
 
     // Build outwards to try and build the stencil, but stop when
     //   we either hit a land cell or have gone far enough.
-    while (LB > 0) {
-        if ( (Iref - LB) > constants::DiffOrd ) { break; }
+    // lb (lower case) will be the periodicity-adjusted value of LB 
+    int LB = Iref, lb;
+    while (LB > LLB) {
+
+        if ( (Iref - LB) > diff_ord ) { break; }
        
-        if (do_lon) { index = Index(0, 0, Ilat, LB,   Ntime, Ndepth, Nlat, Nlon); }
-        else        { index = Index(0, 0, LB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        lb = ( LB < 0 ) ? LB + Nref : LB ;
+        if (do_lon) { index = Index(0, 0, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
+        else        { index = Index(0, 0, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
         
         if (mask.at(index) == 0) { LB++; break; }
 
         LB--;
     }
 
-    while (UB < Nref-1) {
-        if ( (UB - Iref) > constants::DiffOrd ) { break; }
+    // ub (lower case) will be the periodicity-adjusted value of UB 
+    int UB = Iref, ub;
+    while (UB < UUB) {
+        if ( (UB - Iref) > diff_ord ) { break; }
        
-        if (do_lon) { index = Index(0, 0, Ilat, UB,   Ntime, Ndepth, Nlat, Nlon); }
-        else        { index = Index(0, 0, UB,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        ub = ( UB > Nref - 1 ) ? UB - Nref : UB ;
+        if (do_lon) { index = Index(0, 0, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
+        else        { index = Index(0, 0, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
         if (mask.at(index) == 0) { UB--; break; }
 
         UB++;
     }
 
+    // NOTE
+    //   In the case of periodicity, LB may be negative and UB may exceed Nref
+    //     this means that subtraction still gives the correct number of points
+    //     in the stencil, but that a periodicity-adjusted value will be needed
+    //     when determining logical indices.
+
     // We've possibly made too large of a stencil, so now collapse it back down
-    while (UB - LB > constants::DiffOrd) {
-        if (UB - Iref > Iref - LB) { UB--; }
+    while (UB - LB + 1 > num_deriv_pts) {
+        if ((UB - Iref > Iref - LB) and (UB >= Iref)) { UB--; }
         else { LB++; }
     }
 
-    if (UB - LB == constants::DiffOrd) {
+    // We're including LB and UB in our stencil, so the stencil
+    //   has UB - LB + 1 points. The requisit number of points is
+    //   num_deriv_pts.
+    // Again, lower case (ind) will be the periodicty-adjusted value
+    int ind; 
+    if (UB - LB + 1 == num_deriv_pts) {
         // If we have enough cells for differentiation, do it
-        differentiation_vector(ddl, dl, Iref - LB);
+        if ( do_lon or (constants::UNIFORM_LAT_GRID)) {
+            // Since we're on a uniform grid, we can use pre-computed
+            //   differentiation coefficients
+            differentiation_vector(ddl, dl, Iref - LB, order_of_deriv, diff_ord);
+        } else {
+            // We're on a non-uniform grid, so we can guarantee the
+            //   differentiation coefficients a priori, so we need
+            //   to actually compute them now.
+            // This will get expensive (or ugly...) for higher orders of accuracy.
+            // NOTE: This CANNOT handle periodicity
+            non_uniform_diff_vector(ddl, grid, Iref, LB, UB, diff_ord);
+        }
         for (int IND = LB; IND <= UB; IND++) {
 
-            if (do_lon) { index = Index(Itime, Idepth, Ilat, IND,  
+            // Apply periodicity adjustment
+            if      (IND < 0    )   { ind = IND + Nref; }
+            else if (IND >= Nref)   { ind = IND - Nref; }
+            else                    { ind = IND; }
+
+            if (do_lon) { index = Index(Itime, Idepth, Ilat, ind,  
                                         Ntime, Ndepth, Nlat, Nlon); }
-            else        { index = Index(Itime, Idepth, IND,  Ilon, 
+            else        { index = Index(Itime, Idepth, ind,  Ilon, 
                                         Ntime, Ndepth, Nlat, Nlon); }
 
             for (int ii = 0; ii < num_deriv; ii++) {
@@ -100,5 +143,15 @@ void spher_derivative_at_point(
                 }
             }
         }
+    } else if (diff_ord > 2) {
+        // If we couldn't build a large enough stencil, then 
+        //   try again with a lower order. This will allow us
+        //   to fill in smaller areas with at least something,
+        //   if not the most accurate something.
+        spher_derivative_at_point(
+                deriv_vals, fields, grid, dim,
+                Itime, Idepth, Ilat, Ilon,
+                Ntime, Ndepth, Nlat, Nlon,
+                mask, order_of_deriv, diff_ord - 2);
     }
 }

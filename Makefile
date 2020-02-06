@@ -10,7 +10,7 @@ CFLAGS:=-DDEBUG=0 $(CFLAGS)
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
 DEBUG:=false
-EXTRA_OPT:=false
+EXTRA_OPT:=true
 
 ##
 ## Shouldn't need to modify anything beyond this point
@@ -44,6 +44,10 @@ NETCDF_IO_OBJS := $(addprefix NETCDF_IO/,$(notdir $(NETCDF_IO_CPPS:.cpp=.o)))
 FUNCTIONS_CPPS := $(wildcard Functions/*.cpp)
 FUNCTIONS_OBJS := $(addprefix Functions/,$(notdir $(FUNCTIONS_CPPS:.cpp=.o)))
 
+# Get list of SW cpp files
+SW_TOOL_CPPS := $(wildcard Functions/SW_Tools/*.cpp)
+SW_TOOL_OBJS := $(addprefix Functions/SW_Tools/,$(notdir $(SW_TOOL_CPPS:.cpp=.o)))
+
 # Get list of differentation cpp files
 DIFF_TOOL_CPPS := $(wildcard Functions/Differentiation_Tools/*.cpp)
 DIFF_TOOL_OBJS := $(addprefix Functions/Differentiation_Tools/,$(notdir $(DIFF_TOOL_CPPS:.cpp=.o)))
@@ -56,6 +60,10 @@ INTERFACE_OBJS := $(addprefix Functions/Interface_Tools/,$(notdir $(INTERFACE_CP
 FFT_BASED_CPPS := $(wildcard Functions/FFTW_versions/*.cpp)
 FFT_BASED_OBJS := $(addprefix Functions/FFTW_versions/,$(notdir $(FFT_BASED_CPPS:.cpp=.o)))
 
+# Get list of toroidal projection files
+TOROIDAL_CPPS := $(wildcard Functions/Toroidal_Projection/*.cpp)
+TOROIDAL_OBJS := $(addprefix Functions/Toroidal_Projection/,$(notdir $(TOROIDAL_CPPS:.cpp=.o)))
+
 # Get list of ALGLIB object files
 ALGLIB_CPPS := $(wildcard ALGLIB/*.cpp)
 ALGLIB_OBJS := $(addprefix ALGLIB/,$(notdir $(ALGLIB_CPPS:.cpp=.o)))
@@ -64,9 +72,14 @@ ALGLIB_OBJS := $(addprefix ALGLIB/,$(notdir $(ALGLIB_CPPS:.cpp=.o)))
 PREPROCESS_CPPS := $(wildcard Preprocess/*.cpp)
 PREPROCESS_OBJS := $(addprefix Preprocess/,$(notdir $(PREPROCESS_CPPS:.cpp=.o)))
 
+# Get the list of post-processing  cpp files
+POSTPROCESS_CPPS := $(wildcard Postprocess/*.cpp)
+POSTPROCESS_OBJS := $(addprefix Postprocess/,$(notdir $(POSTPROCESS_CPPS:.cpp=.o)))
+
 # Get list of test executables
 TEST_CPPS := $(wildcard Tests/*.cpp)
 TEST_EXES := $(addprefix Tests/,$(notdir $(TEST_CPPS:.cpp=.x)))
+
 
 .PHONY: clean hardclean docs cleandocs tests all ALGLIB
 clean:
@@ -74,17 +87,23 @@ clean:
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
+	rm -f Functions/SW_Tools/*.o 
 	rm -f Functions/Interface_Tools/*.o 
 	rm -f Functions/FFTW_versions/*.o 
 	rm -f Tests/*.o 
 	rm -f Preprocess/*.o
+	rm -f Postprocess/*.o
+	rm -f Case_Files/*.o
 hardclean:
 	rm -f *.o 
+	rm -f *.x
+	rm -f Case_Files/*.o
+	rm -f Case_Files/*.x
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
-	rm -f Tests/*.o 
-	rm -f Tests/*.x
+	rm -f Functions/SW_Tools/*.o 
+	rm -f Tests/*.[o,x] 
 	rm -f Functions/Interface_Tools/*.o 
 	rm -f Functions/FFTW_versions/*.o 
 	rm -f coarse_grain.x 
@@ -92,66 +111,108 @@ hardclean:
 	rm ALGLIB/*.o
 	rm -r docs/html
 	rm -r docs/latex
+	rm -f Preprocess/*.[o,x]
+	rm -f Postprocess/*.[o,x]
 cleandocs:
 	rm -r docs/html
 	rm -r docs/latex
 
-all: coarse_grain.x
+all: coarse_grain.x integrator.x ${TEST_EXES}
 
 tests: ${TEST_EXES}
 
 ALGLIB: ${ALGLIB_OBJS}
 
+
+#
+# Commands for building object files (does not include those for executables)
+#
+
 # ALGLIB requires a different set of compile flags
 ALGLIB/%.o: ALGLIB/%.cpp
 	$(CXX) -I ./ALGLIB -c -O3 -DAE_CPU=AE_INTEL -o $@ $<
 
-# The core coarse_graining functions use the same compile flags
-Functions/Differentiation_Tools/%.o: Functions/Differentiation_Tools/%.cpp
+# Group together object files with similar compilation requirements
+CORE_OBJS := ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} ${POSTPROCESS_OBJS}
+
+$(CORE_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Functions/Interface_Tools/%.o: Functions/Interface_Tools/%.cpp
+$(TOROIDAL_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+$(SW_TOOL_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+$(INTERFACE_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Functions/FFTW_versions/%.o: Functions/FFTW_versions/%.cpp
-	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< -lfftw3 -lm $(LINKS) 
+FFT_BASED_OBJS:= ${FFT_BASED_OBJS} coarse_grain_fftw.o
+$(FFT_BASED_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< -lfftw3 -lm $(LINKS) 
 
-Functions/%.o: Functions/%.cpp
-	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+$(PREPROCESS_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-NETCDF_IO/%.o: NETCDF_IO/%.cpp
-	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Preprocess/%.o: Preprocess/%.cpp
+# 
+# Commands for building executables (and related object files)
+#
+
+# Group together executables with similar compilations
+CORE_TARGET_EXES := Case_Files/coarse_grain.x Case_Files/integrator.x Case_Files/coarse_grain_subset.x Case_Files/do_filtering.x
+CORE_TARGET_OBJS := Case_Files/coarse_grain.o Case_Files/integrator.o Case_Files/coarse_grain_subset.o Case_Files/do_filtering.o
+
+$(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+$(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} %.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
+
+# Building shallow water
+SW_TARGET_EXES := Case_Files/coarse_grain_sw.x
+SW_TARGET_OBJS := Case_Files/coarse_grain_sw.o 
+
+$(SW_TARGET_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+$(SW_TARGET_EXES): %.x : ${SW_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS} %.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
+
+# Building toroidal projection
+TOROID_TARGET_EXES := Case_Files/toroidal_projection.x
+TOROID_TARGET_OBJS := Case_Files/toroidal_projection.o
+
+$(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
+#$(TOROID_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${TOROIDAL_OBJS} %.o
+$(TOROID_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} ${ALGLIB_OBJS} %.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -I ./ALGLIB -o $@ $^ $(LINKS) 
+
 # Building test scripts
-Tests/%.o: Tests/%.cpp
+Tests/%.o: Tests/%.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
 	$(MPICXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
-# Building coarse_grain executable
-coarse_grain.o: coarse_grain.cpp
-	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
-
-coarse_grain.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} coarse_grain.o
-	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
-
 # Building fftw-based coarse_grain executable
-coarse_grain_fftw.o: coarse_grain_fftw.cpp
-	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< -lfftw3 -lm $(LINKS) 
-
-coarse_grain_fftw.x: ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${INTERFACE_OBJS} ${DIFF_TOOL_OBJS} ${FFT_BASED_OBJS} coarse_grain_fftw.o
+coarse_grain_fftw.x: ${CORE_OBJS} ${INTERFACE_OBJS} ${FFT_BASED_OBJS} Case_Files/coarse_grain_fftw.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ -lfftw3 -lm $(LINKS) 
 
 # Interpolator needs to link in ALGLIB
-interpolator.o: interpolator.cpp
+interpolator.o: Case_Files/interpolator.cpp Case_Files/constants.hpp
 	$(MPICXX) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 interpolator.x: ${NETCDF_IO_OBJS} ${ALGLIB_OBJS} ${PREPROCESS_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} interpolator.o
 	$(MPICXX) $(CFLAGS) -I ./ALGLIB $(LDFLAGS) -o $@ $^ $(LINKS) 
+
+
+#
+# Documentation
+#
+
 
 # Documentation build with Doxygen
 docs:
