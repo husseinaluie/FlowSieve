@@ -97,6 +97,7 @@ void Apply_Toroidal_Projection(
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
+        const std::vector<double> & dAreas,
         const std::vector<double> & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
@@ -105,6 +106,21 @@ void Apply_Toroidal_Projection(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
+void Apply_Potential_Projection(
+        std::vector<double> & u_lon,
+        std::vector<double> & u_lat,
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & latitude,
+        const std::vector<double> & longitude,
+        const std::vector<double> & dAreas,
+        const std::vector<double> & mask,
+        const std::vector<int>    & myCounts,
+        const std::vector<int>    & myStarts,
+        const std::vector<double> & seed,
+        const bool single_seed,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
 
 /*!
  * \brief Computes the (toroidal) velocity corresponding to field F.
@@ -120,6 +136,19 @@ void Apply_Toroidal_Projection(
  *
  */
 void toroidal_vel_from_F(  
+        std::vector<double> & vel_lon,
+        std::vector<double> & vel_lat,
+        const std::vector<double> & F,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const std::vector<double> & mask
+    );
+
+void potential_vel_from_F(  
         std::vector<double> & vel_lon,
         std::vector<double> & vel_lat,
         const std::vector<double> & F,
@@ -185,6 +214,8 @@ void toroidal_curl_u_dot_er(
  * @param[in]       longitude,latitude      Grid vectors (1D)
  * @param[in]       Ntime,Ndepth,Nlat,Nlon  Dimension sizes
  * @param[in]       mask                    Array to distinguish land/water
+ * @param[in]       areas                   Array giving the size of each cell
+ * @param[in]       area_weight             Bool indicating if the Laplacian should be weighted by cell-size (i.e. weight error by cell size). Default is false.
  *
  */
 void toroidal_sparse_Lap(
@@ -193,7 +224,9 @@ void toroidal_sparse_Lap(
         const std::vector<double> & longitude,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<double> & mask,
+        const std::vector<double> & areas,
+        const bool area_weight = false
         );
 
 
