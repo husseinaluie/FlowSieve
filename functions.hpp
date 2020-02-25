@@ -120,6 +120,49 @@ void compute_local_kernel(
 
 
 /*!
+ * \brief Compute (local) KE density from the provided velocities.
+ *
+ * KE is simply computed pointwise as 0.5 * rho0 * (u1^2 + u2^2 + u3^2)
+ *
+ * @param[in,out]   KE          Computed KE
+ * @param[in]       u1,u2,u3    Velocities
+ * @param[in]       mask        differentiate land from water 
+ * @param[in]       rho0        constant density
+ *
+ */
+void KE_from_vels(
+            std::vector<double> & KE,
+            std::vector<double> * u1,
+            std::vector<double> * u2,
+            std::vector<double> * u3,
+            const std::vector<double> & mask,
+            const double rho0 = constants::rho0
+        );
+
+/*!
+ * \brief Wrapper that applies vel_Spher_to_Cart_at_point to every point in the domain.
+ *
+ * @param[in,out]   u_x,u_y,u_z                         Computed Cartesian velocities
+ * @param[in]       u_r,u_lon,u_lat                     Spherical velocities to convert
+ * @param[in]       mask                                differentiate land from water 
+ * @param[in]       time, depth, latitude, longitude    grid vectors (1D)
+ *
+ */
+void vel_Spher_to_Cart(
+            std::vector<double> & u_x,
+            std::vector<double> & u_y,
+            std::vector<double> & u_z,
+            const std::vector<double> & u_r,
+            const std::vector<double> & u_lon,
+            const std::vector<double> & u_lat,
+            const std::vector<double> & mask,
+            const std::vector<double> & time,
+            const std::vector<double> & depth,
+            const std::vector<double> & latitude,
+            const std::vector<double> & longitude
+            );
+
+/*!
  * \brief Convert single spherical velocity to Cartesian velocity
  *
  * Convert Spherical velocities to Cartesian
@@ -142,10 +185,41 @@ void compute_local_kernel(
  * @param[in]       lon,lat             coordinates of the location of conversion
  *
  */
-void vel_Spher_to_Cart(
-            double & u_x, double & u_y, double & u_z,
-            const double u_r, const double u_lon, const double u_lat,
-            const double lon, const double lat );
+void vel_Spher_to_Cart_at_point(
+            double & u_x,
+            double & u_y,
+            double & u_z,
+            const double u_r,
+            const double u_lon,
+            const double u_lat,
+            const double lon,
+            const double lat
+        );
+
+
+/*!
+ * \brief Wrapper that applies vel_Spher_to_Cart_at_point to every point in the domain.
+ *
+ * @param[in,out]   u_r,u_lon,u_lat                     Computed Spherical velocities
+ * @param[in]       u_x,u_y,u_z                         Cartesian velocities to convert
+ * @param[in]       mask                                differentiate land from water 
+ * @param[in]       time, depth, latitude, longitude    grid vectors (1D)
+ *
+ */
+void vel_Cart_to_Spher(
+            std::vector<double> & u_r,
+            std::vector<double> & u_lon,
+            std::vector<double> & u_lat,
+            const std::vector<double> & u_x,
+            const std::vector<double> & u_y,
+            const std::vector<double> & u_z,
+            const std::vector<double> & mask,
+            const std::vector<double> & time,
+            const std::vector<double> & depth,
+            const std::vector<double> & latitude,
+            const std::vector<double> & longitude
+            );
+
 
 /*!
  * \brief Convert single Cartesian velocity to spherical velocity
@@ -170,10 +244,16 @@ void vel_Spher_to_Cart(
  * @param[in]       lon,lat             coordinates of the location of conversion
  *
  */
-void vel_Cart_to_Spher(
-            double & u_r, double & u_lon, double & u_lat,
-            const double u_x, const double u_y, const double u_z,
-            const double lon, const double lat );
+void vel_Cart_to_Spher_at_point(
+            double & u_r, 
+            double & u_lon, 
+            double & u_lat,
+            const double u_x, 
+            const double u_y, 
+            const double u_z,
+            const double lon, 
+            const double lat 
+            );
 
 /*!
  * \brief Main filtering driver
@@ -210,6 +290,21 @@ void filtering(const std::vector<double> & u_r,
                const std::vector<int>    & myStarts,
                const MPI_Comm comm = MPI_COMM_WORLD);
 
+
+void filtering_helmholtz(
+        const std::vector<double> & F_potential,
+        const std::vector<double> & F_toroidal,
+        const std::vector<double> & scales,
+        const std::vector<double> & dAreas,
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask,
+        const std::vector<int>    & myCounts,
+        const std::vector<int>    & myStarts,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
 
 
 /*!
@@ -524,10 +619,11 @@ void compute_div_transport(
  *
  * The result, means, is a function of time and depth.
  */
-void compute_mean(
+
+void compute_spatial_average(
         std::vector<double> & means,
         const std::vector<double> & field,
-        const std::vector<double> & dArea,
+        const std::vector<double> & areas,
         const int Ntime,
         const int Ndepth,
         const int Nlat,
