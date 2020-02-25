@@ -16,7 +16,9 @@ void toroidal_sparse_Lap(
         const std::vector<double> & longitude,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<double> & mask,
+        const std::vector<double> & areas,
+        const bool area_weight
         ) {
 
     int Ilat, Ilon, IDIFF, Idiff, Ndiff,
@@ -73,6 +75,7 @@ void toroidal_sparse_Lap(
                 old_val = sparseget(Lap, index, diff_index);
 
                 tmp = diff_vec.at(IDIFF-LB) * cos2_lat_inv * R2_inv;
+                if (area_weight) { tmp *= areas.at(index); }
 
                 alglib::sparseset(Lap, index, diff_index, old_val + tmp);
             }
@@ -116,6 +119,7 @@ void toroidal_sparse_Lap(
                 old_val = sparseget(Lap, index, diff_index);
 
                 tmp = diff_vec.at(IDIFF-LB) * R2_inv;
+                if (area_weight) { tmp *= areas.at(index); }
 
                 alglib::sparseset(Lap, index, diff_index, old_val + tmp);
             }
@@ -159,6 +163,7 @@ void toroidal_sparse_Lap(
                 old_val = sparseget(Lap, index, diff_index);
 
                 tmp = - diff_vec.at(IDIFF-LB) * tan_lat * R2_inv;
+                if (area_weight) { tmp *= areas.at(index); }
 
                 alglib::sparseset(Lap, index, diff_index, old_val + tmp);
             }
