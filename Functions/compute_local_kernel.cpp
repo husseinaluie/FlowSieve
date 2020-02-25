@@ -27,6 +27,8 @@ void compute_local_kernel(
     const double lon_at_ilon = longitude.at(Ilon);
     double lat_at_curr;
 
+    //fprintf(stdout, "    lat(LB,IND,UB) = (%d,%d,%d)\n", LAT_lb, Ilat, LAT_ub);
+
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
         // Handle periodicity
