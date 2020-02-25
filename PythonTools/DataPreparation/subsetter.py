@@ -1,7 +1,7 @@
 from netCDF4 import Dataset
 import numpy as np
 
-infile  = 'full_domain.nc'
+infile  = 'input.nc'
 outfile = 'subset.nc'
 
 # Get the surface density
@@ -12,11 +12,12 @@ depth     = source.variables['depth'][:]
 longitude = source.variables['longitude'][:]
 latitude  = source.variables['latitude' ][:]
 
-dims  = source.variables['uo'].dimensions
-dtype = source.variables['uo'].datatype
+ref_var = 'uo'
+dims  = source.variables[ref_var].dimensions
+dtype = source.variables[ref_var].datatype
 
 time_lb   = 0
-time_ub   = len(time)
+time_ub   = 1#len(time)
 time_step = 1
 
 #lon_lb = np.argmin(np.abs(longitude - (-90)))
@@ -33,7 +34,7 @@ lat_ub = len(latitude)
 with Dataset(outfile, 'w', format='NETCDF4') as fp:
      
     # Create dimension objects
-    for dim in source.variables['uo'].dimensions:
+    for dim in source.variables[ref_var].dimensions:
         if dim == 'longitude':
             shape = len(longitude[lon_lb:lon_ub])
         elif dim == 'latitude':
