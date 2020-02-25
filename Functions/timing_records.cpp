@@ -20,6 +20,8 @@ Timing_Records::Timing_Records() {
     time_records["filter_for_Lambda"] = 0.;
     time_records["land"] = 0.;
 
+    time_records["filter_tor_pot"] = 0.;
+
     time_records["compute_vorticity"] = 0.;
     time_records["compute_Pi"] = 0.;
     time_records["compute_Lambda"] = 0.;
