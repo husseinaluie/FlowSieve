@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
 
     Apply_Toroidal_Projection(
             u_lon, u_lat, time, depth, latitude, longitude,
-            mask, myCounts, myStarts, seed, single_seed
+            areas, mask, myCounts, myStarts, seed, single_seed
             );
 
 
