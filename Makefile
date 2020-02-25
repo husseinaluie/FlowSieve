@@ -64,6 +64,10 @@ FFT_BASED_OBJS := $(addprefix Functions/FFTW_versions/,$(notdir $(FFT_BASED_CPPS
 TOROIDAL_CPPS := $(wildcard Functions/Toroidal_Projection/*.cpp)
 TOROIDAL_OBJS := $(addprefix Functions/Toroidal_Projection/,$(notdir $(TOROIDAL_CPPS:.cpp=.o)))
 
+# Get list of toroidal projection files
+HELMHOLTZ_CPPS := $(wildcard Functions/Helmholtz/*.cpp)
+HELMHOLTZ_OBJS := $(addprefix Functions/Helmholtz/,$(notdir $(HELMHOLTZ_CPPS:.cpp=.o)))
+
 # Get list of ALGLIB object files
 ALGLIB_CPPS := $(wildcard ALGLIB/*.cpp)
 ALGLIB_OBJS := $(addprefix ALGLIB/,$(notdir $(ALGLIB_CPPS:.cpp=.o)))
@@ -87,6 +91,7 @@ clean:
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
+	rm -f Functions/Helmholtz/*.o 
 	rm -f Functions/SW_Tools/*.o 
 	rm -f Functions/Interface_Tools/*.o 
 	rm -f Functions/FFTW_versions/*.o 
@@ -102,6 +107,7 @@ hardclean:
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
+	rm -f Functions/Helmholtz/*.o 
 	rm -f Functions/SW_Tools/*.o 
 	rm -f Tests/*.[o,x] 
 	rm -f Functions/Interface_Tools/*.o 
@@ -160,13 +166,30 @@ $(PREPROCESS_OBJS): %.o : %.cpp constants.hpp
 #
 
 # Group together executables with similar compilations
-CORE_TARGET_EXES := Case_Files/coarse_grain.x Case_Files/integrator.x Case_Files/coarse_grain_subset.x Case_Files/do_filtering.x
-CORE_TARGET_OBJS := Case_Files/coarse_grain.o Case_Files/integrator.o Case_Files/coarse_grain_subset.o Case_Files/do_filtering.o
+CORE_TARGET_EXES := Case_Files/coarse_grain.x \
+					Case_Files/integrator.x \
+					Case_Files/coarse_grain_subset.x \
+					Case_Files/do_filtering.x
+CORE_TARGET_OBJS := Case_Files/coarse_grain.o \
+					Case_Files/integrator.o \
+					Case_Files/coarse_grain_subset.o \
+					Case_Files/do_filtering.o
 
 $(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 $(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} %.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
+
+
+# Helmholtz
+HELM_TARGET_EXES := Case_Files/coarse_grain_helmholtz.x 
+HELM_TARGET_OBJS := Case_Files/coarse_grain_helmholtz.o 
+
+$(HELM_TARGET_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+$(HELM_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} ${ALGLIB_OBJS} ${HELMHOLTZ_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building shallow water
@@ -180,8 +203,8 @@ $(SW_TARGET_EXES): %.x : ${SW_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building toroidal projection
-TOROID_TARGET_EXES := Case_Files/toroidal_projection.x
-TOROID_TARGET_OBJS := Case_Files/toroidal_projection.o
+TOROID_TARGET_EXES := Case_Files/toroidal_projection.x Case_Files/potential_projection.x
+TOROID_TARGET_OBJS := Case_Files/toroidal_projection.o Case_Files/potential_projection.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
