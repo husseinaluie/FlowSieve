@@ -104,7 +104,7 @@ void filtering_helmholtz(
     filter_fields.push_back(&F_toroidal);
     filt_use_mask.push_back(false);
 
-    // Pre some post-processing
+    // Preset some post-processing variables
     std::vector<const std::vector<double>*> postprocess_fields;
     std::vector<std::string> postprocess_names;
 
@@ -373,7 +373,7 @@ void filtering_helmholtz(
             if (wRank == 0) { fprintf(stdout, "Beginning post-process routines\n"); }
             fflush(stdout);
 
-            Apply_Postprocess_Routines_Helm(
+            Apply_Postprocess_Routines(
                     postprocess_fields, postprocess_names,
                     time, depth, latitude, longitude,
                     mask, dAreas,
