@@ -56,7 +56,7 @@ void NC_ERR(
  *    to convert from radians to degrees
  *
  * @param[in] time,depth,longitude,latitude vectors giving the dimensions 
- * @param[in] mask                          masking (distinguish land vs water)
+ * @param[in] area                          cell areas
  * @param[in] vars                          name of variables to write
  * @param[in] filename                      name for the output file
  * @param[in] filter_scale                  lengthscale used in the filter
@@ -68,7 +68,7 @@ void initialize_output_file(
         const std::vector<double> & depth,
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
-        const std::vector<double> & mask,
+        const std::vector<double> & areas,
         const std::vector<std::string> & vars,
         const char * filename,
         const double filter_scale,

@@ -9,7 +9,7 @@ void initialize_output_file(
         const std::vector<double> & depth,
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
-        const std::vector<double> & mask,
+        const std::vector<double> & areas,
         const std::vector<std::string> & vars,
         const char * filename,
         const double filter_scale,
@@ -80,13 +80,6 @@ void initialize_output_file(
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     }
 
-    int mask_dimids[2];
-    mask_dimids[0] = lat_dimid;
-    mask_dimids[1] = lon_dimid;
-    int mask_varid;
-    retval = nc_def_var(ncid, "mask", NC_FLOAT, 2, mask_dimids, &mask_varid);
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-
     // Write the coordinate variables
     size_t start[1], count[1];
     start[0] = 0;
@@ -106,12 +99,20 @@ void initialize_output_file(
     retval = nc_put_vara_double(ncid, lon_varid,   start, count, &longitude[0]);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
-    size_t mask_start[2], mask_count[2];
-    mask_start[0] = 0;
-    mask_start[1] = 0;
-    mask_count[0] = Nlat;
-    mask_count[1] = Nlon;
-    retval = nc_put_vara_double(ncid, mask_varid, mask_start, mask_count, &mask[0]);
+    // Write the cell areas for convenience
+    int area_dimids[2];
+    area_dimids[0] = lat_dimid;
+    area_dimids[1] = lon_dimid;
+    int area_varid;
+    retval = nc_def_var(ncid, "cell_areas", NC_FLOAT, 2, area_dimids, &area_varid);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+    size_t area_start[2], area_count[2];
+    area_start[0] = 0;
+    area_start[1] = 0;
+    area_count[0] = Nlat;
+    area_count[1] = Nlon;
+    retval = nc_put_vara_double(ncid, area_varid, area_start, area_count, &areas[0]);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Close the file
