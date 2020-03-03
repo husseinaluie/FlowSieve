@@ -35,7 +35,7 @@ void apply_filter_at_point_for_quadratics(
 
     double kA_sum, dist, kern, area, mask_val;
     double u_x_loc, u_y_loc, u_z_loc;
-    int index, mask_index;
+    int index, area_index;
     int curr_lon, curr_lat;
 
     kA_sum  = 0.;
@@ -79,7 +79,7 @@ void apply_filter_at_point_for_quadratics(
             index = Index(Itime, Idepth, curr_lat, curr_lon,
                           Ntime, Ndepth, Nlat,     Nlon);
 
-            mask_index = Index(0,     0,      curr_lat, curr_lon,
+            area_index = Index(0,     0,      curr_lat, curr_lon,
                                Ntime, Ndepth, Nlat,     Nlon);
 
             if (local_kernel == NULL) {
@@ -95,12 +95,12 @@ void apply_filter_at_point_for_quadratics(
                 }
                 kern = kernel(dist, scale);
             } else {
-                kern = local_kernel->at(mask_index);
+                kern = local_kernel->at(area_index);
             }
 
-            area     = dAreas.at(mask_index);
+            area     = dAreas.at(area_index);
             kA_sum  += kern * area;
-            mask_val = mask.at(mask_index);
+            mask_val = mask.at(index);
 
             u_x_loc = u_x.at(index);
             u_y_loc = u_y.at(index);

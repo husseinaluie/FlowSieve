@@ -31,7 +31,7 @@ void apply_filter_at_point(
     const size_t Nfields = fields.size();
 
     double dist, kern, area;
-    int index, mask_index;
+    int index, area_index;
     int curr_lon, curr_lat;
 
     double kA_sum = 0.;
@@ -72,7 +72,7 @@ void apply_filter_at_point(
 
             index = Index(Itime, Idepth, curr_lat, curr_lon,
                           Ntime, Ndepth, Nlat,     Nlon);
-            mask_index = Index(0,     0,      curr_lat, curr_lon,
+            area_index = Index(0,     0,      curr_lat, curr_lon,
                                Ntime, Ndepth, Nlat,     Nlon);
 
             if (local_kernel == NULL) {
@@ -88,14 +88,14 @@ void apply_filter_at_point(
                 }
                 kern = kernel(dist, scale);
             } else {
-                kern = local_kernel->at(mask_index);
+                kern = local_kernel->at(area_index);
             }
 
-            area      = dAreas.at(mask_index);
+            area      = dAreas.at(area_index);
             kA_sum   += kern * area;
 
             for (size_t II = 0; II < Nfields; ++II) {
-                mask_val = use_mask.at(II) ? mask.at(mask_index) : 1.;
+                mask_val = use_mask.at(II) ? mask.at(index) : 1.;
                 tmp_vals.at(II) += fields.at(II)->at(index) * kern * area * mask_val;
             }
 
