@@ -142,6 +142,14 @@ void initialize_regions_file(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
+void initialize_particle_file(
+        const std::vector<double> & time,
+        const std::vector<double> & trajectory,
+        std::vector<std::string> & vars,
+        const char * filename,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 /*!
  * \brief Write on scales worth of a single field.
  *
