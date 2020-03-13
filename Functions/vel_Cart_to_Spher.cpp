@@ -24,6 +24,8 @@ void vel_Cart_to_Spher(
     const int Nlat   = latitude.size();
     const int Nlon   = longitude.size();
 
+    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
+
     if (constants::CARTESIAN) {
         u_lon = u_x;
         u_lat = u_y;
@@ -33,7 +35,7 @@ void vel_Cart_to_Spher(
         private(Itime, Idepth, Ilat, Ilon, index) \
         shared(u_x, u_y, u_z, u_r, u_lon, u_lat, longitude, latitude, mask)
         {
-            #pragma omp for collapse(1) schedule(guided)
+            #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
             for (index = 0; index < u_lon.size(); ++index) {
 
                 if (mask.at(index) == 1) { // Skip land areas

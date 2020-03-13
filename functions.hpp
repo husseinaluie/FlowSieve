@@ -676,6 +676,16 @@ void get_lon_bounds(
 void print_compile_info(
         const std::vector<double> &scales);
 
+/*! 
+ * \brief Compute openmp chunk size for OMP for loops
+ *
+ * The point of using a function for this is that it standardizes
+ *    the chunk size across the different functions.
+ *
+ * This assumes that the loop being split is a Lat-Lon loop.
+ *
+ */
+int get_omp_chunksize(const int Nlat, const int Nlon);
 
 /*!
  * \brief Class for storing internal timings.

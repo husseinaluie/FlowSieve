@@ -20,6 +20,8 @@ void compute_div_vel(
         const std::vector<double> & mask
         ) {
 
+    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
+
     double div_tmp;
 
     int Itime, Idepth, Ilat, Ilon;
@@ -55,7 +57,7 @@ void compute_div_vel(
         z_deriv_vals.push_back(NULL);
         z_deriv_vals.push_back(&uz_z);
 
-        #pragma omp for collapse(1) schedule(guided)
+        #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
         for (index = 0; index < Npts; index++) {
 
             div_tmp = constants::fill_value;

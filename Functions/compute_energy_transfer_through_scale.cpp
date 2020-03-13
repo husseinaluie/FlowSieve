@@ -23,6 +23,8 @@ void compute_energy_transfer_through_scale(
         const std::vector<double> & mask        /**< [in] Mask array (2D) to distinguish land from water */
         ) {
 
+    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
+
     double ux_loc, uy_loc, uz_loc;
     double tau_xx, tau_xy, tau_xz, tau_yy, tau_yz, tau_zz;
     double S_xx,   S_xy,   S_xz,   S_yy,   S_yz,   S_zz;
@@ -41,7 +43,7 @@ void compute_energy_transfer_through_scale(
                     S_xx, S_xy, S_xz, S_yy, S_yz, S_zz,\
                     pi_tmp, ux_loc, uy_loc, uz_loc)
             {
-                #pragma omp for collapse(2) schedule(guided)
+                #pragma omp for collapse(2) schedule(guided, OMP_chunksize)
                 for (Ilat = 0; Ilat < Nlat; Ilat++) {
                     for (Ilon = 0; Ilon < Nlon; Ilon++) {
 

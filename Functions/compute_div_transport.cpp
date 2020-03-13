@@ -88,6 +88,8 @@ void compute_div_transport(
         const std::vector<double> & mask
         ) {
 
+    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
+
     double div_J_tmp; 
     
     double dpdx, dpdy, dpdz;
@@ -188,7 +190,7 @@ void compute_div_transport(
             z_deriv_vals.push_back(&dpdz);
         }
 
-        #pragma omp for collapse(1) schedule(guided)
+        #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
         for (index = 0; index < Npts; index++) {
 
             div_J_tmp = constants::fill_value;
