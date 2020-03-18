@@ -123,6 +123,24 @@ void filtering_helmholtz(
     postprocess_names.push_back( "KE_all");
     postprocess_fields.push_back(&KE_all);
 
+    postprocess_names.push_back( "u_lon_tor");
+    postprocess_fields.push_back(&u_lon_tor);
+
+    postprocess_names.push_back( "u_lat_tor");
+    postprocess_fields.push_back(&u_lat_tor);
+
+    postprocess_names.push_back( "u_lon_pot");
+    postprocess_fields.push_back(&u_lon_pot);
+
+    postprocess_names.push_back( "u_lat_pot");
+    postprocess_fields.push_back(&u_lat_pot);
+
+    postprocess_names.push_back( "div_pot");
+    postprocess_fields.push_back(&div_pot);
+
+    postprocess_names.push_back( "div_tor");
+    postprocess_fields.push_back(&div_tor);
+
     //
     //// Begin the main filtering loop
     //
