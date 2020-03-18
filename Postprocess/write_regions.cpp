@@ -36,7 +36,6 @@ void write_regions(
     const int Npts = Nregion * Nlat * Nlon;
 
     // we need to make a new mask to have the correct shape
-    std::vector<double> reg_mask(   Npts, 0.);
     std::vector<double> region_vals(Npts, 0.);
     
     #if DEBUG >= 1
@@ -45,11 +44,11 @@ void write_regions(
         fflush(stdout);
     }
     #endif
-    int index, Ilat, Ilon, Iregion, sub_index;
+    int index, Ilat, Ilon, Iregion;
     double curr_lat, curr_lon, reg_test;
     #pragma omp parallel \
-    default(none) shared(region_vals, latitude, longitude, mask, reg_mask) \
-    private(index, sub_index, Ilat, Ilon, Iregion, curr_lat, curr_lon, reg_test)
+    default(none) shared(region_vals, latitude, longitude, mask) \
+    private(index, Ilat, Ilon, Iregion, curr_lat, curr_lon, reg_test)
     {
         #pragma omp for collapse(3) schedule(static)
         for (Iregion = 0; Iregion < Nregion; ++Iregion) {
@@ -65,11 +64,6 @@ void write_regions(
                     reg_test = (RegionTest::all_regions.at(Iregion))( curr_lat, curr_lon );
 
                     region_vals.at(index) = reg_test ? 1 : 0;
-
-                    // fill in the temporary mask
-                    sub_index = Index(0, 0, Ilat, Ilon,
-                                      1, 1, Nlat, Nlon);
-                    reg_mask.at(index) = mask.at(sub_index);
 
                 }
             }
@@ -96,6 +90,6 @@ void write_regions(
     count[2] = Nlon;
 
     write_field_to_output(region_vals, "region_definitions", 
-            start, count, filename, &reg_mask);
+            start, count, filename, NULL);
 
 }
