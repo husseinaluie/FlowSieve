@@ -104,7 +104,7 @@ void initialize_output_file(
     area_dimids[0] = lat_dimid;
     area_dimids[1] = lon_dimid;
     int area_varid;
-    retval = nc_def_var(ncid, "cell_areas", NC_FLOAT, 2, area_dimids, &area_varid);
+    retval = nc_def_var(ncid, "cell_areas", NC_DOUBLE, 2, area_dimids, &area_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     size_t area_start[2], area_count[2];
