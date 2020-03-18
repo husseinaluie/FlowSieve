@@ -9,13 +9,13 @@
 #include "../preprocess.hpp"
 
 void interpolate_over_land_from_coast(
-        std::vector<double> &interp_field,
-        const std::vector<double> &field,
-        const std::vector<double> &time,
-        const std::vector<double> &depth,
-        const std::vector<double> &latitude,
-        const std::vector<double> &longitude,
-        const std::vector<double> &mask)
+        std::vector<double> & interp_field,
+        const std::vector<double> & field,
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & latitude,
+        const std::vector<double> & longitude,
+        const std::vector<double> & mask)
 {
     int Ntime  = (int)time.size();
     int Ndepth = (int)depth.size();
@@ -44,7 +44,7 @@ void interpolate_over_land_from_coast(
 
     int cntr, num_coast=0;
     double R, val;
-    int index, mask_index, num_interp_points = 0;
+    int index = 0, num_interp_points = 0;
     #if DEBUG >= 1
     double perc_base = 10;
     double perc;
@@ -54,6 +54,9 @@ void interpolate_over_land_from_coast(
     const double D2R = M_PI / 180;
 
     double rbase;
+    // largest interpolation scale is scale * dx
+    //   smallest is largest / 2^nlayers
+    // Current setting sweeps dx -> 128 * dx
     const int nlayers = 7;
     const double scale = 128.;
 
@@ -172,10 +175,8 @@ void interpolate_over_land_from_coast(
 
                     index = Index(Itime, Idepth, Ilat, Ilon,
                                   Ntime, Ndepth, Nlat, Nlon);
-                    mask_index = Index(0,     0,      Ilat, Ilon,
-                                       Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask.at(mask_index) == 0) {
+                    if (mask.at(index) == 0) {
                         // If we're on a land cell, then use the interpolator
                         if (cast_to_sphere) { 
                             x = R * cos(lat * D2R) * cos(lon * D2R);
@@ -194,7 +195,7 @@ void interpolate_over_land_from_coast(
 
                     #if DEBUG >= 1
                     // Every 5 percent, print a dot
-                    if ( ((double)(mask_index) / (Nlat*Nlon)) * 100 >= perc ) {
+                    if ( ((double)(Ilat*Nlon + Ilon) / (Nlat*Nlon)) * 100 >= perc ) {
                         if (perc == perc_base) { fprintf(stdout, "          "); }
                         fprintf(stdout, ".");
                         fflush(stdout);
