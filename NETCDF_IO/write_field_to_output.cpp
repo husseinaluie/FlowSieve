@@ -19,13 +19,6 @@ void write_field_to_output(
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
 
-    #if DEBUG >= 2
-    fprintf(stdout, "  Rank %d: starts = %zu %zu %zu %zu\n", wRank, 
-            start[0], start[1], start[2], start[3]);
-    fprintf(stdout, "  Rank %d: counts = %zu %zu %zu %zu\n", wRank,
-            count[0], count[1], count[2], count[3]);
-    #endif
-
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_WRITE | NC_MPIIO;
     int ncid=0, retval;
