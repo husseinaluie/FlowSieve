@@ -15,12 +15,13 @@ void interpolate_over_land_from_coast(
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
-        const std::vector<double> & mask)
+        const std::vector<double> & mask,
+        const std::vector<int>    & myCounts)
 {
-    int Ntime  = (int)time.size();
-    int Ndepth = (int)depth.size();
-    int Nlat   = (int)latitude.size();
-    int Nlon   = (int)longitude.size();
+    const int Ntime   = myCounts.at(0);
+    const int Ndepth  = myCounts.at(1);
+    const int Nlat    = myCounts.at(2);
+    const int Nlon    = myCounts.at(3);
 
     const bool cast_to_sphere = false;
 
@@ -51,14 +52,13 @@ void interpolate_over_land_from_coast(
     #endif
 
     double x, y, z, lat, lon;
-    const double D2R = M_PI / 180;
 
     double rbase;
     // largest interpolation scale is scale * dx
     //   smallest is largest / 2^nlayers
-    // Current setting sweeps dx -> 128 * dx
+    // Current setting sweeps dx -> 2^nlayers * dx
     const int nlayers = 7;
-    const double scale = 128.;
+    const double scale = pow(2., (double)nlayers);
 
     std::vector<double> lon_coast;
     std::vector<double> lat_coast;
@@ -100,7 +100,8 @@ void interpolate_over_land_from_coast(
 
             R = constants::R_earth - depth.at(Idepth);
             #if DEBUG >= 1
-            fprintf(stdout, "      Adding seed data to the interpolator object.\n");
+            fprintf(stdout, "      Adding seed data to the interpolator object...");
+            fflush(stdout);
             perc = perc_base;
             #endif
             cntr = 0;
@@ -111,9 +112,9 @@ void interpolate_over_land_from_coast(
                 val = field_coast.at(Icoast);
 
                 if (cast_to_sphere) { 
-                    xyzf_vec.at(4*cntr + 0) = R * cos(lat * D2R) * cos(lon * D2R);
-                    xyzf_vec.at(4*cntr + 1) = R * cos(lat * D2R) * sin(lon * D2R);
-                    xyzf_vec.at(4*cntr + 2) = R * sin(lat * D2R);
+                    xyzf_vec.at(4*cntr + 0) = R * cos(lat) * cos(lon);
+                    xyzf_vec.at(4*cntr + 1) = R * cos(lat) * sin(lon);
+                    xyzf_vec.at(4*cntr + 2) = R * sin(lat);
                     xyzf_vec.at(4*cntr + 3) = val;
                 } else {
                     xyzf_vec.at(3*cntr + 0) = lon;
@@ -125,9 +126,14 @@ void interpolate_over_land_from_coast(
 
             }
             #if DEBUG >= 1
-            fprintf(stdout, "\n");
+            fprintf(stdout, " done\n");
+            fflush(stdout);
             #endif
 
+            #if DEBUG >= 1
+            fprintf(stdout, "      Setting points for the model...");
+            fflush(stdout);
+            #endif
             alglib::real_2d_array xyzf;
             if (cast_to_sphere) { 
                 xyzf.setlength(num_coast, 4);
@@ -136,8 +142,17 @@ void interpolate_over_land_from_coast(
                 xyzf.setlength(num_coast, 3);
                 xyzf.setcontent(num_coast, 3, &xyzf_vec[0]);
             }
+
+            #if DEBUG >= 1
+            fprintf(stdout, " ...");
+            fflush(stdout);
+            #endif
         
             alglib::rbfsetpoints(model, xyzf);
+            #if DEBUG >= 1
+            fprintf(stdout, " done\n");
+            fflush(stdout);
+            #endif
         
             //
             // Step 3: rebuild model
@@ -153,9 +168,9 @@ void interpolate_over_land_from_coast(
             //
             #if DEBUG >= 1
             fprintf(stdout, "      Building the interpolator object.\n");
+            fflush(stdout);
             #endif
             alglib::rbfreport rep;
-            fflush(stdout);
             alglib::rbfsetalgohierarchical(model, rbase, nlayers, 0.0);
             alglib::rbfbuildmodel(model, rep);
         
@@ -179,9 +194,9 @@ void interpolate_over_land_from_coast(
                     if (mask.at(index) == 0) {
                         // If we're on a land cell, then use the interpolator
                         if (cast_to_sphere) { 
-                            x = R * cos(lat * D2R) * cos(lon * D2R);
-                            y = R * cos(lat * D2R) * sin(lon * D2R);
-                            z = R * sin(lat * D2R);
+                            x = R * cos(lat) * cos(lon);
+                            y = R * cos(lat) * sin(lon);
+                            z = R * sin(lat);
                             interp_field.at(index) = alglib::rbfcalc3(model, x, y, z);
                         } else {
                             interp_field.at(index) = alglib::rbfcalc2(model, lon, lat);
