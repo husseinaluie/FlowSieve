@@ -33,7 +33,7 @@ void Apply_Potential_Projection(
     MPI_Comm_size( comm, &wSize );
 
     const double rel_tol    = 1e-7;
-    const int    max_iters  = 1e4;
+    const int    max_iters  = 1e6;
     const bool   weight_err = true;
 
     // Create a 'no mask' mask variable
@@ -126,7 +126,8 @@ void Apply_Potential_Projection(
     alglib::sparsematrix Lap;
     alglib::sparsecreate(Npts, Npts, Lap);
 
-    toroidal_sparse_Lap(Lap, latitude, longitude, Nlat, Nlon, unmask, dAreas, weight_err);
+    toroidal_sparse_Lap(Lap, latitude, longitude, Itime, Idepth,
+            Ntime, Ndepth, Nlat, Nlon, unmask, dAreas, weight_err);
     alglib::sparseconverttocrs(Lap);
 
     if (wRank == 0) {
@@ -293,7 +294,8 @@ void Apply_Potential_Projection(
     write_field_to_output(full_div_pot,    "div_pot",  starts, counts, fname, &mask);
     write_field_to_output(full_div_orig,   "div_orig", starts, counts, fname, &mask);
 
-    add_attr_to_file("rel_tol", rel_tol, fname);
-    add_attr_to_file("max_iters", (double) max_iters, fname);
+    add_attr_to_file("rel_tol",    rel_tol,                     fname);
+    add_attr_to_file("max_iters",  (double) max_iters,          fname);
+    add_attr_to_file("diff_order", (double) constants::DiffOrd, fname);
 
 }
