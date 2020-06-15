@@ -63,8 +63,13 @@ void potential_vel_from_F(
 
                 cos_lat = cos(latitude.at(Ilat));
 
-                tmp_lon = dFdlon / (constants::R_earth * cos_lat);
-                tmp_lat = dFdlat /  constants::R_earth;
+                if (constants::CARTESIAN) {
+                    tmp_lon = dFdlon;
+                    tmp_lat = dFdlat;
+                } else {
+                    tmp_lon = dFdlon / (constants::R_earth * cos_lat);
+                    tmp_lat = dFdlat /  constants::R_earth;
+                }
 
             }
             vel_lon.at(index) = tmp_lon;

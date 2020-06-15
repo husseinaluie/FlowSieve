@@ -63,8 +63,13 @@ void toroidal_vel_from_F(
 
                 cos_lat = cos(latitude.at(Ilat));
 
-                tmp_lon = - dFdlat /  constants::R_earth;
-                tmp_lat =   dFdlon / (constants::R_earth * cos_lat);
+                if (constants::CARTESIAN) {
+                    tmp_lon = - dFdlat;
+                    tmp_lat =   dFdlon;
+                } else {
+                    tmp_lon = - dFdlat /  constants::R_earth;
+                    tmp_lat =   dFdlon / (constants::R_earth * cos_lat);
+                }
 
             }
             vel_lon.at(index) = tmp_lon;
