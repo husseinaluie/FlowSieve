@@ -2,7 +2,7 @@
 
 double depotential_temperature(
         const double p,     /**< [in] pressure at point  */
-        const double theta  /**< [in] potential temperature at point */
+        const double theta  /**< [in] potential temperature at point (Celsius) */
         ) {
 
     // Following equation 1.154a from Vallis (p.36)

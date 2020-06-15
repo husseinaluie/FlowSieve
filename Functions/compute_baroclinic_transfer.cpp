@@ -18,7 +18,8 @@ void  compute_baroclinic_transfer(
     const int Nlon,
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
-    const std::vector<double> & mask
+    const std::vector<double> & mask,
+    const double scale_factor
     ) {
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
@@ -78,7 +79,8 @@ void  compute_baroclinic_transfer(
                                     mask);
 
                             baroclinic_transfer.at(index) = 
-                                coarse_vort_r.at(index)
+                                scale_factor
+                                    * coarse_vort_r.at(index)
                                     * ( drhodlon * dpdlat  -  drhodlat * dpdlon ) 
                                     / ( coarse_rho.at(index) * R2 * cos_lat );
 
