@@ -1,6 +1,7 @@
 
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
+#include <cassert>
 #include <math.h>
 
 // Write to netcdf file
@@ -11,6 +12,8 @@ void read_attr_from_file(
         const char * var_name,
         const MPI_Comm comm
         ) {
+
+    assert( check_file_existence( filename ) );
 
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
