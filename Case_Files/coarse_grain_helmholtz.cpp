@@ -52,9 +52,10 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales { 
+        1e3,
         1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
-        1e5, //1.58e5, 2.51e5, 3.98e5, 6.31e5,
-        //1e6, 1.58e6, 2.51e6, 3.98e6, 6.31e6,
+        1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
+        1e6, //1.58e6, 2.51e6, 3.98e6, 6.31e6,
         //1e7//, 1.58e7, 2.51e7, 3.98e7, 6.31e7
     };
 
@@ -75,7 +76,7 @@ int main(int argc, char *argv[]) {
         // check if the flag is 'version'
         if (strcmp(argv[ii], flag_version) == 0) {
             if (wRank == 0) {
-                print_compile_info(filter_scales);
+                print_compile_info(&filter_scales);
             }
             return 0;
 

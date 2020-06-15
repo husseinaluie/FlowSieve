@@ -36,103 +36,31 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
-    // Default input file name
-    const int str_len = 50;
-    char    input_fname[   str_len], out_name[      str_len],
-            flag_version[  str_len], flag_input[    str_len],
-            zonal_vel_name[str_len], flag_zonal_vel[str_len], 
-            merid_vel_name[str_len], flag_merid_vel[str_len];
-
-    snprintf(zonal_vel_name,    str_len, "uo");
-    snprintf(merid_vel_name,    str_len, "vo");
-
-    snprintf(input_fname,       str_len, "input.nc");
-    snprintf(flag_version,      str_len, "--version");
-    snprintf(flag_input,        str_len, "--input_file");
-    snprintf(flag_zonal_vel,    str_len, "--zonal_vel");
-    snprintf(flag_merid_vel,    str_len, "--merid_vel");
-
-    // Parse command-line flags
-    int ii = 1;
-    while(ii < argc) {  
-        if (wRank == 0) {
-            fprintf(stdout, "Argument %d : %s\n", ii, argv[ii]);
-        }
-
-        if (strcmp(argv[ii], flag_version) == 0) {
-            // check if the flag is 'version'
-            if (wRank == 0) {
-                //print_compile_info(filter_scales);
-            }
-            return 0;
-        } else if (strcmp(argv[ii], flag_input) == 0) {
-            // check if the flag is 'input_file' and, if it is
-            //   the next input is then used as the filename
-            //   of the input
-            snprintf(input_fname, 50, argv[ii+1]);
-            ++ii;
-        } else if (strcmp(argv[ii], flag_zonal_vel) == 0) {
-            // check if we're given the name of the zonal velocity var
-            snprintf(zonal_vel_name, str_len, argv[ii+1]);
-            ++ii;
-        } else if (strcmp(argv[ii], flag_merid_vel) == 0) {
-            // check if we're given the name of the meridional velocity var
-            snprintf(merid_vel_name, str_len, argv[ii+1]);
-            ++ii;
-        } else {
-            // Otherwise, the flag is unrecognized
-            if (wRank == 0) {
-                fprintf(stderr, "Flag %s not recognized.\n", argv[ii]);
-            }
-            return -1;
-        }
-        ++ii;
+    //
+    //// Parse command-line arguments
+    //
+    InputParser input(argc, argv);
+    if(input.cmdOptionExists("--version")){
+        if (wRank == 0) { print_compile_info(NULL); } 
+        return 0;
     }
 
-    #if DEBUG >= 0
-    if (wRank == 0) {
-        fprintf(stdout, "\n\n");
-        fprintf(stdout, "Compiled at %s on %s.\n", __TIME__, __DATE__);
-        fprintf(stdout, "  Version %d.%d.%d \n", 
-                MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
-        fprintf(stdout, "\n");
-        fflush(stdout);
-    }
-    #endif
+    // first argument is the flag, second argument is default value (for when flag is not present)
+    const std::string &zonal_vel_name   = input.getCmdOption("--zonal_vel",   "uo");
+    const std::string &merid_vel_name   = input.getCmdOption("--merid_vel",   "vo");
+    const std::string &input_fname      = input.getCmdOption("--input_file",  "input.nc");
+    const std::string &output_fname     = input.getCmdOption("--output_file", "particles.nc");
 
-    #if DEBUG >= 0
-    if (wRank == 0) {
-        if (constants::CARTESIAN) { 
-            fprintf(stdout, "Using Cartesian coordinates.\n");
-        } else {
-            fprintf(stdout, "Using spherical coordinates.\n");
-        }
-        fflush(stdout);
-    }
-    #endif
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    // Print processor assignments
+    // Set OpenMP thread number
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
-    #if DEBUG >= 2
-    int tid, nthreads;
-    #pragma omp parallel default(none) private(tid, nthreads) \
-        shared(stdout) firstprivate(wRank, wSize)
-    {
-        tid = omp_get_thread_num();
-        nthreads = omp_get_num_threads();
-        fprintf(stdout, "Hello from thread %d of %d on processor %d of %d.\n", 
-                tid+1, nthreads, wRank+1, wSize);
-    }
-    fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
-    #endif
+
+    // Print some header info, depending on debug level
+    print_header_info();
 
     std::vector<double> longitude, latitude, time, depth;
     std::vector<double> u_lon, u_lat;
     std::vector<double> mask;
-    std::vector<int> myCounts, myStarts;
     size_t II;
 
     // Read in source data / get size information
@@ -145,46 +73,39 @@ int main(int argc, char *argv[]) {
     read_var_from_file(latitude,  "latitude",  input_fname);
     read_var_from_file(time,      "time",      input_fname);
     read_var_from_file(depth,     "depth",     input_fname);
+     
+    convert_coordinates(longitude, latitude);
 
     // Read in the velocity fields
-    read_var_from_file(u_lon, zonal_vel_name, input_fname, &mask, &myCounts, &myStarts);
-    read_var_from_file(u_lat, merid_vel_name, input_fname, &mask, &myCounts, &myStarts);
+    read_var_from_file(u_lon, zonal_vel_name, input_fname, &mask, NULL, NULL, false);
+    read_var_from_file(u_lat, merid_vel_name, input_fname, &mask, NULL, NULL, false);
 
-    const int Ntime  = time.size();
-    #if DEBUG >= 1
-    const int Ndepth = depth.size();
-    #endif
-    const int Nlon   = longitude.size();
-    const int Nlat   = latitude.size();
-
-    #if DEBUG >= 1
-    fprintf(stdout, "Processor %d has (%d, %d, %d, %d) from (%d, %d, %d, %d)\n", 
-            wRank, 
-            myCounts[0], myCounts[1], myCounts[2], myCounts[3],
-            Ntime, Ndepth, Nlat, Nlon);
-    fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
-    #endif
-
-    if (not(constants::CARTESIAN)) {
-        // Convert coordinate to radians
-        if (wRank == 0) { fprintf(stdout, "Converting to radians.\n\n"); }
-        int ii;
-        const double D2R = M_PI / 180.;
-        #pragma omp parallel default(none) private(ii) shared(longitude, latitude)
-        { 
-            #pragma omp for collapse(1) schedule(static)
-            for (ii = 0; ii < Nlon; ii++) { longitude.at(ii) = longitude.at(ii) * D2R; }
-
-            #pragma omp for collapse(1) schedule(static)
-            for (ii = 0; ii < Nlat; ii++) { latitude.at(ii) = latitude.at(ii) * D2R; }
+    // A sanity check to make sure that the loaded data is nonzero
+    double u_max = 0., v_max = 0.;
+    size_t land_count = 0, water_count = 0;
+    #pragma omp parallel \
+    default(none) shared( u_lon, u_lat, mask ) private( II )\
+    reduction(max : u_max, v_max) reduction(+ : land_count, water_count)
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for ( II = 0; II < u_lon.size(); ++II ){
+            if ( mask.at(II) == 1 ) {
+                u_max = std::max( u_max, std::fabs(u_lon.at(II)) );
+                v_max = std::max( v_max, std::fabs(u_lat.at(II)) );
+                water_count++;
+            } else {
+                land_count++;
+            }
         }
     }
+    assert( u_max > 0 );
+    assert( v_max > 0 );
 
     // Set the output times
-    const int Nouts = Ntime * 4;
     const double start_time = time.front(),
                  final_time = time.at(time.size()-2);
+    const double out_freq = 10. * 60.;
+    const int Nouts = (int) ( (final_time - start_time) / out_freq );
 
     std::vector<double> target_times(Nouts);
     for ( II = 0; II < target_times.size(); ++II ) {
@@ -193,22 +114,42 @@ int main(int argc, char *argv[]) {
     }
 
     // Get particle positions
-    const int Npts = 20;
+    const int Npts = 1000;  // particles per MPI process
     std::vector<double> starting_lat(Npts), starting_lon(Npts);
     particles_initial_positions(starting_lat, starting_lon, Npts,
             latitude, longitude, mask);
 
     // Trajectories dimension (essentially just a numbering)
     std::vector<double> trajectories(Npts);
-    for (II = 0; II < Npts; ++II) { trajectories.at(II) = (double) II; };
+    for (II = 0; II < Npts; ++II) { trajectories.at(II) = (double) II + wRank * Npts; };
+
+    // List the fields to track along particle trajectories
+    std::vector<const std::vector<double>*> fields_to_track;
+    std::vector<std::string> names_of_tracked_fields;
+
+    names_of_tracked_fields.push_back( "vel_lon");
+    fields_to_track.push_back(&u_lon);
+
+    names_of_tracked_fields.push_back( "vel_lat");
+    fields_to_track.push_back(&u_lat);
+
+    // Storage for tracked fields
+    std::vector< std::vector< double > >     field_trajectories(fields_to_track.size()),
+                                         rev_field_trajectories(fields_to_track.size());
+
+    for (size_t Ifield = 0; Ifield < fields_to_track.size(); ++Ifield) {
+            field_trajectories.at(Ifield).resize(Npts * Nouts, constants::fill_value);
+        rev_field_trajectories.at(Ifield).resize(Npts * Nouts, constants::fill_value);
+    }
 
     // Initialize particle output file
-    snprintf(out_name, str_len, "particles.nc");
-    std::vector<std::string> vars_to_write;
-    initialize_particle_file(target_times, trajectories, vars_to_write, out_name);
+    initialize_particle_file(target_times, trajectories, names_of_tracked_fields, output_fname);
 
-    std::vector<double> part_lon_hist(Npts * Nouts, constants::fill_value), 
-                        part_lat_hist(Npts * Nouts, constants::fill_value);
+    std::vector<double>     part_lon_hist(Npts * Nouts, constants::fill_value), 
+                            part_lat_hist(Npts * Nouts, constants::fill_value),
+                        rev_part_lon_hist(Npts * Nouts, constants::fill_value),
+                        rev_part_lat_hist(Npts * Nouts, constants::fill_value),
+                        trajectory_dists( Npts * Nouts, constants::fill_value);
 
     for (II = 0; II < Npts; ++II) {
         part_lon_hist.at(II) = starting_lon.at(II);
@@ -219,36 +160,55 @@ int main(int argc, char *argv[]) {
     starts[0] = 0;
     counts[0] = Nouts;
 
-    starts[1] = 0;
+    starts[1] = wRank * Npts;
     counts[1] = Npts;
 
-    write_field_to_output(part_lon_hist, "longitude", starts, counts, out_name);
-    write_field_to_output(part_lat_hist, "latitude",  starts, counts, out_name);
-
+    /*
     // Convert to seconds
     for (II = 0; II < time.size();         ++II) { time.at(II)         *= 60 * 60; }
     for (II = 0; II < target_times.size(); ++II) { target_times.at(II) *= 60 * 60; }
+    */
 
     // Now do the particle routine
     particles_evolve_trajectories(
-        part_lon_hist, part_lat_hist,
+            part_lon_hist,     part_lat_hist,
+        rev_part_lon_hist, rev_part_lat_hist,
+            field_trajectories,
+        rev_field_trajectories,
         starting_lat,  starting_lon,
         target_times,
         u_lon, u_lat,
+        fields_to_track, names_of_tracked_fields,
         time, latitude, longitude,        
         mask);
 
-    fprintf(stdout, "\n\nDone evolving particles, now writing outputs.\n\n");
+    fprintf(stdout, "\nProcessor %d of %d finished stepping particles.\n", wRank+1, wSize);
 
     std::vector<double> out_mask(part_lon_hist.size());
     for (II = 0; II < out_mask.size(); ++II) {
         out_mask.at(II) = part_lon_hist.at(II) == constants::fill_value ? 0 : 1;
     }
 
-    write_field_to_output(part_lon_hist, "longitude", 
-            starts, counts, out_name, &out_mask);
-    write_field_to_output(part_lat_hist, "latitude",  
-            starts, counts, out_name, &out_mask);
+    particles_fore_back_difference(trajectory_dists,     part_lon_hist,     part_lat_hist, 
+                                                     rev_part_lon_hist, rev_part_lat_hist);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    write_field_to_output(part_lon_hist, "longitude", starts, counts, output_fname, &out_mask);
+    write_field_to_output(part_lat_hist, "latitude",  starts, counts, output_fname, &out_mask);
+
+    #if DEBUG >= 1
+    write_field_to_output(rev_part_lon_hist, "rev_longitude", starts, counts, output_fname, &out_mask);
+    write_field_to_output(rev_part_lat_hist, "rev_latitude",  starts, counts, output_fname, &out_mask);
+    #endif
+
+    write_field_to_output(trajectory_dists, "fore_back_dists", starts, counts, output_fname, &out_mask);
+
+    for (size_t Ifield = 0; Ifield < fields_to_track.size(); ++Ifield) {
+        MPI_Barrier(MPI_COMM_WORLD);
+        write_field_to_output(field_trajectories.at(Ifield), 
+                names_of_tracked_fields.at(Ifield),  
+                starts, counts, output_fname, &out_mask);
+    }
 
     MPI_Finalize();
     return 0;

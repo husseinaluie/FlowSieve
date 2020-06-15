@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
             fprintf(stdout, "Argument %d : %s\n", ii, argv[ii]);
             snprintf(buffer, 50, "--version");
             if (strcmp(argv[ii], buffer) == 0) {
-                print_compile_info(filter_scales);
+                print_compile_info(&filter_scales);
                 return 0;
             } else {
                 fprintf(stderr, "Flag %s not recognized.\n", argv[ii]);

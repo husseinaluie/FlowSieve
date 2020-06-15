@@ -371,6 +371,7 @@ void filtering_subsets(
  * @param[in]       mask                    array to distinguish land from water
  * @param[in]       use_mask                array of booleans indicating whether or not to use mask (i.e. zero out land) or to use the array value
  * @param[in]       local_kernel            pointer to pre-computed kernel (NULL indicates not provided)
+ * @param[in]       weight                  pointer to spatial weight (i.e. rho) (NULL indicates not provided)
  *
  */
 void apply_filter_at_point(
@@ -386,7 +387,9 @@ void apply_filter_at_point(
         const double scale,
         const std::vector<double> & mask,
         const std::vector<bool> & use_mask,
-        const std::vector<double> * local_kernel);
+        const std::vector<double> * local_kernel,
+        const std::vector<double> * weight = NULL
+        );
 
 /*!
  * \brief Primary kernel function coarse-graining procedure (G in publications)
@@ -543,7 +546,8 @@ void compute_largescale_strain(
  * \param Length of longitude dimension
  * \param Longitude dimension (1D)
  * \param Latitude dimension (1D)
- * \param Mask array (2D) to distinguish land from water
+ * \param Mask to distinguish land from water
+ * \param Multiplicative scale factor
  */
 void compute_baroclinic_transfer(
     std::vector<double> & baroclinic_transfer,
@@ -552,6 +556,56 @@ void compute_baroclinic_transfer(
     const std::vector<double> & full_vort_lat,
     const std::vector<double> & coarse_rho,
     const std::vector<double> & coarse_p,
+    const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+    const std::vector<double> & longitude,
+    const std::vector<double> & latitude,
+    const std::vector<double> & mask,
+    const double scale_factor
+    );
+
+void  compute_full_Lambda(
+    std::vector<double> & Lambda,
+    const std::vector<double> & coarse_u_r,
+    const std::vector<double> & coarse_u_lon,
+    const std::vector<double> & coarse_u_lat,
+    const std::vector<double> & tilde_u_r,
+    const std::vector<double> & tilde_u_lon,
+    const std::vector<double> & tilde_u_lat,
+    const std::vector<double> & coarse_p,
+    const int Ntime,
+    const int Ndepth,
+    const int Nlat,
+    const int Nlon,
+    const std::vector<double> & longitude,
+    const std::vector<double> & latitude,
+    const std::vector<double> & mask
+    );
+
+/*!
+ *
+ * \param Where to store the computed values
+ * \param Coarse vorticity (r   component)
+ * \param Coarse vorticity (lon component)
+ * \param Coarse vorticity (lat component)
+ * \param Coarse velocity (r   component)
+ * \param Coarse velocity (lon component)
+ * \param Coarse velocity (lat component)
+ * \param Length of time dimension
+ * \param Length of depth dimension
+ * \param Length of latitude dimension
+ * \param Length of longitude dimension
+ * \param Longitude dimension (1D)
+ * \param Latitude dimension (1D)
+ * \param Mask to distinguish land from water
+ */
+void compute_vort_stretch(
+    std::vector<double> & baroclinic_transfer,
+    const std::vector<double> & full_vort_r,
+    const std::vector<double> & full_vort_lon,
+    const std::vector<double> & full_vort_lat,
+    const std::vector<double> & coarse_u_r,
+    const std::vector<double> & coarse_u_lon,
+    const std::vector<double> & coarse_u_lat,
     const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
@@ -672,9 +726,11 @@ void get_lon_bounds(
  * \brief Print summary of compile-time variables.
  *
  * This is triggered by passing --version to the executable.
+ *
+ * @param[in]   scales      Scales used for filtering
  */
 void print_compile_info(
-        const std::vector<double> &scales);
+        const std::vector<double> * scales = NULL);
 
 /*! 
  * \brief Compute openmp chunk size for OMP for loops
@@ -686,6 +742,21 @@ void print_compile_info(
  *
  */
 int get_omp_chunksize(const int Nlat, const int Nlon);
+
+
+/*!
+ * \brief Apply degree->radian conversion, if necessary.
+ *
+ * This is just to provide a clean wrapper to improve some case file readability.
+ * It applies a Cartesian check (via constants.hpp), so it is safe to include by default.
+ *
+ * @param[in]   longitude, latitude     Coordinate grids to be converted, if appropriate
+ *
+ */
+void convert_coordinates(
+        std::vector<double> & longitude,
+        std::vector<double> & latitude
+        );
 
 /*!
  * \brief Class for storing internal timings.
@@ -718,5 +789,35 @@ class Timing_Records {
         //! Print the timing information in a human-readable format.
         void print();
 };
+
+
+/*!
+ * \brief Class to process command-line arguments
+ *
+ * This parser tool was provided by StackOverflow user 'iain' at the following post.
+ *    mild modifications have been made to adapt the code to our purposes.
+ *
+ * https://stackoverflow.com/questions/865668/how-to-parse-command-line-arguments-in-c
+ *
+ */
+class InputParser {
+
+    public:
+        InputParser (int &argc, char **argv);
+
+        const std::string getCmdOption(
+                const std::string &option,
+                const std::string &default_value = ""
+                ) const;
+
+        bool cmdOptionExists(const std::string &option) const;
+
+    private:
+        std::vector <std::string> tokens;
+
+};
+
+
+void print_header_info( );
 
 #endif
