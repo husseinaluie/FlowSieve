@@ -56,7 +56,8 @@ void toroidal_curl_u_dot_er(
                               Ntime, Ndepth, Nlat, Nlon);
                 index_sub = Index(0, 0, Ilat, Ilon,
                                   1, 1, Nlat, Nlon);
-                tmp = constants::fill_value;
+                //tmp = constants::fill_value;
+                tmp = 0.;
 
                 if (mask.at(index) == 1) { // Skip land areas
 
@@ -87,6 +88,7 @@ void toroidal_curl_u_dot_er(
                     }
 
                 }
+
                 out_arr.at(index_sub) = tmp;
 
             } // end Ilon
