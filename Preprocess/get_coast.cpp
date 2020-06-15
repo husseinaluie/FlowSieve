@@ -24,7 +24,7 @@ void get_coast(
     int num_coast = 0;
     bool is_coast;
 
-    const int coast_width = 6; // width in grid points
+    const int coast_width = 20; // width in grid points
 
     int curr_lon, curr_lat, curr_index, index;
 
