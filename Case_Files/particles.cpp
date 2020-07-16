@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
     // Set the output times
     const double start_time = time.front(),
                  final_time = time.at(time.size()-2);
-    const double out_freq = 10. * 60.;
+    const double out_freq = 15. * 60.;
     const int Nouts = (int) ( (final_time - start_time) / out_freq );
 
     std::vector<double> target_times(Nouts);
@@ -199,9 +199,10 @@ int main(int argc, char *argv[]) {
     #if DEBUG >= 1
     write_field_to_output(rev_part_lon_hist, "rev_longitude", starts, counts, output_fname, &out_mask);
     write_field_to_output(rev_part_lat_hist, "rev_latitude",  starts, counts, output_fname, &out_mask);
-    #endif
 
     write_field_to_output(trajectory_dists, "fore_back_dists", starts, counts, output_fname, &out_mask);
+    #endif
+
 
     for (size_t Ifield = 0; Ifield < fields_to_track.size(); ++Ifield) {
         MPI_Barrier(MPI_COMM_WORLD);

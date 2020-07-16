@@ -57,10 +57,13 @@ int main(int argc, char *argv[]) {
     const std::string &part_longitude_name = input.getCmdOption("--particle_longitude", "longitude");
 
     const std::string &Pi_var_name        = input.getCmdOption("--Pi",        "energy_transfer");
-    const std::string &Lambda_var_name    = input.getCmdOption("--Lambda",    "Lambda_m");
     const std::string &vort_var_name      = input.getCmdOption("--vort",      "vort_r");
     const std::string &fine_KE_var_name   = input.getCmdOption("--fine_KE",   "fine_KE");
     const std::string &coarse_KE_var_name = input.getCmdOption("--coarse_KE", "KE_from_coarse_vels");
+
+    const std::string &Lambda_rot_var_name     = input.getCmdOption("--Lambda_rot",     "Lambda_rotational");
+    const std::string &Lambda_nonlin_var_name  = input.getCmdOption("--Lambda_nonlin",  "Lambda_nonlinear");
+    const std::string &Lambda_full_var_name    = input.getCmdOption("--Lambda_full",    "Lambda_full");
 
     const std::string &input_fields     = input.getCmdOption("--input_fields",       "input.nc");
     const std::string &input_trajectory = input.getCmdOption("--input_trajectories", "particles.nc");
@@ -74,7 +77,8 @@ int main(int argc, char *argv[]) {
     omp_set_num_threads( max_threads );
 
     std::vector<double> longitude, latitude, time, depth, mask, particle_mask,
-                        Pi, Lambda, vort, fine_KE, coarse_KE,
+                        Pi, vort, fine_KE, coarse_KE,
+                        Lambda_rot, Lambda_nonlin, Lambda_full,
                         particle_time, particle_traj, particle_lon, particle_lat;
 
     // Read in source data / get size information
@@ -92,10 +96,13 @@ int main(int argc, char *argv[]) {
 
     // Read in the velocity fields
     read_var_from_file( Pi,         Pi_var_name.c_str(),        input_fields.c_str(), &mask, NULL, NULL, false );
-    read_var_from_file( Lambda,     Lambda_var_name.c_str(),    input_fields.c_str(), NULL,  NULL, NULL, false );
     read_var_from_file( vort,       vort_var_name.c_str(),      input_fields.c_str(), NULL,  NULL, NULL, false );
     read_var_from_file( fine_KE,    fine_KE_var_name.c_str(),   input_fields.c_str(), NULL,  NULL, NULL, false );
     read_var_from_file( coarse_KE,  coarse_KE_var_name.c_str(), input_fields.c_str(), NULL,  NULL, NULL, false );
+
+    read_var_from_file( Lambda_rot,     Lambda_rot_var_name.c_str(),     input_fields.c_str(), NULL,  NULL, NULL, false );
+    read_var_from_file( Lambda_nonlin,  Lambda_nonlin_var_name.c_str(),  input_fields.c_str(), NULL,  NULL, NULL, false );
+    read_var_from_file( Lambda_full,    Lambda_full_var_name.c_str(),    input_fields.c_str(), NULL,  NULL, NULL, false );
 
     // Read in the particle trajectories
     read_var_from_file( particle_time, "time",       input_trajectory.c_str() );
@@ -125,17 +132,25 @@ int main(int argc, char *argv[]) {
     fields_to_track.push_back( &Pi );
     const int Pi_ind = 1;
 
-    names_of_tracked_fields.push_back( "Lambda" );
-    fields_to_track.push_back( &Lambda );
-    const int Lambda_ind = 2;
+    names_of_tracked_fields.push_back( "Lambda_rot" );
+    fields_to_track.push_back( &Lambda_rot );
+    const int Lambda_rot_ind = 2;
+
+    names_of_tracked_fields.push_back( "Lambda_nonlin" );
+    fields_to_track.push_back( &Lambda_nonlin );
+    const int Lambda_nonlin_ind = 3;
+
+    names_of_tracked_fields.push_back( "Lambda_full" );
+    fields_to_track.push_back( &Lambda_full );
+    const int Lambda_full_ind = 4;
 
     names_of_tracked_fields.push_back( "fine_KE" );
     fields_to_track.push_back( &fine_KE );
-    const int fine_KE_ind = 3;
+    const int fine_KE_ind = 5;
 
     names_of_tracked_fields.push_back( "coarse_KE" );
     fields_to_track.push_back( &coarse_KE );
-    const int coarse_KE_ind = 4;
+    const int coarse_KE_ind = 6;
 
     // Storage for tracked fields
     std::vector< std::vector< double > > field_trajectories(fields_to_track.size());
@@ -153,11 +168,9 @@ int main(int argc, char *argv[]) {
     ////    and write what we have so far
     //
     if (wRank == 0) { fprintf(stdout, "Initializing output file\n"); fflush(stdout); }
-    #if DEBUG >= 2
     names_of_tracked_fields.push_back("ddt_fine_KE");
     names_of_tracked_fields.push_back("ddt_coarse_KE");
     names_of_tracked_fields.push_back("ddt_enstrophy");
-    #endif
     initialize_projected_particle_file( particle_time, particle_traj, names_of_tracked_fields, 
             output_name.c_str());
 
@@ -251,12 +264,11 @@ int main(int argc, char *argv[]) {
     }
 
     //
-    #if DEBUG >= 2
     write_field_to_output(ddt_fine_KE,   "ddt_fine_KE",   starts, counts, output_name.c_str(), &particle_mask);
     write_field_to_output(ddt_coarse_KE, "ddt_coarse_KE", starts, counts, output_name.c_str(), &particle_mask);
     write_field_to_output(ddt_enstrophy, "ddt_enstrophy", starts, counts, output_name.c_str(), &particle_mask);
-    #endif
 
+    /*
     // Compute correlations
     if (wRank == 0) { fprintf(stdout, "Computing correlations\n"); fflush(stdout); }
     double ddt_cKE_mean, ddt_fKE_mean, ddt_EN_mean, Pi_mean, Lambda_mean,
@@ -305,17 +317,6 @@ int main(int argc, char *argv[]) {
         #pragma omp for collapse(1) schedule(static)
         for ( Itraj = 0; Itraj < Ntraj; ++Itraj ) {
 
-
-            //
-            //// First, compute the mean(s)
-            //
-            ddt_cKE_mean = 0.;
-            ddt_fKE_mean = 0.;
-            ddt_EN_mean = 0.;
-            Pi_mean     = 0.;
-            Lambda_mean = 0.;
-
-
             // get the starting index (since the first chunk might be masked)
             //   i.e. iterate until we hit a mask == 1 value
             Itime = 0;
@@ -328,32 +329,31 @@ int main(int argc, char *argv[]) {
             Itime += constants::DiffOrd / 2;
             Itime_min = Itime;
 
-            // if, for some reason, the entire trajectory is masked, just skip it
-            if (Itime >= Ntime_traj - constants::DiffOrd - 1) { out_mask.at(Itraj) = 0; continue; }
-
-            count = 0;
+            // get the upper bound in time for the trajectory
             while ( Itime < Ntime_traj - constants::DiffOrd ) {
                 index = Index(0, 0, Itime,      Itraj,
                               1, 1, Ntime_traj, Ntraj);
 
                 if ( particle_mask.at(index) == 0) { break; }
 
-                ddt_cKE_mean += ddt_coarse_KE.at(index);
-                ddt_fKE_mean += ddt_fine_KE.at(index);
-                ddt_EN_mean  += ddt_enstrophy.at(index);
-                Pi_mean      += field_trajectories.at( Pi_ind     ).at(index);
-                Lambda_mean  += field_trajectories.at( Lambda_ind ).at(index);
-
-                count++;
                 Itime++;
             }
             Itime_max = Itime;
 
-            ddt_cKE_mean = ddt_cKE_mean / count;
-            ddt_fKE_mean = ddt_fKE_mean / count;
-            ddt_EN_mean  = ddt_EN_mean  / count;
-            Pi_mean      = Pi_mean      / count;
-            Lambda_mean  = Lambda_mean  / count;
+            //
+            //// First, compute the mean(s)
+            //
+            ddt_cKE_mean = particles_trajectory_mean( ddt_coarse_KE, 
+                                                        particles_mask, Itraj, Ntraj, Itime_max, Itime_min );
+            ddt_fKE_mean = particles_trajectory_mean( ddt_fine_KE,   
+                                                        particles_mask, Itraj, Ntraj, Itime_max, Itime_min );
+            ddt_EN_mean  = particles_trajectory_mean( ddt_enstrophy, 
+                                                        particles_mask, Itraj, Ntraj, Itime_max, Itime_min );
+
+            Pi_mean      = particles_trajectory_mean( field_trajectories.at(Pi_ind), 
+                                                        particles_mask, Itraj, Ntraj, Itime_max, Itime_min );
+            Lambda_mean  = particles_trajectory_mean( field_trajectories.at(Lambda_ind), 
+                                                        particles_mask, Itraj, Ntraj, Itime_max, Itime_min );
 
             mean_ddt_cKE_vec.at( Itraj ) = ddt_cKE_mean;
             mean_ddt_fKE_vec.at( Itraj ) = ddt_fKE_mean;
@@ -479,6 +479,7 @@ int main(int argc, char *argv[]) {
     write_field_to_output( denom_La_vec,  "denom_La",
                             correl_starts, correl_counts, output_name.c_str(), &out_mask);
     #endif
+    */
 
     MPI_Finalize();
     return 0;
