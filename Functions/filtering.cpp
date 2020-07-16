@@ -214,7 +214,7 @@ void filtering(
 
     double rho_tmp, p_tmp;
     std::vector<double> coarse_rho, coarse_p, fine_rho, fine_p,
-        lambda_nl, lambda_full, PEtoKE, 
+        lambda_rot, lambda_nonlin, lambda_full, PEtoKE, 
         tilde_u_r,    tilde_u_lon,    tilde_u_lat,
         tilde_vort_r, tilde_vort_lon, tilde_vort_lat;
     if (constants::COMP_BC_TRANSFERS) {
@@ -245,9 +245,11 @@ void filtering(
         postprocess_names.push_back( "tilde_vort_r");
         postprocess_fields.push_back(&tilde_vort_r);
 
-        lambda_nl.resize(num_pts);
+        lambda_rot.resize(num_pts);
+        lambda_nonlin.resize(num_pts);
         lambda_full.resize(num_pts);
         if (not(constants::NO_FULL_OUTPUTS)) {
+            vars_to_write.push_back("Lambda_rotational");
             vars_to_write.push_back("Lambda_nonlinear");
             vars_to_write.push_back("Lambda_full");
         }
@@ -530,7 +532,7 @@ void filtering(
                                             "filter_for_Pi");
                                 }
 
-                                // If we want baroclinic transfers (Lambda^m), 
+                                // If we want baroclinic transfers (Lees and Aluie, 2019), 
                                 //    then do those calculations now
                                 if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                                 if (constants::COMP_BC_TRANSFERS) {
@@ -746,7 +748,7 @@ void filtering(
             fflush(stdout);
             #endif
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-            compute_baroclinic_transfer(lambda_nl,
+            compute_Lambda_rotational(lambda_rot,
                     coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
                     coarse_rho, coarse_p,
                     Ntime, Ndepth, Nlat, Nlon,
@@ -754,7 +756,15 @@ void filtering(
                     0.5 * kern_alpha * pow(scales.at(Iscale), 2)
                     );
 
-            compute_full_Lambda(lambda_full,
+            compute_Lambda_nonlin_model(lambda_nonlin,
+                    coarse_u_r, coarse_u_lon, coarse_u_lat,
+                    coarse_rho, coarse_p,
+                    Ntime, Ndepth, Nlat, Nlon,
+                    longitude, latitude, mask,
+                    0.5 * kern_alpha * pow(scales.at(Iscale), 2)
+                    );
+
+            compute_Lambda_full(lambda_full,
                     coarse_u_r, coarse_u_lon, coarse_u_lat,
                     tilde_u_r, tilde_u_lon, tilde_u_lat,
                     coarse_p,
@@ -773,7 +783,9 @@ void filtering(
 
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             if (not(constants::NO_FULL_OUTPUTS)) {
-                write_field_to_output(lambda_nl,  "Lambda_nonlinear",   
+                write_field_to_output(lambda_rot,  "Lambda_rotational",   
+                        starts, counts, fname, &mask);
+                write_field_to_output(lambda_nonlin,  "Lambda_nonlinear",   
                         starts, counts, fname, &mask);
                 write_field_to_output(lambda_full,"Lambda_full",   
                         starts, counts, fname, &mask);
