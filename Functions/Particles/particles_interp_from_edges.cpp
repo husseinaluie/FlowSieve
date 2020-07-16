@@ -9,10 +9,10 @@
 double particles_interp_from_edges(
         double ref_lat,
         double ref_lon,
-        const std::vector<double> lat,
-        const std::vector<double> lon,
-        const std::vector<double> field,
-        const std::vector<double> mask,
+        const std::vector<double> & lat,
+        const std::vector<double> & lon,
+        const std::vector<double> * field,
+        const std::vector<double> & mask,
         const int left,
         const int right,
         const int bottom,
@@ -61,19 +61,19 @@ double particles_interp_from_edges(
 
     // Get field values at each corner
     if (top >= 0) {
-        if ( mask.at(TL_pre_ind) == 1 ) { top_L_pre_val = field.at(TL_pre_ind); }
-        if ( mask.at(TR_pre_ind) == 1 ) { top_R_pre_val = field.at(TR_pre_ind); }
+        if ( mask.at(TL_pre_ind) == 1 ) { top_L_pre_val = field->at(TL_pre_ind); }
+        if ( mask.at(TR_pre_ind) == 1 ) { top_R_pre_val = field->at(TR_pre_ind); }
 
-        if ( mask.at(TL_fut_ind) == 1 ) { top_L_fut_val = field.at(TL_fut_ind); }
-        if ( mask.at(TR_fut_ind) == 1 ) { top_R_fut_val = field.at(TR_fut_ind); }
+        if ( mask.at(TL_fut_ind) == 1 ) { top_L_fut_val = field->at(TL_fut_ind); }
+        if ( mask.at(TR_fut_ind) == 1 ) { top_R_fut_val = field->at(TR_fut_ind); }
     } 
 
     if (bottom >= 0) {
-        if ( mask.at(BL_pre_ind) == 1 ) { bot_L_pre_val = field.at(BL_pre_ind); }
-        if ( mask.at(BR_pre_ind) == 1 ) { bot_R_pre_val = field.at(BR_pre_ind); }
+        if ( mask.at(BL_pre_ind) == 1 ) { bot_L_pre_val = field->at(BL_pre_ind); }
+        if ( mask.at(BR_pre_ind) == 1 ) { bot_R_pre_val = field->at(BR_pre_ind); }
 
-        if ( mask.at(BL_fut_ind) == 1 ) { bot_L_fut_val = field.at(BL_fut_ind); }
-        if ( mask.at(BR_fut_ind) == 1 ) { bot_R_fut_val = field.at(BR_fut_ind); }
+        if ( mask.at(BL_fut_ind) == 1 ) { bot_L_fut_val = field->at(BL_fut_ind); }
+        if ( mask.at(BR_fut_ind) == 1 ) { bot_R_fut_val = field->at(BR_fut_ind); }
     }
 
     // Do the interpolation in time
