@@ -532,28 +532,27 @@ void compute_largescale_strain(
         const std::vector<double> & mask);
 
 /*!
- * \brief Compute the baroclinic energy transfer through the current filter scale
+ * \brief Compute the rotational component of the non-linear model of the baroclinic transfer term Lambda (see Lees and Aluie 2019)
  *
- * \param Where to store the computed values
- * \param Full vorticity (r   component)
- * \param Full vorticity (lon component)
- * \param Full vorticity (lat component)
- * \param Coarse density field
- * \param Coarse pressure field
- * \param Length of time dimension
- * \param Length of depth dimension
- * \param Length of latitude dimension
- * \param Length of longitude dimension
- * \param Longitude dimension (1D)
- * \param Latitude dimension (1D)
- * \param Mask to distinguish land from water
- * \param Multiplicative scale factor
+ * Specifically, it computes
+ * \f[
+ *      \Lambda_{\mathrm{rot}} = \frac{1}{2}\alpha_{\mathrm{kernel}}l^2 \frac{1}{\overline{\rho}}\left[ \frac{1}{2}\overline{\omega} \cdot \left( \nabla\overline{\rho}\times\nabla\overline{P} \right)  \right] 
+ * \f]
+ * where \f$ \alpha_{\mathrm{kernel}} \f$ is a multiplicative coefficient that depends on the kernel (see kernel_alpha.cpp) and \f$ l\f$ is the filter scale.
+ *
+ * @param[in,out]   Lambda_rot                                          Storage array for computed values
+ * @param[in]       coarse_vort_r, coarse_vort_lon, coarse_vort_lat     Components of vorticity vector
+ * @param[in]       coarse_rho, coarse_p                                Coarse density and pressure (respectively)
+ * @param[in]       Ntime, Ndepth, Nlat, Nlon                           Size of time, depth, lat, lon dimensions (respectively)
+ * @param[in]       longitude, latitude                                 Grid vectors
+ * @param[in]       mask                                                Mask to distinguish land from water
+ * @param[in]       scale_factor                                        Multiplicative scale factor
  */
-void compute_baroclinic_transfer(
-    std::vector<double> & baroclinic_transfer,
-    const std::vector<double> & full_vort_r,
-    const std::vector<double> & full_vort_lon,
-    const std::vector<double> & full_vort_lat,
+void compute_Lambda_rotational(
+    std::vector<double> & Lambda_rot,
+    const std::vector<double> & coarse_vort_r,
+    const std::vector<double> & coarse_vort_lon,
+    const std::vector<double> & coarse_vort_lat,
     const std::vector<double> & coarse_rho,
     const std::vector<double> & coarse_p,
     const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
@@ -563,7 +562,24 @@ void compute_baroclinic_transfer(
     const double scale_factor
     );
 
-void  compute_full_Lambda(
+
+/*!
+ * \brief Compute the full baroclinic transfer term Lambda (see Lees and Aluie 2019)
+ *
+ * Specifically, it computes
+ * \f[
+ *      \Lambda_{\mathrm{rot}} = \frac{1}{\overline{\rho}} \overline{P}_{,j}\overline{\tau}(\rho,u_j) = \overline{P}_{,j}\left(\widetilde{u}-\overline{u}\right)
+ * \f]
+ *
+ * @param[in,out]   Lambda                                      Storage array for computed values
+ * @param[in]       coarse_u_r, coarse_u_lon, coarse_u_lat      Components of velocity (bar filtered)
+ * @param[in]       tilde_u_r,  tilde_u_lon,  tilde_u_lat       Components of velocity (tilde filtered)
+ * @param[in]       coarse_p                                    Coarse pressure 
+ * @param[in]       Ntime, Ndepth, Nlat, Nlon                   Size of time, depth, lat, lon dimensions (respectively)
+ * @param[in]       longitude, latitude                         Grid vectors
+ * @param[in]       mask                                        Mask to distinguish land from water
+ */
+void  compute_Lambda_full(
     std::vector<double> & Lambda,
     const std::vector<double> & coarse_u_r,
     const std::vector<double> & coarse_u_lon,
@@ -580,6 +596,39 @@ void  compute_full_Lambda(
     const std::vector<double> & latitude,
     const std::vector<double> & mask
     );
+
+/*!
+ * \brief Compute the non-linear model of the baroclinic transfer term Lambda (see Lees and Aluie 2019)
+ *
+ * Specifically, it computes
+ * \f[
+ *      \Lambda_{\mathrm{rot}} = \frac{1}{2}\alpha_{\mathrm{kernel}}l^2 \frac{1}{\overline{\rho}} \overline{P}_{,j}\overline{\rho}_{,k}\overline{u}_{j,k}
+ *                             = \frac{1}{2}\alpha_{\mathrm{kernel}}l^2 \frac{1}{\overline{\rho}} \nabla\overline{P}\cdot \nabla\overline{\vec{u}} \cdot \nabla \overline{\rho}
+ * \f]
+ * where \f$ \alpha_{\mathrm{kernel}} \f$ is a multiplicative coefficient that depends on the kernel (see kernel_alpha.cpp) and \f$ l\f$ is the filter scale.
+ *
+ * @param[in,out]   Lambda_rot                                  Storage array for computed values
+ * @param[in]       coarse_u_r, coarse_u_lon, coarse_u_lat      Components of vorticity vector
+ * @param[in]       coarse_rho, coarse_p                        Coarse density and pressure (respectively)
+ * @param[in]       Ntime, Ndepth, Nlat, Nlon                   Size of time, depth, lat, lon dimensions (respectively)
+ * @param[in]       longitude, latitude                         Grid vectors
+ * @param[in]       mask                                        Mask to distinguish land from water
+ * @param[in]       scale_factor                                Multiplicative scale factor
+ */
+void compute_Lambda_nonlin_model(
+    std::vector<double> & Lambda_nonlin,
+    const std::vector<double> & coarse_u_r,
+    const std::vector<double> & coarse_u_lon,
+    const std::vector<double> & coarse_u_lat,
+    const std::vector<double> & coarse_rho,
+    const std::vector<double> & coarse_p,
+    const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+    const std::vector<double> & longitude,
+    const std::vector<double> & latitude,
+    const std::vector<double> & mask,
+    const double scale_factor
+    );
+
 
 /*!
  *
