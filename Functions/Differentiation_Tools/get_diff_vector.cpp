@@ -24,20 +24,13 @@ void get_diff_vector(
         ) {
 
     // Check which derivative we're taking
-    int index, Iref;
-    const int Nref = grid.size();
+    int index;
     const bool do_lat = (dim == "lat");
     const bool do_lon = (dim == "lon");
     assert( do_lat ^ do_lon ); // xor
 
-    // Verify input
-    if      (do_lon) { Iref = Ilon; }
-    else if (do_lat) { Iref = Ilat; }
-    else { 
-        fprintf(stderr, "Illegal dimension provided! %s given to %s\n", 
-                dim.c_str(), __FILE__);
-        assert(false);
-    }
+    int Iref = do_lon ? Ilon : Ilat;
+    const int Nref = grid.size();
 
     // Determine lowest lower bound (LLB) and upperest upper bound (UUB)
     //   for the integration region. This essentially just depends on periodicity.
@@ -58,11 +51,11 @@ void get_diff_vector(
     int lb, LB = Iref;
     while (LB > LLB) {
 
-        if ( (Iref - LB) > diff_ord ) { break; }
+        if ( (Iref - LB) >= num_deriv_pts ) { break; }
        
         lb = ( LB < 0 ) ? LB + Nref : LB ;
-        if (do_lon) { index = Index(0, 0, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
-        else        { index = Index(0, 0, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        if (do_lon) { index = Index(Itime, Idepth, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
+        else        { index = Index(Itime, Idepth, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
         
         if (mask.at(index) == 0) { LB++; break; }
 
@@ -72,11 +65,11 @@ void get_diff_vector(
     // ub (lower case) will be the periodicity-adjusted value of UB 
     int UB = Iref, ub;
     while (UB < UUB) {
-        if ( (UB - Iref) > diff_ord ) { break; }
+        if ( (UB - Iref) >= num_deriv_pts ) { break; }
        
         ub = ( UB > Nref - 1 ) ? UB - Nref : UB ;
-        if (do_lon) { index = Index(0, 0, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
-        else        { index = Index(0, 0, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        if (do_lon) { index = Index(Itime, Idepth, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
+        else        { index = Index(Itime, Idepth, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
         if (mask.at(index) == 0) { UB--; break; }
 
@@ -119,6 +112,7 @@ void get_diff_vector(
         for (int IND = LB; IND <= UB; IND++) {
             diff_vector.push_back( ddl.at(IND - LB) );
         }
+
         LB_ret = LB;
 
     } else if (diff_ord > 2) {

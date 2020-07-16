@@ -13,12 +13,14 @@
 
 
 void Apply_Toroidal_Projection(
+        const std::string output_fname,
         std::vector<double> & u_lon,
         std::vector<double> & u_lat,
         const std::vector<double> & time,
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
+        const std::vector<double> & dAreas,
         const std::vector<double> & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
@@ -31,14 +33,16 @@ void Apply_Toroidal_Projection(
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
 
-    const double rel_tol   = 1e-7;
-    const int    max_iters = 1e4;
+    const double rel_tol    = 1e-4;
+    const int    max_iters  = 1e5;
+    const bool   weight_err = true; // weight err by cell size
+    const bool   use_mask   = false;
 
     // Create a 'no mask' mask variable
     //   we'll treat land values as zero velocity
     //   We do this because including land seems
     //   to introduce strong numerical issues
-    std::vector<double> unmask(mask.size(), 1.);
+    const std::vector<double> unmask(mask.size(), 1.);
 
     const int Ntime   = myCounts.at(0);
     const int Ndepth  = myCounts.at(1);
@@ -47,31 +51,43 @@ void Apply_Toroidal_Projection(
 
     const int Npts = Nlat * Nlon;
 
-    int Ilat, Ilon, index, index_sub;
+    int Itime, Idepth, Ilat, Ilon, index, index_sub, mean_ind;
+
+    // Get the velocity means
+    std::vector<double> u_lon_means, u_lat_means;
+    compute_spatial_average(u_lon_means, u_lon, dAreas, Ntime, Ndepth, Nlat, Nlon, mask);
+    compute_spatial_average(u_lat_means, u_lat, dAreas, Ntime, Ndepth, Nlat, Nlon, mask);
 
     // Fill in the land areas with zero velocity
+    //   also subtract the mean off (will be added back later)
     for (index = 0; index < (int)u_lon.size(); index++) {
         if (mask.at(index) == 0) {
             u_lon.at(index) = 0.;
             u_lat.at(index) = 0.;
+        } else {
+            Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                             Ntime, Ndepth, Nlat, Nlon);
+            mean_ind  = Index(0, 0, Itime, Idepth,
+                              1, 1, Ntime, Ndepth);
+
+            u_lon.at(index) -= u_lon_means.at(mean_ind);
+            u_lat.at(index) -= u_lat_means.at(mean_ind);
         }
     }
 
     // Get the divergence of the original reference field, for comparison
     std::vector<double> full_div_orig(u_lon.size(), 0.);
     toroidal_vel_div(full_div_orig, u_lon, u_lat, longitude, latitude,
-            Ntime, Ndepth, Nlat, Nlon, unmask);
+            Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
     // Storage vectors
-    std::vector<double> full_F(u_lon.size(), 0.),
-        full_Lap_F(u_lon.size(), 0.),
-        full_u_lon_tor(u_lon.size(), 0.),
-        full_u_lat_tor(u_lon.size(), 0.),
-        full_u_lon_seed(u_lon.size(), 0.),
-        full_u_lat_seed(u_lon.size(), 0.),
-        full_div_tor(u_lon.size(), 0.),
-        full_curl_term(u_lon.size(), 0.),
-        full_seed(u_lon.size(), 0.);
+    std::vector<double> 
+        full_F(         u_lon.size(), 0. ),
+        full_u_lon_tor( u_lon.size(), 0. ),
+        full_u_lat_tor( u_lon.size(), 0. ),
+        full_div_tor(   u_lon.size(), 0. ),
+        full_RHS(       u_lon.size(), 0. ),
+        full_seed(      u_lon.size(), 0. );
 
     // alglib variables
     alglib::real_1d_array rhs;
@@ -113,7 +129,8 @@ void Apply_Toroidal_Projection(
     alglib::sparsematrix Lap;
     alglib::sparsecreate(Npts, Npts, Lap);
 
-    toroidal_sparse_Lap(Lap, latitude, longitude, Nlat, Nlon, unmask);
+    toroidal_sparse_Lap(Lap, latitude, longitude, Itime, Idepth,
+            Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask, dAreas, weight_err);
     alglib::sparseconverttocrs(Lap);
 
     if (wRank == 0) {
@@ -159,10 +176,22 @@ void Apply_Toroidal_Projection(
             //   problem Ax' = b - Ax0
             //
             toroidal_Lap_F(F_seed_Lap, F_seed, longitude, latitude,
-                    Ntime, Ndepth, Nlat, Nlon, unmask);
+                    Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
             toroidal_curl_u_dot_er(curl_term, u_lon, u_lat, longitude, latitude, 
-                    Itime, Idepth, Ntime, Ndepth, Nlat, Nlon, unmask, &F_seed_Lap);
+                    Itime, Idepth, Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask, &F_seed_Lap);
+
+            if (weight_err) {
+                // Weight by area if requested
+                for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                    for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                        index_sub = Index(0, 0, Ilat, Ilon,
+                                          1, 1, Nlat, Nlon);
+
+                        curl_term.at(index_sub) *= dAreas.at(index_sub);
+                    }
+                }
+            }
 
             //
             //// Now apply the least-squares solver
@@ -173,6 +202,29 @@ void Apply_Toroidal_Projection(
             }
             alglib::linlsqrsolvesparse(state, Lap, rhs);
             alglib::linlsqrresults(state, F_alglib, report);
+
+            #if DEBUG >= 1
+            if      (report.terminationtype == 1) { fprintf(stdout, "Termination type: absolulte tolerance reached.\n"); }
+            else if (report.terminationtype == 4) { fprintf(stdout, "Termination type: relative tolerance reached.\n"); }
+            else if (report.terminationtype == 5) { fprintf(stdout, "Termination type: maximum number of iterations reached.\n"); }
+            else if (report.terminationtype == 7) { fprintf(stdout, "Termination type: round-off errors prevent further progress.\n"); }
+            else if (report.terminationtype == 8) { fprintf(stdout, "Termination type: user requested (?)\n"); }
+            else                                  { fprintf(stdout, "Termination type: unknown\n"); }
+            #endif
+
+            /*    Rep     -   optimization report:
+                * Rep.TerminationType completetion code:
+                    *  1    ||Rk||<=EpsB*||B||
+                    *  4    ||A^T*Rk||/(||A||*||Rk||)<=EpsA
+                    *  5    MaxIts steps was taken
+                    *  7    rounding errors prevent further progress,
+                            X contains best point found so far.
+                            (sometimes returned on singular systems)
+                    *  8    user requested termination via calling
+                            linlsqrrequesttermination()
+                * Rep.IterationsCount contains iterations count
+                * NMV countains number of matrix-vector calculations
+            */
 
             // Extract the solution and add the seed back in
             F_array = F_alglib.getcontent();
@@ -185,19 +237,19 @@ void Apply_Toroidal_Projection(
             std::vector<double> 
                 u_lon_tor(Npts, 0.), u_lat_tor(Npts, 0.), div_tor(Npts, 0.);
             toroidal_vel_from_F(u_lon_tor, u_lat_tor, F_vector, longitude, latitude,
-                                Ntime, Ndepth, Nlat, Nlon, unmask);
+                                Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
             toroidal_vel_div(div_tor, u_lon_tor, u_lat_tor, longitude, latitude,
-                                Ntime, Ndepth, Nlat, Nlon, unmask);
+                                Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
             // Get velocity associated with seed F field
             std::vector<double> 
                 u_lon_seed(Npts, 0.), u_lat_seed(Npts, 0.);
             toroidal_vel_from_F(u_lon_seed, u_lat_seed, F_seed, longitude, latitude,
-                                Ntime, Ndepth, Nlat, Nlon, unmask);
+                                Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
             // Get Lap of computed F term
             toroidal_Lap_F(Lap_F_tor, F_vector, longitude, latitude,
-                    Ntime, Ndepth, Nlat, Nlon, unmask);
+                    Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
             //
             //// Store into the full arrays
@@ -209,24 +261,25 @@ void Apply_Toroidal_Projection(
 
                     index_sub = Index(0, 0, Ilat, Ilon,
                                       1, 1, Nlat, Nlon);
+                    mean_ind  = Index(0, 0, Itime, Idepth,
+                                      1, 1, Ntime, Ndepth);
 
-                    full_u_lon_tor.at(index) = u_lon_tor.at(index_sub);
-                    full_u_lat_tor.at(index) = u_lat_tor.at(index_sub);
+                    // add the mean velocity back in
+                    full_u_lon_tor.at(index) = u_lon_tor.at(index_sub) 
+                        + u_lon_means.at(mean_ind);
+                    full_u_lat_tor.at(index) = u_lat_tor.at(index_sub)
+                        + u_lat_means.at(mean_ind);
+
                     full_div_tor.at(  index) = div_tor.at(  index_sub);
                     full_F.at(        index) = F_vector.at( index_sub);
 
-                    full_curl_term.at(index) = curl_term.at(index_sub);
-                    full_Lap_F.at(    index) = Lap_F_tor.at(index_sub);
-
-                    full_u_lon_seed.at(index) = u_lon_seed.at(index_sub);
-                    full_u_lat_seed.at(index) = u_lat_seed.at(index_sub);
-                    full_seed.at(      index) = F_seed.at(    index_sub);
+                    full_seed.at(index) = F_seed.at(   index_sub);
+                    full_RHS.at( index) = curl_term.at(index_sub);
 
                 }
             }
 
             // Copy this solution into the seed for the next iteration
-            //  if single_seed == true (i.e. carry the seed onwards)
             if (single_seed) {
                 F_seed = F_vector;
             }
@@ -255,39 +308,31 @@ void Apply_Toroidal_Projection(
     std::vector<std::string> vars_to_write;
     vars_to_write.push_back("u_lon");
     vars_to_write.push_back("u_lat");
+
     vars_to_write.push_back("F");
-
-    vars_to_write.push_back("Lap_F");
-    vars_to_write.push_back("curl_term");
-
     vars_to_write.push_back("F_seed");
-    //vars_to_write.push_back("u_lon_seed");
-    //vars_to_write.push_back("u_lat_seed");
+
+    vars_to_write.push_back("RHS");
 
     vars_to_write.push_back("div_tor");
     vars_to_write.push_back("div_orig");
 
-    char fname [50];
-    snprintf(fname, 50, "toroidal_projection.nc");
-
     initialize_output_file(time, depth, longitude, latitude,
-            mask, vars_to_write, fname, 0);
+            mask, vars_to_write, output_fname.c_str(), 0);
     
-    write_field_to_output(full_u_lon_tor,  "u_lon",         starts, counts, fname, &mask);
-    write_field_to_output(full_u_lat_tor,  "u_lat",         starts, counts, fname, &mask);
-    write_field_to_output(full_F,          "F",             starts, counts, fname, &unmask);
+    write_field_to_output(full_u_lon_tor,  "u_lon",    starts, counts, output_fname.c_str(), &mask);
+    write_field_to_output(full_u_lat_tor,  "u_lat",    starts, counts, output_fname.c_str(), &mask);
 
-    write_field_to_output(full_Lap_F,      "Lap_F",         starts, counts, fname, &mask);
-    write_field_to_output(full_curl_term,  "curl_term",     starts, counts, fname, &mask);
+    write_field_to_output(full_RHS,        "RHS",      starts, counts, output_fname.c_str(), &mask);
 
-    write_field_to_output(full_seed,       "F_seed",        starts, counts, fname, &mask);
-    //write_field_to_output(full_u_lon_seed, "u_lon_seed",    starts, counts, fname, &mask);
-    //write_field_to_output(full_u_lat_seed, "u_lat_seed",    starts, counts, fname, &mask);
+    write_field_to_output(full_F,          "F",        starts, counts, output_fname.c_str(), &unmask);
+    write_field_to_output(full_seed,       "F_seed",   starts, counts, output_fname.c_str(), &mask);
 
-    write_field_to_output(full_div_tor,    "div_tor",       starts, counts, fname, &mask);
-    write_field_to_output(full_div_orig,   "div_orig",      starts, counts, fname, &mask);
+    write_field_to_output(full_div_tor,    "div_tor",  starts, counts, output_fname.c_str(), &mask);
+    write_field_to_output(full_div_orig,   "div_orig", starts, counts, output_fname.c_str(), &mask);
 
-    add_attr_to_file("rel_tol", rel_tol, fname);
-    add_attr_to_file("max_iters", (double) max_iters, fname);
+    add_attr_to_file("rel_tol",    rel_tol,                     output_fname.c_str());
+    add_attr_to_file("max_iters",  (double) max_iters,          output_fname.c_str());
+    add_attr_to_file("diff_order", (double) constants::DiffOrd, output_fname.c_str());
 
 }

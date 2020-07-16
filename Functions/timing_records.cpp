@@ -20,6 +20,8 @@ Timing_Records::Timing_Records() {
     time_records["filter_for_Lambda"] = 0.;
     time_records["land"] = 0.;
 
+    time_records["filter_tor_pot"] = 0.;
+
     time_records["compute_vorticity"] = 0.;
     time_records["compute_Pi"] = 0.;
     time_records["compute_Lambda"] = 0.;
@@ -55,7 +57,7 @@ void Timing_Records::add_to_record( double delta, std::string record_name ) {
     } else {
         MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
         if (wRank == 0) {
-            fprintf(stderr, "%s does is not a valid key of time_records."
+            fprintf(stderr, "%s is not a valid key of time_records."
                     " Aborting\n", record_name.c_str());
         }
         assert(false);

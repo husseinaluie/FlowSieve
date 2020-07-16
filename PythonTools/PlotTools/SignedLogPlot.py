@@ -5,6 +5,7 @@ import numpy as np
 
 def SignedLogPlot(XX, YY, ZZ, ax, fig,
         num_ords=6, xscale = 'linear', yscale = 'linear',
+        max_val = None, bad_val_colour=None,
         xlabel = '', ylabel = '', title = ''):
     # figsize:  size of the figure (passed to figsize flag in matplotlib)
     # num_ords: number of orders of magnitude to show on colour bar
@@ -28,8 +29,15 @@ def SignedLogPlot(XX, YY, ZZ, ax, fig,
     red_map.set_under( 'w')
     blue_map.set_under('w')
 
+    if not(bad_val_colour == None):
+        red_map.set_under( bad_val_colour, alpha=None)
+        blue_map.set_under(bad_val_colour, alpha=None)
+
     ## Plot
-    vmax = np.max(np.abs(ZZ))
+    if (max_val == None):
+        vmax = np.max(np.abs(ZZ))
+    else:
+        vmax = max_val
     vmin = 10**(np.ceil(np.log10(vmax)-num_ords)-1.0)
 
     # Plot the positives in red

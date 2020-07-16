@@ -74,7 +74,7 @@ void initialize_postprocess_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     retval = nc_def_var(ncid, "longitude", NC_DOUBLE,  1, &lon_dimid,   &lon_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    retval = nc_def_var(ncid, "region",    NC_STRING, 1, &reg_dimid,   &reg_varid);
+    retval = nc_def_var(ncid, "region",    NC_STRING, 1,  &reg_dimid,   &reg_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     if (not(constants::CARTESIAN)) {
@@ -107,8 +107,12 @@ void initialize_postprocess_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // We're also going to store the region areas
+    int area_dims[3];
+    area_dims[0] = time_dimid;
+    area_dims[1] = depth_dimid;
+    area_dims[2] = reg_dimid;
     int reg_area_varid;
-    retval = nc_def_var(ncid, "region_areas", NC_DOUBLE, 1, &reg_dimid, &reg_area_varid);
+    retval = nc_def_var(ncid, "region_areas", NC_DOUBLE, 3, area_dims, &reg_area_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Close the file
@@ -141,6 +145,14 @@ void initialize_postprocess_file(
                     dim_names_time_ave, ndims_time_ave, buffer);
         }
     }
+
+    // Add some global attributes from constants.hpp
+    add_attr_to_file("R_earth",                                      constants::R_earth,    filename);
+    add_attr_to_file("rho0",                                         constants::rho0,       filename);
+    add_attr_to_file("g",                                            constants::g,          filename);
+    add_attr_to_file("differentiation_convergence_order",   (double) constants::DiffOrd,    filename);
+    add_attr_to_file("KERNEL_OPT",                          (double) constants::KERNEL_OPT, filename);
+    add_attr_to_file("KernPad",                             (double) constants::KernPad,    filename);
 
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }

@@ -66,7 +66,7 @@ namespace constants
      * \brief Fill value used to indicate land values in output files.
      * @ingroup constants
      */
-    const double fill_value = -1e10;
+    const double fill_value = -1e8;
 
     /*!
      * \param fill_value_s

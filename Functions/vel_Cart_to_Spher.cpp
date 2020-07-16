@@ -3,35 +3,52 @@
 #include "../constants.hpp"
 
 void vel_Cart_to_Spher(
-            double & u_r,
-            double & u_lon,
-            double & u_lat,
-            const double u_x,
-            const double u_y,
-            const double u_z,
-            const double lon,
-            const double lat
+            std::vector<double> & u_r,
+            std::vector<double> & u_lon,
+            std::vector<double> & u_lat,
+            const std::vector<double> & u_x,
+            const std::vector<double> & u_y,
+            const std::vector<double> & u_z,
+            const std::vector<double> & mask,
+            const std::vector<double> & time,
+            const std::vector<double> & depth,
+            const std::vector<double> & latitude,
+            const std::vector<double> & longitude
         ) {
+
+    size_t index;
+    int Itime, Idepth, Ilat, Ilon;
+
+    const int Ntime  = time.size();
+    const int Ndepth = depth.size();
+    const int Nlat   = latitude.size();
+    const int Nlon   = longitude.size();
+
+    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
     if (constants::CARTESIAN) {
         u_lon = u_x;
         u_lat = u_y;
         u_r   = u_z;
     } else {
-        const double cos_lon = cos(lon);
-        const double cos_lat = cos(lat);
-        const double sin_lon = sin(lon);
-        const double sin_lat = sin(lat);
+        #pragma omp parallel default(none) \
+        private(Itime, Idepth, Ilat, Ilon, index) \
+        shared(u_x, u_y, u_z, u_r, u_lon, u_lat, longitude, latitude, mask)
+        {
+            #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
+            for (index = 0; index < u_lon.size(); ++index) {
 
-        u_r   =   u_x * cos_lon * cos_lat
-                + u_y * sin_lon * cos_lat
-                + u_z           * sin_lat;
+                if (mask.at(index) == 1) { // Skip land areas
+                    Index1to4( index, Itime, Idepth, Ilat, Ilon,
+                                      Ntime, Ndepth, Nlat, Nlon );
 
-        u_lon = - u_x * sin_lon
-                + u_y * cos_lon;
-
-        u_lat = - u_x * cos_lon * sin_lat
-                - u_y * sin_lon * sin_lat
-                + u_z           * cos_lat;
+                    vel_Cart_to_Spher_at_point(     
+                            u_r.at(index), u_lon.at(index), u_lat.at(index),
+                            u_x.at(index), u_y.at(  index), u_z.at(  index),
+                            longitude.at(Ilon), latitude.at(Ilat) );
+                }
+            }
+        }
     }
+
 }

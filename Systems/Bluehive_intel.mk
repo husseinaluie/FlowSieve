@@ -1,9 +1,7 @@
 # The following modules were last used
-#  impi/2018
-#  intel/2018 (automatically loaded with impi/2018)
-#  netcdf/4.4.1.1/b1
-#  hdf5/1.8.17/b4  (automatically loaded with netcdf/4.4.1.1/b1)
-#  module unload impi/2017  (this is loaded with netcdf too, but we don't want it)
+#
+#  module load netcdf/4.7.1/b1
+#  module load impi/2019.4
 
 # Specify compilers
 CXX     ?= icc
@@ -13,7 +11,7 @@ MPICXX  ?= mpiicc
 LINKS:=-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl -qopenmp
 
 # Default compiler flags
-CFLAGS:=-Wall 
+CFLAGS:=-Wall -std=c++14
 
 # Debug flags
 DEBUG_FLAGS:=-g

@@ -43,7 +43,9 @@ void interpolate_over_land_from_coast(
         const std::vector<double> &depth,
         const std::vector<double> &latitude,
         const std::vector<double> &longitude,
-        const std::vector<double> &mask);
+        const std::vector<double> &mask,
+        const std::vector<int>    &myCounts
+        );
 
 /*!
  * @ingroup InterpolationRoutines
@@ -80,6 +82,7 @@ void get_coast(
  *
  * *single_seed*: If true, then only one seed is provided and should be used as the seed for all different times. If false, then the provided seed incorporates a different seed for each time.
  *
+ * @param[in]       output_fname                    Name for the output file
  * @param[in,out]   u_lon,u_lat                     velocity field to be projected
  * @param[in]       time,depth,latitude,longitude   dimension vectors (1D)
  * @param[in]       mask                            array to distinguish land/water
@@ -91,12 +94,14 @@ void get_coast(
  *
  */
 void Apply_Toroidal_Projection(
+        const std::string output_fname,
         std::vector<double> & u_lon,
         std::vector<double> & u_lat,
         const std::vector<double> & time,
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
+        const std::vector<double> & dAreas,
         const std::vector<double> & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
@@ -105,6 +110,22 @@ void Apply_Toroidal_Projection(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
+void Apply_Potential_Projection(
+        const std::string output_fname,
+        std::vector<double> & u_lon,
+        std::vector<double> & u_lat,
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & latitude,
+        const std::vector<double> & longitude,
+        const std::vector<double> & dAreas,
+        const std::vector<double> & mask,
+        const std::vector<int>    & myCounts,
+        const std::vector<int>    & myStarts,
+        const std::vector<double> & seed,
+        const bool single_seed,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
 
 /*!
  * \brief Computes the (toroidal) velocity corresponding to field F.
@@ -120,6 +141,19 @@ void Apply_Toroidal_Projection(
  *
  */
 void toroidal_vel_from_F(  
+        std::vector<double> & vel_lon,
+        std::vector<double> & vel_lat,
+        const std::vector<double> & F,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const std::vector<double> & mask
+    );
+
+void potential_vel_from_F(  
         std::vector<double> & vel_lon,
         std::vector<double> & vel_lat,
         const std::vector<double> & F,
@@ -183,17 +217,26 @@ void toroidal_curl_u_dot_er(
  *
  * @param[in,out]   Lap                     Where to store the (sparse) differentiation matrix
  * @param[in]       longitude,latitude      Grid vectors (1D)
+ * @param[in]       Itime,Idepth            Current time-depth iteration
  * @param[in]       Ntime,Ndepth,Nlat,Nlon  Dimension sizes
  * @param[in]       mask                    Array to distinguish land/water
+ * @param[in]       areas                   Array giving the size of each cell
+ * @param[in]       area_weight             Bool indicating if the Laplacian should be weighted by cell-size (i.e. weight error by cell size). Default is false.
  *
  */
 void toroidal_sparse_Lap(
         alglib::sparsematrix & Lap,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
+        const int Itime,
+        const int Idepth,
+        const int Ntime,
+        const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<double> & mask,
+        const std::vector<double> & areas,
+        const bool area_weight = false
         );
 
 

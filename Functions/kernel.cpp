@@ -31,9 +31,6 @@ double kernel(
                 break;
         case 4: kern = 0.5 * (1 - tanh( (D - 1) / (0.1) ));
                 break;
-        // this version matches the definition from Hussein / Mahmoud's code
-        //    it transitions very sharply, so I prefer the above
-        //case 4: kern = 0.5 * (1 - tanh( (D - 1) / (20 / scale) ));
     }
 
     #if DEBUG >= 6

@@ -8,9 +8,8 @@
 void write_integral_to_post(
         const std::vector<
             std::vector<double> > & field,  /**< [in] data to be written to the file*/
-        std::string field_name,            /**< [in] name of the variable in the netcdf file */
-        std::string field_suffix,          /**< [in] name of the variable in the netcdf file */
-        //const char * field_name,            /**< [in] name of the variable in the netcdf file */
+        std::string field_name,             /**< [in] name of the variable in the netcdf file */
+        std::string field_suffix,           /**< [in] name of the variable in the netcdf file */
         size_t * start,                     /**< [in] starting indices for the write */
         size_t * count,                     /**< [in] size of the write in each dimension */
         const char * filename,              /**< [in] name of the netcdf file */

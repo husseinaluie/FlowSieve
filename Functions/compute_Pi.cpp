@@ -24,6 +24,8 @@ void compute_Pi(
         const std::vector<double> & mask        /**< [in] Mask array (2D) to distinguish land from water */
         ) {
 
+    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
+
     double pi_tmp;
     int Itime, Idepth, Ilat, Ilon, ii, jj;
     size_t index;
@@ -117,7 +119,7 @@ void compute_Pi(
             shared(tau_ij, u_i_tau_ij, mask, ui, uj, uiuj)\
             private(index, uiuj_loc, ui_loc, uj_loc, is_water)
             {
-                #pragma omp for collapse(1) schedule(guided)
+                #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
                 for (index = 0; index < Npts; index++) {
 
                     is_water = mask.at(index) == 1;
@@ -164,7 +166,7 @@ void compute_Pi(
                 // Now actually compute Pi
                 //   in particular, compute
                 //           u_i * tau_ij,j - (u_i * tau_ij)_,j
-                #pragma omp for collapse(1) schedule(guided)
+                #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
                 for (index = 0; index < Npts; index++) {
 
                     is_water = mask.at(index) == 1;

@@ -7,13 +7,13 @@
 
 
 void get_coast(
-        std::vector<double> &lon_coast,
-        std::vector<double> &lat_coast,
-        std::vector<double> &field_coast,
-        const std::vector<double> &lon_full,
-        const std::vector<double> &lat_full,
-        const std::vector<double> &field_full,
-        const std::vector<double> &mask,
+        std::vector<double> & lon_coast,
+        std::vector<double> & lat_coast,
+        std::vector<double> & field_coast,
+        const std::vector<double> & lon_full,
+        const std::vector<double> & lat_full,
+        const std::vector<double> & field_full,
+        const std::vector<double> & mask,
         const int Itime,
         const int Idepth,
         const int Ntime,
@@ -24,21 +24,21 @@ void get_coast(
     int num_coast = 0;
     bool is_coast;
 
-    const int coast_width = 6; // width in grid points
+    const int coast_width = 20; // width in grid points
 
-    int curr_lon, curr_lat, curr_index, index, mask_index;
+    int curr_lon, curr_lat, curr_index, index;
 
     // First, we do a large loop to simply
     //   count how many coast points we have.
     for (int Ilat = 0; Ilat < Nlat; Ilat++) {
         for (int Ilon = 0; Ilon < Nlon; Ilon++) {
 
-            mask_index = Index(0,     0,      Ilat, Ilon,
-                               Ntime, Ndepth, Nlat, Nlon);
-
             is_coast = false;
 
-            if (mask.at(mask_index) == 1) {
+            index = Index(Itime, Idepth, Ilat, Ilon,
+                          Ntime, Ndepth, Nlat, Nlon);
+
+            if (mask.at(index) == 1) {
                 for (int II = 0; II < coast_width+1; II++) {
 
                     // Look northward
@@ -48,14 +48,14 @@ void get_coast(
                         // Look westward
                         curr_lon = Ilon + JJ;
                         if (curr_lon >= Nlon) { curr_lon -= Nlon; } 
-                        curr_index = Index(0,     0,      curr_lat, curr_lon,
+                        curr_index = Index(Itime, Idepth, curr_lat, curr_lon,
                                            Ntime, Ndepth, Nlat,     Nlon);
                         if (mask.at(curr_index) == 0) { is_coast = true; }
 
                         // Look eastward
                         curr_lon = Ilon - JJ;
                         if (curr_lon < 0) { curr_lon += Nlon; } 
-                        curr_index = Index(0,     0,      curr_lat, curr_lon,
+                        curr_index = Index(Itime, Idepth, curr_lat, curr_lon,
                                            Ntime, Ndepth, Nlat,     Nlon);
                         if (mask.at(curr_index) == 0) { is_coast = true; }
                     }  
@@ -67,14 +67,14 @@ void get_coast(
                         // Look westward
                         curr_lon = Ilon + JJ;
                         if (curr_lon >= Nlon) { curr_lon -= Nlon; } 
-                        curr_index = Index(0,     0,      curr_lat, curr_lon,
+                        curr_index = Index(Itime, Idepth, curr_lat, curr_lon,
                                            Ntime, Ndepth, Nlat,     Nlon);
                         if (mask.at(curr_index) == 0) { is_coast = true; }
 
                         // Look eastward
                         curr_lon = Ilon - JJ;
                         if (curr_lon < 0) { curr_lon += Nlon; } 
-                        curr_index = Index(0,     0,      curr_lat, curr_lon,
+                        curr_index = Index(Itime, Idepth, curr_lat, curr_lon,
                                            Ntime, Ndepth, Nlat,     Nlon);
                         if (mask.at(curr_index) == 0) { is_coast = true; }
                     }  
@@ -100,12 +100,9 @@ void get_coast(
             index = Index(Itime, Idepth, Ilat, Ilon,
                           Ntime, Ndepth, Nlat, Nlon);
 
-            mask_index = Index(0,     0,      Ilat, Ilon,
-                               Ntime, Ndepth, Nlat, Nlon);
-
             is_coast = false;
 
-            if (mask.at(mask_index) == 1) {
+            if (mask.at(index) == 1) {
                 for (int II = 0; II < coast_width+1; II++) {
 
                     // Look northward
@@ -115,14 +112,14 @@ void get_coast(
                         // Look westward
                         curr_lon = Ilon + JJ;
                         if (curr_lon >= Nlon) { curr_lon -= Nlon; } 
-                        curr_index = Index(0,     0,      curr_lat, curr_lon,
+                        curr_index = Index(Itime, Idepth, curr_lat, curr_lon,
                                            Ntime, Ndepth, Nlat,     Nlon);
                         if (mask.at(curr_index) == 0) { is_coast = true; }
 
                         // Look eastward
                         curr_lon = Ilon - JJ;
                         if (curr_lon < 0) { curr_lon += Nlon; } 
-                        curr_index = Index(0,     0,      curr_lat, curr_lon,
+                        curr_index = Index(Itime, Idepth, curr_lat, curr_lon,
                                            Ntime, Ndepth, Nlat,     Nlon);
                         if (mask.at(curr_index) == 0) { is_coast = true; }
                     }  
@@ -134,25 +131,20 @@ void get_coast(
                         // Look westward
                         curr_lon = Ilon + JJ;
                         if (curr_lon >= Nlon) { curr_lon -= Nlon; } 
-                        curr_index = Index(0,     0,      curr_lat, curr_lon,
+                        curr_index = Index(Itime, Idepth, curr_lat, curr_lon,
                                            Ntime, Ndepth, Nlat,     Nlon);
                         if (mask.at(curr_index) == 0) { is_coast = true; }
 
                         // Look eastward
                         curr_lon = Ilon - JJ;
                         if (curr_lon < 0) { curr_lon += Nlon; } 
-                        curr_index = Index(0,     0,      curr_lat, curr_lon,
+                        curr_index = Index(Itime, Idepth, curr_lat, curr_lon,
                                            Ntime, Ndepth, Nlat,     Nlon);
                         if (mask.at(curr_index) == 0) { is_coast = true; }
                     }  
                 }
             }
             if (is_coast) {
-                //fprintf(stdout, "is coast: Ilat, Ilon, cnt, index = %d, %d, %d, %d\n", Ilat, Ilon, cnt, index);
-                //fprintf(stdout, "    len(lon_coast, lat_coast, field_coast) = %zu, %zu, %zu\n", 
-                //        lon_coast.size(), lat_coast.size(), field_coast.size());
-                //fprintf(stdout, "    len(lon_full, lat_full, field_fill) = %zu, %zu, %zu\n",
-                //        lon_full.size(), lat_full.size(), field_full.size());
                 lon_coast.at(cnt)   = lon_full.at(Ilon);
                 lat_coast.at(cnt)   = lat_full.at(Ilat);
                 field_coast.at(cnt) = field_full.at(index);

@@ -1,16 +1,20 @@
 
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
+#include <string.h>
+#include <cassert>
 #include <math.h>
 
 // Write to netcdf file
 void read_attr_from_file(
         double &attr,
         const char * attr_name,
-        const char * filename,
+        const std::string filename,
         const char * var_name,
         const MPI_Comm comm
         ) {
+
+    assert( check_file_existence( filename ) );
 
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
@@ -18,7 +22,7 @@ void read_attr_from_file(
 
     #if DEBUG >= 1
     if (wRank == 0) {
-        fprintf(stdout, "Attempting to read %s from %s\n", attr_name, filename);
+        fprintf(stdout, "Attempting to read %s from %s\n", attr_name, filename.c_str());
     }
     #endif
 
@@ -27,7 +31,7 @@ void read_attr_from_file(
     int FLAG = NC_NETCDF4 | NC_MPIIO;
     int ncid=0, retval;
     char buffer [50];
-    snprintf(buffer, 50, filename);
+    snprintf(buffer, 50, filename.c_str());
     retval = nc_open_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 

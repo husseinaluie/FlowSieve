@@ -120,6 +120,49 @@ void compute_local_kernel(
 
 
 /*!
+ * \brief Compute (local) KE density from the provided velocities.
+ *
+ * KE is simply computed pointwise as 0.5 * rho0 * (u1^2 + u2^2 + u3^2)
+ *
+ * @param[in,out]   KE          Computed KE
+ * @param[in]       u1,u2,u3    Velocities
+ * @param[in]       mask        differentiate land from water 
+ * @param[in]       rho0        constant density
+ *
+ */
+void KE_from_vels(
+            std::vector<double> & KE,
+            std::vector<double> * u1,
+            std::vector<double> * u2,
+            std::vector<double> * u3,
+            const std::vector<double> & mask,
+            const double rho0 = constants::rho0
+        );
+
+/*!
+ * \brief Wrapper that applies vel_Spher_to_Cart_at_point to every point in the domain.
+ *
+ * @param[in,out]   u_x,u_y,u_z                         Computed Cartesian velocities
+ * @param[in]       u_r,u_lon,u_lat                     Spherical velocities to convert
+ * @param[in]       mask                                differentiate land from water 
+ * @param[in]       time, depth, latitude, longitude    grid vectors (1D)
+ *
+ */
+void vel_Spher_to_Cart(
+            std::vector<double> & u_x,
+            std::vector<double> & u_y,
+            std::vector<double> & u_z,
+            const std::vector<double> & u_r,
+            const std::vector<double> & u_lon,
+            const std::vector<double> & u_lat,
+            const std::vector<double> & mask,
+            const std::vector<double> & time,
+            const std::vector<double> & depth,
+            const std::vector<double> & latitude,
+            const std::vector<double> & longitude
+            );
+
+/*!
  * \brief Convert single spherical velocity to Cartesian velocity
  *
  * Convert Spherical velocities to Cartesian
@@ -142,10 +185,41 @@ void compute_local_kernel(
  * @param[in]       lon,lat             coordinates of the location of conversion
  *
  */
-void vel_Spher_to_Cart(
-            double & u_x, double & u_y, double & u_z,
-            const double u_r, const double u_lon, const double u_lat,
-            const double lon, const double lat );
+void vel_Spher_to_Cart_at_point(
+            double & u_x,
+            double & u_y,
+            double & u_z,
+            const double u_r,
+            const double u_lon,
+            const double u_lat,
+            const double lon,
+            const double lat
+        );
+
+
+/*!
+ * \brief Wrapper that applies vel_Spher_to_Cart_at_point to every point in the domain.
+ *
+ * @param[in,out]   u_r,u_lon,u_lat                     Computed Spherical velocities
+ * @param[in]       u_x,u_y,u_z                         Cartesian velocities to convert
+ * @param[in]       mask                                differentiate land from water 
+ * @param[in]       time, depth, latitude, longitude    grid vectors (1D)
+ *
+ */
+void vel_Cart_to_Spher(
+            std::vector<double> & u_r,
+            std::vector<double> & u_lon,
+            std::vector<double> & u_lat,
+            const std::vector<double> & u_x,
+            const std::vector<double> & u_y,
+            const std::vector<double> & u_z,
+            const std::vector<double> & mask,
+            const std::vector<double> & time,
+            const std::vector<double> & depth,
+            const std::vector<double> & latitude,
+            const std::vector<double> & longitude
+            );
+
 
 /*!
  * \brief Convert single Cartesian velocity to spherical velocity
@@ -170,10 +244,16 @@ void vel_Spher_to_Cart(
  * @param[in]       lon,lat             coordinates of the location of conversion
  *
  */
-void vel_Cart_to_Spher(
-            double & u_r, double & u_lon, double & u_lat,
-            const double u_x, const double u_y, const double u_z,
-            const double lon, const double lat );
+void vel_Cart_to_Spher_at_point(
+            double & u_r, 
+            double & u_lon, 
+            double & u_lat,
+            const double u_x, 
+            const double u_y, 
+            const double u_z,
+            const double lon, 
+            const double lat 
+            );
 
 /*!
  * \brief Main filtering driver
@@ -210,6 +290,21 @@ void filtering(const std::vector<double> & u_r,
                const std::vector<int>    & myStarts,
                const MPI_Comm comm = MPI_COMM_WORLD);
 
+
+void filtering_helmholtz(
+        const std::vector<double> & F_potential,
+        const std::vector<double> & F_toroidal,
+        const std::vector<double> & scales,
+        const std::vector<double> & dAreas,
+        const std::vector<double> & time,
+        const std::vector<double> & depth,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const std::vector<double> & mask,
+        const std::vector<int>    & myCounts,
+        const std::vector<int>    & myStarts,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
 
 
 /*!
@@ -276,6 +371,7 @@ void filtering_subsets(
  * @param[in]       mask                    array to distinguish land from water
  * @param[in]       use_mask                array of booleans indicating whether or not to use mask (i.e. zero out land) or to use the array value
  * @param[in]       local_kernel            pointer to pre-computed kernel (NULL indicates not provided)
+ * @param[in]       weight                  pointer to spatial weight (i.e. rho) (NULL indicates not provided)
  *
  */
 void apply_filter_at_point(
@@ -291,7 +387,9 @@ void apply_filter_at_point(
         const double scale,
         const std::vector<double> & mask,
         const std::vector<bool> & use_mask,
-        const std::vector<double> * local_kernel);
+        const std::vector<double> * local_kernel,
+        const std::vector<double> * weight = NULL
+        );
 
 /*!
  * \brief Primary kernel function coarse-graining procedure (G in publications)
@@ -434,29 +532,129 @@ void compute_largescale_strain(
         const std::vector<double> & mask);
 
 /*!
- * \brief Compute the baroclinic energy transfer through the current filter scale
+ * \brief Compute the rotational component of the non-linear model of the baroclinic transfer term Lambda (see Lees and Aluie 2019)
+ *
+ * Specifically, it computes
+ * \f[
+ *      \Lambda_{\mathrm{rot}} = \frac{1}{2}\alpha_{\mathrm{kernel}}l^2 \frac{1}{\overline{\rho}}\left[ \frac{1}{2}\overline{\omega} \cdot \left( \nabla\overline{\rho}\times\nabla\overline{P} \right)  \right] 
+ * \f]
+ * where \f$ \alpha_{\mathrm{kernel}} \f$ is a multiplicative coefficient that depends on the kernel (see kernel_alpha.cpp) and \f$ l\f$ is the filter scale.
+ *
+ * @param[in,out]   Lambda_rot                                          Storage array for computed values
+ * @param[in]       coarse_vort_r, coarse_vort_lon, coarse_vort_lat     Components of vorticity vector
+ * @param[in]       coarse_rho, coarse_p                                Coarse density and pressure (respectively)
+ * @param[in]       Ntime, Ndepth, Nlat, Nlon                           Size of time, depth, lat, lon dimensions (respectively)
+ * @param[in]       longitude, latitude                                 Grid vectors
+ * @param[in]       mask                                                Mask to distinguish land from water
+ * @param[in]       scale_factor                                        Multiplicative scale factor
+ */
+void compute_Lambda_rotational(
+    std::vector<double> & Lambda_rot,
+    const std::vector<double> & coarse_vort_r,
+    const std::vector<double> & coarse_vort_lon,
+    const std::vector<double> & coarse_vort_lat,
+    const std::vector<double> & coarse_rho,
+    const std::vector<double> & coarse_p,
+    const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+    const std::vector<double> & longitude,
+    const std::vector<double> & latitude,
+    const std::vector<double> & mask,
+    const double scale_factor
+    );
+
+
+/*!
+ * \brief Compute the full baroclinic transfer term Lambda (see Lees and Aluie 2019)
+ *
+ * Specifically, it computes
+ * \f[
+ *      \Lambda_{\mathrm{rot}} = \frac{1}{\overline{\rho}} \overline{P}_{,j}\overline{\tau}(\rho,u_j) = \overline{P}_{,j}\left(\widetilde{u}-\overline{u}\right)
+ * \f]
+ *
+ * @param[in,out]   Lambda                                      Storage array for computed values
+ * @param[in]       coarse_u_r, coarse_u_lon, coarse_u_lat      Components of velocity (bar filtered)
+ * @param[in]       tilde_u_r,  tilde_u_lon,  tilde_u_lat       Components of velocity (tilde filtered)
+ * @param[in]       coarse_p                                    Coarse pressure 
+ * @param[in]       Ntime, Ndepth, Nlat, Nlon                   Size of time, depth, lat, lon dimensions (respectively)
+ * @param[in]       longitude, latitude                         Grid vectors
+ * @param[in]       mask                                        Mask to distinguish land from water
+ */
+void  compute_Lambda_full(
+    std::vector<double> & Lambda,
+    const std::vector<double> & coarse_u_r,
+    const std::vector<double> & coarse_u_lon,
+    const std::vector<double> & coarse_u_lat,
+    const std::vector<double> & tilde_u_r,
+    const std::vector<double> & tilde_u_lon,
+    const std::vector<double> & tilde_u_lat,
+    const std::vector<double> & coarse_p,
+    const int Ntime,
+    const int Ndepth,
+    const int Nlat,
+    const int Nlon,
+    const std::vector<double> & longitude,
+    const std::vector<double> & latitude,
+    const std::vector<double> & mask
+    );
+
+/*!
+ * \brief Compute the non-linear model of the baroclinic transfer term Lambda (see Lees and Aluie 2019)
+ *
+ * Specifically, it computes
+ * \f[
+ *      \Lambda_{\mathrm{rot}} = \frac{1}{2}\alpha_{\mathrm{kernel}}l^2 \frac{1}{\overline{\rho}} \overline{P}_{,j}\overline{\rho}_{,k}\overline{u}_{j,k}
+ *                             = \frac{1}{2}\alpha_{\mathrm{kernel}}l^2 \frac{1}{\overline{\rho}} \nabla\overline{P}\cdot \nabla\overline{\vec{u}} \cdot \nabla \overline{\rho}
+ * \f]
+ * where \f$ \alpha_{\mathrm{kernel}} \f$ is a multiplicative coefficient that depends on the kernel (see kernel_alpha.cpp) and \f$ l\f$ is the filter scale.
+ *
+ * @param[in,out]   Lambda_rot                                  Storage array for computed values
+ * @param[in]       coarse_u_r, coarse_u_lon, coarse_u_lat      Components of vorticity vector
+ * @param[in]       coarse_rho, coarse_p                        Coarse density and pressure (respectively)
+ * @param[in]       Ntime, Ndepth, Nlat, Nlon                   Size of time, depth, lat, lon dimensions (respectively)
+ * @param[in]       longitude, latitude                         Grid vectors
+ * @param[in]       mask                                        Mask to distinguish land from water
+ * @param[in]       scale_factor                                Multiplicative scale factor
+ */
+void compute_Lambda_nonlin_model(
+    std::vector<double> & Lambda_nonlin,
+    const std::vector<double> & coarse_u_r,
+    const std::vector<double> & coarse_u_lon,
+    const std::vector<double> & coarse_u_lat,
+    const std::vector<double> & coarse_rho,
+    const std::vector<double> & coarse_p,
+    const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
+    const std::vector<double> & longitude,
+    const std::vector<double> & latitude,
+    const std::vector<double> & mask,
+    const double scale_factor
+    );
+
+
+/*!
  *
  * \param Where to store the computed values
- * \param Full vorticity (r   component)
- * \param Full vorticity (lon component)
- * \param Full vorticity (lat component)
- * \param Coarse density field
- * \param Coarse pressure field
+ * \param Coarse vorticity (r   component)
+ * \param Coarse vorticity (lon component)
+ * \param Coarse vorticity (lat component)
+ * \param Coarse velocity (r   component)
+ * \param Coarse velocity (lon component)
+ * \param Coarse velocity (lat component)
  * \param Length of time dimension
  * \param Length of depth dimension
  * \param Length of latitude dimension
  * \param Length of longitude dimension
  * \param Longitude dimension (1D)
  * \param Latitude dimension (1D)
- * \param Mask array (2D) to distinguish land from water
+ * \param Mask to distinguish land from water
  */
-void compute_baroclinic_transfer(
+void compute_vort_stretch(
     std::vector<double> & baroclinic_transfer,
     const std::vector<double> & full_vort_r,
     const std::vector<double> & full_vort_lon,
     const std::vector<double> & full_vort_lat,
-    const std::vector<double> & coarse_rho,
-    const std::vector<double> & coarse_p,
+    const std::vector<double> & coarse_u_r,
+    const std::vector<double> & coarse_u_lon,
+    const std::vector<double> & coarse_u_lat,
     const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
@@ -524,10 +722,11 @@ void compute_div_transport(
  *
  * The result, means, is a function of time and depth.
  */
-void compute_mean(
+
+void compute_spatial_average(
         std::vector<double> & means,
         const std::vector<double> & field,
-        const std::vector<double> & dArea,
+        const std::vector<double> & areas,
         const int Ntime,
         const int Ndepth,
         const int Nlat,
@@ -576,10 +775,37 @@ void get_lon_bounds(
  * \brief Print summary of compile-time variables.
  *
  * This is triggered by passing --version to the executable.
+ *
+ * @param[in]   scales      Scales used for filtering
  */
 void print_compile_info(
-        const std::vector<double> &scales);
+        const std::vector<double> * scales = NULL);
 
+/*! 
+ * \brief Compute openmp chunk size for OMP for loops
+ *
+ * The point of using a function for this is that it standardizes
+ *    the chunk size across the different functions.
+ *
+ * This assumes that the loop being split is a Lat-Lon loop.
+ *
+ */
+int get_omp_chunksize(const int Nlat, const int Nlon);
+
+
+/*!
+ * \brief Apply degree->radian conversion, if necessary.
+ *
+ * This is just to provide a clean wrapper to improve some case file readability.
+ * It applies a Cartesian check (via constants.hpp), so it is safe to include by default.
+ *
+ * @param[in]   longitude, latitude     Coordinate grids to be converted, if appropriate
+ *
+ */
+void convert_coordinates(
+        std::vector<double> & longitude,
+        std::vector<double> & latitude
+        );
 
 /*!
  * \brief Class for storing internal timings.
@@ -612,5 +838,35 @@ class Timing_Records {
         //! Print the timing information in a human-readable format.
         void print();
 };
+
+
+/*!
+ * \brief Class to process command-line arguments
+ *
+ * This parser tool was provided by StackOverflow user 'iain' at the following post.
+ *    mild modifications have been made to adapt the code to our purposes.
+ *
+ * https://stackoverflow.com/questions/865668/how-to-parse-command-line-arguments-in-c
+ *
+ */
+class InputParser {
+
+    public:
+        InputParser (int &argc, char **argv);
+
+        const std::string getCmdOption(
+                const std::string &option,
+                const std::string &default_value = ""
+                ) const;
+
+        bool cmdOptionExists(const std::string &option) const;
+
+    private:
+        std::vector <std::string> tokens;
+
+};
+
+
+void print_header_info( );
 
 #endif

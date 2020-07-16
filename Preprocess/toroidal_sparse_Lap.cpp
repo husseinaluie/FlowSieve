@@ -6,6 +6,7 @@
 #include <vector>
 #include <omp.h>
 #include <math.h>
+#include <cassert>
 #include "../ALGLIB/stdafx.h"
 #include "../ALGLIB/linalg.h"
 #include "../ALGLIB/solvers.h"
@@ -14,13 +15,19 @@ void toroidal_sparse_Lap(
         alglib::sparsematrix & Lap,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
+        const int Itime,
+        const int Idepth,
+        const int Ntime,
+        const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<double> & mask,
+        const std::vector<double> & areas,
+        const bool area_weight
         ) {
 
     int Ilat, Ilon, IDIFF, Idiff, Ndiff,
-        diff_index, index, LB;
+        diff_index, index, index_sub, LB;
     double old_val, tmp, cos2_lat_inv, tan_lat;
     std::vector<double> diff_vec;
 
@@ -32,135 +39,160 @@ void toroidal_sparse_Lap(
             cos2_lat_inv = 1. / pow( cos(latitude.at(Ilat)), 2 );
             tan_lat = tan(latitude.at(Ilat));
 
-            index = Index(0, 0, Ilat, Ilon,
-                          1, 1, Nlat, Nlon);
+            index = Index(Itime, Idepth, Ilat, Ilon,
+                          Ntime, Ndepth, Nlat, Nlon);
+            index_sub = Index(0, 0, Ilat, Ilon,
+                              1, 1, Nlat, Nlon);
 
-            //
-            //// LON second derivative part
-            //
+            if (mask.at(index) == 1) { // Skip land areas
 
-            get_diff_vector(diff_vec, LB, longitude, "lon",
-                    0, 0, Ilat, Ilon,
-                    1, 1, Nlat, Nlon,
-                    mask, 2, constants::DiffOrd);
+                //
+                //// LON second derivative part
+                //
 
-            Ndiff = diff_vec.size();
+                LB = - 2 * Nlon;
+                get_diff_vector(diff_vec, LB, longitude, "lon",
+                                Itime, Idepth, Ilat, Ilon,
+                                Ntime, Ndepth, Nlat, Nlon,
+                                mask, 2, constants::DiffOrd);
 
-            for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
+                Ndiff = diff_vec.size();
 
-                if (constants::PERIODIC_X) {
-                    if      (IDIFF < 0    ) { Idiff = IDIFF + Nlon; }
-                    else if (IDIFF >= Nlon) { Idiff = IDIFF - Nlon; }
-                    else                    { Idiff = IDIFF; }
-                } else {
-                    Idiff = IDIFF;
+                // If LB is unchanged, then we failed to build a stencil
+                if (LB != - 2 * Nlon) {
+                    for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
+
+                        if (constants::PERIODIC_X) {
+                            if      (IDIFF < 0    ) { Idiff = IDIFF + Nlon; }
+                            else if (IDIFF >= Nlon) { Idiff = IDIFF - Nlon; }
+                            else                    { Idiff = IDIFF; }
+                        } else {
+                            Idiff = IDIFF;
+                        }
+
+                        diff_index = Index(0, 0, Ilat, Idiff,
+                                           1, 1, Nlat, Nlon);
+
+                        if ( (diff_index >= Nlat*Nlon) or (diff_index < 0) ) {
+                            fprintf(stdout, 
+                                    "  LON(2) index out of bounds"
+                                    " : (lat,lon) = (%d, %d)"
+                                    " : (index, diff_index) = (%d, %d)"
+                                    " : IDIFF, Idiff = (%d, %d)"
+                                    " : LB = %d\n",
+                                    Ilat, Ilon, index_sub, diff_index, IDIFF, Idiff, LB);
+                            fflush(stdout);
+                        }
+
+                        old_val = sparseget(Lap, index_sub, diff_index);
+
+                        tmp = diff_vec.at(IDIFF-LB) * cos2_lat_inv * R2_inv;
+                        if (area_weight) { tmp *= areas.at(index_sub); }
+
+                        alglib::sparseset(Lap, index_sub, diff_index, old_val + tmp);
+                    }
                 }
 
-                diff_index = Index(0, 0, Ilat, Idiff,
-                                   1, 1, Nlat, Nlon);
 
-                if ( (diff_index >= Nlat*Nlon) or (diff_index < 0) ) {
-                    fprintf(stdout, 
-                            "  LON(2) index out of bounds"
-                            " : (lat,lon) = (%d, %d)"
-                            " : (index, diff_index) = (%d, %d)"
-                            " : IDIFF, Idiff = (%d, %d)"
-                            " : LB = %d\n",
-                            Ilat, Ilon, index, diff_index, IDIFF, Idiff, LB);
-                    fflush(stdout);
+                //
+                //// LAT second derivative part
+                //
+
+                LB = -2 * Nlat;
+                get_diff_vector(diff_vec, LB, latitude, "lat",
+                                Itime, Idepth, Ilat, Ilon,
+                                Ntime, Ndepth, Nlat, Nlon,
+                                mask, 2, constants::DiffOrd);
+
+                Ndiff = diff_vec.size();
+
+                // If LB is unchanged, then we failed to build a stencil
+                if (LB != - 2 * Nlat) {
+                    for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
+
+                        if (constants::PERIODIC_Y) {
+                            if      (IDIFF < 0    ) { Idiff = IDIFF + Nlat; }
+                            else if (IDIFF >= Nlat) { Idiff = IDIFF - Nlat; }
+                            else                    { Idiff = IDIFF; }
+                        } else {
+                            Idiff = IDIFF;
+                        }
+
+                        diff_index = Index(0, 0, Idiff, Ilon,
+                                           1, 1, Nlat,  Nlon);
+
+                        if ( (diff_index >= Nlat*Nlon) or (diff_index < 0) ) {
+                            fprintf(stdout, 
+                                    "  LAT(2) index out of bounds"
+                                    " : (lat,lon) = (%d, %d)"
+                                    " : (index, diff_index) = (%d, %d)"
+                                    " : IDIFF, Idiff = (%d, %d)"
+                                    " : LB = %d\n",
+                                    Ilat, Ilon, index_sub, diff_index, IDIFF, Idiff, LB);
+                            fflush(stdout);
+                        }
+
+                        old_val = sparseget(Lap, index_sub, diff_index);
+
+                        tmp = diff_vec.at(IDIFF-LB) * R2_inv;
+                        if (area_weight) { tmp *= areas.at(index_sub); }
+
+                        alglib::sparseset(Lap, index_sub, diff_index, old_val + tmp);
+                    }
                 }
 
-                old_val = sparseget(Lap, index, diff_index);
 
-                tmp = diff_vec.at(IDIFF-LB) * cos2_lat_inv * R2_inv;
+                //
+                //// LAT first derivative part
+                //
 
-                alglib::sparseset(Lap, index, diff_index, old_val + tmp);
-            }
+                LB = - 2 * Nlat;
+                get_diff_vector(diff_vec, LB, latitude, "lat",
+                                Itime, Idepth, Ilat, Ilon,
+                                Ntime, Ndepth, Nlat, Nlon,
+                                mask, 1, constants::DiffOrd);
 
+                Ndiff = diff_vec.size();
 
-            //
-            //// LAT second derivative part
-            //
+                // If LB is unchanged, then we failed to build a stencil
+                if (LB != - 2 * Nlat) {
+                    for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
 
-            get_diff_vector(diff_vec, LB, latitude, "lat",
-                    0, 0, Ilat, Ilon,
-                    1, 1, Nlat, Nlon,
-                    mask, 2, constants::DiffOrd);
+                        if (constants::PERIODIC_Y) {
+                            if      (IDIFF < 0    ) { Idiff = IDIFF + Nlat; }
+                            else if (IDIFF >= Nlat) { Idiff = IDIFF - Nlat; }
+                            else                    { Idiff = IDIFF; }
+                        } else {
+                            Idiff = IDIFF;
+                        }
 
-            Ndiff = diff_vec.size();
+                        diff_index = Index(0, 0, Idiff, Ilon,
+                                           1, 1, Nlat,  Nlon);
 
-            for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
+                        if ( (diff_index >= Nlat*Nlon) or (diff_index < 0) ) {
+                            fprintf(stdout, 
+                                    "  LAT(1) index out of bounds"
+                                    " : (lat,lon) = (%d, %d)"
+                                    " : (index, diff_index) = (%d, %d)"
+                                    " : IDIFF, Idiff = (%d, %d)"
+                                    " : LB = %d\n",
+                                    Ilat, Ilon, index_sub, diff_index, IDIFF, Idiff, LB);
+                            fflush(stdout);
+                        }
 
-                if (constants::PERIODIC_Y) {
-                    if      (IDIFF < 0    ) { Idiff = IDIFF + Nlat; }
-                    else if (IDIFF >= Nlat) { Idiff = IDIFF - Nlat; }
-                    else                    { Idiff = IDIFF; }
-                } else {
-                    Idiff = IDIFF;
+                        old_val = sparseget(Lap, index_sub, diff_index);
+
+                        tmp = - diff_vec.at(IDIFF-LB) * tan_lat * R2_inv;
+                        if (area_weight) { tmp *= areas.at(index_sub); }
+
+                        alglib::sparseset(Lap, index_sub, diff_index, old_val + tmp);
+                    }
                 }
-
-                diff_index = Index(0, 0, Idiff, Ilon,
-                                   1, 1, Nlat,  Nlon);
-
-                if ( (diff_index >= Nlat*Nlon) or (diff_index < 0) ) {
-                    fprintf(stdout, 
-                            "  LAT(2) index out of bounds"
-                            " : (lat,lon) = (%d, %d)"
-                            " : (index, diff_index) = (%d, %d)"
-                            " : IDIFF, Idiff = (%d, %d)"
-                            " : LB = %d\n",
-                            Ilat, Ilon, index, diff_index, IDIFF, Idiff, LB);
-                    fflush(stdout);
-                }
-
-                old_val = sparseget(Lap, index, diff_index);
-
-                tmp = diff_vec.at(IDIFF-LB) * R2_inv;
-
-                alglib::sparseset(Lap, index, diff_index, old_val + tmp);
-            }
-
-
-            //
-            //// LAT first derivative part
-            //
-
-            get_diff_vector(diff_vec, LB, latitude, "lat",
-                    0, 0, Ilat, Ilon,
-                    1, 1, Nlat, Nlon,
-                    mask, 1, constants::DiffOrd);
-
-            Ndiff = diff_vec.size();
-
-            for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
-
-                if (constants::PERIODIC_Y) {
-                    if      (IDIFF < 0    ) { Idiff = IDIFF + Nlat; }
-                    else if (IDIFF >= Nlat) { Idiff = IDIFF - Nlat; }
-                    else                    { Idiff = IDIFF; }
-                } else {
-                    Idiff = IDIFF;
-                }
-
-                diff_index = Index(0, 0, Idiff, Ilon,
-                                   1, 1, Nlat,  Nlon);
-
-                if ( (diff_index >= Nlat*Nlon) or (diff_index < 0) ) {
-                    fprintf(stdout, 
-                            "  LAT(1) index out of bounds"
-                            " : (lat,lon) = (%d, %d)"
-                            " : (index, diff_index) = (%d, %d)"
-                            " : IDIFF, Idiff = (%d, %d)"
-                            " : LB = %d\n",
-                            Ilat, Ilon, index, diff_index, IDIFF, Idiff, LB);
-                    fflush(stdout);
-                }
-
-                old_val = sparseget(Lap, index, diff_index);
-
-                tmp = - diff_vec.at(IDIFF-LB) * tan_lat * R2_inv;
-
-                alglib::sparseset(Lap, index, diff_index, old_val + tmp);
+            } else { // end mask if
+                // If this spot is masked, then set the value to 1
+                //   if we correspondingly set the RHS value to 0,
+                //   then this should force a zero value over land
+                alglib::sparseset(Lap, index_sub, index_sub, 1.);
             }
 
         }

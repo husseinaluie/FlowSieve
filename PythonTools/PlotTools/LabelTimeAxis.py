@@ -13,7 +13,7 @@ def colour(dark):
 def seconds(date):
     return (date - datetime.datetime.fromtimestamp(0)).total_seconds()
 
-def LabelTimeAxis(ax, time):
+def LabelTimeAxis(ax, time, label_months = False, label_years = False):
 
     num_hour  = (time[-1] - time[0]) / (60*60)
     num_day   = num_hour / 24
@@ -87,7 +87,7 @@ def LabelTimeAxis(ax, time):
             ax.add_patch(rect)
             dark_year = not(dark_year)
         
-            if draw_month == 1:
+            if (label_years) or (draw_month == 1):
                 ax.text( (left+right)/2, 0.5, str(year), ha='center', va='center')
     
         for month in range(1, 13):
@@ -110,7 +110,7 @@ def LabelTimeAxis(ax, time):
                     ax.add_patch(rect)
                     dark_month = not(dark_month)
                 
-                    if draw_year == 0:
+                    if (label_months) or (draw_year == 0):
                         month_str = datetime.date(1900, month, 1).strftime('%b')
                         ax.text( (left+right)/2, draw_year + 0.5, month_str, ha='center', va='center')
             

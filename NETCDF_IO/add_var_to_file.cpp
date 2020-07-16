@@ -3,6 +3,7 @@
 #include <string>
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
+#include <cassert>
 
 void add_var_to_file(
         const std::string var_name,
@@ -14,7 +15,8 @@ void add_var_to_file(
     static_assert( 
                    not(     (constants::CAST_TO_SINGLE) 
                         and (constants::CAST_TO_INT) 
-                       ) 
+                       ),
+                   "Cannot cast to both single and int. Update cast flags in constants.hpp\n"
                  );
 
     int datatype;
@@ -59,6 +61,6 @@ void add_var_to_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     #if DEBUG >= 2
-    fprintf(stdout, "  - added %s to %s -\n", varname, buffer);
+    fprintf(stdout, "  - added %s to %s -\n", varname, filename);
     #endif
 }

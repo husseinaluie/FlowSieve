@@ -6,7 +6,7 @@
 #include "../../functions.hpp"
 
 void print_compile_info(
-        const std::vector<double> &scales   /**< [in] Scales used for filtering */
+        const std::vector<double> * scales
         ) {
 
     fprintf(stdout, "\n");
@@ -75,11 +75,13 @@ void print_compile_info(
     fprintf(stdout, "  KernPad = %g\n", constants::KernPad);
     fprintf(stdout, "\n");
 
-    fprintf(stdout, "%zu Filter Scales (km)\n", scales.size());
-    fprintf(stdout, "  ");
-    for (size_t II = 0; II < scales.size(); ++II) {
-        fprintf(stdout, "%g", scales.at(II)/1e3);
-        if (II < scales.size() - 1) { fprintf(stdout, ",  "); }
+    if ( scales != NULL ) {
+        fprintf(stdout, "%zu Filter Scales (km)\n", scales->size());
+        fprintf(stdout, "  ");
+        for (size_t II = 0; II < scales->size(); ++II) {
+            fprintf(stdout, "%g", scales->at(II)/1e3);
+            if (II < scales->size() - 1) { fprintf(stdout, ",  "); }
+        }
+        fprintf(stdout, "\n\n");
     }
-    fprintf(stdout, "\n\n");
 }

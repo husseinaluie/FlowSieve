@@ -20,6 +20,8 @@ void compute_vorticity(
         const MPI_Comm comm
         ) {
 
+    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
+
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
@@ -40,7 +42,7 @@ void compute_vorticity(
     private(Itime, Idepth, Ilat, Ilon, index, \
             vort_r_tmp, vort_lon_tmp, vort_lat_tmp)
     {
-        #pragma omp for collapse(1) schedule(guided)
+        #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
         for (index = 0; index < Npts; index++) {
 
             vort_r_tmp   = constants::fill_value;

@@ -7,17 +7,8 @@
 #include <mpi.h>
 
 void Apply_Postprocess_Routines(
-        const std::vector<double> & coarse_u_r, 
-        const std::vector<double> & coarse_u_lon, 
-        const std::vector<double> & coarse_u_lat, 
-        const std::vector<double> & coarse_vort_r, 
-        const std::vector<double> & coarse_vort_lon, 
-        const std::vector<double> & coarse_vort_lat,
-        const std::vector<double> & energy_transfer, 
-        const std::vector<double> & div_J, 
-        const std::vector<double> & lambda_m, 
-        const std::vector<double> & PEtoKE,
-        const std::vector<double> & div,
+        const std::vector<const std::vector<double>*> & postprocess_fields,
+        const std::vector<std::string> & vars_to_process,
         const std::vector<double> & time,
         const std::vector<double> & depth,
         const std::vector<double> & latitude,

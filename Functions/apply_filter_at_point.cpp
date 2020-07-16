@@ -24,14 +24,15 @@ void apply_filter_at_point(
         const double scale,
         const std::vector<double> & mask,
         const std::vector<bool> & use_mask,
-        const std::vector<double> * local_kernel
+        const std::vector<double> * local_kernel,
+        const std::vector<double> * weight
         ) {
 
     assert(coarse_vals.size() == fields.size());
     const size_t Nfields = fields.size();
 
-    double dist, kern, area;
-    int index, mask_index;
+    double dist, kern, area, loc_val;
+    int index, area_index;
     int curr_lon, curr_lat;
 
     double kA_sum = 0.;
@@ -72,7 +73,7 @@ void apply_filter_at_point(
 
             index = Index(Itime, Idepth, curr_lat, curr_lon,
                           Ntime, Ndepth, Nlat,     Nlon);
-            mask_index = Index(0,     0,      curr_lat, curr_lon,
+            area_index = Index(0,     0,      curr_lat, curr_lon,
                                Ntime, Ndepth, Nlat,     Nlon);
 
             if (local_kernel == NULL) {
@@ -88,15 +89,17 @@ void apply_filter_at_point(
                 }
                 kern = kernel(dist, scale);
             } else {
-                kern = local_kernel->at(mask_index);
+                kern = local_kernel->at(area_index);
             }
 
-            area      = dAreas.at(mask_index);
+            area      = dAreas.at(area_index);
             kA_sum   += kern * area;
 
             for (size_t II = 0; II < Nfields; ++II) {
-                mask_val = use_mask.at(II) ? mask.at(mask_index) : 1.;
-                tmp_vals.at(II) += fields.at(II)->at(index) * kern * area * mask_val;
+                mask_val = use_mask.at(II) ? mask.at(index) : 1.;
+                loc_val = fields.at(II)->at(index);
+                if (weight != NULL) { loc_val *= weight->at(index); }
+                tmp_vals.at(II) += loc_val * kern * area * mask_val;
             }
 
         }
@@ -104,6 +107,8 @@ void apply_filter_at_point(
 
     // On the off chance that the kernel was null (size zero), just return zero
     for (size_t II = 0; II < Nfields; ++II) {
-        *(coarse_vals.at(II)) = (kA_sum == 0) ? 0. : tmp_vals.at(II) / kA_sum;
+        if (coarse_vals.at(II) != NULL) {
+            *(coarse_vals.at(II)) = (kA_sum == 0) ? 0. : tmp_vals.at(II) / kA_sum;
+        }
     }
 }

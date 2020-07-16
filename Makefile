@@ -5,12 +5,12 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=0 $(CFLAGS)
+CFLAGS:=-DDEBUG=1 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
 DEBUG:=false
-EXTRA_OPT:=true
+EXTRA_OPT:=false
 
 ##
 ## Shouldn't need to modify anything beyond this point
@@ -37,43 +37,51 @@ CFLAGS:=$(CFLAGS) $(LIB_DIRS)
 LDFLAGS:=$(LDFLAGS) $(INC_DIRS)
 
 # Get list of netcdf IO cpp files
-NETCDF_IO_CPPS := $(wildcard NETCDF_IO/*.cpp)
+NETCDF_IO_CPPS := $(wildcard  NETCDF_IO/*.cpp)
 NETCDF_IO_OBJS := $(addprefix NETCDF_IO/,$(notdir $(NETCDF_IO_CPPS:.cpp=.o)))
 
 # Get list of function cpp files
-FUNCTIONS_CPPS := $(wildcard Functions/*.cpp)
+FUNCTIONS_CPPS := $(wildcard  Functions/*.cpp)
 FUNCTIONS_OBJS := $(addprefix Functions/,$(notdir $(FUNCTIONS_CPPS:.cpp=.o)))
 
 # Get list of SW cpp files
-SW_TOOL_CPPS := $(wildcard Functions/SW_Tools/*.cpp)
+SW_TOOL_CPPS := $(wildcard  Functions/SW_Tools/*.cpp)
 SW_TOOL_OBJS := $(addprefix Functions/SW_Tools/,$(notdir $(SW_TOOL_CPPS:.cpp=.o)))
 
 # Get list of differentation cpp files
-DIFF_TOOL_CPPS := $(wildcard Functions/Differentiation_Tools/*.cpp)
+DIFF_TOOL_CPPS := $(wildcard  Functions/Differentiation_Tools/*.cpp)
 DIFF_TOOL_OBJS := $(addprefix Functions/Differentiation_Tools/,$(notdir $(DIFF_TOOL_CPPS:.cpp=.o)))
 
 # Get list of interface cpp files
-INTERFACE_CPPS := $(wildcard Functions/Interface_Tools/*.cpp)
+INTERFACE_CPPS := $(wildcard  Functions/Interface_Tools/*.cpp)
 INTERFACE_OBJS := $(addprefix Functions/Interface_Tools/,$(notdir $(INTERFACE_CPPS:.cpp=.o)))
 
 # Get list of fftw-based files
-FFT_BASED_CPPS := $(wildcard Functions/FFTW_versions/*.cpp)
+FFT_BASED_CPPS := $(wildcard  Functions/FFTW_versions/*.cpp)
 FFT_BASED_OBJS := $(addprefix Functions/FFTW_versions/,$(notdir $(FFT_BASED_CPPS:.cpp=.o)))
 
 # Get list of toroidal projection files
-TOROIDAL_CPPS := $(wildcard Functions/Toroidal_Projection/*.cpp)
+TOROIDAL_CPPS := $(wildcard  Functions/Toroidal_Projection/*.cpp)
 TOROIDAL_OBJS := $(addprefix Functions/Toroidal_Projection/,$(notdir $(TOROIDAL_CPPS:.cpp=.o)))
 
+# Get the list of particle cpp files
+PARTICLE_CPPS := $(wildcard  Functions/Particles/*.cpp)
+PARTICLE_OBJS := $(addprefix Functions/Particles/,$(notdir $(PARTICLE_CPPS:.cpp=.o)))
+
+# Get list of toroidal projection files
+HELMHOLTZ_CPPS := $(wildcard  Functions/Helmholtz/*.cpp)
+HELMHOLTZ_OBJS := $(addprefix Functions/Helmholtz/,$(notdir $(HELMHOLTZ_CPPS:.cpp=.o)))
+
 # Get list of ALGLIB object files
-ALGLIB_CPPS := $(wildcard ALGLIB/*.cpp)
+ALGLIB_CPPS := $(wildcard  ALGLIB/*.cpp)
 ALGLIB_OBJS := $(addprefix ALGLIB/,$(notdir $(ALGLIB_CPPS:.cpp=.o)))
 
 # Get the list of preprocessing  cpp files
-PREPROCESS_CPPS := $(wildcard Preprocess/*.cpp)
+PREPROCESS_CPPS := $(wildcard  Preprocess/*.cpp)
 PREPROCESS_OBJS := $(addprefix Preprocess/,$(notdir $(PREPROCESS_CPPS:.cpp=.o)))
 
 # Get the list of post-processing  cpp files
-POSTPROCESS_CPPS := $(wildcard Postprocess/*.cpp)
+POSTPROCESS_CPPS := $(wildcard  Postprocess/*.cpp)
 POSTPROCESS_OBJS := $(addprefix Postprocess/,$(notdir $(POSTPROCESS_CPPS:.cpp=.o)))
 
 # Get list of test executables
@@ -87,9 +95,11 @@ clean:
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
+	rm -f Functions/Helmholtz/*.o 
 	rm -f Functions/SW_Tools/*.o 
 	rm -f Functions/Interface_Tools/*.o 
 	rm -f Functions/FFTW_versions/*.o 
+	rm -f Functions/Particles/*.o 
 	rm -f Tests/*.o 
 	rm -f Preprocess/*.o
 	rm -f Postprocess/*.o
@@ -102,10 +112,12 @@ hardclean:
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
+	rm -f Functions/Helmholtz/*.o 
 	rm -f Functions/SW_Tools/*.o 
 	rm -f Tests/*.[o,x] 
 	rm -f Functions/Interface_Tools/*.o 
 	rm -f Functions/FFTW_versions/*.o 
+	rm -f Functions/Particles/*.o 
 	rm -f coarse_grain.x 
 	rm -r coarse_grain.x.dSYM
 	rm ALGLIB/*.o
@@ -133,7 +145,8 @@ ALGLIB/%.o: ALGLIB/%.cpp
 	$(CXX) -I ./ALGLIB -c -O3 -DAE_CPU=AE_INTEL -o $@ $<
 
 # Group together object files with similar compilation requirements
-CORE_OBJS := ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} ${POSTPROCESS_OBJS}
+CORE_OBJS := ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} \
+	${DIFF_TOOL_OBJS} ${POSTPROCESS_OBJS} ${PARTICLE_OBJS}
 
 $(CORE_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
@@ -160,13 +173,36 @@ $(PREPROCESS_OBJS): %.o : %.cpp constants.hpp
 #
 
 # Group together executables with similar compilations
-CORE_TARGET_EXES := Case_Files/coarse_grain.x Case_Files/integrator.x Case_Files/coarse_grain_subset.x Case_Files/do_filtering.x
-CORE_TARGET_OBJS := Case_Files/coarse_grain.o Case_Files/integrator.o Case_Files/coarse_grain_subset.o Case_Files/do_filtering.o
+CORE_TARGET_EXES := Case_Files/coarse_grain.x \
+					Case_Files/integrator.x \
+					Case_Files/coarse_grain_subset.x \
+					Case_Files/do_filtering.x \
+					Case_Files/particles.x \
+					Case_Files/compare_particles.x \
+					Case_Files/project_onto_particles.x
+CORE_TARGET_OBJS := Case_Files/coarse_grain.o \
+					Case_Files/integrator.o \
+					Case_Files/coarse_grain_subset.o \
+					Case_Files/do_filtering.o \
+					Case_Files/particles.o \
+					Case_Files/compare_particles.o \
+					Case_Files/project_onto_particles.o
 
 $(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 $(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} %.o
+	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
+
+
+# Helmholtz
+HELM_TARGET_EXES := Case_Files/coarse_grain_helmholtz.x 
+HELM_TARGET_OBJS := Case_Files/coarse_grain_helmholtz.o 
+
+$(HELM_TARGET_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
+
+$(HELM_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} ${ALGLIB_OBJS} ${HELMHOLTZ_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building shallow water
@@ -180,13 +216,16 @@ $(SW_TARGET_EXES): %.x : ${SW_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building toroidal projection
-TOROID_TARGET_EXES := Case_Files/toroidal_projection.x
-TOROID_TARGET_OBJS := Case_Files/toroidal_projection.o
+TOROID_TARGET_EXES := 	Case_Files/toroidal_projection.x \
+						Case_Files/potential_projection.x \
+						Case_Files/interpolator.x
+TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
+						Case_Files/potential_projection.o \
+						Case_Files/interpolator.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-#$(TOROID_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${TOROIDAL_OBJS} %.o
 $(TOROID_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} ${ALGLIB_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -I ./ALGLIB -o $@ $^ $(LINKS) 
 
@@ -202,11 +241,11 @@ coarse_grain_fftw.x: ${CORE_OBJS} ${INTERFACE_OBJS} ${FFT_BASED_OBJS} Case_Files
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ -lfftw3 -lm $(LINKS) 
 
 # Interpolator needs to link in ALGLIB
-interpolator.o: Case_Files/interpolator.cpp Case_Files/constants.hpp
-	$(MPICXX) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
-
-interpolator.x: ${NETCDF_IO_OBJS} ${ALGLIB_OBJS} ${PREPROCESS_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} interpolator.o
-	$(MPICXX) $(CFLAGS) -I ./ALGLIB $(LDFLAGS) -o $@ $^ $(LINKS) 
+#Case_Files/interpolator.o: Case_Files/interpolator.cpp constants.hpp
+#	$(MPICXX) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
+#
+#Case_Files/interpolator.x: ${NETCDF_IO_OBJS} ${ALGLIB_OBJS} ${PREPROCESS_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS} Case_Files/interpolator.o
+#	$(MPICXX) $(CFLAGS) -I ./ALGLIB $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 
 #

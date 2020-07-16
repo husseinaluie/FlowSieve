@@ -22,5 +22,5 @@ double kernel_alpha(void) {
         norm_fact += M_PI * dr * ( kernel(r_loc, 1.) *     r_loc     );
     }
 
-    return 0.5 * alpha / norm_fact;
+    return alpha / norm_fact;
 }
