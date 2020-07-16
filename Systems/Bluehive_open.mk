@@ -13,7 +13,7 @@ MPICXX  ?= mpicxx
 LINKS:=-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl -fopenmp
 
 # Default compiler flags
-CFLAGS:=-Wall 
+CFLAGS:=-Wall -std=c++14
 
 # Debug flags
 DEBUG_FLAGS:=-g
