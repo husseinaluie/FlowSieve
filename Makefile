@@ -5,12 +5,12 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=0 $(CFLAGS)
+CFLAGS:=-DDEBUG=1 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
 DEBUG:=false
-EXTRA_OPT:=true
+EXTRA_OPT:=false
 
 ##
 ## Shouldn't need to modify anything beyond this point
@@ -177,12 +177,16 @@ CORE_TARGET_EXES := Case_Files/coarse_grain.x \
 					Case_Files/integrator.x \
 					Case_Files/coarse_grain_subset.x \
 					Case_Files/do_filtering.x \
-					Case_Files/particles.x
+					Case_Files/particles.x \
+					Case_Files/compare_particles.x \
+					Case_Files/project_onto_particles.x
 CORE_TARGET_OBJS := Case_Files/coarse_grain.o \
 					Case_Files/integrator.o \
 					Case_Files/coarse_grain_subset.o \
 					Case_Files/do_filtering.o \
-					Case_Files/particles.o
+					Case_Files/particles.o \
+					Case_Files/compare_particles.o \
+					Case_Files/project_onto_particles.o
 
 $(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
