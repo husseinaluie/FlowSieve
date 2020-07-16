@@ -107,6 +107,12 @@ void Apply_Postprocess_Routines(
             filter_scale
             );
 
+    // Add some attributes to the file
+    const double kern_alpha = kernel_alpha();
+    add_attr_to_file("kernel_alpha", 
+            kern_alpha * pow(filter_scale, 2), 
+            filename);
+
     //
     //// Compute the area of each region
     //
@@ -221,7 +227,11 @@ void Apply_Postprocess_Routines(
                             }
                         }
                     }
-                    field_averages.at(Ifield).at(Iregion).at(int_index) = int_val / reg_area;
+                    if (reg_area == 0) {
+                        field_averages.at(Ifield).at(Iregion).at(int_index) = 0.;
+                    } else {
+                        field_averages.at(Ifield).at(Iregion).at(int_index) = int_val / reg_area;
+                    }
                 }
             }
         }
@@ -277,7 +287,11 @@ void Apply_Postprocess_Routines(
                             }
                         }
                     }
-                    field_std_devs.at(Ifield).at(Iregion).at(int_index) = sqrt( int_val / reg_area );
+                    if (reg_area == 0) {
+                        field_std_devs.at(Ifield).at(Iregion).at(int_index) = 0.;
+                    } else {
+                        field_std_devs.at(Ifield).at(Iregion).at(int_index) = sqrt( int_val / reg_area );
+                    }
                 }
             }
         }
