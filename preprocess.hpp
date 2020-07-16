@@ -43,7 +43,9 @@ void interpolate_over_land_from_coast(
         const std::vector<double> &depth,
         const std::vector<double> &latitude,
         const std::vector<double> &longitude,
-        const std::vector<double> &mask);
+        const std::vector<double> &mask,
+        const std::vector<int>    &myCounts
+        );
 
 /*!
  * @ingroup InterpolationRoutines
@@ -80,6 +82,7 @@ void get_coast(
  *
  * *single_seed*: If true, then only one seed is provided and should be used as the seed for all different times. If false, then the provided seed incorporates a different seed for each time.
  *
+ * @param[in]       output_fname                    Name for the output file
  * @param[in,out]   u_lon,u_lat                     velocity field to be projected
  * @param[in]       time,depth,latitude,longitude   dimension vectors (1D)
  * @param[in]       mask                            array to distinguish land/water
@@ -91,6 +94,7 @@ void get_coast(
  *
  */
 void Apply_Toroidal_Projection(
+        const std::string output_fname,
         std::vector<double> & u_lon,
         std::vector<double> & u_lat,
         const std::vector<double> & time,
@@ -107,6 +111,7 @@ void Apply_Toroidal_Projection(
         );
 
 void Apply_Potential_Projection(
+        const std::string output_fname,
         std::vector<double> & u_lon,
         std::vector<double> & u_lat,
         const std::vector<double> & time,
@@ -212,6 +217,7 @@ void toroidal_curl_u_dot_er(
  *
  * @param[in,out]   Lap                     Where to store the (sparse) differentiation matrix
  * @param[in]       longitude,latitude      Grid vectors (1D)
+ * @param[in]       Itime,Idepth            Current time-depth iteration
  * @param[in]       Ntime,Ndepth,Nlat,Nlon  Dimension sizes
  * @param[in]       mask                    Array to distinguish land/water
  * @param[in]       areas                   Array giving the size of each cell
@@ -222,6 +228,10 @@ void toroidal_sparse_Lap(
         alglib::sparsematrix & Lap,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
+        const int Itime,
+        const int Idepth,
+        const int Ntime,
+        const int Ndepth,
         const int Nlat,
         const int Nlon,
         const std::vector<double> & mask,
