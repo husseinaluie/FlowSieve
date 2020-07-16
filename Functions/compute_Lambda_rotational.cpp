@@ -5,8 +5,8 @@
 #include "../constants.hpp"
 #include "../differentiation_tools.hpp"
 
-void  compute_baroclinic_transfer(
-    std::vector<double> & baroclinic_transfer,
+void  compute_Lambda_rotational(
+    std::vector<double> & Lambda_rot,
     const std::vector<double> & coarse_vort_r,
     const std::vector<double> & coarse_vort_lon,
     const std::vector<double> & coarse_vort_lat,
@@ -38,7 +38,7 @@ void  compute_baroclinic_transfer(
     #pragma omp parallel \
     default(none) \
     shared(mask, latitude, longitude,\
-            coarse_rho, baroclinic_transfer, coarse_vort_r,\
+            coarse_rho, Lambda_rot, coarse_vort_r,\
             deriv_fields)\
     private(Itime, Idepth, Ilat, Ilon, index,\
             drhodlat, dpdlat, drhodlon, dpdlon, cos_lat,\
@@ -78,7 +78,7 @@ void  compute_baroclinic_transfer(
                                     Ntime, Ndepth, Nlat, Nlon,
                                     mask);
 
-                            baroclinic_transfer.at(index) = 
+                            Lambda_rot.at(index) = 
                                 scale_factor
                                     * coarse_vort_r.at(index)
                                     * ( drhodlon * dpdlat  -  drhodlat * dpdlon ) 
@@ -86,7 +86,7 @@ void  compute_baroclinic_transfer(
 
                         } // end if(water) block
                         else { // if(land)
-                            baroclinic_transfer.at(index) = constants::fill_value;
+                            Lambda_rot.at(index) = constants::fill_value;
                         }  // end if(land) block
                     } // end depth loop
                 } // end time loop

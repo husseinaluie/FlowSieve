@@ -5,7 +5,7 @@
 #include "../constants.hpp"
 #include "../differentiation_tools.hpp"
 
-void  compute_full_Lambda(
+void  compute_Lambda_full(
     std::vector<double> & Lambda,
     const std::vector<double> & coarse_u_r,
     const std::vector<double> & coarse_u_lon,
