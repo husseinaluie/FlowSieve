@@ -7,10 +7,10 @@
 
 void write_field_to_output(
         const std::vector<double> & field,
-        const char * field_name,
+        const std::string & field_name,
         const size_t * start,
         const size_t * count,
-        const char * filename,
+        const std::string & filename,
         const std::vector<double> * mask,
         MPI_Comm comm
         ) {
@@ -23,14 +23,14 @@ void write_field_to_output(
     int FLAG = NC_NETCDF4 | NC_WRITE | NC_MPIIO;
     int ncid=0, retval;
     char buffer [50];
-    snprintf(buffer, 50, filename);
+    snprintf(buffer, 50, filename.c_str());
     MPI_Barrier(comm);
     retval = nc_open_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Get the variable ID for the field
     int field_varid;
-    retval = nc_inq_varid(ncid, field_name, &field_varid );
+    retval = nc_inq_varid(ncid, field_name.c_str(), &field_varid );
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     std::vector<signed short> reduced_field; 
@@ -92,8 +92,17 @@ void write_field_to_output(
         fmiddle = 0.5 * ( fmax + fmin );
         frange  = fmax - fmin;
 
-        scale_factor = frange / max_val;
-        if (scale_factor < 1e-15) { scale_factor = 1.; }
+        #if DEBUG >= 2
+        if (wRank == 0) { 
+            fprintf(stdout, "    fmin, fmax, fmiddle, frange = %'g, %'g, %'g, %'g\n", 
+                    fmin, fmax, fmiddle, frange);
+            fflush(stdout);
+        }
+        #endif
+
+        scale_factor = std::fabs( frange / max_val );
+        if (scale_factor < 1e-25) { scale_factor = 1.; }
+        if (scale_factor > 1e+15) { scale_factor = 1e+15; }
 
         retval = nc_put_att_double(
                 ncid, field_varid, "scale_factor", NC_DOUBLE, 1, &scale_factor);
@@ -131,7 +140,7 @@ void write_field_to_output(
 
     #if DEBUG >= 1
     if (wRank == 0) { 
-        fprintf(stdout, "  - wrote %s to %s -\n", field_name, filename); 
+        fprintf(stdout, "  - wrote %s to %s -\n", field_name.c_str(), filename.c_str());
         fflush(stdout);
     }
     #endif

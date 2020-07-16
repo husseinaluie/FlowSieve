@@ -38,6 +38,17 @@ void NC_ERR(
         );
 
 
+/*!
+ * \brief check if a file exists
+ *
+ * @param[in] name      Filename to test
+ *
+ */
+bool check_file_existence (
+        const std::string& name
+        );
+
+
 /*! 
  * \brief Initialize netcdf output file for filtered fields.
  *
@@ -146,7 +157,15 @@ void initialize_particle_file(
         const std::vector<double> & time,
         const std::vector<double> & trajectory,
         std::vector<std::string> & vars,
-        const char * filename,
+        const std::string & filename,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void initialize_projected_particle_file(
+        const std::vector<double> & time,
+        const std::vector<double> & trajectory,
+        std::vector<std::string> & vars,
+        const std::string & filename,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -171,10 +190,12 @@ void initialize_particle_file(
  */
 void write_field_to_output(
         const std::vector<double> & field, 
-        const char * field_name,
+        //const char * field_name,
+        const std::string & field_name,
         const size_t * start, 
         const size_t * count,
-        const char * filename,
+        //const char * filename,
+        const std::string & filename,
         const std::vector<double> * mask = NULL,
         MPI_Comm = MPI_COMM_WORLD
         );
@@ -228,12 +249,13 @@ void write_regions_to_post(
  */
 void read_var_from_file(
         std::vector<double> &var,
-        const char * var_name,
-        const char * filename,
+        const std::string & var_name,
+        const std::string & filename,
         std::vector<double> *mask = NULL,
         std::vector<int> *myCounts = NULL,
         std::vector<int> *myStarts = NULL,
         const bool do_splits = true,
+        const int force_split_dim = -1,
         const MPI_Comm = MPI_COMM_WORLD 
         );
 
@@ -251,7 +273,7 @@ void read_var_from_file(
 void read_attr_from_file(
         double &attr,
         const char * attr_name,
-        const char * filename,
+        const std::string filename,
         const char * var_name = NULL,
         const MPI_Comm comm = MPI_COMM_WORLD 
         );
