@@ -17,3 +17,6 @@ docs/
 
 # Ignore the *local* system.mk. The Systems directory, however, is included.
 system.mk
+
+# use .tmp to ignore my own temporary files
+*.tmp
