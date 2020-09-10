@@ -21,11 +21,13 @@ void Apply_Toroidal_Projection(
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
         const std::vector<double> & dAreas,
-        const std::vector<double> & mask,
+        const std::vector<bool>   & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const std::vector<double> & seed,
         const bool single_seed,
+        const double rel_tol,
+        const int max_iters,
         const MPI_Comm comm
         ) {
 
@@ -33,8 +35,6 @@ void Apply_Toroidal_Projection(
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
 
-    const double rel_tol    = 1e-4;
-    const int    max_iters  = 1e5;
     const bool   weight_err = true; // weight err by cell size
     const bool   use_mask   = false;
 
@@ -42,7 +42,7 @@ void Apply_Toroidal_Projection(
     //   we'll treat land values as zero velocity
     //   We do this because including land seems
     //   to introduce strong numerical issues
-    const std::vector<double> unmask(mask.size(), 1.);
+    const std::vector<bool> unmask(mask.size(), true);
 
     const int Ntime   = myCounts.at(0);
     const int Ndepth  = myCounts.at(1);
@@ -61,7 +61,7 @@ void Apply_Toroidal_Projection(
     // Fill in the land areas with zero velocity
     //   also subtract the mean off (will be added back later)
     for (index = 0; index < (int)u_lon.size(); index++) {
-        if (mask.at(index) == 0) {
+        if (not(mask.at(index))) {
             u_lon.at(index) = 0.;
             u_lat.at(index) = 0.;
         } else {
@@ -300,10 +300,12 @@ void Apply_Toroidal_Projection(
     const int ndims = 4;
     size_t starts[ndims] = {
         size_t(myStarts.at(0)), size_t(myStarts.at(1)), 
-        size_t(myStarts.at(2)), size_t(myStarts.at(3))};
+        size_t(myStarts.at(2)), size_t(myStarts.at(3))
+    };
     size_t counts[ndims] = {
         size_t(Ntime), size_t(Ndepth), 
-        size_t(Nlat), size_t(Nlon)};
+        size_t(Nlat),  size_t(Nlon)
+    };
 
     std::vector<std::string> vars_to_write;
     vars_to_write.push_back("u_lon");
@@ -312,24 +314,29 @@ void Apply_Toroidal_Projection(
     vars_to_write.push_back("F");
     vars_to_write.push_back("F_seed");
 
-    vars_to_write.push_back("RHS");
+    if (not(constants::MINIMAL_OUTPUT)) {
+        vars_to_write.push_back("RHS");
 
-    vars_to_write.push_back("div_tor");
-    vars_to_write.push_back("div_orig");
+        vars_to_write.push_back("div_orig");
+        vars_to_write.push_back("div_tor");
+    }
+
 
     initialize_output_file(time, depth, longitude, latitude,
-            mask, vars_to_write, output_fname.c_str(), 0);
+            dAreas, vars_to_write, output_fname.c_str(), 0);
     
     write_field_to_output(full_u_lon_tor,  "u_lon",    starts, counts, output_fname.c_str(), &mask);
     write_field_to_output(full_u_lat_tor,  "u_lat",    starts, counts, output_fname.c_str(), &mask);
 
-    write_field_to_output(full_RHS,        "RHS",      starts, counts, output_fname.c_str(), &mask);
-
     write_field_to_output(full_F,          "F",        starts, counts, output_fname.c_str(), &unmask);
     write_field_to_output(full_seed,       "F_seed",   starts, counts, output_fname.c_str(), &mask);
 
-    write_field_to_output(full_div_tor,    "div_tor",  starts, counts, output_fname.c_str(), &mask);
-    write_field_to_output(full_div_orig,   "div_orig", starts, counts, output_fname.c_str(), &mask);
+    if (not(constants::MINIMAL_OUTPUT)) {
+        write_field_to_output(full_RHS,        "RHS",      starts, counts, output_fname.c_str(), &mask);
+
+        write_field_to_output(full_div_tor,    "div_tor",  starts, counts, output_fname.c_str(), &mask);
+        write_field_to_output(full_div_orig,   "div_orig", starts, counts, output_fname.c_str(), &mask);
+    }
 
     add_attr_to_file("rel_tol",    rel_tol,                     output_fname.c_str());
     add_attr_to_file("max_iters",  (double) max_iters,          output_fname.c_str());
