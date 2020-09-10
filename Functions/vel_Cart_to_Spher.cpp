@@ -9,7 +9,7 @@ void vel_Cart_to_Spher(
             const std::vector<double> & u_x,
             const std::vector<double> & u_y,
             const std::vector<double> & u_z,
-            const std::vector<double> & mask,
+            const std::vector<bool> & mask,
             const std::vector<double> & time,
             const std::vector<double> & depth,
             const std::vector<double> & latitude,
@@ -38,7 +38,7 @@ void vel_Cart_to_Spher(
             #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
             for (index = 0; index < u_lon.size(); ++index) {
 
-                if (mask.at(index) == 1) { // Skip land areas
+                if ( mask.at(index) ) { // Skip land areas
                     Index1to4( index, Itime, Idepth, Ilat, Ilon,
                                       Ntime, Ndepth, Nlat, Nlon );
 

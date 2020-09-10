@@ -28,7 +28,7 @@ void apply_filter_at_point_for_quadratics(
         const int LAT_ub,
         const std::vector<double> & dAreas,     /**< [in] Array of cell areas (2D) (compute_areas())*/
         const double scale,                     /**< [in] The filtering scale */
-        const std::vector<double> & mask,       /**< [in] Array to distinguish between land and water cells (2D) */
+        const std::vector<bool>   & mask,       /**< [in] Array to distinguish between land and water cells (2D) */
         const std::vector<double> * local_kernel    /**< [in] Array of local kernel (if not NULL) */
         ) {
 
@@ -100,7 +100,7 @@ void apply_filter_at_point_for_quadratics(
 
             area     = dAreas.at(area_index);
             kA_sum  += kern * area;
-            mask_val = mask.at(index);
+            mask_val = mask.at(index) ? 1. : 0.;
 
             u_x_loc = u_x.at(index);
             u_y_loc = u_y.at(index);

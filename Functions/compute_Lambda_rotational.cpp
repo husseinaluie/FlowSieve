@@ -18,7 +18,7 @@ void  compute_Lambda_rotational(
     const int Nlon,
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
-    const std::vector<double> & mask,
+    const std::vector<bool> & mask,
     const double scale_factor
     ) {
 
@@ -61,7 +61,7 @@ void  compute_Lambda_rotational(
                         index = Index(Itime, Idepth, Ilat, Ilon,
                                       Ntime, Ndepth, Nlat, Nlon);
 
-                        if (mask.at(index) == 1) { // Skip land areas
+                        if ( mask.at(index) ) { // Skip land areas
 
                             // We need a few derivatives
                             spher_derivative_at_point(

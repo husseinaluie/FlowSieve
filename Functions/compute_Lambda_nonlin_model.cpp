@@ -18,7 +18,7 @@ void  compute_Lambda_nonlin_model(
     const int Nlon,
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
-    const std::vector<double> & mask,
+    const std::vector<bool>   & mask,
     const double scale_factor
     ) {
 
@@ -61,7 +61,7 @@ void  compute_Lambda_nonlin_model(
         #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
         for (index = 0; index < Lambda_nonlin.size(); ++index) {
 
-            if (mask.at(index) == 1) { // Skip land areas
+            if ( mask.at(index) ) { // Skip land areas
                 Index1to4(index, Itime, Idepth, Ilat, Ilon,
                                  Ntime, Ndepth, Nlat, Nlon);
 

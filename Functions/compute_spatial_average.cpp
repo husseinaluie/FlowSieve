@@ -14,7 +14,7 @@ void compute_spatial_average(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<bool> & mask
         ) {
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
@@ -45,7 +45,7 @@ void compute_spatial_average(
                         sub_index = Index( 0, 0, Ilat, Ilon,
                                            1, 1, Nlat, Nlon );
 
-                        if (mask.at(index) == 1) { // Skip land areas
+                        if ( mask.at(index) ) { // Skip land areas
                             integrated_area += areas.at(sub_index);
                             integrated_sum  += areas.at(sub_index) * field.at(index);
                         }

@@ -16,7 +16,7 @@ void compute_vorticity(
         const int Nlon,                         /**< [in] Length of longitude dimension */
         const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
         const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
-        const std::vector<double> & mask,       /**< [in] Mask array (2D) to distinguish land from water */
+        const std::vector<bool> & mask,         /**< [in] Mask array (2D) to distinguish land from water */
         const MPI_Comm comm
         ) {
 
@@ -49,7 +49,7 @@ void compute_vorticity(
             vort_lon_tmp = constants::fill_value;
             vort_lat_tmp = constants::fill_value;
 
-            if (mask.at(index) == 1) { // Skip land areas
+            if ( mask.at(index) ) { // Skip land areas
 
                 Index1to4(index, Itime, Idepth, Ilat, Ilon,
                                  Ntime, Ndepth, Nlat, Nlon);

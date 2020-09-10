@@ -22,7 +22,7 @@ void compute_vorticity_at_point(
         const int Ilon,                         /**< [in] Current position in longitude dimension */
         const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
         const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
-        const std::vector<double> & mask        /**< [in] Mask array (2D) to distinguish land from water*/
+        const std::vector<bool> & mask          /**< [in] Mask array (2D) to distinguish land from water*/
         ) {
 
     // For the moment, only compute vort_r

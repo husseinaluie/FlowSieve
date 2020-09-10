@@ -7,7 +7,6 @@
 #include "../constants.hpp"
 #include "../functions.hpp"
 
-
 void convert_coordinates(
         std::vector<double> & longitude,
         std::vector<double> & latitude

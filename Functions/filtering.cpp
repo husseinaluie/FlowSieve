@@ -20,7 +20,7 @@ void filtering(
         const std::vector<double> & depth,
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
-        const std::vector<double> & mask,
+        const std::vector<bool>   & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const MPI_Comm comm
@@ -66,8 +66,10 @@ void filtering(
     std::vector<double> u_x(num_pts), u_y(num_pts), u_z(num_pts);
     std::vector<double> coarse_u_r(num_pts), coarse_u_lon(num_pts), coarse_u_lat(num_pts);
 
-    if (not(constants::NO_FULL_OUTPUTS)) {
+    if (not(constants::MINIMAL_OUTPUT)) {
         vars_to_write.push_back("coarse_u_r");
+    }
+    if (not(constants::NO_FULL_OUTPUTS)) {
         vars_to_write.push_back("coarse_u_lon");
         vars_to_write.push_back("coarse_u_lat");
         vars_to_write.push_back("KE_from_coarse_vels");
@@ -109,7 +111,7 @@ void filtering(
     div_J.resize(num_pts);
     postprocess_names.push_back( "div_Jtransport");
     postprocess_fields.push_back(&div_J);
-    if (not(constants::NO_FULL_OUTPUTS)) {
+    if (not(constants::MINIMAL_OUTPUT)) {
         vars_to_write.push_back("div_Jtransport");
     }
 
@@ -125,7 +127,9 @@ void filtering(
     // If we're computing transfers, then we already have what
     //   we need to computed band-filtered KE, so might as well do it
     filtered_KE.resize(num_pts);
-    vars_to_write.push_back("filtered_KE");
+    if (not(constants::MINIMAL_OUTPUT)) {
+        vars_to_write.push_back("filtered_KE");
+    }
 
     postprocess_names.push_back( "filtered_KE");
     postprocess_fields.push_back(&filtered_KE);
@@ -435,7 +439,7 @@ void filtering(
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
 
-                            if (mask.at(index) == 1) { // Skip land areas
+                            if ( mask.at(index) ) { // Skip land areas
 
                                 // Apply the filter at the point
                                 if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
@@ -523,9 +527,11 @@ void filtering(
 
                                     // tau(u,u)
                                     fine_KE.at(index) = 
+                                        0.5 * constants::rho0 * (
                                                 uxux_tmp - u_x_tmp * u_x_tmp
-                                        +       uyuy_tmp - u_y_tmp * u_y_tmp
-                                        +       uzuz_tmp - u_z_tmp * u_z_tmp;
+                                            +   uyuy_tmp - u_y_tmp * u_y_tmp
+                                            +   uzuz_tmp - u_z_tmp * u_z_tmp
+                                        );
                                 }
                                 if (constants::DO_TIMING) { 
                                     timing_records.add_to_record(MPI_Wtime() - clock_on,
@@ -633,9 +639,11 @@ void filtering(
 
         // Write to file
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        if (not(constants::NO_FULL_OUTPUTS)) {
+        if (not(constants::MINIMAL_OUTPUT)) {
             write_field_to_output(coarse_u_r,         "coarse_u_r",   
                     starts, counts, fname, &mask);
+        }
+        if (not(constants::NO_FULL_OUTPUTS)) {
             write_field_to_output(coarse_u_lon,       "coarse_u_lon", 
                     starts, counts, fname, &mask);
             write_field_to_output(coarse_u_lat,       "coarse_u_lat", 
@@ -650,7 +658,9 @@ void filtering(
             write_field_to_output(fine_u_lat, "fine_u_lat", starts, counts, fname, &mask);
 
         }
-        write_field_to_output(filtered_KE, "filtered_KE", starts, counts, fname, &mask);
+        if (not(constants::MINIMAL_OUTPUT)) {
+            write_field_to_output(filtered_KE, "filtered_KE", starts, counts, fname, &mask);
+        }
         if (constants::DO_TIMING) { 
             timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
         }
@@ -825,7 +835,7 @@ void filtering(
         }
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        if (not(constants::NO_FULL_OUTPUTS)) {
+        if (not(constants::MINIMAL_OUTPUT)) {
             write_field_to_output(div_J, "div_Jtransport", starts, counts, fname, &mask);
         }
         if (constants::DO_TIMING) { 

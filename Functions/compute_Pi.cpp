@@ -21,7 +21,7 @@ void compute_Pi(
         const int Nlon,                         /**< [in] Length of longitude dimension */
         const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
         const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
-        const std::vector<double> & mask        /**< [in] Mask array (2D) to distinguish land from water */
+        const std::vector<bool> & mask          /**< [in] Mask array (2D) to distinguish land from water */
         ) {
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
@@ -30,7 +30,6 @@ void compute_Pi(
     int Itime, Idepth, Ilat, Ilon, ii, jj;
     size_t index;
     const size_t Npts = energy_transfer.size();
-    bool is_water;
 
     double tau_ij_j, u_i_tau_ij_j;
     std::vector<double> tau_ij;
@@ -54,13 +53,11 @@ void compute_Pi(
     // Zero out energy transfer before we start
     #pragma omp parallel \
     default(none) shared(mask, energy_transfer) \
-    private(index, is_water)
+    private(index)
     {
         #pragma omp for collapse(1) schedule(static)
         for (index = 0; index < Npts; index++) {
-            is_water = mask.at(index) == 1;
-
-            energy_transfer.at(index) = is_water ? 0. : constants::fill_value;
+            energy_transfer.at(index) = mask.at(index) ? 0. : constants::fill_value;
         }
     }
 
@@ -117,14 +114,12 @@ void compute_Pi(
             #pragma omp parallel \
             default(none) \
             shared(tau_ij, u_i_tau_ij, mask, ui, uj, uiuj)\
-            private(index, uiuj_loc, ui_loc, uj_loc, is_water)
+            private(index, uiuj_loc, ui_loc, uj_loc)
             {
                 #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
                 for (index = 0; index < Npts; index++) {
 
-                    is_water = mask.at(index) == 1;
-
-                    if (is_water) {
+                    if ( mask.at(index) ) {
 
                         ui_loc   = ui->at(  index);
                         uj_loc   = uj->at(  index);
@@ -142,7 +137,7 @@ void compute_Pi(
             shared(energy_transfer, latitude, longitude, mask,\
                     jj, ui, tau_ij, u_i_tau_ij, deriv_fields)\
             private(Itime, Idepth, Ilat, Ilon, index,\
-                    pi_tmp, tau_ij_j, u_i_tau_ij_j, is_water,\
+                    pi_tmp, tau_ij_j, u_i_tau_ij_j,\
                     x_deriv_vals, y_deriv_vals, z_deriv_vals)
             {
 
@@ -169,9 +164,7 @@ void compute_Pi(
                 #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
                 for (index = 0; index < Npts; index++) {
 
-                    is_water = mask.at(index) == 1;
-
-                    if (is_water) {
+                    if ( mask.at(index) ) {
 
                         Index1to4(index, Itime, Idepth, Ilat, Ilon,
                                          Ntime, Ndepth, Nlat, Nlon);

@@ -22,7 +22,7 @@ void apply_filter_at_point(
         const int LAT_ub,
         const std::vector<double> & dAreas,
         const double scale,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const std::vector<bool> & use_mask,
         const std::vector<double> * local_kernel,
         const std::vector<double> * weight
@@ -32,7 +32,7 @@ void apply_filter_at_point(
     const size_t Nfields = fields.size();
 
     double dist, kern, area, loc_val;
-    int index, area_index;
+    size_t index, area_index;
     int curr_lon, curr_lat;
 
     double kA_sum = 0.;
@@ -96,7 +96,7 @@ void apply_filter_at_point(
             kA_sum   += kern * area;
 
             for (size_t II = 0; II < Nfields; ++II) {
-                mask_val = use_mask.at(II) ? mask.at(index) : 1.;
+                mask_val = ( not(use_mask.at(II)) or mask.at(index) ) ? 1. : 0.;
                 loc_val = fields.at(II)->at(index);
                 if (weight != NULL) { loc_val *= weight->at(index); }
                 tmp_vals.at(II) += loc_val * kern * area * mask_val;

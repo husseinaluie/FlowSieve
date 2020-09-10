@@ -7,7 +7,7 @@ void KE_from_vels(
             std::vector<double> * u1,
             std::vector<double> * u2,
             std::vector<double> * u3,
-            const std::vector<double> & mask,
+            const std::vector<bool> & mask,
             const double rho0
         ) {
 
@@ -19,7 +19,7 @@ void KE_from_vels(
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < u1->size(); ++index) {
 
-            if (mask.at(index) == 1) { // Skip land areas
+            if ( mask.at(index) ) { // Skip land areas
                 tmp = 0.;
                 if (u1 != NULL) { tmp += 0.5 * rho0 * pow(u1->at(index), 2); }
                 if (u2 != NULL) { tmp += 0.5 * rho0 * pow(u2->at(index), 2); }

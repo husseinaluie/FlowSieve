@@ -20,7 +20,7 @@ void  compute_Lambda_full(
     const int Nlon,
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
-    const std::vector<double> & mask
+    const std::vector<bool>   & mask
     ) {
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
@@ -55,7 +55,7 @@ void  compute_Lambda_full(
             Index1to4(index, Itime, Idepth, Ilat, Ilon,
                              Ntime, Ndepth, Nlat, Nlon);
 
-            if (mask.at(index) == 1) { // Skip land areas
+            if ( mask.at(index) ) { // Skip land areas
 
                 // We need a few derivatives
                 spher_derivative_at_point(

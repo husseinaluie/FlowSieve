@@ -85,7 +85,7 @@ void compute_div_transport(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<bool> & mask
         ) {
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
@@ -195,7 +195,7 @@ void compute_div_transport(
 
             div_J_tmp = constants::fill_value;
 
-            if (mask.at(index) == 1) { // Skip land areas
+            if ( mask.at(index) ) { // Skip land areas
 
                 Index1to4(index, Itime, Idepth, Ilat, Ilon,
                                  Ntime, Ndepth, Nlat, Nlon);
