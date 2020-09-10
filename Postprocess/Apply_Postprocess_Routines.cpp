@@ -15,7 +15,7 @@ void Apply_Postprocess_Routines(
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const std::vector<double> & areas,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
@@ -68,7 +68,7 @@ void Apply_Postprocess_Routines(
                                1, Ndepth, Nlat, Nlon);
 
             // Add up the number of times a cell is water (not masked)
-            mask_count_loc.at(area_index) += (int) mask.at(index);
+            if ( mask.at(index) ) { mask_count_loc.at(area_index) = mask_count_loc.at(area_index) + 1; }
         }
     }
     MPI_Allreduce( &(mask_count_loc[0]),
@@ -144,7 +144,7 @@ void Apply_Postprocess_Routines(
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
 
-                            if (mask.at(index) == 1) { // Skip land areas
+                            if ( mask.at(index) ) { // Skip land areas
 
                                 area_index = Index(0, 0, Ilat, Ilon,
                                                    1, 1, Nlat, Nlon);
@@ -211,7 +211,7 @@ void Apply_Postprocess_Routines(
                                 index = Index(Itime, Idepth, Ilat, Ilon,
                                               Ntime, Ndepth, Nlat, Nlon);
 
-                                if (mask.at(index) == 1) { // Skip land areas
+                                if ( mask.at(index) ) { // Skip land areas
 
                                     area_index = Index(0, 0, Ilat, Ilon,
                                                        1, 1, Nlat, Nlon);
@@ -268,7 +268,7 @@ void Apply_Postprocess_Routines(
                                 index = Index(Itime, Idepth, Ilat, Ilon,
                                               Ntime, Ndepth, Nlat, Nlon);
 
-                                if (mask.at(index) == 1) { // Skip land areas
+                                if ( mask.at(index) ) { // Skip land areas
 
                                     area_index = Index(0, 0, Ilat, Ilon,
                                                        1, 1, Nlat, Nlon);
@@ -386,7 +386,7 @@ void Apply_Postprocess_Routines(
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
 
-                            if (mask.at(index) == 1) {
+                            if ( mask.at(index) ) {
                                 for (Ifield = 0; Ifield < num_fields; ++Ifield) {
 
                                     // compute the time average for 
@@ -442,7 +442,7 @@ void Apply_Postprocess_Routines(
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
 
-                            if (mask.at(index) == 1) { // Skip land areas
+                            if ( mask.at(index) ) { // Skip land areas
                                 for (Ifield = 0; Ifield < num_fields; ++Ifield) {
 
                                     // compute the time std. dev. for 
@@ -514,8 +514,8 @@ void Apply_Postprocess_Routines(
 
     for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
         write_time_average_to_post(time_average.at(Ifield), vars_to_process.at(Ifield), 
-                "_time_average", start, count, filename);
+                "_time_average", start, count, filename, &mask);
         write_time_average_to_post(time_std_dev.at(Ifield), vars_to_process.at(Ifield), 
-                "_time_std_dev", start, count, filename);
+                "_time_std_dev", start, count, filename, &mask);
     }
 }
