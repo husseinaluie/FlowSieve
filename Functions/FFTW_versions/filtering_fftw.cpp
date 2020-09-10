@@ -7,6 +7,7 @@
 #include "../../fft_based.hpp"
 #include "../../netcdf_io.hpp"
 #include "../../constants.hpp"
+#include "../../postprocess.hpp"
 #include <fftw3.h>
 #include <assert.h>
 
@@ -22,7 +23,7 @@ void filtering_fftw(
         const std::vector<double> & depth,          /**< [in] Depth dimension (1D) */
         const std::vector<double> & longitude,      /**< [in] Longitude dimension (1D) */
         const std::vector<double> & latitude,       /**< [in] Latitude dimension (1D) */
-        const std::vector<double> & mask,           /**< [in] Array to distinguish between land and water cells (2D) */
+        const std::vector<bool> & mask,             /**< [in] Array to distinguish between land and water cells (2D) */
         const std::vector<int>    & myCounts,       /**< [in] Array of dimension sizes */
         const std::vector<int>    & myStarts,       /**< [in] Array of dimension sizes */
         const MPI_Comm comm                         /**< [in] MPI Communicator */
@@ -35,6 +36,9 @@ void filtering_fftw(
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
+
+    size_t index;
+    double scale;
 
     // Get dimension sizes
     const int Nscales = scales.size();
@@ -64,101 +68,47 @@ void filtering_fftw(
 
     std::vector<double> local_kernel(Nlat * Nlon);
 
-    std::vector<double> coarse_u_x(num_pts);
-    std::vector<double> coarse_u_y(num_pts);
-    std::vector<double> coarse_u_z(num_pts);
-    vars_to_write.push_back("coarse_u_r");
-    vars_to_write.push_back("coarse_u_lon");
-    vars_to_write.push_back("coarse_u_lat");
+    std::vector<double> coarse_u_x(num_pts), coarse_u_y(num_pts), coarse_u_z(num_pts);
+    vars_to_write.push_back("coarse_u_x");
+    vars_to_write.push_back("coarse_u_y");
+    vars_to_write.push_back("coarse_u_z");
 
-    std::vector<double> full_KE(num_pts);
-
-    size_t index;
-    #pragma omp parallel default(none) private(index) \
-        shared(full_KE, full_u_x, full_u_y, full_u_z)
-    {
-        #pragma omp for collapse(1) schedule(static)
-        for (index = 0; index < num_pts; ++index) {
-            full_KE.at(index) = 
-                0.5 * ( 
-                          pow(full_u_x.at(index), 2) 
-                        + pow(full_u_y.at(index), 2) 
-                        + pow(full_u_z.at(index), 2) 
-                      );
-        } 
-    } // done pragma
-
-    double scale;
-
-    std::vector<double> fine_u_x(num_pts);
-    std::vector<double> fine_u_y(num_pts);
-    std::vector<double> fine_u_z(num_pts);
-    vars_to_write.push_back("fine_u_r");
-    vars_to_write.push_back("fine_u_lon");
-    vars_to_write.push_back("fine_u_lat");
-
-    std::vector<double> div_J(num_pts);
-    vars_to_write.push_back("div_Jtransport");
-
-    std::vector<double> fine_KE(num_pts);
     std::vector<double> coarse_KE(num_pts);
-    vars_to_write.push_back("fine_KE");
     vars_to_write.push_back("coarse_KE");
 
+    std::vector<double> div;
+    if (not(constants::MINIMAL_OUTPUT)) {
+        div.resize(num_pts);
+        vars_to_write.push_back("full_vel_div");
+        vars_to_write.push_back("coarse_vel_div");
+    }
+
     // If computing energy transfers, we'll need some more arrays
-    std::vector<double> coarse_uxux(num_pts);
-    std::vector<double> coarse_uxuy(num_pts);
-    std::vector<double> coarse_uxuz(num_pts);
-    std::vector<double> coarse_uyuy(num_pts);
-    std::vector<double> coarse_uyuz(num_pts);
-    std::vector<double> coarse_uzuz(num_pts);
-    vars_to_write.push_back("coarse_uxux");
-    vars_to_write.push_back("coarse_uxuy");
-    vars_to_write.push_back("coarse_uxuz");
-    vars_to_write.push_back("coarse_uyuy");
-    vars_to_write.push_back("coarse_uyuz");
-    vars_to_write.push_back("coarse_uzuz");
+        std::vector<double> coarse_uxux, coarse_uxuy, coarse_uxuz,
+                                         coarse_uyuy, coarse_uyuz, 
+                                                      coarse_uzuz;   
+        std::vector<double> energy_transfer;
+    if (constants::COMP_TRANSFERS) {
+        coarse_uxux.resize(num_pts);
+        coarse_uxuy.resize(num_pts);
+        coarse_uxuz.resize(num_pts);
 
-    /*
-    std::vector<double> tau_xx(num_pts);
-    std::vector<double> tau_xy(num_pts);
-    std::vector<double> tau_xz(num_pts);
-    std::vector<double> tau_yy(num_pts);
-    std::vector<double> tau_yz(num_pts);
-    std::vector<double> tau_zz(num_pts);
-    vars_to_write.push_back("tau_xx");
-    vars_to_write.push_back("tau_xy");
-    vars_to_write.push_back("tau_xz");
-    vars_to_write.push_back("tau_yy");
-    vars_to_write.push_back("tau_yz");
-    vars_to_write.push_back("tau_zz");
+        coarse_uyuy.resize(num_pts);
+        coarse_uyuz.resize(num_pts);
 
-    double s_xx, s_xy, s_xz, s_yy, s_yz, s_zz;
-    double ux_loc, uy_loc, uz_loc, pi_tmp;
-    std::vector<double> S_xx(num_pts);
-    std::vector<double> S_xy(num_pts);
-    std::vector<double> S_xz(num_pts);
-    std::vector<double> S_yy(num_pts);
-    std::vector<double> S_yz(num_pts);
-    std::vector<double> S_zz(num_pts);
-    vars_to_write.push_back("S_xx");
-    vars_to_write.push_back("S_xy");
-    vars_to_write.push_back("S_xz");
-    vars_to_write.push_back("S_yy");
-    vars_to_write.push_back("S_yz");
-    vars_to_write.push_back("S_zz");
-    */
+        coarse_uzuz.resize(num_pts);
 
-    std::vector<double> div(num_pts);
-    vars_to_write.push_back("full_vel_div");
-    vars_to_write.push_back("coarse_vel_div");
+        // Also an array for the transfer itself
+        energy_transfer.resize(num_pts);
+        vars_to_write.push_back("energy_transfer");
+    }
 
-    // Also an array for the transfer itself
-    std::vector<double> energy_transfer(num_pts);
-    vars_to_write.push_back("energy_transfer");
+    // Preset some post-processing variables
+    std::vector<const std::vector<double>*> postprocess_fields;
+    std::vector<std::string> postprocess_names;
 
-    // Placeholder
-    std::vector<double> coarse_p;
+    postprocess_names.push_back("coarse_KE");
+    postprocess_fields.push_back(&coarse_KE);
 
     // Initialize fftw plans
     const int rank = 2; 
@@ -208,9 +158,11 @@ void filtering_fftw(
     for (int Iscale = 0; Iscale < Nscales; Iscale++) {
 
         // Create the output file
-        snprintf(filename, 50, "filter_%.6gkm.nc", scales.at(Iscale)/1e3);
-        initialize_output_file(time, depth, longitude, latitude, 
-                mask, vars_to_write, filename, scales.at(Iscale));
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            snprintf(filename, 50, "filter_%.6gkm.nc", scales.at(Iscale)/1e3);
+            initialize_output_file(time, depth, longitude, latitude, 
+                    dAreas, vars_to_write, filename, scales.at(Iscale));
+        }
 
         #if DEBUG >= 0
         if (wRank == 0) { 
@@ -229,155 +181,88 @@ void filtering_fftw(
         fft_filter(coarse_u_z, full_u_z, fft, ifft, fft_inp, fft_out, scale,
                 Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
 
-        // Also filter KE
-        fft_filter(coarse_KE, full_KE, fft, ifft, fft_inp, fft_out, scale,
-                Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
-
-        for (size_t index = 0; index < num_pts; ++index) {
-            fine_u_x.at(index) = full_u_x.at(index) - coarse_u_x.at(index);
-            fine_u_y.at(index) = full_u_y.at(index) - coarse_u_y.at(index);
-            fine_u_z.at(index) = full_u_z.at(index) - coarse_u_z.at(index);
-            fine_KE.at(index) = full_KE.at(index) - coarse_KE.at(index);
+        for (index = 0; index < num_pts; ++index) {
+            coarse_KE.at(index) = 0.5 * constants::rho0 * (
+                                    pow(coarse_u_x.at(index), 2.0)
+                                  + pow(coarse_u_y.at(index), 2.0)
+                                  + pow(coarse_u_z.at(index), 2.0)
+                                );
         }
 
-        // Filter Quadratics (for tau)
-        fft_filter_product(coarse_uxux, full_u_x, full_u_x, fft, ifft, fft_inp, fft_out,
-                scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
-        fft_filter_product(coarse_uxuy, full_u_x, full_u_y, fft, ifft, fft_inp, fft_out,
-                scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
-        fft_filter_product(coarse_uxuz, full_u_x, full_u_z, fft, ifft, fft_inp, fft_out,
-                scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
-        fft_filter_product(coarse_uyuy, full_u_y, full_u_y, fft, ifft, fft_inp, fft_out,
-                scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
-        fft_filter_product(coarse_uyuz, full_u_y, full_u_z, fft, ifft, fft_inp, fft_out,
-                scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
-        fft_filter_product(coarse_uzuz, full_u_z, full_u_z, fft, ifft, fft_inp, fft_out,
-                scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
+        if (constants::COMP_TRANSFERS) {
+            // Filter Quadratics (for tau)
+            fft_filter_product(coarse_uxux, full_u_x, full_u_x, fft, ifft, fft_inp, fft_out,
+                    scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
+            fft_filter_product(coarse_uxuy, full_u_x, full_u_y, fft, ifft, fft_inp, fft_out,
+                    scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
+            fft_filter_product(coarse_uxuz, full_u_x, full_u_z, fft, ifft, fft_inp, fft_out,
+                    scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
+            fft_filter_product(coarse_uyuy, full_u_y, full_u_y, fft, ifft, fft_inp, fft_out,
+                    scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
+            fft_filter_product(coarse_uyuz, full_u_y, full_u_z, fft, ifft, fft_inp, fft_out,
+                    scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
+            fft_filter_product(coarse_uzuz, full_u_z, full_u_z, fft, ifft, fft_inp, fft_out,
+                    scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
+        }
 
         #if DEBUG >= 1
         fprintf(stdout, "  = Rank %d finished filtering =\n", wRank);
+        fflush(stdout);
         #endif
 
         // Write to file
-        write_field_to_output(fine_u_x,   "fine_u_lon",   starts, counts, filename);
-        write_field_to_output(fine_u_y,   "fine_u_lat",   starts, counts, filename);
-        write_field_to_output(fine_u_z,   "fine_u_r",     starts, counts, filename);
-        write_field_to_output(coarse_u_x, "coarse_u_lon", starts, counts, filename);
-        write_field_to_output(coarse_u_y, "coarse_u_lat", starts, counts, filename);
-        write_field_to_output(coarse_u_z, "coarse_u_r",   starts, counts, filename);
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            write_field_to_output(coarse_u_x, "coarse_u_x", starts, counts, filename);
+            write_field_to_output(coarse_u_y, "coarse_u_y", starts, counts, filename);
+            write_field_to_output(coarse_u_z, "coarse_u_z",   starts, counts, filename);
 
-        write_field_to_output(coarse_uxux, "coarse_uxux",   starts, counts, filename);
-        write_field_to_output(coarse_uxuy, "coarse_uxuy",   starts, counts, filename);
-        write_field_to_output(coarse_uxuz, "coarse_uxuz",   starts, counts, filename);
-        write_field_to_output(coarse_uyuy, "coarse_uyuy",   starts, counts, filename);
-        write_field_to_output(coarse_uyuz, "coarse_uyuz",   starts, counts, filename);
-        write_field_to_output(coarse_uzuz, "coarse_uzuz",   starts, counts, filename);
+            write_field_to_output(coarse_KE, "coarse_KE", starts, counts, filename);
+        }
 
-        write_field_to_output(fine_KE,   "fine_KE",   starts, counts, filename);
-        write_field_to_output(coarse_KE, "coarse_KE", starts, counts, filename);
+        if (constants::COMP_TRANSFERS) {
+            // Compute the energy transfer through the filter scale
+            compute_energy_transfer_through_scale(
+                    energy_transfer, 
+                    coarse_u_x,  coarse_u_y,  coarse_u_z,
+                    coarse_uxux, coarse_uxuy, coarse_uxuz,
+                    coarse_uyuy, coarse_uyuz, coarse_uzuz,
+                    Ntime, Ndepth, Nlat, Nlon,
+                    longitude, latitude, mask);
 
-        // Compute the energy transfer through the filter scale
-        compute_energy_transfer_through_scale(
-                energy_transfer, 
-                coarse_u_x,  coarse_u_y,  coarse_u_z,
-                coarse_uxux, coarse_uxuy, coarse_uxuz,
-                coarse_uyuy, coarse_uyuz, coarse_uzuz,
-                Ntime, Ndepth, Nlat, Nlon,
-                longitude, latitude, mask);
-
-        /*
-        for (int Itime = 0; Itime < Ntime; Itime++) {
-            for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
-                for (int Ilat = 0; Ilat < Nlat; Ilat++) {
-                    for (int Ilon = 0; Ilon < Nlon; Ilon++) {
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                      Ntime, Ndepth, Nlat, Nlon);
-
-                        ux_loc = coarse_u_x.at(index);
-                        uy_loc = coarse_u_y.at(index);
-                        uz_loc = coarse_u_z.at(index);
-
-                        // Compute subfilter-scale stress
-                        tau_xx.at(index) = coarse_uxux.at(index) - ux_loc * ux_loc;
-                        tau_xy.at(index) = coarse_uxuy.at(index) - ux_loc * uy_loc;
-                        tau_xz.at(index) = coarse_uxuz.at(index) - ux_loc * uz_loc;
-                        tau_yy.at(index) = coarse_uyuy.at(index) - uy_loc * uy_loc;
-                        tau_yz.at(index) = coarse_uyuz.at(index) - uy_loc * uz_loc;
-                        tau_zz.at(index) = coarse_uzuz.at(index) - uz_loc * uz_loc;
-
-                        // Compute large-scale strain
-                        compute_largescale_strain(
-                                s_xx, s_xy, s_xz, s_yy, s_yz, s_zz, 
-                                coarse_u_x, coarse_u_y, coarse_u_z,
-                                Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon,
-                                longitude, latitude, mask);
-                
-                        S_xx.at(index) = s_xx;
-                        S_xy.at(index) = s_xy;
-                        S_xz.at(index) = s_xz;
-                        S_yy.at(index) = s_yy;
-                        S_yz.at(index) = s_yz;
-                        S_zz.at(index) = s_zz;
-
-                        pi_tmp = -constants::rho0 * 
-                            (   s_xx * tau_xx.at(index) 
-                              + s_yy * tau_yy.at(index) 
-                              + s_zz * tau_zz.at(index)
-                              + 2 * s_xy * tau_xy.at(index) 
-                              + 2 * s_xz * tau_xz.at(index) 
-                              + 2 * s_yz * tau_yz.at(index) 
-                            );
-
-                        energy_transfer.at(index) = pi_tmp;
-                    }
-                }
+            if (not(constants::NO_FULL_OUTPUTS)) {
+                write_field_to_output(energy_transfer, "energy_transfer", starts, counts, filename);
             }
         }
-        write_field_to_output(tau_xx, "tau_xx", starts, counts, filename);
-        write_field_to_output(tau_xy, "tau_xy", starts, counts, filename);
-        write_field_to_output(tau_xz, "tau_xz", starts, counts, filename);
-        write_field_to_output(tau_yy, "tau_yy", starts, counts, filename);
-        write_field_to_output(tau_yz, "tau_yz", starts, counts, filename);
-        write_field_to_output(tau_zz, "tau_zz", starts, counts, filename);
 
-        write_field_to_output(S_xx, "S_xx", starts, counts, filename);
-        write_field_to_output(S_xy, "S_xy", starts, counts, filename);
-        write_field_to_output(S_xz, "S_xz", starts, counts, filename);
-        write_field_to_output(S_yy, "S_yy", starts, counts, filename);
-        write_field_to_output(S_yz, "S_yz", starts, counts, filename);
-        write_field_to_output(S_zz, "S_zz", starts, counts, filename);
-        */
 
-        write_field_to_output(energy_transfer, "energy_transfer", starts, counts, filename);
+        if (not(constants::MINIMAL_OUTPUT)) {
+            compute_div_vel(div, coarse_u_x, coarse_u_y, coarse_u_z, longitude, latitude,
+                    Ntime, Ndepth, Nlat, Nlon, mask);
+            if (not(constants::NO_FULL_OUTPUTS)) {
+                write_field_to_output(div, "coarse_vel_div", starts, counts, filename);
+            }
 
-        // Compute the divergence of the coarse field and full field (for comparison)
-        compute_div_vel(div, coarse_u_x, coarse_u_y, coarse_u_z, longitude, latitude,
-                Ntime, Ndepth, Nlat, Nlon, mask);
-        write_field_to_output(div, "coarse_vel_div", starts, counts, filename);
+            compute_div_vel(div, full_u_x, full_u_y, full_u_z, longitude, latitude,
+                    Ntime, Ndepth, Nlat, Nlon, mask);
+            if (not(constants::NO_FULL_OUTPUTS)) {
+                write_field_to_output(div, "full_vel_div", starts, counts, filename);
+            }
+        }
 
-        compute_div_vel(div, full_u_x, full_u_y, full_u_z, longitude, latitude,
-                Ntime, Ndepth, Nlat, Nlon, mask);
-        write_field_to_output(div, "full_vel_div", starts, counts, filename);
+        if (constants::APPLY_POSTPROCESS) {
+            MPI_Barrier(MPI_COMM_WORLD);
 
-        #if DEBUG >= 1
-        if (wRank == 0) { fprintf(stdout, "Starting compute_div_transport\n"); }
-        #endif
+            if (wRank == 0) { fprintf(stdout, "Beginning post-process routines\n"); }
+            fflush(stdout);
 
-        compute_div_transport(
-                div_J,
-                coarse_u_x,  coarse_u_y,  coarse_u_z,
-                coarse_uxux, coarse_uxuy, coarse_uxuz,
-                coarse_uyuy, coarse_uyuz, coarse_uzuz,
-                coarse_p, longitude, latitude,
-                Ntime, Ndepth, Nlat, Nlon,
-                mask);
-        write_field_to_output(div_J, "div_Jtransport", starts, counts, filename);
+            Apply_Postprocess_Routines(
+                    postprocess_fields, postprocess_names,
+                    time, depth, latitude, longitude,
+                    mask, dAreas,
+                    myCounts, myStarts,
+                    scales.at(Iscale));
+        }
 
-        #if DEBUG >= 0
-        // Flushing stdout is necessary for SLURM outputs.
-        fflush(stdout);
-        #endif
 
     }  // end for(scale) block
 
