@@ -52,14 +52,15 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales { 
-        2, 4, 5
-        //2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
+        2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
         //100e3, 250e3, 400e3
-        //1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
-        //1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
-        //1e6, //1.58e6, 2.51e6, 3.98e6, 6.31e6,
+        /*
+        1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
+        1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
+        1e6, //1.58e6, 2.51e6, 3.98e6, 6.31e6,
         //1.58e6, 2.51e6, 3.98e6, 6.31e6, 1e7
         //1e7//, 1.58e7, 2.51e7, 3.98e7, 6.31e7
+        */
     };
 
     //
@@ -93,7 +94,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<double> longitude, latitude, time, depth;
     std::vector<double> u_r, u_lon, u_lat, rho, p;
-    std::vector<double> mask;
+    std::vector<bool> mask;
     std::vector<int> myCounts, myStarts;
     size_t II;
 
