@@ -12,6 +12,7 @@ void write_time_average_to_post(
         size_t * start,
         size_t * count,
         const char * filename,
+        const std::vector<bool> * mask,
         const MPI_Comm comm
         ) {
 
@@ -34,8 +35,71 @@ void write_time_average_to_post(
     retval = nc_inq_varid(ncid, (field_name + field_suffix).c_str(), &field_varid );
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
+    // Apply mask
+    std::vector<double> output_field;
+    int index;
+    double fmin, fmax, fmiddle, frange = 0, 
+           fmin_loc = 1e100, fmax_loc = -1e100, scale_factor;
+    double max_val =   constants::fill_value < 0 
+                     ? constants::fill_value + 2 
+                     : constants::fill_value - 2;
+
+    // Get the median value to let us use offsets
+    #pragma omp parallel \
+    default(none) shared(field, mask) private(index) \
+    reduction(max : fmax_loc) reduction(min : fmin_loc)
+    {
+    #pragma omp for collapse(1) schedule(guided)
+        for (index = 0; index < (int) field.size(); index++) {
+            if ( (mask == NULL) or ( mask->at(index) ) ) {
+                fmax_loc = std::max(fmax_loc, field.at(index));
+                fmin_loc = std::min(fmin_loc, field.at(index));
+            }
+        }
+    }
+    MPI_Allreduce(&fmax_loc, &fmax, 1, MPI_DOUBLE, MPI_MAX, comm);
+    MPI_Allreduce(&fmin_loc, &fmin, 1, MPI_DOUBLE, MPI_MIN, comm);
+
+    fmiddle = 0.5 * ( fmax + fmin );
+    frange  = fmax - fmin;
+
+    #if DEBUG >= 2
+    if (wRank == 0) { 
+        fprintf(stdout, "    fmin, fmax, fmiddle, frange = %'g, %'g, %'g, %'g\n", 
+                fmin, fmax, fmiddle, frange);
+        fflush(stdout);
+    }
+    #endif
+
+    scale_factor = std::fabs( frange / max_val );
+    if (scale_factor < 1e-25) { scale_factor = 1.; }
+    if (scale_factor > 1e+15) { scale_factor = 1e+15; }
+
+    retval = nc_put_att_double(
+            ncid, field_varid, "scale_factor", NC_DOUBLE, 1, &scale_factor);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+    retval = nc_put_att_double(ncid, field_varid, 
+            "add_offset", NC_DOUBLE, 1, &fmiddle);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+    output_field.resize(field.size());
+    #pragma omp parallel \
+    default(none) shared(output_field, field, mask, fmiddle, scale_factor) \
+    private(index)
+    {
+    #pragma omp for collapse(1) schedule(static)
+        for (index = 0; index < (int) field.size(); index++) {
+            if ( (mask == NULL) or ( mask->at(index) ) ) {
+                output_field.at(index) = ( field.at(index) - fmiddle ) / scale_factor;
+            } else {
+                output_field.at(index) = constants::fill_value;
+            }
+        }
+    }
+
     // Write the time average
-    retval = nc_put_vara_double(ncid, field_varid, start, count, &(field[0]));
+    retval = nc_put_vara_double(ncid, field_varid, start, count, &(output_field[0]));
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Close the file

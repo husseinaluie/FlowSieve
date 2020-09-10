@@ -196,7 +196,7 @@ void write_field_to_output(
         const size_t * count,
         //const char * filename,
         const std::string & filename,
-        const std::vector<double> * mask = NULL,
+        const std::vector<bool> * mask = NULL,
         MPI_Comm = MPI_COMM_WORLD
         );
 
@@ -221,6 +221,7 @@ void write_time_average_to_post(
         size_t * start,
         size_t * count,
         const char * filename,
+        const std::vector<bool> * mask,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -240,7 +241,7 @@ void write_regions_to_post(
  *  @param[in,out]  var         vector into which to store the loaded variable
  *  @param[in]      var_name    name of the variable to be read
  *  @param[in]      filename    name of the file from which to load the variable
- *  @param[in,out]  mask        point to where a mask array should be stored (if not NULL)
+ *  @param[in,out]  mask        point to where a mask array should be stored (if not NULL) (true = water, false = land)
  *  @param[in,out]  myCounts    the sizes of each dimension (on this MPI process) if not NULL
  *  @param[in,out]  myStarts    the starting index for each dimension, if not NULL
  *  @param[in]      do_splits   boolean indicating if the arrays should be split over MPI procs.
@@ -251,7 +252,7 @@ void read_var_from_file(
         std::vector<double> &var,
         const std::string & var_name,
         const std::string & filename,
-        std::vector<double> *mask = NULL,
+        std::vector<bool> *mask = NULL,
         std::vector<int> *myCounts = NULL,
         std::vector<int> *myStarts = NULL,
         const bool do_splits = true,
@@ -329,7 +330,7 @@ void package_field(
         double & scale_factor,
         double & add_offset,
         const std::vector<double> & original,
-        const std::vector<double> * mask,
+        const std::vector<bool> * mask,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
