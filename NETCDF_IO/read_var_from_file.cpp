@@ -9,7 +9,7 @@ void read_var_from_file(
         std::vector<double> &var,
         const std::string & var_name,
         const std::string & filename,
-        std::vector<double> *mask,
+        std::vector<bool> *mask,
         std::vector<int> *myCounts,
         std::vector<int> *myStarts,
         const bool do_splits,
@@ -34,6 +34,7 @@ void read_var_from_file(
     #if DEBUG >= 1
     if (wRank == 0) {
         fprintf(stdout, "Attempting to read %s from %s\n", var_name.c_str(), buffer);
+        fflush(stdout);
     }
     #endif
 
@@ -114,6 +115,7 @@ void read_var_from_file(
     }
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }
+    fflush(stdout);
     #endif
 
     /*
@@ -147,8 +149,40 @@ void read_var_from_file(
     var.resize(num_pts);
 
     // Now read in the data
-    retval = nc_get_vara_double(ncid, var_id, start, count, &var[0]);
-    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    if (num_pts < 4 * pow(512,3)) {
+        retval = nc_get_vara_double(ncid, var_id, start, count, &var[0]);
+        if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    } else {
+        // We can't read in more than 4 * 512^3 at a time, so break into chunks 
+        //   right now we assume that splitting the first dimension is sufficient
+        const unsigned int num_chunks = ceil( num_pts / ( 4 * pow(512,3) ) );
+
+        size_t target = 0;
+        const size_t full_time_count = count[0];
+        size_t curr_count, pts_per_slice = 1;
+
+
+        for (int Idim = 1; Idim < num_dims; ++Idim) {
+            pts_per_slice *= count[Idim];
+        }
+
+        for (unsigned int Ichunk = 0; Ichunk < num_chunks; ++Ichunk) {
+
+            curr_count = floor( full_time_count / num_chunks );
+            if (Ichunk < ( full_time_count % num_chunks ) ) {
+                curr_count++;
+            }
+
+            count[0] = curr_count;
+
+            retval = nc_get_vara_double(ncid, var_id, start, count, &var[target]);
+            if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+
+            start[0] += curr_count;
+            target += curr_count * pts_per_slice;
+
+        }
+    }
 
     // Apply scale factor if appropriate
     double scale = 1.;
@@ -191,12 +225,12 @@ void read_var_from_file(
     // If we're at 99% of the fill_val, call it land
     for (size_t II = 0; II < var.size(); II++) {
         if (fabs(var.at(II)) > 0.99 * (fabs(fill_val*scale) + fabs(offset))) {
-            if (mask != NULL) { mask->at(II) = 0; }
+            if (mask != NULL) { mask->at(II) = false; }
             num_land++;
         } else {
             var_max = std::max( var_max, var.at(II) );
             var_min = std::min( var_min, var.at(II) );
-            if (mask != NULL) { mask->at(II) = 1; }
+            if (mask != NULL) { mask->at(II) = true; }
             num_water++;
         }
     }
