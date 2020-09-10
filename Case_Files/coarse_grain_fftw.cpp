@@ -34,82 +34,40 @@ int main(int argc, char *argv[]) {
     //   include scales as a comma-separated list
     //   scales are given in metres
     // A zero scale will cause everything to nan out
-    /*
-    std::vector<double> filter_scales { 250e3 };
-    */
     std::vector<double> filter_scales {
-        25.28e3, 31.6e3, 39.5e3, 49.375e3, 
-        63.2e3, 80e3, 100e3, 150e3,
-        158e3, 200e3, 250e3, 252.8e3, 395e3,
-        400e3, 632e3, 790e3, 1580e3, 6320e3
+        2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
     };
 
-    // Parse command-line flags
-    char buffer [50];
-    if (wRank == 0) {
-        for(int ii = 1; ii < argc; ++ii) {  
-            fprintf(stdout, "Argument %d : %s\n", ii, argv[ii]);
-            snprintf(buffer, 50, "--version");
-            if (strcmp(argv[ii], buffer) == 0) {
-                print_compile_info(&filter_scales);
-                return 0;
-            } else {
-                fprintf(stderr, "Flag %s not recognized.\n", argv[ii]);
-                return -1;
-            }
-        }
+    //
+    //// Parse command-line arguments
+    //
+    InputParser input(argc, argv);
+    if(input.cmdOptionExists("--version")){
+        if (wRank == 0) { print_compile_info(NULL); } 
+        return 0;
     }
 
-    #if DEBUG >= 0
-    if (wRank == 0) {
-        fprintf(stdout, "\n\n");
-        fprintf(stdout, "Compiled at %s on %s.\n", __TIME__, __DATE__);
-        fprintf(stdout, "  Version %d.%d.%d \n", 
-                MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
-        fprintf(stdout, "\n");
-    }
-    #endif
+    // first argument is the flag, second argument is default value (for when flag is not present)
+    const std::string &input_fname       = input.getCmdOption("--input_file",  "input.nc");
 
-    #if DEBUG >= 0
-    if (wRank == 0) {
-        if (constants::CARTESIAN) { 
-            fprintf(stdout, "Using Cartesian coordinates.\n");
-        } else {
-            fprintf(stdout, "Using spherical coordinates.\n");
-        }
-    }
-    #endif
-    MPI_Barrier(MPI_COMM_WORLD);
+    const std::string &time_dim_name      = input.getCmdOption("--time",        "time");
+    const std::string &depth_dim_name     = input.getCmdOption("--depth",       "depth");
+    const std::string &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude");
+    const std::string &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
 
-    // Print processor assignments
-    #if DEBUG >= 2
-    int tid, nthreads;
+    const std::string &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo");
+    const std::string &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo");
+
+    // Set OpenMP thread number
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
-    #pragma omp parallel default(none) private(tid, nthreads) \
-        shared(stdout) firstprivate(wRank, wSize)
-    {
-        tid = omp_get_thread_num();
-        nthreads = omp_get_num_threads();
-        fprintf(stdout, "Hello from thread %d of %d on processor %d of %d.\n", 
-                tid+1, nthreads, wRank+1, wSize);
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-    #endif
 
-    std::vector<double> longitude;
-    std::vector<double> latitude;
-    std::vector<double> time;
-    std::vector<double> depth;
+    // Print some header info, depending on debug level
+    print_header_info();
 
-    std::vector<double> u_r;
-    std::vector<double> u_lon;
-    std::vector<double> u_lat;
-
-    std::vector<double> rho;
-    std::vector<double> p;
-
-    std::vector<double> mask;
+    std::vector<double> longitude, latitude, time, depth;
+    std::vector<double> u_r, u_lon, u_lat, rho, p;
+    std::vector<bool> mask;
     std::vector<int> myCounts, myStarts;
     size_t II;
 
@@ -119,14 +77,16 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Read in the grid coordinates
-    read_var_from_file(longitude, "longitude", "input.nc");
-    read_var_from_file(latitude,  "latitude",  "input.nc");
-    read_var_from_file(time,      "time",      "input.nc");
-    read_var_from_file(depth,     "depth",     "input.nc");
+    read_var_from_file(time,      time_dim_name,      input_fname);
+    read_var_from_file(depth,     depth_dim_name,     input_fname);
+    read_var_from_file(latitude,  latitude_dim_name,  input_fname);
+    read_var_from_file(longitude, longitude_dim_name, input_fname);
+     
+    convert_coordinates(longitude, latitude);
 
     // Read in the velocity fields
-    read_var_from_file(u_lon, "uo", "input.nc", &mask, &myCounts, &myStarts);
-    read_var_from_file(u_lat, "vo", "input.nc", &mask, &myCounts, &myStarts);
+    read_var_from_file(u_lon, zonal_vel_name, input_fname, &mask, &myCounts, &myStarts);
+    read_var_from_file(u_lat, merid_vel_name, input_fname, &mask, &myCounts, &myStarts);
 
     // No u_r in inputs, so initialize as zero
     u_r.resize(u_lon.size());
@@ -138,35 +98,21 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (constants::COMP_BC_TRANSFERS) {
-        // If desired, read in rho and p
-        read_var_from_file(rho, "rho", "input.nc");
-        read_var_from_file(p,   "p",   "input.nc");
-    }
-
-    //const int Ntime  = time.size();
-    //const int Ndepth = depth.size();
+    #if DEBUG >= 1
+    const int Ntime  = time.size();
+    const int Ndepth = depth.size();
+    #endif
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
-    if (not(constants::CARTESIAN)) {
-        // Convert coordinate to radians
-        if (wRank == 0) { fprintf(stdout, "Converting to radians.\n\n"); }
-        int ii;
-        const double D2R = M_PI / 180.;
-        #pragma omp parallel default(none) private(ii) shared(longitude, latitude)
-        { 
-            #pragma omp for collapse(1) schedule(static)
-            for (ii = 0; ii < Nlon; ii++) {
-                longitude.at(ii) = longitude.at(ii) * D2R;
-            }
-
-            #pragma omp for collapse(1) schedule(static)
-            for (ii = 0; ii < Nlat; ii++) { 
-                latitude.at(ii) = latitude.at(ii) * D2R;
-            }
-        }
-    }
+    #if DEBUG >= 1
+    fprintf(stdout, "Processor %d has (%d, %d, %d, %d) from (%d, %d, %d, %d)\n", 
+            wRank, 
+            myCounts[0], myCounts[1], myCounts[2], myCounts[3],
+            Ntime, Ndepth, Nlat, Nlon);
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
+    #endif
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration
