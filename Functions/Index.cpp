@@ -1,7 +1,7 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
-int Index( 
+size_t Index( 
         const int Itime,
         const int Idepth,
         const int Ilat,
@@ -19,7 +19,7 @@ int Index(
                 + Ilon;
     */
 
-    int index =  ( ( Itime * Ndepth + Idepth) * Nlat + Ilat ) * Nlon + Ilon;
+    size_t index =  ( ( (size_t) Itime * (size_t) Ndepth + (size_t) Idepth) * (size_t) Nlat + (size_t) Ilat ) * (size_t) Nlon + (size_t) Ilon;
 
     #if DEBUG >= 5
     fprintf(stdout, "      Index conversion (%d, %d, %d, %d) -> %d\n ", 
