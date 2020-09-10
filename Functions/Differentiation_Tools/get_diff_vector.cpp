@@ -18,7 +18,7 @@ void get_diff_vector(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const int order_of_deriv,
         const int diff_ord
         ) {
@@ -57,7 +57,7 @@ void get_diff_vector(
         if (do_lon) { index = Index(Itime, Idepth, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
         else        { index = Index(Itime, Idepth, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
         
-        if (mask.at(index) == 0) { LB++; break; }
+        if ( not(mask.at(index)) ) { LB++; break; }
 
         LB--;
     }
@@ -71,7 +71,7 @@ void get_diff_vector(
         if (do_lon) { index = Index(Itime, Idepth, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
         else        { index = Index(Itime, Idepth, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
-        if (mask.at(index) == 0) { UB--; break; }
+        if ( not(mask.at(index)) ) { UB--; break; }
 
         UB++;
     }

@@ -94,7 +94,7 @@ void spher_derivative_at_point(
         const std::string & dim,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const int order_of_deriv = 1,
         const int diff_ord = constants::DiffOrd);
 
@@ -129,7 +129,7 @@ void Cart_derivatives_at_point(
         const std::vector<double> & longitude,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const int order_of_deriv = 1,
         const int diff_ord = constants::DiffOrd);
 
@@ -166,7 +166,7 @@ void get_diff_vector(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const int order_of_deriv,
         const int diff_ord = constants::DiffOrd
         );

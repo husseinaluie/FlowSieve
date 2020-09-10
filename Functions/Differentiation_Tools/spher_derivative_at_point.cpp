@@ -18,7 +18,7 @@ void spher_derivative_at_point(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const int order_of_deriv,
         const int diff_ord
         ) {
@@ -75,7 +75,7 @@ void spher_derivative_at_point(
         if (do_lon) { index = Index(0, 0, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
         else        { index = Index(0, 0, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
         
-        if (mask.at(index) == 0) { LB++; break; }
+        if ( not(mask.at(index)) ) { LB++; break; }
 
         LB--;
     }
@@ -89,7 +89,7 @@ void spher_derivative_at_point(
         if (do_lon) { index = Index(0, 0, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
         else        { index = Index(0, 0, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
-        if (mask.at(index) == 0) { UB--; break; }
+        if ( not(mask.at(index)) ) { UB--; break; }
 
         UB++;
     }

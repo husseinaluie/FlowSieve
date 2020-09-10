@@ -21,7 +21,7 @@ void Cart_derivatives_at_point(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const int order_of_deriv,
         const int diff_ord
         ) {
