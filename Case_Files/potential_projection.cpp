@@ -59,6 +59,12 @@ int main(int argc, char *argv[]) {
     const std::string &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo");
     const std::string &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo");
 
+    const std::string &tolerance_string = input.getCmdOption("--tolerance", "5e-3");
+    const double tolerance = stod(tolerance_string);  
+
+    const std::string &iteration_string = input.getCmdOption("--max_iterations", "100000");
+    const int max_iterations = stoi(iteration_string);  
+
     // Print processor assignments
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
@@ -68,7 +74,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<double> longitude, latitude, time, depth;
     std::vector<double> u_lon, u_lat, seed;
-    std::vector<double> mask;
+    std::vector<bool> mask;
     std::vector<int> myCounts, myStarts;
 
     // Read in source data / get size information
@@ -109,7 +115,8 @@ int main(int argc, char *argv[]) {
     Apply_Potential_Projection(
             output_fname,
             u_lon, u_lat, time, depth, latitude, longitude,
-            areas, mask, myCounts, myStarts, seed, single_seed
+            areas, mask, myCounts, myStarts, seed, single_seed,
+            tolerance, max_iterations
             );
 
 
