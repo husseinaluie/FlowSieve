@@ -11,7 +11,7 @@ void write_field_to_output(
         const size_t * start,
         const size_t * count,
         const std::string & filename,
-        const std::vector<double> * mask,
+        const std::vector<bool> * mask,
         MPI_Comm comm
         ) {
 
@@ -80,7 +80,7 @@ void write_field_to_output(
         {
             #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < (int) field.size(); index++) {
-                if ( (mask == NULL) or (mask->at(index) == 1) ) {
+                if ( (mask == NULL) or ( mask->at(index) ) ) {
                     fmax_loc = std::max(fmax_loc, field.at(index));
                     fmin_loc = std::min(fmin_loc, field.at(index));
                 }
@@ -119,7 +119,7 @@ void write_field_to_output(
         {
             #pragma omp for collapse(1) schedule(static)
             for (index = 0; index < (int) field.size(); index++) {
-                if ( (mask == NULL) or (mask->at(index) == 1) ) {
+                if ( (mask == NULL) or ( mask->at(index) ) ) {
                     output_field.at(index) = ( field.at(index) - fmiddle ) / scale_factor;
                 } else {
                     output_field.at(index) = constants::fill_value;

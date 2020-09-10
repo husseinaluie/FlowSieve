@@ -9,7 +9,7 @@ void package_field(
         double & scale_factor,
         double & add_offset,
         const std::vector<double> & original,
-        const std::vector<double> * mask,
+        const std::vector<bool> * mask,
         MPI_Comm comm
         ) {
 
@@ -25,7 +25,7 @@ void package_field(
     {
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < (int) original.size(); index++) {
-            if (mask->at(index) == 1) {
+            if ( mask->at(index) ) {
                 fmax_loc = std::max(fmax_loc, original.at(index));
                 fmin_loc = std::min(fmin_loc, original.at(index));
             }
@@ -53,7 +53,7 @@ void package_field(
     {
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < (int) original.size(); index++) {
-            if (mask->at(index) == 1) {
+            if ( mask->at(index) ) {
 
                 // Scale original down to [-0.5,0.5] and store in local_double
                 local_double = (original.at(index) - fmiddle) / frange;
