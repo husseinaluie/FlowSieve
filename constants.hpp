@@ -59,7 +59,7 @@ namespace constants
      * \brief Differentiation order for finite differencing (currently must be 2, 4, or 6).
      * @ingroup constants
      */
-    const int DiffOrd = 2;
+    const int DiffOrd = 4;
 
     /*!
      * \param fill_value
@@ -85,6 +85,7 @@ namespace constants
     /*!
      * \param PERIODIC_X
      * \brief Boolean indicating if the coordinate system is periodic in x / longitude.
+     *
      * @ingroup constants
      */
     const bool PERIODIC_X = true;
@@ -97,6 +98,13 @@ namespace constants
     const bool PERIODIC_Y = false;
 
     /*!
+     * \param UNIFORM_LON_GRID
+     * \brief Boolean indicating if the longitude grid is uniform
+     * @ingroup constants
+     */
+    const bool UNIFORM_LON_GRID = true;
+
+    /*!
      * \param UNIFORM_LAT_GRID
      * \brief Boolean indicating if the latitude grid is uniform
      * @ingroup constants
@@ -104,18 +112,31 @@ namespace constants
     const bool UNIFORM_LAT_GRID = true;
 
     /*!
+     * \param FULL_LON_SPAN
+     * \brief Boolean indicating if the provided longitude grid spans the full periodic domain.
+     *
+     * i.e. is the first longitude point beside the last longitude point?
+     *
+     * This flag enables computational optimizations by allowing the kernel to simply be translated
+     * through lon, instead of having to recompute for each longitude index.
+     *
+     * @ingroup constants
+     */
+    const bool FULL_LON_SPAN = true;
+
+    /*!
      * \param COMP_VORT
      * \brief Boolean indicating if vorticity should be computed.
      * @ingroup constants
      */
-    const bool COMP_VORT = false;
+    const bool COMP_VORT = true;
 
     /*!
      * \param COMP_TRANSFERS
      * \brief Boolean indicating if non-linear transfers (Pi) should be computed.
      * @ingroup constants
      */
-    const bool COMP_TRANSFERS = true;
+    const bool COMP_TRANSFERS = false;
 
     /*!
      * \param COMP_BC_TRANSFERS
@@ -145,7 +166,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool NO_FULL_OUTPUTS = false;
+    const bool NO_FULL_OUTPUTS = true;
 
     /*!
      * \param CAST_TO_SINGLE
@@ -154,7 +175,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool CAST_TO_SINGLE = false;
+    const bool CAST_TO_SINGLE = true;
 
     /*!
      * \param CAST_TO_INT
