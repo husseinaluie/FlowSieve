@@ -25,7 +25,7 @@ void filtering_fftw(
         const std::vector<double> & depth,
         const std::vector<double> & longitude, 
         const std::vector<double> & latitude,
-        const std::vector<double> & mask,
+        const std::vector<bool>   & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const MPI_Comm comm = MPI_COMM_WORLD);

@@ -5,7 +5,7 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=1 $(CFLAGS)
+CFLAGS:=-DDEBUG=2 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
@@ -160,7 +160,7 @@ $(SW_TOOL_OBJS): %.o : %.cpp constants.hpp
 $(INTERFACE_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-FFT_BASED_OBJS:= ${FFT_BASED_OBJS} coarse_grain_fftw.o
+FFT_BASED_OBJS:= ${FFT_BASED_OBJS} Case_Files/coarse_grain_fftw.o
 $(FFT_BASED_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< -lfftw3 -lm $(LINKS) 
 
@@ -237,7 +237,7 @@ Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
 	$(MPICXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building fftw-based coarse_grain executable
-coarse_grain_fftw.x: ${CORE_OBJS} ${INTERFACE_OBJS} ${FFT_BASED_OBJS} Case_Files/coarse_grain_fftw.o
+Case_Files/coarse_grain_fftw.x: ${CORE_OBJS} ${INTERFACE_OBJS} ${FFT_BASED_OBJS} Case_Files/coarse_grain_fftw.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ -lfftw3 -lm $(LINKS) 
 
 # Interpolator needs to link in ALGLIB
