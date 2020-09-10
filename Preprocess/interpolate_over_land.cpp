@@ -14,12 +14,14 @@ void interpolate_over_land(
         const std::vector<double> &depth,
         const std::vector<double> &latitude,
         const std::vector<double> &longitude,
-        const std::vector<double> &mask)
+        const std::vector<bool>   &mask)
 {
     // Count how mayn water points there are (since these are the data points
     //   that are known / valid)
     int num_water_pts = 0;
-    for (size_t II = 0; II < mask.size(); II++) { num_water_pts += mask.at(II); }
+    for (size_t II = 0; II < mask.size(); II++) { 
+        if (mask.at(II)) { num_water_pts++; }
+    }
 
     int Ntime  = (int)time.size();
     int Ndepth = (int)depth.size();
@@ -101,7 +103,7 @@ void interpolate_over_land(
                     mask_index = Index(0,     0,      Ilat, Ilon,
                                        Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask.at(mask_index) == 1) {
+                    if (mask.at(mask_index)) {
                         if (cast_to_sphere) { 
                             xyzf_vec.at(4*cntr + 0) = R * cos(lat * D2R) * cos(lon * D2R);
                             xyzf_vec.at(4*cntr + 1) = R * cos(lat * D2R) * sin(lon * D2R);
@@ -182,7 +184,7 @@ void interpolate_over_land(
                     mask_index = Index(0,     0,      Ilat, Ilon,
                                        Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask.at(mask_index) == 0) {
+                    if (not(mask.at(mask_index))) {
                         // If we're on a land cell, then use the interpolator
                         if (cast_to_sphere) { 
                             x = R * cos(lat * D2R) * cos(lon * D2R);

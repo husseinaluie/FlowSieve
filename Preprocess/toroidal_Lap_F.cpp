@@ -16,7 +16,7 @@ void toroidal_Lap_F(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<bool> & mask
         ) {
 
     // ret = ddlon(vel_lat) / cos_lat - ddlat( u_lon * cos_lat ) / cos_lat 
@@ -52,7 +52,7 @@ void toroidal_Lap_F(
                               1, 1, Nlat, Nlon);
                 tmp = constants::fill_value;
 
-                if (mask.at(index) == 1) { // Skip land areas
+                if (mask.at(index)) { // Skip land areas
 
                     // Second lon derivative
                     spher_derivative_at_point(

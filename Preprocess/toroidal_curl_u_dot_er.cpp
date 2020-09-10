@@ -19,7 +19,7 @@ void toroidal_curl_u_dot_er(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask,
+        const std::vector<bool>   & mask,
         const std::vector<double> * seed
         ) {
 
@@ -59,7 +59,7 @@ void toroidal_curl_u_dot_er(
                 //tmp = constants::fill_value;
                 tmp = 0.;
 
-                if (mask.at(index) == 1) { // Skip land areas
+                if (mask.at(index)) { // Skip land areas
 
                     spher_derivative_at_point(
                             lon_deriv_vals, deriv_fields,

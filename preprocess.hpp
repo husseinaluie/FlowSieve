@@ -31,7 +31,7 @@ void interpolate_over_land(
         const std::vector<double> &depth,
         const std::vector<double> &latitude,
         const std::vector<double> &longitude,
-        const std::vector<double> &mask);
+        const std::vector<bool> &mask);
 
 /*!
  * @ingroup InterpolationRoutines
@@ -43,7 +43,7 @@ void interpolate_over_land_from_coast(
         const std::vector<double> &depth,
         const std::vector<double> &latitude,
         const std::vector<double> &longitude,
-        const std::vector<double> &mask,
+        const std::vector<bool> &mask,
         const std::vector<int>    &myCounts
         );
 
@@ -57,7 +57,7 @@ void get_coast(
         const std::vector<double> &lon_full,
         const std::vector<double> &lat_full,
         const std::vector<double> &field_full,
-        const std::vector<double> &mask,
+        const std::vector<bool> &mask,
         const int Itime,
         const int Idepth,
         const int Ntime,
@@ -102,11 +102,13 @@ void Apply_Toroidal_Projection(
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
         const std::vector<double> & dAreas,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const std::vector<double> & seed,
         const bool single_seed,
+        const double rel_tol,
+        const int max_iters,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -119,11 +121,13 @@ void Apply_Potential_Projection(
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
         const std::vector<double> & dAreas,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const std::vector<double> & seed,
         const bool single_seed,
+        const double rel_tol,
+        const int max_iters,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -150,7 +154,7 @@ void toroidal_vel_from_F(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<bool> & mask
     );
 
 void potential_vel_from_F(  
@@ -163,7 +167,7 @@ void potential_vel_from_F(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<bool> & mask
     );
 
 
@@ -202,7 +206,7 @@ void toroidal_curl_u_dot_er(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const std::vector<double> * seed = NULL
         );
 
@@ -234,7 +238,7 @@ void toroidal_sparse_Lap(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const std::vector<double> & areas,
         const bool area_weight = false
         );
@@ -260,7 +264,7 @@ void toroidal_Lap_F(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<bool> & mask
         );
 
 
@@ -285,7 +289,7 @@ void toroidal_vel_div(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<bool> & mask
     );
 
 #endif

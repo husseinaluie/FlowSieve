@@ -15,7 +15,7 @@ void interpolate_over_land_from_coast(
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
-        const std::vector<double> & mask,
+        const std::vector<bool>   & mask,
         const std::vector<int>    & myCounts)
 {
     const int Ntime   = myCounts.at(0);
@@ -191,7 +191,7 @@ void interpolate_over_land_from_coast(
                     index = Index(Itime, Idepth, Ilat, Ilon,
                                   Ntime, Ndepth, Nlat, Nlon);
 
-                    if (mask.at(index) == 0) {
+                    if (not(mask.at(index))) {
                         // If we're on a land cell, then use the interpolator
                         if (cast_to_sphere) { 
                             x = R * cos(lat) * cos(lon);

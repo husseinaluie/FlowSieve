@@ -16,7 +16,7 @@ void toroidal_vel_div(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<bool> & mask
     ) {
 
     int Itime, Idepth, Ilat, Ilon, index;
@@ -43,7 +43,7 @@ void toroidal_vel_div(
 
             tmp_val = constants::fill_value;
 
-            if (mask.at(index) == 1) { // Skip land areas
+            if (mask.at(index)) { // Skip land areas
 
                 Index1to4(index, Itime, Idepth, Ilat, Ilon,
                                  Ntime, Ndepth, Nlat, Nlon);

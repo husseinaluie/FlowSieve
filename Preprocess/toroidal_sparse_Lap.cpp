@@ -21,7 +21,7 @@ void toroidal_sparse_Lap(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask,
+        const std::vector<bool>   & mask,
         const std::vector<double> & areas,
         const bool area_weight
         ) {
@@ -44,7 +44,7 @@ void toroidal_sparse_Lap(
             index_sub = Index(0, 0, Ilat, Ilon,
                               1, 1, Nlat, Nlon);
 
-            if (mask.at(index) == 1) { // Skip land areas
+            if (mask.at(index)) { // Skip land areas
 
                 //
                 //// LON second derivative part

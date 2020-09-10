@@ -16,7 +16,7 @@ void toroidal_vel_from_F(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask
+        const std::vector<bool> & mask
     ) {
 
     int Itime, Idepth, Ilat, Ilon, index;
@@ -42,7 +42,7 @@ void toroidal_vel_from_F(
             tmp_lon = constants::fill_value;
             tmp_lat = constants::fill_value;
 
-            if (mask.at(index) == 1) { // Skip land areas
+            if (mask.at(index)) { // Skip land areas
 
                 Index1to4(index, Itime, Idepth, Ilat, Ilon,
                                  Ntime, Ndepth, Nlat, Nlon);
@@ -61,12 +61,12 @@ void toroidal_vel_from_F(
                         Ntime, Ndepth, Nlat, Nlon,
                         mask);
 
-                cos_lat = cos(latitude.at(Ilat));
-
                 if (constants::CARTESIAN) {
                     tmp_lon = - dFdlat;
                     tmp_lat =   dFdlon;
                 } else {
+                    cos_lat = cos(latitude.at(Ilat));
+
                     tmp_lon = - dFdlat /  constants::R_earth;
                     tmp_lat =   dFdlon / (constants::R_earth * cos_lat);
                 }
