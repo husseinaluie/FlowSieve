@@ -24,7 +24,7 @@ void particles_evolve_trajectories(
         const std::vector<double> & time,
         const std::vector<double> & lat,
         const std::vector<double> & lon,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const MPI_Comm comm
         ) {
 
@@ -43,20 +43,21 @@ void particles_evolve_trajectories(
                  U0   = 2.,
                  dt_target = target_times.at(1) - target_times.at(0);
 
-    const int Nlat   = lat.size(),
-              Nlon   = lon.size(),
-              Ntime  = time.size(),
-              Ndepth = 1,
-              Nparts = starting_lat.size(),
-              Nouts  = target_times.size();
+    const unsigned int  Nlat   = lat.size(),
+                        Nlon   = lon.size(),
+                        Ntime  = time.size(),
+                        Ndepth = 1,
+                        Nparts = starting_lat.size(),
+                        Nouts  = target_times.size();
 
     int left, right, bottom, top;
 
     std::vector<double> vel_lon_sub( Nlat * Nlon ), 
-                        vel_lat_sub( Nlat * Nlon ),
-                        mask_sub(    Nlat * Nlon );
+                        vel_lat_sub( Nlat * Nlon );
+    std::vector<bool>   mask_sub(    Nlat * Nlon );
 
-    int out_ind, step_iter, ref_ind, index, Ip;
+    unsigned int out_ind, step_iter, ref_ind, Ip;
+    size_t index;
 
     #pragma omp parallel \
     default(none) \
@@ -106,10 +107,10 @@ void particles_evolve_trajectories(
             vel_lon_part = U0;
             vel_lat_part = U0;
 
-            #if DEBUG >= 1
-            //fprintf(stdout, "Particle %03d of %03d (rank %d of %d)\n", 
-            //        Ip+1 + Nparts * wRank, Nparts * wSize, wRank + 1, wSize);
-            //fflush(stdout);
+            #if DEBUG >= 2
+            fprintf(stdout, "Particle %03d of %03d (rank %d of %d)\n", 
+                    Ip+1 + Nparts * wRank, Nparts * wSize, wRank + 1, wSize);
+            fflush(stdout);
             #endif
 
             while (t_part < target_times.back()) {
@@ -124,10 +125,10 @@ void particles_evolve_trajectories(
                                      dy_loc / std::max(vel_lat_part, 1e-3) );
 
                 if ( ( (size_t)out_ind < target_times.size() )
-                     and ( (t_part + dt) - target_times[out_ind] > (dt_target / 50.) ) 
+                     and ( (t_part + dt) - target_times.at(out_ind) > (dt_target / 50.) ) 
                    )
                 {
-                    dt = target_times[out_ind] - t_part;
+                    dt = target_times.at(out_ind) - t_part;
                 }
 
                 // Subset velocities by time
@@ -141,6 +142,7 @@ void particles_evolve_trajectories(
                 if ( (bottom < 0) or (top < 0) ) { break; }
                 vel_lon_part = particles_interp_from_edges(lat0, lon0, lat, lon, &vel_lon, 
                         mask, left, right, bottom, top, time_p, ref_ind, Ntime);
+                if ( fabs(vel_lon_part) > 100. ) { break; }
 
                 // convert to radial velocity and step in space
                 lon0 += dt * vel_lon_part / (constants::R_earth * cos(lat0));
@@ -154,6 +156,7 @@ void particles_evolve_trajectories(
                 if ( (bottom < 0) or (top < 0) ) { break; }
                 vel_lat_part = particles_interp_from_edges(lat0, lon0, lat, lon, &vel_lat, 
                         mask, left, right, bottom, top, time_p, ref_ind, Ntime);
+                if ( fabs(vel_lat_part) > 100. ) { break; }
 
                 // convert to radial velocity and step in space
                 lat0 += dt * vel_lat_part / constants::R_earth;
@@ -163,14 +166,16 @@ void particles_evolve_trajectories(
 
                 // Track, if at right time
                 if (      (t_part < target_times.back()) 
-                        and (t_part >= target_times[out_ind]) 
+                      and (t_part >= target_times.at(out_ind)) 
                    ){
+
                     index = Index(0,       0,      out_ind, Ip,
                                   Ntime,   Ndepth, Nouts,   Nparts);
                     part_lon_hist.at(index) = lon0;
                     part_lat_hist.at(index) = lat0;
 
                     particles_get_edges(left, right, bottom, top, lat0, lon0, lat, lon);
+
                     for (size_t Ifield = 0; Ifield < fields_to_track.size(); ++Ifield) {
                         field_val = particles_interp_from_edges(lat0, lon0, lat, lon, 
                                 fields_to_track.at(Ifield), mask,
@@ -181,15 +186,20 @@ void particles_evolve_trajectories(
                     out_ind++;
                 }
 
+                if ( (t_part >= target_times.back()) or (out_ind >= Nouts) ) { break; }
+
                 if (t_part > time.at(ref_ind+1)) { ref_ind++; }
                 step_iter++;
             }
             #if DEBUG >= 2
-            //fprintf(stdout, "  time %g / %g (%g %% - %d)\n", 
-            //        t_part, target_times.back(), 100 * t_part / target_times.back(), step_iter);
+            fprintf(stdout, "  time %g / %g (%g %% - %d)\n", 
+                    t_part, target_times.back(), 100 * t_part / target_times.back(), step_iter);
+            fflush(stdout);
             #endif
 
 
+            /*
+            #if DEBUG >= 1
             //
             //// Reversing the trajectory
             //
@@ -270,10 +280,8 @@ void particles_evolve_trajectories(
                 if (t_part < time.at(ref_ind)) { ref_ind--; }
                 step_iter++;
             }
-            #if DEBUG >= 2
-            //fprintf(stdout, "  time %g / %g (%g %%)\n", 
-            //        t_part, target_times.back(), 100 * t_part / target_times.back());
             #endif
+            */
         } 
     }
 }

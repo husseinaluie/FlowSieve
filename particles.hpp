@@ -26,7 +26,7 @@ void particles_evolve_trajectories(
         const std::vector<double> & time,
         const std::vector<double> & lat,
         const std::vector<double> & lon,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -47,7 +47,7 @@ double particles_interp_from_edges(
         const std::vector<double> & lat,
         const std::vector<double> & lon,
         const std::vector<double> * field,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const int left,
         const int right,
         const int bottom,
@@ -63,7 +63,7 @@ void particles_initial_positions(
         const int Npts,
         const std::vector<double> & latitude, 
         const std::vector<double> & longitude, 
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -85,8 +85,8 @@ void particles_project_onto_trajectory(
         const std::vector<double> & time,
         const std::vector<double> & lat,
         const std::vector<double> & lon,
-        const std::vector<double> & particle_mask,
-        const std::vector<double> & field_mask,
+        const std::vector<bool> & particle_mask,
+        const std::vector<bool> & field_mask,
         const std::vector<int> & myCounts,
         const MPI_Comm comm = MPI_COMM_WORLD
         );

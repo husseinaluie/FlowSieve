@@ -14,7 +14,7 @@ void particles_initial_positions(
         const int Npts,
         const std::vector<double> & latitude, 
         const std::vector<double> & longitude, 
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const MPI_Comm comm
         ) {
 
@@ -74,8 +74,8 @@ void particles_initial_positions(
     lat_mid.push_back(  30 * D2R );
     */
 
-    int left, right, bottom, top,
-        BL_ind, BR_ind, TL_ind, TR_ind;
+    int left, right, bottom, top;
+    size_t BL_ind, BR_ind, TL_ind, TR_ind;
 
     const int Nlat = latitude.size(),
               Nlon = longitude.size(),
@@ -105,15 +105,10 @@ void particles_initial_positions(
                        1, 1, Nlat,   Nlon);
 
         // So long as we are on land, keep picking a new point
-        while (   (   mask.at(BL_ind) 
-                    * mask.at(TL_ind) 
-                    * mask.at(BR_ind) 
-                    * mask.at(TR_ind) == 0 
-                  ) or (
-                      std::isnan(bottom)
-                  ) or ( 
-                      std::isnan(top) 
-                  )) {
+        while ( not( mask.at(BL_ind) and mask.at(TL_ind) and mask.at(BR_ind) and mask.at(TR_ind) )
+                or ( std::isnan(bottom) )
+                or ( std::isnan(top)    )
+              ) {
 
             part_lon = ( ((double) rand() / (RAND_MAX)) - 0.5) * lon_rng.at(II % Nreg) + lon_mid.at(II % Nreg);
             part_lat = ( ((double) rand() / (RAND_MAX)) - 0.5) * lat_rng.at(II % Nreg) + lat_mid.at(II % Nreg);

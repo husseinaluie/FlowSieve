@@ -16,8 +16,8 @@ void particles_project_onto_trajectory(
         const std::vector<double> & time,
         const std::vector<double> & lat,
         const std::vector<double> & lon,
-        const std::vector<double> & particle_mask,
-        const std::vector<double> & field_mask,
+        const std::vector<bool> & particle_mask,
+        const std::vector<bool> & field_mask,
         const std::vector<int> & myCounts,
         const MPI_Comm comm
         ) {
@@ -41,16 +41,18 @@ void particles_project_onto_trajectory(
     }
 
     int left, right, bottom, top,
-        ref_ind = 0, index, Ip,
+        ref_ind = 0, Ip,
         print_count = 1;
+    size_t index;
+    bool do_print = false;
 
     for ( int Itime_traj = 0; Itime_traj < Ntime_traj; ++Itime_traj ) {
 
-        if (Itime_traj + 1 > 0.05 * print_count * Ntime_traj) {
-            if (wRank == 0) {
-                fprintf(stdout, "  ... done %d percent\n", print_count * 5);
-                fflush(stdout);
-            }
+        do_print = Itime_traj + 1 > 0.05 * print_count * Ntime_traj ;
+
+        if (do_print and (wRank == 0)) {
+            fprintf(stdout, "  ... done %d percent\n", print_count * 5);
+            fflush(stdout);
             print_count++;
         }
 
@@ -66,7 +68,7 @@ void particles_project_onto_trajectory(
         default(none) \
         shared( time, lat, lon, particle_mask, field_mask, Itime_traj, traj_time, time_p,\
                 ref_ind, trajectory_time, trajectory_lat, trajectory_lon,\
-                field_trajectories, fields_to_track, stdout )\
+                field_trajectories, fields_to_track, stdout, do_print, wRank )\
         private( Ip, index, Ifield, traj_lat, traj_lon, field_val,\
                  left, right, bottom, top)
         {
@@ -76,22 +78,30 @@ void particles_project_onto_trajectory(
                 index = Index(0, 0, Itime_traj, Ip,
                               1, 1, Ntime_traj, Ntraj);
 
-                if ( particle_mask.at(index) == 1 ) {
+                for (Ifield = 0; Ifield < fields_to_track.size(); ++Ifield) {
+                    field_trajectories.at(Ifield).at(index) = constants::fill_value;
+                }
+
+                if ( particle_mask.at(index) ) {
 
                     traj_lon = trajectory_lon.at(index);
                     traj_lat = trajectory_lat.at(index);
 
                     particles_get_edges(left, right, bottom, top, traj_lat, traj_lon, lat, lon);
+                    if ( (bottom >= 0) and (top >= 0) ) { 
 
-                    for (Ifield = 0; Ifield < fields_to_track.size(); ++Ifield) {
-                        field_val = particles_interp_from_edges(traj_lat, traj_lon, lat, lon, 
-                                                                fields_to_track.at(Ifield), field_mask,
-                                                                left, right, bottom, top, time_p, ref_ind, Ntime);
-                        field_trajectories.at(Ifield).at(index) = field_val;
-                    }
-                } else {
-                    for (Ifield = 0; Ifield < fields_to_track.size(); ++Ifield) {
-                        field_trajectories.at(Ifield).at(index) = constants::fill_value;
+                        for (Ifield = 0; Ifield < fields_to_track.size(); ++Ifield) {
+                            field_val = particles_interp_from_edges(traj_lat, traj_lon, lat, lon, 
+                                                                    fields_to_track.at(Ifield), field_mask,
+                                                                    left, right, bottom, top, time_p, ref_ind, Ntime);
+                            field_trajectories.at(Ifield).at(index) = field_val;
+
+                            if (do_print and (wRank == 0) and (Ip == 0)) {
+                                fprintf(stdout, "    field %'zu has value %'g\n", Ifield, field_val);
+                                fflush(stdout);
+                            }
+
+                        }
                     }
                 }
             }
