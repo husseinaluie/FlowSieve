@@ -83,6 +83,7 @@ void initialize_projected_particle_file(
         }
     }
 
+    /*
     if ( (wRank == 0) ) {
         // Loop through and add the desired variables
         // Dimension names (in order!)
@@ -113,6 +114,7 @@ void initialize_projected_particle_file(
         add_var_to_file("denom_La",  correl_dim_names, 1, buffer);
         #endif
     }
+    */
 
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }
