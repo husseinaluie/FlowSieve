@@ -52,12 +52,20 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales { 
-        100e3, 250e3, 400e3
-        //1e3,
-        //1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
-        //1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
-        //1e6, //1.58e6, 2.51e6, 3.98e6, 6.31e6,
-        //1e7//, 1.58e7, 2.51e7, 3.98e7, 6.31e7
+        //100e3, 250e3, 400e3
+        
+        //1.
+        
+        /*
+        1.e4 , 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4, 4.64e4, 5.99e4, 7.74e4,
+        1.e5 , 1.29e5, 1.67e5, 2.15e5, 2.78e5, 3.59e5, 4.64e5, 5.99e5, 7.74e5,
+        1.e6 , 1.29e6, 1.67e6, 2.15e6, 2.78e6, 3.59e6, 4.64e6, 5.99e6, 7.74e6,
+        1.e7
+        */
+
+        1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
+        1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
+        1e6, //1.58e6, 2.51e6, 3.98e6, 6.31e6,
     };
 
     //
@@ -70,7 +78,18 @@ int main(int argc, char *argv[]) {
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string &input_fname       = input.getCmdOption("--input_file",  "input.nc");
+    const std::string &tor_input_fname = input.getCmdOption("--toroidal_input_file",   "toroidal_projection.nc");
+    const std::string &pot_input_fname = input.getCmdOption("--potential_input_file",  "potential_projection.nc");
+    const std::string &vel_input_fname = input.getCmdOption("--velocity_input_file",   "toroidal_projection.nc");
+
+    const std::string &time_dim_name      = input.getCmdOption("--time",        "time");
+    const std::string &depth_dim_name     = input.getCmdOption("--depth",       "depth");
+    const std::string &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude");
+    const std::string &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+
+    const std::string &tor_field_var_name = input.getCmdOption("--tor_field",   "F");
+    const std::string &pot_field_var_name = input.getCmdOption("--pot_field",   "F");
+    const std::string &vel_field_var_name = input.getCmdOption("--vel_field",   "u_lat");
 
     // Print processor assignments
     const int max_threads = omp_get_max_threads();
@@ -81,7 +100,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<double> longitude, latitude, time, depth;
     std::vector<double> F_potential, F_toroidal, u_tor;
-    std::vector<double> mask;
+    std::vector<bool> mask;
     std::vector<int> myCounts, myStarts;
 
     // Read in source data / get size information
@@ -90,29 +109,31 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Read in the grid coordinates
-    read_var_from_file(longitude, "longitude", input_fname);
-    read_var_from_file(latitude,  "latitude",  input_fname);
-    read_var_from_file(time,      "time",      input_fname);
-    read_var_from_file(depth,     "depth",     input_fname);
+    //   implicitely assume coordinates are the same between input files
+    read_var_from_file(longitude, longitude_dim_name, tor_input_fname);
+    read_var_from_file(latitude,  latitude_dim_name,  tor_input_fname);
+    read_var_from_file(time,      time_dim_name,      tor_input_fname);
+    read_var_from_file(depth,     depth_dim_name,     tor_input_fname);
      
     convert_coordinates(longitude, latitude);
 
-    // Read in the toroidal and potential fields
-    read_var_from_file(F_potential, "F_potential", input_fname, NULL, &myCounts, &myStarts);
-    read_var_from_file(F_toroidal,  "F_toroidal",  input_fname, NULL, &myCounts, &myStarts);
-
-    // read in velocity to get the mask
-    read_var_from_file(u_tor, "u_tor", input_fname, &mask, &myCounts, &myStarts);
-
+    const int Ntime  = time.size();
+    const int Ndepth = depth.size();
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
+    // Read in the toroidal and potential fields
+    read_var_from_file(F_potential, tor_field_var_name, pot_input_fname, NULL, &myCounts, &myStarts);
+    read_var_from_file(F_toroidal,  pot_field_var_name, tor_input_fname, NULL, &myCounts, &myStarts);
+
+    // read in velocity to get the mask
+    read_var_from_file(u_tor, "u_lat", tor_input_fname, &mask, &myCounts, &myStarts);
+
+    // Mask out the pole, if necessary (i.e. set lat = 90 to land)
+    mask_out_pole(latitude, mask, Ntime, Ndepth, Nlat, Nlon);
+
     // Compute the area of each 'cell'
     //   which will be necessary for integration
-    #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "Computing the cell areas.\n\n"); }
-    #endif
-
     std::vector<double> areas(Nlon * Nlat);
     compute_areas(areas, longitude, latitude);
 
