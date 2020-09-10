@@ -18,7 +18,7 @@ void filtering_helmholtz(
         const std::vector<double> & depth,
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
-        const std::vector<double> & mask,
+        const std::vector<bool>   & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const MPI_Comm comm
@@ -63,12 +63,12 @@ void filtering_helmholtz(
         KE_tor(      num_pts, constants::fill_value),
         KE_pot(      num_pts, constants::fill_value),
         KE_all(      num_pts, constants::fill_value),
-        div_tor(     num_pts, constants::fill_value),
-        div_pot(     num_pts, constants::fill_value),
-        u_x_tmp(     num_pts, constants::fill_value),
-        u_y_tmp(     num_pts, constants::fill_value),
-        u_z_tmp(     num_pts, constants::fill_value),
-        u_r_zero(    num_pts, constants::fill_value),
+        div_tor,
+        div_pot,
+        u_x_tmp,
+        u_y_tmp,
+        u_z_tmp,
+        u_r_zero(    num_pts, 0.),
         u_lon_tor(   num_pts, constants::fill_value),
         u_lat_tor(   num_pts, constants::fill_value),
         u_lon_pot(   num_pts, constants::fill_value),
@@ -86,14 +86,24 @@ void filtering_helmholtz(
     }
 
     if (not(constants::MINIMAL_OUTPUT)) {
+        div_tor.resize( num_pts );
+        div_pot.resize( num_pts );
+
+        u_x_tmp.resize( num_pts );
+        u_y_tmp.resize( num_pts );
+        u_z_tmp.resize( num_pts );
+
         vars_to_write.push_back("div_tor");
         vars_to_write.push_back("div_pot");
     }
 
+    // Compute the kernal alpha value (for baroclinic transfers)
+    const double kern_alpha = kernel_alpha();
+
     // Now prepare to filter
     double scale, F_tor_tmp, F_pot_tmp;
-    int Itime, Idepth, Ilat, Ilon, index, tid;
-    size_t index_st;
+    int Itime, Idepth, Ilat, Ilon, tid;
+    size_t index;
 
     int perc_base = 5;
     int perc, perc_count=0;
@@ -140,11 +150,13 @@ void filtering_helmholtz(
     postprocess_names.push_back( "u_lat_pot");
     postprocess_fields.push_back(&u_lat_pot);
 
-    postprocess_names.push_back( "div_pot");
-    postprocess_fields.push_back(&div_pot);
+    if (not(constants::MINIMAL_OUTPUT)) {
+        postprocess_names.push_back( "div_pot");
+        postprocess_fields.push_back(&div_pot);
 
-    postprocess_names.push_back( "div_tor");
-    postprocess_fields.push_back(&div_tor);
+        postprocess_names.push_back( "div_tor");
+        postprocess_fields.push_back(&div_tor);
+    }
 
     //
     //// Begin the main filtering loop
@@ -158,7 +170,10 @@ void filtering_helmholtz(
         snprintf(fname, 50, "filter_%.6gkm.nc", scales.at(Iscale)/1e3);
         if (not(constants::NO_FULL_OUTPUTS)) {
             initialize_output_file(time, depth, longitude, latitude, 
-                    mask, vars_to_write, fname, scales.at(Iscale));
+                    dAreas, vars_to_write, fname, scales.at(Iscale));
+
+            // Add some attributes to the file
+            add_attr_to_file("kernel_alpha", kern_alpha, fname);
         }
 
         #if DEBUG >= 0
@@ -194,11 +209,25 @@ void filtering_helmholtz(
             filtered_vals.push_back(&F_pot_tmp);
             filtered_vals.push_back(&F_tor_tmp);
 
-            #pragma omp for collapse(2) schedule(guided, OMP_chunksize)
+            #pragma omp for collapse(1) schedule(guided)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
+
+                get_lat_bounds(LAT_lb, LAT_ub, latitude,  Ilat, scale); 
+
+                // If our longitude grid is uniform, and spans the full periodic domain,
+                // then we can just compute it once and translate it at each lon index
+                if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+                if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) {
+                    std::fill(local_kernel.begin(), local_kernel.end(), 0);
+                    compute_local_kernel(
+                            local_kernel, scale, longitude, latitude,
+                            Ilat, 0, Ntime, Ndepth, Nlat, Nlon,
+                            LAT_lb, LAT_ub);
+                }
+                if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation"); }
+
                 for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
-                    get_lat_bounds(LAT_lb, LAT_ub, latitude,  Ilat, scale); 
 
                     #if DEBUG >= 0
                     tid = omp_get_thread_num();
@@ -215,15 +244,20 @@ void filtering_helmholtz(
                     #endif
 
                     if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-                    std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                    compute_local_kernel(
-                            local_kernel, scale, longitude, latitude,
-                            Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
-                            LAT_lb, LAT_ub);
-                    if (constants::DO_TIMING) { 
-                        timing_records.add_to_record(MPI_Wtime() - clock_on,
-                                "kernel_precomputation");
+                    if ( not( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) ) {
+                        // If we couldn't precompute the kernel earlier, then do it now
+                        std::fill(local_kernel.begin(), local_kernel.end(), 0);
+                        compute_local_kernel(
+                                local_kernel, scale, longitude, latitude,
+                                Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
+                                LAT_lb, LAT_ub);
+                    } else {
+                        // If we were able to compute the kernel earlier, then just translate it now 
+                        // to the new longitude index
+                        if (Ilon > 0) { roll_field(local_kernel, "lon", 1, 1, 1, Nlat, Nlon); }
                     }
+                    if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation"); }
+
 
                     if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                     for (Itime = 0; Itime < Ntime; Itime++) {
@@ -233,7 +267,7 @@ void filtering_helmholtz(
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
 
-                            if (mask.at(index) == 1) { // Skip land areas
+                            if (mask.at(index)) { // Skip land areas
     
                                 // Apply the filter at the point
                                 #if DEBUG >= 3
@@ -297,19 +331,21 @@ void filtering_helmholtz(
         potential_vel_from_F(u_lon_pot, u_lat_pot, coarse_F_pot,
                 longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
 
-        // Compute the divergence of the tor field
-        vel_Spher_to_Cart(u_x_tmp,  u_y_tmp,   u_z_tmp,
-                          u_r_zero, u_lon_tor, u_lat_tor,
-                          mask, time, depth, latitude, longitude);
-        compute_div_vel(div_tor, u_x_tmp, u_y_tmp, u_z_tmp, 
-                longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+        if (not(constants::MINIMAL_OUTPUT)) {
+            // Compute the divergence of the tor field
+            vel_Spher_to_Cart(u_x_tmp,  u_y_tmp,   u_z_tmp,
+                    u_r_zero, u_lon_tor, u_lat_tor,
+                    mask, time, depth, latitude, longitude);
+            compute_div_vel(div_tor, u_x_tmp, u_y_tmp, u_z_tmp, 
+                    longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
 
-        // Compute the divergence of the tor field
-        vel_Spher_to_Cart(u_x_tmp,  u_y_tmp,   u_z_tmp,
-                          u_r_zero, u_lon_pot, u_lat_pot,
-                          mask, time, depth, latitude, longitude);
-        compute_div_vel(div_pot, u_x_tmp, u_y_tmp, u_z_tmp, 
-                longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+            // Compute the divergence of the tor field
+            vel_Spher_to_Cart(u_x_tmp,  u_y_tmp,   u_z_tmp,
+                    u_r_zero, u_lon_pot, u_lat_pot,
+                    mask, time, depth, latitude, longitude);
+            compute_div_vel(div_pot, u_x_tmp, u_y_tmp, u_z_tmp, 
+                    longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+        }
 
 
         if (not(constants::NO_FULL_OUTPUTS)) {
@@ -336,25 +372,30 @@ void filtering_helmholtz(
         default( none ) \
         shared( KE_tor, KE_pot, KE_all, mask, \
                 u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot) \
-        private( index_st )
+        private( index )
         {
             #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
-            for (index_st = 0; index_st < u_lon_tor.size(); ++index_st) {
-                if (mask.at(index_st) == 1) {
-                    KE_tor.at(index_st) =    pow(u_lon_tor.at(index_st), 2.) 
-                                           + pow(u_lat_tor.at(index_st), 2.);
+            for (index = 0; index < u_lon_tor.size(); ++index) {
+                if (mask.at(index) == 1) {
+                    KE_tor.at(index) =  
+                        0.5 * constants::rho0 * (
+                                  pow(u_lon_tor.at(index), 2.) 
+                                + pow(u_lat_tor.at(index), 2.)
+                                );
 
-                    KE_pot.at(index_st) =    pow(u_lon_pot.at(index_st), 2.) 
-                                           + pow(u_lat_pot.at(index_st), 2.);
+                    KE_pot.at(index) =   
+                        0.5 * constants::rho0 * (
+                                  pow(u_lon_pot.at(index), 2.) 
+                                + pow(u_lat_pot.at(index), 2.)
+                                );
 
-                    KE_all.at(index_st) =    pow(   u_lon_pot.at(index_st) 
-                                                  + u_lon_tor.at(index_st) , 2.) 
-                                           + pow(   u_lat_pot.at(index_st) 
-                                                  + u_lat_tor.at(index_st) , 2.);
-
-                    KE_tor.at(index_st) *= 0.5 * constants::rho0;
-                    KE_pot.at(index_st) *= 0.5 * constants::rho0;
-                    KE_all.at(index_st) *= 0.5 * constants::rho0;
+                    KE_all.at(index) = 
+                        0.5 * constants::rho0 * (
+                                pow(  u_lon_pot.at(index) 
+                                    + u_lon_tor.at(index) , 2.) 
+                              + pow(  u_lat_pot.at(index) 
+                                    + u_lat_tor.at(index) , 2.)
+                              );
                 }
             }
         }
