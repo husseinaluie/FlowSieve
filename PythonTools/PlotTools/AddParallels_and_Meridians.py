@@ -6,14 +6,17 @@ def AddParallels_and_Meridians(
         parallels, meridians, 
         latitude, longitude,
         label_parallels = True,
-        label_meridians = True):
+        label_meridians = True,
+        colour = 'g',
+        linestyle = '--',
+        linewidth = 1):
 
     for mer in meridians:
         xs, ys = proj(mer*np.ones(latitude.shape), latitude, inverse=False)
-        ax.plot(xs, ys, '--g', linewidth=1)
+        ax.plot(xs, ys, linestyle = linestyle, linewidth = linewidth, color = colour)
     for par in parallels:
         xs, ys = proj(longitude, par*np.ones(longitude.shape), inverse=False)
-        ax.plot(xs, ys, '--g', linewidth=1)
+        ax.plot(xs, ys, linestyle = linestyle, linewidth = linewidth, color = colour)
 
     xs, ys = proj(meridians, latitude.min()*np.ones(meridians.shape), inverse=False)
     ax.set_xticks(xs)
