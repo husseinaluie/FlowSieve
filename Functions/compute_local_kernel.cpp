@@ -19,9 +19,8 @@ void compute_local_kernel(
         ){
 
     double dist, kern, dlat_m, dlon_m;
-    int index,
-        curr_lon, curr_lat,
-        LON_lb, LON_ub;
+    size_t index;
+    int curr_lon, curr_lat, LON_lb, LON_ub;
 
     const double lat_at_ilat = latitude.at(Ilat);
     const double lon_at_ilon = longitude.at(Ilon);
@@ -60,11 +59,11 @@ void compute_local_kernel(
                 dlat_m = latitude.at( 1) - latitude.at( 0);
                 dlon_m = longitude.at(1) - longitude.at(0);
                 dist = distance(lon_at_ilon,     lat_at_ilat,
-                        longitude.at(curr_lon), lat_at_curr,
-                        dlon_m * Nlon, dlat_m * Nlat);
+                                longitude.at(curr_lon), lat_at_curr,
+                                dlon_m * Nlon, dlat_m * Nlat);
             } else {
-                dist = distance(lon_at_ilon,     lat_at_ilat,
-                        longitude.at(curr_lon), lat_at_curr);
+                dist = distance(lon_at_ilon,            lat_at_ilat,
+                                longitude.at(curr_lon), lat_at_curr);
             }
             kern = kernel(dist, scale);
 
