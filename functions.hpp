@@ -45,8 +45,8 @@ void compute_areas(
  * @returns The effective 1-index that corresponds to the 4-index tuplet
  *
  */
-int Index( const int Itime, const int Idepth, const int Ilat, const int Ilon,
-           const int Ntime, const int Ndepth, const int Nlat, const int Nlon  );
+size_t Index( const int Itime, const int Idepth, const int Ilat, const int Ilon,
+              const int Ntime, const int Ndepth, const int Nlat, const int Nlon  );
 
 /*!
  * \brief Convenience tool to convert logical index to physical index (time, depth, lat, lon).
@@ -135,7 +135,7 @@ void KE_from_vels(
             std::vector<double> * u1,
             std::vector<double> * u2,
             std::vector<double> * u3,
-            const std::vector<double> & mask,
+            const std::vector<bool> & mask,
             const double rho0 = constants::rho0
         );
 
@@ -155,7 +155,7 @@ void vel_Spher_to_Cart(
             const std::vector<double> & u_r,
             const std::vector<double> & u_lon,
             const std::vector<double> & u_lat,
-            const std::vector<double> & mask,
+            const std::vector<bool> & mask,
             const std::vector<double> & time,
             const std::vector<double> & depth,
             const std::vector<double> & latitude,
@@ -213,7 +213,7 @@ void vel_Cart_to_Spher(
             const std::vector<double> & u_x,
             const std::vector<double> & u_y,
             const std::vector<double> & u_z,
-            const std::vector<double> & mask,
+            const std::vector<bool> & mask,
             const std::vector<double> & time,
             const std::vector<double> & depth,
             const std::vector<double> & latitude,
@@ -285,7 +285,7 @@ void filtering(const std::vector<double> & u_r,
                const std::vector<double> & depth,
                const std::vector<double> & longitude, 
                const std::vector<double> & latitude,
-               const std::vector<double> & mask,
+               const std::vector<bool> & mask,
                const std::vector<int>    & myCounts,
                const std::vector<int>    & myStarts,
                const MPI_Comm comm = MPI_COMM_WORLD);
@@ -300,7 +300,7 @@ void filtering_helmholtz(
         const std::vector<double> & depth,
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const MPI_Comm comm = MPI_COMM_WORLD
@@ -323,7 +323,7 @@ void filter_fields(
         const std::vector<double> & depth,
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const MPI_Comm comm = MPI_COMM_WORLD
@@ -347,7 +347,7 @@ void filtering_subsets(
         const std::vector<double> & depth,
         const std::vector<double> & longitude, 
         const std::vector<double> & latitude,
-              std::vector<double> & mask,
+              std::vector<bool> & mask,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const MPI_Comm comm = MPI_COMM_WORLD);
@@ -385,7 +385,7 @@ void apply_filter_at_point(
         const int LAT_ub,
         const std::vector<double> & dAreas, 
         const double scale,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const std::vector<bool> & use_mask,
         const std::vector<double> * local_kernel,
         const std::vector<double> * weight = NULL
@@ -427,7 +427,7 @@ void compute_vorticity_at_point(
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
         const std::vector<double> & longitude, 
         const std::vector<double> & latitude,
-        const std::vector<double> & mask);
+        const std::vector<bool> & mask);
 
 /*!
  * \brief Wrapper for computing vorticity
@@ -446,7 +446,7 @@ void compute_vorticity(
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const std::vector<double> & longitude, 
         const std::vector<double> & latitude,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const MPI_Comm comm = MPI_COMM_WORLD);
 
 /*!
@@ -474,28 +474,12 @@ void apply_filter_at_point_for_quadratics(
         const int LAT_ub,
         const std::vector<double> & dAreas, 
         const double scale,
-        const std::vector<double> & mask,
+        const std::vector<bool> & mask,
         const std::vector<double> * local_kernel);
 
 /*!
  * \brief Compute the energy transfer through the current filter scale
  */
-void compute_energy_transfer_through_scale(
-        std::vector<double> & energy_transfer,
-        const std::vector<double> & ux,   
-        const std::vector<double> & uy,   
-        const std::vector<double> & uz,
-        const std::vector<double> & uxux, 
-        const std::vector<double> & uxuy, 
-        const std::vector<double> & uxuz,
-        const std::vector<double> & uyuy, 
-        const std::vector<double> & uyuz, 
-        const std::vector<double> & uzuz,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & longitude, 
-        const std::vector<double> & latitude,
-        const std::vector<double> & mask);
-
 void compute_Pi(
         std::vector<double> & energy_transfer,
         const std::vector<double> & ux,   
@@ -510,26 +494,7 @@ void compute_Pi(
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const std::vector<double> & longitude, 
         const std::vector<double> & latitude,
-        const std::vector<double> & mask);
-
-/*!
- * \brief Compute the large-scale strain tensor S
- *
- * Uses Cartesian derivatives of Cartesian velocities on a spherical coordinate system.
- *
- * \f[ S = \frac{1}{2}\left( \nabla\overline{u}_l + \nabla\overline{u}_l^T \right) \f]
- */
-void compute_largescale_strain(
-        double & S_xx, double & S_xy, double & S_xz,
-        double & S_yy, double & S_yz, double & S_zz,
-        const std::vector<double> & u_x, 
-        const std::vector<double> & u_y, 
-        const std::vector<double> & u_z,
-        const int Itime, const int Idepth, const int Ilat, const int Ilon,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & longitude, 
-        const std::vector<double> & latitude, 
-        const std::vector<double> & mask);
+        const std::vector<bool> & mask);
 
 /*!
  * \brief Compute the rotational component of the non-linear model of the baroclinic transfer term Lambda (see Lees and Aluie 2019)
@@ -558,7 +523,7 @@ void compute_Lambda_rotational(
     const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
-    const std::vector<double> & mask,
+    const std::vector<bool> & mask,
     const double scale_factor
     );
 
@@ -594,7 +559,7 @@ void  compute_Lambda_full(
     const int Nlon,
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
-    const std::vector<double> & mask
+    const std::vector<bool> & mask
     );
 
 /*!
@@ -625,7 +590,7 @@ void compute_Lambda_nonlin_model(
     const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
-    const std::vector<double> & mask,
+    const std::vector<bool> & mask,
     const double scale_factor
     );
 
@@ -658,7 +623,7 @@ void compute_vort_stretch(
     const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
     const std::vector<double> & longitude,
     const std::vector<double> & latitude,
-    const std::vector<double> & mask);
+    const std::vector<bool> & mask);
 
 /*!
  *  \brief Interpolate the given field over the land cells
@@ -669,7 +634,7 @@ void interpolate_over_land(
         const std::vector<double> &depth,
         const std::vector<double> &latitude,
         const std::vector<double> &longitude,
-        const std::vector<double> &mask);
+        const std::vector<bool> &mask);
 
 /*!
  *  \brief Convert potential temperature to actual temperature
@@ -715,7 +680,7 @@ void compute_div_transport(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask);
+        const std::vector<bool> & mask);
 
 /*!
  * \brief Given a field, compute the horizontal average.
@@ -731,7 +696,7 @@ void compute_spatial_average(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask);
+        const std::vector<bool> & mask);
 
 /*!
  * \brief Compute the divergence of the filtered velocity fields.
@@ -747,7 +712,7 @@ void compute_div_vel(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<double> & mask);
+        const std::vector<bool> & mask);
 
 /*!
  * \brief Get latitude integratation bounds
@@ -805,6 +770,47 @@ int get_omp_chunksize(const int Nlat, const int Nlon);
 void convert_coordinates(
         std::vector<double> & longitude,
         std::vector<double> & latitude
+        );
+
+/*!
+ *
+ * \brief If the grid includes the poles (lat = 90 degrees), then mask it out
+ *
+ * @param[in]       latitude                    Latitude grid
+ * @param[in,out]   mask                        Mask array to differentiate land/water
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon      Dimension sizes
+ *
+ */
+void mask_out_pole(
+        const std::vector<double> & latitude,
+        std::vector<bool> & mask,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon
+        );
+
+
+/*!
+ *
+ * \brief Roll field along dimension
+ *
+ * Currently hard-coded to roll along lon dimension only.
+ *
+ * @param[in,out]   field_to_roll
+ * @param[in]       dimension
+ * @param[in]       roll_count
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon
+ *
+ */
+void roll_field(
+        std::vector<double> & field_to_roll,
+        const std::string dimension,
+        const int roll_count,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon
         );
 
 /*!
