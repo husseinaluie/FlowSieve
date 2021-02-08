@@ -1,6 +1,7 @@
 #include <math.h>
 #include <algorithm>
 #include <vector>
+#include <cassert>
 #include "../functions.hpp"
 
 void roll_field(
@@ -13,16 +14,32 @@ void roll_field(
         const int Nlon
         ) {
 
+    assert(roll_count == 1);
+
     // If roll_count is zero, just stop now
     if (roll_count == 0) {return;}
 
     size_t index;
+    const size_t Npts = ( (size_t) Ntime) * ( (size_t) Ndepth) * ( (size_t) Nlat) * ( (size_t) Nlon);
     std::vector<double> work_arr( Nlon );
+
+    std::vector<double>::reverse_iterator rbegin, rend;
+    //std::reverse_iterator<std::string::iterator>
 
     for (int Itime = 0; Itime < Ntime; Itime++) {
         for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
             for (int Ilat = 0; Ilat < Nlat; Ilat++) {
 
+                // Since we're assuming a roll in lon (the last [i.e. fastest] index, just rotate in-place)
+                index = Index(Itime, Idepth, Ilat, Nlon - 1,
+                              Ntime, Ndepth, Nlat, Nlon     );
+
+                rbegin  = field_to_roll.rbegin() + (Npts - index) - 1 ;
+                rend    = rbegin + Nlon;
+
+                std::rotate( rbegin, rbegin + roll_count, rend );
+
+                /*
                 // First, pull out the Ilon slice and store it in the work array
                 for (int Ilon = 0; Ilon < Nlon; Ilon++) {
                     index = Index(Itime, Idepth, Ilat, Ilon,
@@ -43,6 +60,7 @@ void roll_field(
                                   Ntime, Ndepth, Nlat, Nlon);
                     field_to_roll.at(index) = work_arr.at(Ilon);
                 }
+                */
 
             }
         }
