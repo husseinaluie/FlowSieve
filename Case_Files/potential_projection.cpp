@@ -65,6 +65,12 @@ int main(int argc, char *argv[]) {
     const std::string &iteration_string = input.getCmdOption("--max_iterations", "100000");
     const int max_iterations = stoi(iteration_string);  
 
+    const std::string &use_mask_string = input.getCmdOption("--use_mask", "false");
+    const bool use_mask = string_to_bool(use_mask_string);
+
+    const std::string &use_area_weight_string = input.getCmdOption("--use_area_weight", "true");
+    const bool use_area_weight = string_to_bool(use_area_weight_string);
+
     // Print processor assignments
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
@@ -87,6 +93,11 @@ int main(int argc, char *argv[]) {
     read_var_from_file(latitude,  latitude_dim_name,  input_fname);
     read_var_from_file(time,      time_dim_name,      input_fname);
     read_var_from_file(depth,     depth_dim_name,     input_fname);
+
+    const int Ntime  = time.size();
+    const int Ndepth = depth.size();
+    const int Nlon   = longitude.size();
+    const int Nlat   = latitude.size();
      
     convert_coordinates(longitude, latitude);
 
@@ -94,15 +105,22 @@ int main(int argc, char *argv[]) {
     read_var_from_file(u_lon, zonal_vel_name,  input_fname, &mask, &myCounts, &myStarts);
     read_var_from_file(u_lat, merid_vel_name,  input_fname, &mask, &myCounts, &myStarts);
 
+    // Mask out the pole, if necessary (i.e. set lat = 90 to land)
+    mask_out_pole(latitude, mask, Ntime, Ndepth, Nlat, Nlon);
+
     // Read in the seed
     double seed_count;
-    read_attr_from_file(seed_count, "seed_count", seed_fname);
-    const bool single_seed = (seed_count < 2);
+    bool single_seed;
+    if (seed_fname == "zero") {
+        seed_count = 1.;
+        single_seed = (seed_count < 2);
+        seed.resize(Nlat*Nlon, 0.);
+    } else {
+        read_attr_from_file(seed_count, "seed_count", seed_fname);
+        single_seed = (seed_count < 2);
+        read_var_from_file(seed, "seed", seed_fname, NULL, NULL, NULL, not(single_seed));
+    }
     if (wRank == 0) { fprintf(stdout, " single_seed = %s\n", single_seed ? "true" : "false"); }
-    read_var_from_file(seed, "seed",  seed_fname, NULL, NULL, NULL, not(single_seed));
-
-    const int Nlon   = longitude.size();
-    const int Nlat   = latitude.size();
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration
@@ -116,7 +134,7 @@ int main(int argc, char *argv[]) {
             output_fname,
             u_lon, u_lat, time, depth, latitude, longitude,
             areas, mask, myCounts, myStarts, seed, single_seed,
-            tolerance, max_iterations
+            tolerance, max_iterations, use_area_weight, use_mask
             );
 
 

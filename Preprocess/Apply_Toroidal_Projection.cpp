@@ -28,15 +28,14 @@ void Apply_Toroidal_Projection(
         const bool single_seed,
         const double rel_tol,
         const int max_iters,
+        const bool weight_err,
+        const bool use_mask,
         const MPI_Comm comm
         ) {
 
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
-
-    const bool   weight_err = true; // weight err by cell size
-    const bool   use_mask   = false;
 
     // Create a 'no mask' mask variable
     //   we'll treat land values as zero velocity
@@ -317,8 +316,8 @@ void Apply_Toroidal_Projection(
     if (not(constants::MINIMAL_OUTPUT)) {
         vars_to_write.push_back("RHS");
 
-        vars_to_write.push_back("div_orig");
-        vars_to_write.push_back("div_tor");
+        //vars_to_write.push_back("div_orig");
+        //vars_to_write.push_back("div_tor");
     }
 
 
@@ -334,12 +333,15 @@ void Apply_Toroidal_Projection(
     if (not(constants::MINIMAL_OUTPUT)) {
         write_field_to_output(full_RHS,        "RHS",      starts, counts, output_fname.c_str(), &mask);
 
-        write_field_to_output(full_div_tor,    "div_tor",  starts, counts, output_fname.c_str(), &mask);
-        write_field_to_output(full_div_orig,   "div_orig", starts, counts, output_fname.c_str(), &mask);
+        //write_field_to_output(full_div_tor,    "div_tor",  starts, counts, output_fname.c_str(), &mask);
+        //write_field_to_output(full_div_orig,   "div_orig", starts, counts, output_fname.c_str(), &mask);
     }
 
     add_attr_to_file("rel_tol",    rel_tol,                     output_fname.c_str());
     add_attr_to_file("max_iters",  (double) max_iters,          output_fname.c_str());
     add_attr_to_file("diff_order", (double) constants::DiffOrd, output_fname.c_str());
+
+    add_attr_to_file("use_mask",   (double) use_mask,           output_fname.c_str());
+    add_attr_to_file("weight_err", (double) weight_err,         output_fname.c_str());
 
 }
