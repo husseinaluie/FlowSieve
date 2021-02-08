@@ -76,10 +76,11 @@ int main(int argc, char *argv[]) {
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
 
-    std::vector<double> longitude, latitude, time, depth, mask, particle_mask,
+    std::vector<double> longitude, latitude, time, depth,
                         Pi, vort, fine_KE, coarse_KE,
                         Lambda_rot, Lambda_nonlin, Lambda_full,
                         particle_time, particle_traj, particle_lon, particle_lat;
+    std::vector<bool>   mask, particle_mask;
 
     // Read in source data / get size information
     #if DEBUG >= 1
@@ -112,7 +113,7 @@ int main(int argc, char *argv[]) {
     read_var_from_file( particle_lon, part_longitude_name, input_trajectory.c_str(), 
             &particle_mask, &myCounts, &myStarts, true, 1 );
     read_var_from_file( particle_lat, part_latitude_name,  input_trajectory.c_str(),
-            NULL, NULL, NULL, true, 1 );
+            &particle_mask, &myCounts, &myStarts, true, 1 );
 
     //const int Ntraj = particle_traj.size();
     //const int Ntime_traj = particle_time.size();
@@ -130,19 +131,19 @@ int main(int argc, char *argv[]) {
 
     names_of_tracked_fields.push_back( "Pi" );
     fields_to_track.push_back( &Pi );
-    const int Pi_ind = 1;
+    //const int Pi_ind = 1;
 
     names_of_tracked_fields.push_back( "Lambda_rot" );
     fields_to_track.push_back( &Lambda_rot );
-    const int Lambda_rot_ind = 2;
+    //const int Lambda_rot_ind = 2;
 
     names_of_tracked_fields.push_back( "Lambda_nonlin" );
     fields_to_track.push_back( &Lambda_nonlin );
-    const int Lambda_nonlin_ind = 3;
+    //const int Lambda_nonlin_ind = 3;
 
     names_of_tracked_fields.push_back( "Lambda_full" );
     fields_to_track.push_back( &Lambda_full );
-    const int Lambda_full_ind = 4;
+    //const int Lambda_full_ind = 4;
 
     names_of_tracked_fields.push_back( "fine_KE" );
     fields_to_track.push_back( &fine_KE );
@@ -205,7 +206,7 @@ int main(int argc, char *argv[]) {
     {
         #pragma omp for collapse(1) schedule(static)
         for (II = 0; II < enstrophy.size(); ++II) {
-            if ( particle_mask.at(II) == 1 ) {
+            if ( particle_mask.at(II) ) {
                 enstrophy.at(II) = 0.5 * constants::rho0 * ( pow( field_trajectories.at( vort_ind ).at(II), 2.) );
             }
         }
@@ -233,7 +234,7 @@ int main(int argc, char *argv[]) {
                 index = Index(0, 0, Itime,      Itraj,
                               1, 1, Ntime_traj, Ntraj);
 
-                if (particle_mask.at(index) == 1) {
+                if ( particle_mask.at(index) ) {
                     // build the differentiation vector 
                     //    we're going to call it 'lat', since it's the second-to-last dim
                     get_diff_vector( diff_vector, LB_ret, particle_time, "lat", 

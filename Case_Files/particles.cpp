@@ -51,6 +51,14 @@ int main(int argc, char *argv[]) {
     const std::string &input_fname      = input.getCmdOption("--input_file",  "input.nc");
     const std::string &output_fname     = input.getCmdOption("--output_file", "particles.nc");
 
+    // particles per MPI process
+    const std::string &particles_string = input.getCmdOption("--particle_per_mpi", "1000");
+    const size_t Npts = stoi(particles_string);  
+    #if DEBUG >= 0
+    fprintf(stdout, "  Using %'zu particles per mpi process.\n", Npts);
+    #endif
+
+
     // Set OpenMP thread number
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
@@ -60,7 +68,7 @@ int main(int argc, char *argv[]) {
 
     std::vector<double> longitude, latitude, time, depth;
     std::vector<double> u_lon, u_lat;
-    std::vector<double> mask;
+    std::vector<bool> mask;
     size_t II;
 
     // Read in source data / get size information
@@ -103,9 +111,10 @@ int main(int argc, char *argv[]) {
 
     // Set the output times
     const double start_time = time.front(),
-                 final_time = time.at(time.size()-2);
+                 final_time = time.back() - 2*24*60*60.;
+                 //final_time = time.at(time.size()-2);
     const double out_freq = 15. * 60.;
-    const int Nouts = (int) ( (final_time - start_time) / out_freq );
+    const size_t Nouts = (int) ( (final_time - start_time) / out_freq );
 
     std::vector<double> target_times(Nouts);
     for ( II = 0; II < target_times.size(); ++II ) {
@@ -114,7 +123,6 @@ int main(int argc, char *argv[]) {
     }
 
     // Get particle positions
-    const int Npts = 1000;  // particles per MPI process
     std::vector<double> starting_lat(Npts), starting_lon(Npts);
     particles_initial_positions(starting_lat, starting_lon, Npts,
             latitude, longitude, mask);
@@ -151,6 +159,9 @@ int main(int argc, char *argv[]) {
                         rev_part_lat_hist(Npts * Nouts, constants::fill_value),
                         trajectory_dists( Npts * Nouts, constants::fill_value);
 
+    #if DEBUG >= 2
+    fprintf(stdout, "Setting particle initial positions.\n");
+    #endif
     for (II = 0; II < Npts; ++II) {
         part_lon_hist.at(II) = starting_lon.at(II);
         part_lat_hist.at(II) = starting_lat.at(II);
@@ -169,6 +180,9 @@ int main(int argc, char *argv[]) {
     for (II = 0; II < target_times.size(); ++II) { target_times.at(II) *= 60 * 60; }
     */
 
+    #if DEBUG >= 2
+    fprintf(stdout, "Beginning evolution routine.\n");
+    #endif
     // Now do the particle routine
     particles_evolve_trajectories(
             part_lon_hist,     part_lat_hist,
@@ -184,13 +198,10 @@ int main(int argc, char *argv[]) {
 
     fprintf(stdout, "\nProcessor %d of %d finished stepping particles.\n", wRank+1, wSize);
 
-    std::vector<double> out_mask(part_lon_hist.size());
+    std::vector<bool> out_mask(part_lon_hist.size());
     for (II = 0; II < out_mask.size(); ++II) {
-        out_mask.at(II) = part_lon_hist.at(II) == constants::fill_value ? 0 : 1;
+        out_mask.at(II) = part_lon_hist.at(II) == constants::fill_value ? false : true;
     }
-
-    particles_fore_back_difference(trajectory_dists,     part_lon_hist,     part_lat_hist, 
-                                                     rev_part_lon_hist, rev_part_lat_hist);
 
     MPI_Barrier(MPI_COMM_WORLD);
     write_field_to_output(part_lon_hist, "longitude", starts, counts, output_fname, &out_mask);
@@ -199,6 +210,9 @@ int main(int argc, char *argv[]) {
     #if DEBUG >= 1
     write_field_to_output(rev_part_lon_hist, "rev_longitude", starts, counts, output_fname, &out_mask);
     write_field_to_output(rev_part_lat_hist, "rev_latitude",  starts, counts, output_fname, &out_mask);
+
+    particles_fore_back_difference(trajectory_dists,     part_lon_hist,     part_lat_hist, 
+                                                     rev_part_lon_hist, rev_part_lat_hist);
 
     write_field_to_output(trajectory_dists, "fore_back_dists", starts, counts, output_fname, &out_mask);
     #endif
