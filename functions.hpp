@@ -414,12 +414,14 @@ double kernel_alpha(void);
 /*!
  * \brief Compute the vorticity at a given point.
  *
- * Assumes that the lon-lat grid is uniform.
- *
- * Currently only computes the vort_r component.
+ * Also computes the divergence and OkuboWeiss parameter (since we're at it anyways)
  */
 void compute_vorticity_at_point(
-        double & vort_r_tmp, double & vort_lon_tmp, double & vort_lat_tmp,
+        double & vort_r_tmp, 
+        double & vort_lon_tmp, 
+        double & vort_lat_tmp,
+        double & div_tmp,
+        double & OkuboWeiss_tmp,
         const std::vector<double> & u_r, 
         const std::vector<double> & u_lon, 
         const std::vector<double> & u_lat,
@@ -440,6 +442,8 @@ void compute_vorticity(
         std::vector<double> & vort_r,    
         std::vector<double> & vort_lon,    
         std::vector<double> & vort_lat,
+        std::vector<double> & vel_div,
+        std::vector<double> & OkuboWeiss,
         const std::vector<double> & u_r, 
         const std::vector<double> & u_lon, 
         const std::vector<double> & u_lat,
@@ -699,22 +703,6 @@ void compute_spatial_average(
         const std::vector<bool> & mask);
 
 /*!
- * \brief Compute the divergence of the filtered velocity fields.
- */
-void compute_div_vel(
-        std::vector<double> & div,
-        const std::vector<double> & u_x,
-        const std::vector<double> & u_y,
-        const std::vector<double> & u_z,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
-        const std::vector<bool> & mask);
-
-/*!
  * \brief Get latitude integratation bounds
  */
 void get_lat_bounds(
@@ -872,6 +860,10 @@ class InputParser {
 
 };
 
+/*!
+ * \brief Convert string to boolean
+ */
+bool string_to_bool( std::string str );
 
 void print_header_info( );
 
