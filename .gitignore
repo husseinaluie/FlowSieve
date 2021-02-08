@@ -20,3 +20,6 @@ system.mk
 
 # use .tmp to ignore my own temporary files
 *.tmp
+
+# Ignore any jupyter notebook stuff
+.ipynb_checkpoints/
