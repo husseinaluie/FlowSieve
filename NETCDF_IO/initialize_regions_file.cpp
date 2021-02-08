@@ -26,11 +26,7 @@ void initialize_regions_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Record coordinate type
-    if (constants::CARTESIAN) {
-        retval = nc_put_att_text(ncid, NC_GLOBAL, "coord-type", 10, "cartesian");
-    } else {
-        retval = nc_put_att_text(ncid, NC_GLOBAL, "coord-type", 10, "spherical");
-    }
+    retval = nc_put_att_text(ncid, NC_GLOBAL, "coord-type", 10, constants::CARTESIAN ? "cartesian" : "spherical");
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Extract dimension sizes

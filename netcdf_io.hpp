@@ -125,10 +125,12 @@ void initialize_postprocess_file(
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
+        const std::vector<double> & OkuboWeiss_dim_vals,
         const std::vector<std::string> & regions,
         const std::vector<std::string> & int_vars,
         const char * filename,
         const double & filter_scale,
+        const bool include_OkuboWeiss,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -190,11 +192,9 @@ void initialize_projected_particle_file(
  */
 void write_field_to_output(
         const std::vector<double> & field, 
-        //const char * field_name,
         const std::string & field_name,
         const size_t * start, 
         const size_t * count,
-        //const char * filename,
         const std::string & filename,
         const std::vector<bool> * mask = NULL,
         MPI_Comm = MPI_COMM_WORLD
@@ -204,12 +204,12 @@ void write_field_to_output(
 void write_integral_to_post(
         const std::vector<
             std::vector<double> > & field,
-        //const char * field_name,
         std::string field_name,
         std::string field_suffix,
         size_t * start,
         size_t * count,
         const char * filename,
+        const int region_dim,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
