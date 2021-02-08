@@ -135,7 +135,8 @@ void filtering(
     postprocess_fields.push_back(&filtered_KE);
 
     std::vector<double> fine_vort_r, fine_vort_lat, fine_vort_lon,
-        coarse_vort_r, coarse_vort_lon, coarse_vort_lat;
+        coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
+        div, OkuboWeiss;
     if (constants::COMP_VORT) {
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "Initializing COMP_VORT fields.\n"); }
@@ -157,6 +158,19 @@ void filtering(
             vars_to_write.push_back("fine_vort_r");
         }
 
+        div.resize(num_pts);
+        OkuboWeiss.resize(num_pts);
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            vars_to_write.push_back("coarse_vel_div");
+            vars_to_write.push_back("OkuboWeiss");
+        }
+
+        postprocess_names.push_back( "coarse_vel_div" );
+        postprocess_fields.push_back(&div);
+
+        postprocess_names.push_back( "OkuboWeiss" );
+        postprocess_fields.push_back(&OkuboWeiss);
+
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
         #endif
@@ -167,7 +181,7 @@ void filtering(
     double KE_tmp;
     std::vector<double> coarse_uxux, coarse_uxuy, coarse_uxuz,
         coarse_uyuy, coarse_uyuz, coarse_uzuz, coarse_u_x,
-        coarse_u_y, coarse_u_z, div, energy_transfer;
+        coarse_u_y, coarse_u_z, energy_transfer;
     if (constants::COMP_TRANSFERS) {
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "Initializing COMP_TRANSFERS fields.\n"); }
@@ -184,14 +198,6 @@ void filtering(
         coarse_u_x.resize(num_pts);
         coarse_u_y.resize(num_pts);
         coarse_u_z.resize(num_pts);
-
-        div.resize(num_pts);
-        if (not(constants::NO_FULL_OUTPUTS)) {
-            vars_to_write.push_back("coarse_vel_div");
-        }
-
-        postprocess_names.push_back( "coarse_vel_div");
-        postprocess_fields.push_back(&div);
 
         // Fine KE (tau(u,u))
         fine_KE.resize(num_pts);
@@ -268,7 +274,9 @@ void filtering(
         }
 
         // We'll need vorticity, so go ahead and compute it
-        compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
+        compute_vorticity(
+                coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
+                div, OkuboWeiss,
                 full_u_r, full_u_lon, full_u_lat,
                 Ntime, Ndepth, Nlat, Nlon,
                 longitude, latitude, mask);
@@ -675,12 +683,14 @@ void filtering(
             #endif
             if (not(constants::MINIMAL_OUTPUT)) {
                 compute_vorticity(fine_vort_r, fine_vort_lon, fine_vort_lat,
+                        div, OkuboWeiss,
                         fine_u_r, fine_u_lon, fine_u_lat,
                         Ntime, Ndepth, Nlat, Nlon,
                         longitude, latitude, mask);
             }
 
             compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
+                    div, OkuboWeiss,
                     coarse_u_r, coarse_u_lon, coarse_u_lat,
                     Ntime, Ndepth, Nlat, Nlon,
                     longitude, latitude, mask);
@@ -691,12 +701,12 @@ void filtering(
 
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             if (not(constants::MINIMAL_OUTPUT)) {
-                write_field_to_output(fine_vort_r, "fine_vort_r", 
-                        starts, counts, fname, &mask);
+                write_field_to_output(fine_vort_r, "fine_vort_r", starts, counts, fname, &mask);
+                write_field_to_output(div, "coarse_vel_div", starts, counts, fname, &mask);
             }
             if (not(constants::NO_FULL_OUTPUTS)) {
-                write_field_to_output(coarse_vort_r, "coarse_vort_r", 
-                        starts, counts, fname, &mask);
+                write_field_to_output(coarse_vort_r, "coarse_vort_r", starts, counts, fname, &mask);
+                write_field_to_output(OkuboWeiss, "OkuboWeiss", starts, counts, fname, &mask);
             }
             if (constants::DO_TIMING) { 
                 timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
@@ -733,23 +743,6 @@ void filtering(
             if (constants::DO_TIMING) { 
                 timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
             }
-
-            // Compute the divergence of the coarse field
-            //      but only output if not minimalized
-            #if DEBUG >= 1
-            if (wRank == 0) { fprintf(stdout, "Starting compute_div_vel (coarse)\n"); }
-            fflush(stdout);
-            #endif
-            compute_div_vel(div, coarse_u_x, coarse_u_y, coarse_u_z, 
-                    longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
-
-            if (not(constants::NO_FULL_OUTPUTS)) {
-                if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-                write_field_to_output(div, "coarse_vel_div", starts, counts, fname, &mask);
-                if (constants::DO_TIMING) { 
-                    timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
-                }
-            }
         }
 
         if (constants::COMP_BC_TRANSFERS) {
@@ -783,6 +776,7 @@ void filtering(
                     );
 
             compute_vorticity(tilde_vort_r, tilde_vort_lon, tilde_vort_lat,
+                    div, OkuboWeiss,
                     tilde_u_r, tilde_u_lon, tilde_u_lat,
                     Ntime, Ndepth, Nlat, Nlon,
                     longitude, latitude, mask);
@@ -854,11 +848,9 @@ void filtering(
 
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             Apply_Postprocess_Routines(
-                    postprocess_fields, postprocess_names,
-                    time, depth, latitude, longitude,
-                    mask, dAreas,
-                    myCounts, myStarts,
-                    scales.at(Iscale));
+                    postprocess_fields, postprocess_names, OkuboWeiss,
+                    time, depth, latitude, longitude, mask, dAreas,
+                    myCounts, myStarts, scales.at(Iscale), "postprocess");
             if (constants::DO_TIMING) { 
                 timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess");
             }
