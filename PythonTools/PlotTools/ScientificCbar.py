@@ -3,8 +3,10 @@ import numpy as np
 from matplotlib.colors import LogNorm
 
 def ScientificCbar(cbar, units='',
-        orientation='vertical', centre = True, centre_val=0.,
-        labelpad = 20, label='', logbar = False):
+        orientation='vertical', 
+        centre = True, centre_val=0.,
+        labelpad = 20, label='', logbar = False, 
+        force_scale = True, scale_val = 0):
 
     if ( logbar and centre ):
         print("Cannot log a centred colour bar. Setting centre to False")
@@ -30,13 +32,20 @@ def ScientificCbar(cbar, units='',
     else:
         # Re-scale the values to avoid the poorly-placed exponent
         #   above the colour bar
-        scale = np.log10(np.max(np.abs(ticks)))
-        scale = np.floor(scale)
+        if force_scale:
+            scale = scale_val
+        else:
+            scale = np.log10(np.max(np.abs(ticks)))
+            scale = np.floor(scale)
     
         # Label
-        cb_label = '$\\times10^{' + '{0:d}'.format(int(scale)) + '}$ ' + units
+        if scale != 0:
+            cb_label = '$\\times10^{' + '{0:d}'.format(int(scale)) + '}$ ' + units
+        else:
+            cb_label = ''
+
         if len(label) > 0:
-            cb_label = label + '\n' + cb_label
+            cb_label = label + ('\n' + cb_label) * ( len(cb_label) > 0 )
     
         # Tick labels
         tick_labels = ["{0:.2g}".format(tick/(10**scale)) for tick in ticks]
