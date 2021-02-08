@@ -13,7 +13,9 @@ def colour(dark):
 def seconds(date):
     return (date - datetime.datetime.fromtimestamp(0)).total_seconds()
 
-def LabelTimeAxis(ax, time, label_months = False, label_years = False):
+def LabelTimeAxis(ax, time, 
+        label_months = False, label_years = False, short_month = False,
+        fontsize = 12):
 
     num_hour  = (time[-1] - time[0]) / (60*60)
     num_day   = num_hour / 24
@@ -43,6 +45,12 @@ def LabelTimeAxis(ax, time, label_months = False, label_years = False):
             else:
                 draw_month = 0
                 draw_year = 1
+
+    if label_years:
+        draw_year = 1
+    if label_months:
+        draw_month = 1
+
 
     ax.set_ylim(0,draw_year+draw_month+draw_day+draw_hour)
     dark_year  = False
@@ -88,7 +96,7 @@ def LabelTimeAxis(ax, time, label_months = False, label_years = False):
             dark_year = not(dark_year)
         
             if (label_years) or (draw_month == 1):
-                ax.text( (left+right)/2, 0.5, str(year), ha='center', va='center')
+                ax.text( (left+right)/2, 0.5, str(year), ha='center', va='center', fontsize = fontsize)
     
         for month in range(1, 13):
         
@@ -112,7 +120,9 @@ def LabelTimeAxis(ax, time, label_months = False, label_years = False):
                 
                     if (label_months) or (draw_year == 0):
                         month_str = datetime.date(1900, month, 1).strftime('%b')
-                        ax.text( (left+right)/2, draw_year + 0.5, month_str, ha='center', va='center')
+                        if short_month:
+                            month_str = month_str[0]
+                        ax.text( (left+right)/2, draw_year + 0.5, month_str, ha='center', va='center', fontsize = fontsize)
             
                 for day in range(1, num_days+1):
                     left  = datetime.datetime(year, month, day, 0)
@@ -129,7 +139,7 @@ def LabelTimeAxis(ax, time, label_months = False, label_years = False):
                             dark_day = not(dark_day)
                             
                             if draw_month == 0:
-                                ax.text( (left+right)/2, draw_year+draw_month+0.5, str(day), ha='center', va='center')
+                                ax.text( (left+right)/2, draw_year+draw_month+0.5, str(day), ha='center', va='center', fontsize = fontsize)
                 
                         for hour in range(24):
                             left  = datetime.datetime(year, month, day, hour)
