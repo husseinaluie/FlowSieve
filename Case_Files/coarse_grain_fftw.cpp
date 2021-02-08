@@ -35,7 +35,16 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales {
-        2, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
+        //2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 35, 40, 45, 
+        //50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 128, 180
+        //150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 300, 400, 500
+
+        // 2d full-output
+        //10, 20, 45, 65
+
+        // Artifical Dataset
+        0.1, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 17, 20
+
     };
 
     //

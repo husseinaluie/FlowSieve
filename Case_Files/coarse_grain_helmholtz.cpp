@@ -52,9 +52,13 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales { 
-        //100e3, 250e3, 400e3
+        //100e3, 250e3, 400e3, 1000e3
         
-        //1.
+        //1e3 //129e3
+
+                                                      4.64e4, 5.99e4, 7.74e4,
+        1.e5, 1.29e5, 1.67e5, 2.15e5, 2.78e5, 3.59e5, 4.64e5, 5.99e5, 7.74e5,
+        1.e6, 1.29e6, 1.67e6, 2.15e6, 
         
         /*
         1.e4 , 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4, 4.64e4, 5.99e4, 7.74e4,
@@ -63,9 +67,6 @@ int main(int argc, char *argv[]) {
         1.e7
         */
 
-        1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
-        1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
-        1e6, //1.58e6, 2.51e6, 3.98e6, 6.31e6,
     };
 
     //
@@ -127,7 +128,7 @@ int main(int argc, char *argv[]) {
     read_var_from_file(F_toroidal,  pot_field_var_name, tor_input_fname, NULL, &myCounts, &myStarts);
 
     // read in velocity to get the mask
-    read_var_from_file(u_tor, "u_lat", tor_input_fname, &mask, &myCounts, &myStarts);
+    read_var_from_file(u_tor, vel_field_var_name, vel_input_fname, &mask, &myCounts, &myStarts);
 
     // Mask out the pole, if necessary (i.e. set lat = 90 to land)
     mask_out_pole(latitude, mask, Ntime, Ndepth, Nlat, Nlon);
