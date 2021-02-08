@@ -9,15 +9,17 @@
 void Apply_Postprocess_Routines(
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<std::string> & vars_to_process,
+        const std::vector<double> & OkuboWeiss,
         const std::vector<double> & time,
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
-        const std::vector<bool> & mask,
+        const std::vector<bool>   & mask,
         const std::vector<double> & areas,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const double filter_scale,
+        const std::string filename_base = "postprocess",
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -30,6 +32,104 @@ void write_regions(
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void compute_region_areas(
+        std::vector<double> & region_areas,
+        const std::vector<double> & areas,
+        const std::vector<bool> & mask,
+        const std::vector<double> & latitude,
+        const std::vector<double> & longitude,
+        const int num_regions,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon
+        );
+
+void compute_region_avg_and_std(
+        std::vector< std::vector< double > > & field_averages,
+        std::vector< std::vector< double > > & field_std_devs,
+        const std::vector<const std::vector<double>*> & postprocess_fields,
+        const std::vector<double> & region_areas,
+        const std::vector<double> & areas,
+        const std::vector<bool> & mask,
+        const std::vector<double> & latitude,
+        const std::vector<double> & longitude,
+        const int num_fields,
+        const int num_regions,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon
+        );
+
+void compute_region_avg_and_std_OkuboWeiss(
+        std::vector< std::vector< double > > & field_averages,
+        std::vector< std::vector< double > > & field_std_devs,
+        std::vector< double > & OkuboWeiss_areas,
+        const std::vector<const std::vector<double>*> & postprocess_fields,
+        const std::vector<double> & OkuboWeiss,
+        const std::vector<double> & region_areas,
+        const std::vector<double> & areas,
+        const std::vector<bool> & mask,
+        const std::vector<double> OkuboWeiss_bounds,
+        const std::vector<double> & latitude,
+        const std::vector<double> & longitude,
+        const int num_fields,
+        const int num_regions,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const int NOkubo
+        );
+
+void compute_time_avg_std(
+        std::vector<std::vector<double>> & time_average,
+        std::vector<std::vector<double>> & time_std_dev,
+        const std::vector<const std::vector<double>*> & postprocess_fields,
+        const std::vector<bool> & mask,
+        const std::vector<double> & areas,
+        const std::vector<double> & latitude,
+        const std::vector<double> & longitude,
+        const std::vector<int> & mask_count,
+        const std::vector<bool> & always_masked,
+        const int num_fields,
+        const int full_Ntime,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void write_region_avg_and_std(
+        const std::vector< std::vector< double > > & field_averages,
+        const std::vector< std::vector< double > > & field_std_devs,
+        const std::vector<std::string> & vars_to_process,
+        const char * filename,
+        const int Stime,
+        const int Sdepth,
+        const int Ntime,
+        const int Ndepth,
+        const int num_regions,
+        const int num_fields
+        );
+
+void write_region_avg_and_std_OkuboWeiss(
+        const std::vector< std::vector< double > > & field_averages_OW,
+        const std::vector< std::vector< double > > & field_std_devs_OW,
+        const std::vector< double > & OkuboWeiss_areas,
+        const std::vector<std::string> & vars_to_process,
+        const char * filename,
+        const int Stime,
+        const int Sdepth,
+        const int Ntime,
+        const int Ndepth,
+        const int Nokubo,
+        const int num_regions,
+        const int num_fields
         );
 
 namespace RegionTest 

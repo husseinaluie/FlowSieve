@@ -2,6 +2,7 @@
 #include <mpi.h>
 #include <omp.h>
 #include <vector>
+#include <cassert>
 
 #include "../constants.hpp"
 #include "../functions.hpp"
@@ -11,24 +12,26 @@
 void Apply_Postprocess_Routines(
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<std::string> & vars_to_process,
+        const std::vector<double> & OkuboWeiss,
         const std::vector<double> & time,
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
-        const std::vector<bool> & mask,
+        const std::vector<bool>   & mask,
         const std::vector<double> & areas,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
         const double filter_scale,
+        const std::string filename_base,
         const MPI_Comm comm
         ) {
+
+    //static_assert( not(constants::APPLY_POSTPROCESS) or not(constants::CAST_TO_INT) );
 
     const int Ntime  = myCounts.at(0);
     const int Ndepth = myCounts.at(1);
     const int Nlat   = myCounts.at(2);
     const int Nlon   = myCounts.at(3);
-
-    const int chunk_size = get_omp_chunksize(Nlat, Nlon);
 
     // Get full number of time points
     int full_Ntime;
@@ -36,18 +39,14 @@ void Apply_Postprocess_Routines(
 
     const int Stime  = myStarts.at(0);
     const int Sdepth = myStarts.at(1);
-    const int Slat   = myStarts.at(2);
-    const int Slon   = myStarts.at(3);
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
-    double dA, local_area;
-    int Ifield, Ilat, Ilon, Itime, Idepth, Iregion, 
-        area_index, int_index, reg_index, space_index;
-
-    size_t index;
+    //double dA, local_area;
+    int Ilat, Ilon, Itime, Idepth;
+    size_t index, area_index;
 
     // Extract a common mask that determines what points are always masked.
     //    Also keep a tally of how often a cell is masked
@@ -96,15 +95,36 @@ void Apply_Postprocess_Routines(
     //
     //// Start by initializing the postprocess file
     //
-    
+   
+    // If we're using OkuboWeiss, create dimension values
+    const bool do_OkuboWeiss = (OkuboWeiss.size() > 2);
+    const int N_Okubo = 601; // Make it odd
+    const int N_Ok_by_2 = N_Okubo / 2;
+    std::vector<double> OkuboWeiss_dim_vals( do_OkuboWeiss ? N_Okubo : 0 );
+    const double Okubo_max = 1.e10 / pow( 24. * 60. * 60., 2.);
+    if (do_OkuboWeiss) {
+
+        // This does log spacing (except for 0)
+        const double decades = 30,
+                     log_UB = log10( Okubo_max ),
+                     log_LB = log_UB - decades;
+        OkuboWeiss_dim_vals.at( N_Ok_by_2 ) = 0.;
+        for (int II = 1; II <= N_Ok_by_2; ++II) {
+            OkuboWeiss_dim_vals.at(N_Ok_by_2 + II) =  pow( 10., log_LB + II * ( decades / N_Ok_by_2 ) );
+            OkuboWeiss_dim_vals.at(N_Ok_by_2 - II) = -OkuboWeiss_dim_vals.at( N_Ok_by_2 + II );
+        }
+
+    }
+
     // Filename + file
-    snprintf(filename, 50, "postprocess_%.6gkm.nc", filter_scale/1e3);
+    snprintf(filename, 50, (filename_base + "_%.6gkm.nc").c_str(), filter_scale/1e3);
     initialize_postprocess_file(
-            time, depth, latitude, longitude, 
+            time, depth, latitude, longitude, OkuboWeiss_dim_vals,
             RegionTest::region_names,
             vars_to_process,
             filename,
-            filter_scale
+            filter_scale,
+            do_OkuboWeiss
             );
 
     // Add some attributes to the file
@@ -123,207 +143,10 @@ void Apply_Postprocess_Routines(
     fflush(stdout);
 
     std::vector<double> region_areas(num_regions * Ntime * Ndepth, 0.);
-    for (Iregion = 0; Iregion < num_regions; ++Iregion) {
-        for (Itime = 0; Itime < Ntime; ++Itime) {
-            for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
+    compute_region_areas(region_areas, areas, mask, latitude, longitude,
+            num_regions, Ntime, Ndepth, Nlat, Nlon);
 
-                reg_index = Index(0, Itime, Idepth, Iregion,
-                                  1, Ntime, Ndepth, num_regions);
-
-                local_area = 0.;
-
-                #pragma omp parallel default(none)\
-                private(Ilat, Ilon, index, dA, area_index )\
-                shared(latitude, longitude, areas, mask, Iregion, Itime, Idepth) \
-                reduction(+ : local_area)
-                { 
-                    #pragma omp for collapse(2) schedule(guided, chunk_size)
-                    for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                        for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-
-                            index = Index(Itime, Idepth, Ilat, Ilon,
-                                          Ntime, Ndepth, Nlat, Nlon);
-
-                            if ( mask.at(index) ) { // Skip land areas
-
-                                area_index = Index(0, 0, Ilat, Ilon,
-                                                   1, 1, Nlat, Nlon);
-
-                                dA = areas.at(area_index);
-
-                                if ( RegionTest::all_regions.at(Iregion)(
-                                            latitude.at(Ilat), longitude.at(Ilon)) ) 
-                                { local_area += dA; }
-                            }
-                        }
-                    }
-                }
-
-                region_areas.at(reg_index) = local_area;
-            }
-        }
-    }
-
-
-    //
-    //// Domain integrals
-    //
-    std::vector< std::vector< std::vector< double > > > 
-        field_averages(num_fields), field_std_devs(num_fields);
-
-    for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
-        field_averages.at(Ifield).resize(num_regions,
-            std::vector<double>(Ntime * Ndepth, 0.));
-        field_std_devs.at(Ifield).resize(num_regions,
-            std::vector<double>(Ntime * Ndepth, 0.));
-    }
-
-    std::vector<double> field_values(num_fields, 0.);
-
-    // Compute region averages
-    if (wRank == 0) { fprintf(stdout, "  .. computing region integrals\n"); }
-    fflush(stdout);
-
-    double int_val, reg_area;
-    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-        for (Iregion = 0; Iregion < num_regions; ++Iregion) {
-            for (Itime = 0; Itime < Ntime; ++Itime) {
-                for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
-                    int_index = Index(Itime, Idepth, 0, 0,
-                                      Ntime, Ndepth, 1, 1);
-
-                    reg_index = Index(0, Itime, Idepth, Iregion,
-                                      1, Ntime, Ndepth, num_regions);
-                    reg_area = region_areas.at(reg_index);
-
-                    int_val = 0.;
-
-                    #pragma omp parallel default(none)\
-                    private(Ilat, Ilon, index, dA, area_index )\
-                    shared(Ifield, Iregion, Itime, Idepth, int_index, mask, areas,\
-                            latitude, longitude, postprocess_fields) \
-                    reduction(+ : int_val)
-                    { 
-                        #pragma omp for collapse(2) schedule(guided, chunk_size)
-                        for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                            for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-
-                                index = Index(Itime, Idepth, Ilat, Ilon,
-                                              Ntime, Ndepth, Nlat, Nlon);
-
-                                if ( mask.at(index) ) { // Skip land areas
-
-                                    area_index = Index(0, 0, Ilat, Ilon,
-                                                       1, 1, Nlat, Nlon);
-
-                                    dA = areas.at(area_index);
-
-                                    if ( RegionTest::all_regions.at(Iregion)(
-                                                latitude.at(Ilat), longitude.at(Ilon)) ) 
-                                    {
-                                        int_val +=  postprocess_fields.at(Ifield)->at(index) * dA;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (reg_area == 0) {
-                        field_averages.at(Ifield).at(Iregion).at(int_index) = 0.;
-                    } else {
-                        field_averages.at(Ifield).at(Iregion).at(int_index) = int_val / reg_area;
-                    }
-                }
-            }
-        }
-    }
-
-    // Now that we have region averages, get region standard deviations
-    if (wRank == 0) { fprintf(stdout, "  .. computing region standard deviations\n"); }
-    fflush(stdout);
-
-    // Now that we have region averages, get region standard deviations
-    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-        for (Iregion = 0; Iregion < num_regions; ++Iregion) {
-            for (Itime = 0; Itime < Ntime; ++Itime) {
-                for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
-                    int_index = Index(Itime, Idepth, 0, 0,
-                                      Ntime, Ndepth, 1, 1);
-
-                    reg_index = Index(0, Itime, Idepth, Iregion,
-                                      1, Ntime, Ndepth, num_regions);
-                    reg_area = region_areas.at(reg_index);
-
-                    int_val = 0.;
-
-                    #pragma omp parallel default(none)\
-                    private(Ilat, Ilon, index, dA, area_index )\
-                    shared(Ifield, Iregion, Itime, Idepth, int_index, mask, areas,\
-                            latitude, longitude, postprocess_fields, field_averages) \
-                    reduction(+ : int_val)
-                    { 
-                        #pragma omp for collapse(2) schedule(guided, chunk_size)
-                        for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                            for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-
-                                index = Index(Itime, Idepth, Ilat, Ilon,
-                                              Ntime, Ndepth, Nlat, Nlon);
-
-                                if ( mask.at(index) ) { // Skip land areas
-
-                                    area_index = Index(0, 0, Ilat, Ilon,
-                                                       1, 1, Nlat, Nlon);
-
-                                    dA = areas.at(area_index);
-
-                                    if ( RegionTest::all_regions.at(Iregion)(
-                                                latitude.at(Ilat), longitude.at(Ilon)) ) 
-                                    {
-                                        int_val +=
-                                            pow(   field_averages.at(Ifield).at(Iregion).at(int_index)
-                                                 - postprocess_fields.at(Ifield)->at(index),
-                                                2.) * dA;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (reg_area == 0) {
-                        field_std_devs.at(Ifield).at(Iregion).at(int_index) = 0.;
-                    } else {
-                        field_std_devs.at(Ifield).at(Iregion).at(int_index) = sqrt( int_val / reg_area );
-                    }
-                }
-            }
-        }
-    }
-
-    if (wRank == 0) { fprintf(stdout, "  .. writing region averages and deviations\n"); }
-    fflush(stdout);
-
-    // Dimension order: time - depth - region
-    size_t start[3], count[3];
-    start[0] = Stime;
-    count[0] = Ntime;
-
-    start[1] = Sdepth;
-    count[1] = Ndepth;
-
-    // start[2] will be set in the write_integral_to_post function
-    count[2] = 1;
-
-    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-        write_integral_to_post(field_averages.at(Ifield), vars_to_process.at(Ifield), 
-                "_avg", start, count, filename);
-        write_integral_to_post(field_std_devs.at(Ifield), vars_to_process.at(Ifield), 
-                "_std", start, count, filename);
-
-        if (wRank == 0) { fprintf(stdout, "  .. .. wrote field index %d\n", Ifield); }
-        fflush(stdout);
-    }
-    if (wRank == 0) { fprintf(stdout, "  .. done writing fields %d\n", Ifield); }
-    fflush(stdout);
-
-    // Write the region areas (needed for reference, etc)
+    // Write the region areas
     size_t start_r[3], count_r[3];
     start_r[0] = (size_t) Stime;
     count_r[0] = (size_t) Ntime;
@@ -348,6 +171,65 @@ void Apply_Postprocess_Routines(
 
 
     //
+    //// Region averages and standard deviations
+    //
+
+    if (wRank == 0) { fprintf(stdout, "  .. computing the average and std. dev. in each region\n"); }
+    fflush(stdout);
+
+    std::vector< std::vector< double > >
+        field_averages(num_fields, std::vector<double>(Ntime * Ndepth * num_regions, 0.)), 
+        field_std_devs(num_fields, std::vector<double>(Ntime * Ndepth * num_regions, 0.));
+
+    compute_region_avg_and_std(
+            field_averages, field_std_devs, postprocess_fields, region_areas,
+            areas, mask, latitude, longitude,
+            num_fields, num_regions, Ntime, Ndepth, Nlat, Nlon
+            );
+
+    if (wRank == 0) { fprintf(stdout, "  .. writing region averages and deviations\n"); }
+    fflush(stdout);
+
+    write_region_avg_and_std(
+            field_averages, field_std_devs, vars_to_process, filename,
+            Stime, Sdepth, Ntime, Ndepth, num_regions, num_fields
+            );
+
+
+    //
+    //// If we have OkuboWeiss data, then also do processing along OW contours
+    //
+
+    if (wRank == 0) { fprintf(stdout, "  .. Applying Okubo-Weiss processing\n"); }
+    fflush(stdout);
+
+    std::vector< double > OkuboWeiss_areas;
+    if (do_OkuboWeiss) {
+
+        std::vector< std::vector< double > > 
+            field_averages_OW(num_fields, std::vector<double>(Ntime * Ndepth * N_Okubo * num_regions, 0.)), 
+            field_std_devs_OW(num_fields, std::vector<double>(Ntime * Ndepth * N_Okubo * num_regions, 0.));
+
+        OkuboWeiss_areas.resize(Ntime * Ndepth * N_Okubo * num_regions, 0.);
+
+        compute_region_avg_and_std_OkuboWeiss(
+                field_averages_OW, field_std_devs_OW, OkuboWeiss_areas, 
+                postprocess_fields, OkuboWeiss, region_areas,
+                areas, mask, OkuboWeiss_dim_vals, latitude, longitude,
+                num_fields, num_regions, Ntime, Ndepth, Nlat, Nlon, N_Okubo
+                );
+
+        if (wRank == 0) { fprintf(stdout, "  .. writing Okubo results\n"); }
+        fflush(stdout);
+
+        write_region_avg_and_std_OkuboWeiss(
+                field_averages_OW, field_std_devs_OW, OkuboWeiss_areas,
+                vars_to_process, filename,
+                Stime, Sdepth, Ntime, Ndepth, N_Okubo, num_regions, num_fields
+                );
+    }
+
+    //
     //// Time averages
     //
 
@@ -355,154 +237,25 @@ void Apply_Postprocess_Routines(
     fflush(stdout);
 
     // Time-average the fields
-    std::vector<std::vector<double>> 
-        time_average_loc(num_fields), time_average(num_fields), 
-        time_std_dev_loc(num_fields), time_std_dev(num_fields);
+    std::vector<std::vector<double>> time_average(num_fields), time_std_dev(num_fields);
+    int Ifield;
     for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-        time_average_loc.at(Ifield).resize( Ndepth * Nlat * Nlon, 0. );
-        time_average.at(    Ifield).resize( Ndepth * Nlat * Nlon, 0. );
-
-        time_std_dev_loc.at(Ifield).resize( Ndepth * Nlat * Nlon, 0. );
-        time_std_dev.at(    Ifield).resize( Ndepth * Nlat * Nlon, 0. );
+        time_average.at( Ifield ).resize( Ndepth * Nlat * Nlon, 0. );
+        time_std_dev.at( Ifield ).resize( Ndepth * Nlat * Nlon, 0. );
     }
 
-    #pragma omp parallel default(none)\
-    private(Ifield, Ilat, Ilon, Itime, Idepth, \
-            index, space_index )\
-    shared(latitude, longitude, postprocess_fields, \
-            areas, mask, always_masked, mask_count, \
-            time_average_loc, full_Ntime)
-    { 
-        #pragma omp for collapse(3) schedule(guided, chunk_size)
-        for (Ilat = 0; Ilat < Nlat; ++Ilat){
-            for (Ilon = 0; Ilon < Nlon; ++Ilon){
-                for (Idepth = 0; Idepth < Ndepth; ++Idepth){
-                    space_index = Index(0, 0, Ilat, Ilon,
-                                        1, 1, Nlat, Nlon);
-                    if (not(always_masked.at(space_index))) { // Skip land areas
-                        for (Itime = 0; Itime < Ntime; ++Itime){
-
-                            // get some indices
-                            index = Index(Itime, Idepth, Ilat, Ilon,
-                                          Ntime, Ndepth, Nlat, Nlon);
-
-                            if ( mask.at(index) ) {
-                                for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-
-                                    // compute the time average for 
-                                    // the part on this processor
-                                    time_average_loc.at(Ifield).at(space_index) 
-                                        += postprocess_fields.at(Ifield)->at(index) 
-                                                / mask_count.at(space_index);
-                                }
-                            }
-                        }
-                    } else {
-                        for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-                            time_average_loc.at(Ifield).at(space_index) 
-                                = constants::fill_value;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Now communicate with other processors to get the full time average
-    if (wRank == 0) { fprintf(stdout, "  .. .. reducing across processors\n"); }
-    fflush(stdout);
-
-    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-        MPI_Allreduce(&(time_average_loc.at(Ifield)[0]),
-                      &(time_average.at(    Ifield)[0]),
-                      Ndepth * Nlat * Nlon, MPI_DOUBLE, MPI_SUM, comm);
-    }
-
-    // Compute the standard deviation
-    if (wRank == 0) { fprintf(stdout, "  .. computing time standard deviations\n"); }
-    fflush(stdout);
-
-    #pragma omp parallel default(none)\
-    private(Ifield, Ilat, Ilon, Itime, Idepth, \
-            index, space_index )\
-    shared(latitude, longitude, full_Ntime, wSize, postprocess_fields, \
-            areas, mask, always_masked, mask_count, \
-            time_average_loc, time_std_dev_loc, time_average)
-    { 
-        #pragma omp for collapse(3) schedule(guided, chunk_size)
-        for (Ilat = 0; Ilat < Nlat; ++Ilat){
-            for (Ilon = 0; Ilon < Nlon; ++Ilon){
-                for (Idepth = 0; Idepth < Ndepth; ++Idepth){
-                    space_index = Index(0, Idepth, Ilat, Ilon,
-                                        1, Ndepth, Nlat, Nlon);
-                    if (not(always_masked.at(space_index))) { // Skip land areas
-                        for (Itime = 0; Itime < Ntime; ++Itime){
-
-                            // get some indices
-                            index = Index(Itime, Idepth, Ilat, Ilon,
-                                          Ntime, Ndepth, Nlat, Nlon);
-
-                            if ( mask.at(index) ) { // Skip land areas
-                                for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-
-                                    // compute the time std. dev. for 
-                                    // the part on this processor
-                                    time_std_dev_loc.at(Ifield).at(space_index) += 
-                                        pow(   postprocess_fields.at(Ifield)->at(index) 
-                                             - time_average.at(Ifield).at(space_index), 
-                                            2.) / mask_count.at(space_index);
-                                }
-                            }
-                        }
-                    } else {
-                        for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-                            // We'll handle these later to avoid over-flow issues
-                            time_std_dev_loc.at(Ifield).at(space_index) = 0.; 
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (wRank == 0) { fprintf(stdout, "  .. writing time averages and deviations\n"); }
-    fflush(stdout);
-
-    // Now communicate with other processors to get the full time average
-    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-        MPI_Allreduce(&(time_std_dev_loc.at(Ifield)[0]),
-                      &(time_std_dev.at(    Ifield)[0]),
-                      Ndepth * Nlat * Nlon, MPI_DOUBLE, MPI_SUM, comm);
-    }
-
-    // Re-mask to fill in land areas / apply sqrt to water
-    for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
-        #pragma omp parallel default(none)\
-        private(index, space_index)\
-        shared(Ifield, time_average, time_std_dev, full_Ntime, always_masked)
-        { 
-            #pragma omp for collapse(3) schedule(guided, chunk_size)
-            for (Idepth = 0; Idepth < Ndepth; ++Idepth){
-                for (Ilat = 0; Ilat < Nlat; ++Ilat){
-                    for (Ilon = 0; Ilon < Nlon; ++Ilon){
-                        space_index = Index(0, Idepth, Ilat, Ilon,
-                                            1, Ndepth, Nlat, Nlon);
-                        if (not(always_masked.at(space_index))) { // Skip land areas
-                            time_std_dev.at(Ifield).at(index) = 
-                                sqrt(time_std_dev.at(Ifield).at(index));
-                        } else {
-                            time_std_dev.at(Ifield).at(index) = constants::fill_value;
-                            time_average.at(Ifield).at(index) = constants::fill_value;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+    compute_time_avg_std(
+            time_average, time_std_dev, postprocess_fields,
+            mask, areas, latitude, longitude, mask_count, always_masked,
+            full_Ntime, num_fields, Ntime, Ndepth, Nlat, Nlon
+            );
 
     // Write the time averages
     //   dimension order: depth - lat - lon
+    const int Slat   = myStarts.at(2);
+    const int Slon   = myStarts.at(3);
+
+    size_t start[3], count[3];
     start[0] = Sdepth;
     count[0] = Ndepth;
 
@@ -513,9 +266,14 @@ void Apply_Postprocess_Routines(
     count[2] = Nlon;
 
     for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
+        write_field_to_output( time_average.at(Ifield), vars_to_process.at(Ifield) + "_time_average", 
+                start, count, filename, &mask );
+
+        /*
         write_time_average_to_post(time_average.at(Ifield), vars_to_process.at(Ifield), 
                 "_time_average", start, count, filename, &mask);
         write_time_average_to_post(time_std_dev.at(Ifield), vars_to_process.at(Ifield), 
                 "_time_std_dev", start, count, filename, &mask);
+        */
     }
 }
