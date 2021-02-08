@@ -5,11 +5,11 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=2 $(CFLAGS)
+CFLAGS:=-DDEBUG=1 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
-DEBUG:=false
+DEBUG:=true
 EXTRA_OPT:=false
 
 ##
@@ -218,10 +218,12 @@ $(SW_TARGET_EXES): %.x : ${SW_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS} %.o
 # Building toroidal projection
 TOROID_TARGET_EXES := 	Case_Files/toroidal_projection.x \
 						Case_Files/potential_projection.x \
-						Case_Files/interpolator.x
+						Case_Files/interpolator.x \
+						Case_Files/geostrophic_vel.x	
 TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
 						Case_Files/potential_projection.o \
-						Case_Files/interpolator.o
+						Case_Files/interpolator.o \
+						Case_Files/geostrophic_vel.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
@@ -233,7 +235,7 @@ $(TOROID_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} $
 Tests/%.o: Tests/%.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Tests/%.x: Tests/%.o ${NETCDF_IO_OBJS} ${FUNCTIONS_OBJS} ${DIFF_TOOL_OBJS}
+Tests/%.x: Tests/%.o ${DIFF_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS}
 	$(MPICXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building fftw-based coarse_grain executable
