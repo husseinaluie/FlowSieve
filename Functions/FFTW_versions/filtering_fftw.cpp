@@ -76,18 +76,14 @@ void filtering_fftw(
     std::vector<double> coarse_KE(num_pts);
     vars_to_write.push_back("coarse_KE");
 
-    std::vector<double> div;
-    if (not(constants::MINIMAL_OUTPUT)) {
-        div.resize(num_pts);
-        vars_to_write.push_back("full_vel_div");
-        vars_to_write.push_back("coarse_vel_div");
-    }
+    // placeholder
+    std::vector<double> OkuboWeiss;
 
     // If computing energy transfers, we'll need some more arrays
         std::vector<double> coarse_uxux, coarse_uxuy, coarse_uxuz,
                                          coarse_uyuy, coarse_uyuz, 
                                                       coarse_uzuz;   
-        std::vector<double> energy_transfer;
+        std::vector<double> energy_transfer, fine_KE;
     if (constants::COMP_TRANSFERS) {
         coarse_uxux.resize(num_pts);
         coarse_uxuy.resize(num_pts);
@@ -101,14 +97,24 @@ void filtering_fftw(
         // Also an array for the transfer itself
         energy_transfer.resize(num_pts);
         vars_to_write.push_back("energy_transfer");
+
+        fine_KE.resize(num_pts);
+        vars_to_write.push_back("fine_KE");
     }
 
     // Preset some post-processing variables
     std::vector<const std::vector<double>*> postprocess_fields;
     std::vector<std::string> postprocess_names;
 
+
     postprocess_names.push_back("coarse_KE");
     postprocess_fields.push_back(&coarse_KE);
+
+    postprocess_names.push_back("fine_KE");
+    postprocess_fields.push_back(&fine_KE);
+
+    postprocess_names.push_back("Pi");
+    postprocess_fields.push_back(&energy_transfer);
 
     // Initialize fftw plans
     const int rank = 2; 
@@ -203,6 +209,12 @@ void filtering_fftw(
                     scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
             fft_filter_product(coarse_uzuz, full_u_z, full_u_z, fft, ifft, fft_inp, fft_out,
                     scale, Ntime, Ndepth, Nlat, Nlon, Llat, Llon);
+
+            for (index = 0; index < num_pts; ++index) {
+                fine_KE.at(index) = 
+                    0.5 * constants::rho0 * ( coarse_uxux.at(index) + coarse_uyuy.at(index) + coarse_uzuz.at(index) )
+                    - coarse_KE.at(index);
+            }
         }
 
         #if DEBUG >= 1
@@ -217,11 +229,12 @@ void filtering_fftw(
             write_field_to_output(coarse_u_z, "coarse_u_z",   starts, counts, filename);
 
             write_field_to_output(coarse_KE, "coarse_KE", starts, counts, filename);
+            write_field_to_output(fine_KE,   "fine_KE", starts, counts, filename);
         }
 
         if (constants::COMP_TRANSFERS) {
             // Compute the energy transfer through the filter scale
-            compute_energy_transfer_through_scale(
+            compute_Pi(
                     energy_transfer, 
                     coarse_u_x,  coarse_u_y,  coarse_u_z,
                     coarse_uxux, coarse_uxuy, coarse_uxuz,
@@ -234,21 +247,6 @@ void filtering_fftw(
             }
         }
 
-
-        if (not(constants::MINIMAL_OUTPUT)) {
-            compute_div_vel(div, coarse_u_x, coarse_u_y, coarse_u_z, longitude, latitude,
-                    Ntime, Ndepth, Nlat, Nlon, mask);
-            if (not(constants::NO_FULL_OUTPUTS)) {
-                write_field_to_output(div, "coarse_vel_div", starts, counts, filename);
-            }
-
-            compute_div_vel(div, full_u_x, full_u_y, full_u_z, longitude, latitude,
-                    Ntime, Ndepth, Nlat, Nlon, mask);
-            if (not(constants::NO_FULL_OUTPUTS)) {
-                write_field_to_output(div, "full_vel_div", starts, counts, filename);
-            }
-        }
-
         if (constants::APPLY_POSTPROCESS) {
             MPI_Barrier(MPI_COMM_WORLD);
 
@@ -257,7 +255,7 @@ void filtering_fftw(
 
             Apply_Postprocess_Routines(
                     postprocess_fields, postprocess_names,
-                    time, depth, latitude, longitude,
+                    OkuboWeiss, time, depth, latitude, longitude,
                     mask, dAreas,
                     myCounts, myStarts,
                     scales.at(Iscale));

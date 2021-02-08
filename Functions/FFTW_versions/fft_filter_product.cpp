@@ -32,8 +32,8 @@ void fft_filter_product(
     size_t index;
     int Itime, Idepth, Iky, Ikx;
     double ky, kx, kk;
-    const double dky = 1./Ly;
-    const double dkx = 1./Lx;
+    const double dky = 2. * M_PI / Ly;
+    const double dkx = 2. * M_PI / Lx;
     const int Nky = Ny;
     const int Nkx = Nx/2 + 1;
 
@@ -70,7 +70,7 @@ void fft_filter_product(
             kk = sqrt(kx*kx + ky*ky);
 
             // Remove anything higher frequency than filter scale
-            if (kk >= 1./scale) {
+            if (kk >= 2. * M_PI / scale) {
                 for (Itime = 0; Itime < Ntime; Itime++) {
                     for (Idepth = 0; Idepth < Ndepth; Idepth++) {
                         index = ( ( Itime * Ndepth + Idepth) * Nky + Iky ) * Nkx + Ikx;
