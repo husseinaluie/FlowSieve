@@ -18,16 +18,14 @@ void mask_out_pole(
     int Itime, Idepth, Ilat, Ilon;
     size_t index;
     
-    // quarter of a degree from pole
-    //const double pole_cut = M_PI * ( 1. - (0.25 / 180.) );
-    const double pole_cut = M_PI * ( 0.5 - (0.5 / 180.) );
+    const double D2R = M_PI / 180.;
+    const double pole_cut = (90. - 1.) * D2R;
 
     #if not(CARTESIAN)
     #pragma omp parallel default(none) \
         private(Itime, Idepth, Ilat, Ilon, index) \
         shared(latitude, mask)
     { 
-        // Mask out top quarter of a degree
         #pragma omp for collapse(1) schedule(static)
         for (index = 0; index < mask.size(); ++index) {
             Index1to4(index, Itime, Idepth, Ilat, Ilon,
