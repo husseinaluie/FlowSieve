@@ -1,6 +1,7 @@
 #include <vector>
 #include <string>
 #include <assert.h>
+#include <math.h>
 #include "../../differentiation_tools.hpp"
 #include "../../constants.hpp"
 #include "../../functions.hpp"
@@ -99,7 +100,7 @@ void get_diff_vector(
             //   differentiation coefficients
             differentiation_vector(ddl, dl, Iref - LB, order_of_deriv, diff_ord);
         } else {
-            // We're on a non-uniform grid, so we can guarantee the
+            // We're on a non-uniform grid, so we can't guarantee the
             //   differentiation coefficients a priori, so we need
             //   to actually compute them now.
             // This will get expensive (or ugly...) for higher orders of accuracy.
@@ -108,7 +109,6 @@ void get_diff_vector(
         }
 
         diff_vector.clear();
-
         for (int IND = LB; IND <= UB; IND++) {
             diff_vector.push_back( ddl.at(IND - LB) );
         }
@@ -126,6 +126,34 @@ void get_diff_vector(
                 Itime, Idepth, Ilat, Ilon,
                 Ntime, Ndepth, Nlat, Nlon,
                 mask, order_of_deriv, diff_ord - 2);
+
+    } else {
+
+        // Some back-up plans, in the case nothing else worked
+        diff_vector.clear();
+
+        // Back-up plan 1: first derivative with two points?
+        //                 then use a first-order derivative
+        //                 (not great, but better than nothing (hopefully))
+        if ( (order_of_deriv == 1) and (UB - LB + 1 == 2)) {
+            diff_vector.push_back( -1. / dl );
+            diff_vector.push_back(  1. / dl );
+            LB_ret = LB;
+        }
+
+        // Back-up plan 2: second derivative with only three points?
+        //                 assume the second derivative is constant on those
+        //                 three points, and use a classic (1, -2, 1) stencil
+        //                 (not great, but better than nothing (hopefully))
+        if ( (order_of_deriv == 2) and (UB - LB + 1 == 3)) {
+            // For now require uniform grid
+            if ( do_lon or (constants::UNIFORM_LAT_GRID)) {
+                diff_vector.push_back(  1. / pow(dl, 2.) );
+                diff_vector.push_back( -2. / pow(dl, 2.) );
+                diff_vector.push_back(  1. / pow(dl, 2.) );
+                LB_ret = LB;
+            }
+        }
     }
 
 }
