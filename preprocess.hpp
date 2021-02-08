@@ -109,6 +109,8 @@ void Apply_Toroidal_Projection(
         const bool single_seed,
         const double rel_tol,
         const int max_iters,
+        const bool weight_err,
+        const bool use_mask,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -128,6 +130,8 @@ void Apply_Potential_Projection(
         const bool single_seed,
         const double rel_tol,
         const int max_iters,
+        const bool weight_err,
+        const bool use_mask,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
