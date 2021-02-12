@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <mpi.h>
+#include <math.h>
 
 #include "netcdf.h"
 #include "netcdf_par.h"

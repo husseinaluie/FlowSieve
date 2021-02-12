@@ -1,14 +1,17 @@
 # The following modules were last used
 #
-#  module load netcdf/4.7.1/b1
-#  module load impi/2019.4
+#  Modules:
+#  netcdf/4.7.1/b1  (loading this loads all below)
+#  hdf5/1.10.5/b4    
+#  openmpi/4.0.1/b2  
+#  intel/2019.5      
 
 # Specify compilers
 CXX     ?= icc
-MPICXX  ?= mpiicc
+MPICXX  ?= mpicxx
 
 # Linking flags for netcdf
-LINKS:=-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl -qopenmp
+LINKS:=-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl -qopenmp -lm
 
 # Default compiler flags
 CFLAGS:=-Wall -std=c++14

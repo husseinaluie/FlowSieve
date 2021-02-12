@@ -9,8 +9,8 @@ CFLAGS:=-DDEBUG=1 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
-DEBUG:=true
-EXTRA_OPT:=false
+DEBUG:=false
+EXTRA_OPT:=true
 
 ##
 ## Shouldn't need to modify anything beyond this point
@@ -118,11 +118,7 @@ hardclean:
 	rm -f Functions/Interface_Tools/*.o 
 	rm -f Functions/FFTW_versions/*.o 
 	rm -f Functions/Particles/*.o 
-	rm -f coarse_grain.x 
-	rm -r coarse_grain.x.dSYM
 	rm ALGLIB/*.o
-	rm -r docs/html
-	rm -r docs/latex
 	rm -f Preprocess/*.[o,x]
 	rm -f Postprocess/*.[o,x]
 cleandocs:

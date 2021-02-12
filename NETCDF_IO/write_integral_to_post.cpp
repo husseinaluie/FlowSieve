@@ -36,13 +36,15 @@ void write_integral_to_post(
     //
     double fmax, fmin, fmax_loc, fmin_loc;
     size_t index, Iregion;
+    const size_t num_regions = field.size(),
+                 len_fields  = field.front().size();
     #pragma omp parallel \
     default(none) shared(field) private(Iregion, index) \
     reduction(max : fmax_loc) reduction(min : fmin_loc)
     {
         #pragma omp for collapse(2) schedule(static)
-        for (Iregion = 0; Iregion < field.size(); Iregion++) {
-            for (index = 0; index < field.front().size(); index++) {
+        for (Iregion = 0; Iregion < num_regions; Iregion++) {
+            for (index = 0; index < len_fields; index++) {
                 fmax_loc = std::max(fmax_loc, field.at(Iregion).at(index));
                 fmin_loc = std::min(fmin_loc, field.at(Iregion).at(index));
             }
@@ -84,8 +86,8 @@ void write_integral_to_post(
         private(Iregion, index, local_double, local_int)
         {
             #pragma omp for collapse(2) schedule(static)
-            for (Iregion = 0; Iregion < field.size(); Iregion++) {
-                for (index = 0; index < field.front().size(); index++) {
+            for (Iregion = 0; Iregion < num_regions; Iregion++) {
+                for (index = 0; index < len_fields; index++) {
                     local_double = (field.at(Iregion).at(index) - fmiddle) / frange;
                     local_int = (signed short) round(ndrv * local_double);
                     int_fields.at(Iregion).at(index) = local_int;
@@ -113,7 +115,8 @@ void write_integral_to_post(
                                ? constants::fill_value + 2 
                                : constants::fill_value - 2;
 
-        scale_factor = std::fabs( frange / max_val );
+        //scale_factor = std::fabs( frange / max_val );
+        scale_factor = fabs( frange / max_val );
         if (scale_factor < 1e-25) { scale_factor = 1.; }
         if (scale_factor > 1e+15) { scale_factor = 1e+15; }
 
@@ -129,8 +132,8 @@ void write_integral_to_post(
         private(Iregion, index)
         {
             #pragma omp for collapse(2) schedule(static)
-            for (Iregion = 0; Iregion < field.size(); Iregion++) {
-                for (index = 0; index < field.front().size(); index++) {
+            for (Iregion = 0; Iregion < num_regions; Iregion++) {
+                for (index = 0; index < len_fields; index++) {
                     float_fields.at(Iregion).at(index) = ( field.at(Iregion).at(index) - fmiddle ) / scale_factor;
                 }
             }
@@ -149,7 +152,8 @@ void write_integral_to_post(
                                ? constants::fill_value + 2 
                                : constants::fill_value - 2;
 
-        scale_factor = std::fabs( frange / max_val );
+        //scale_factor = std::fabs( frange / max_val );
+        scale_factor = fabs( frange / max_val );
         if (scale_factor < 1e-25) { scale_factor = 1.; }
         if (scale_factor > 1e+15) { scale_factor = 1e+15; }
 
@@ -165,8 +169,8 @@ void write_integral_to_post(
         private(Iregion, index)
         {
             #pragma omp for collapse(2) schedule(static)
-            for (Iregion = 0; Iregion < field.size(); Iregion++) {
-                for (index = 0; index < field.front().size(); index++) {
+            for (Iregion = 0; Iregion < num_regions; Iregion++) {
+                for (index = 0; index < len_fields; index++) {
                     double_fields.at(Iregion).at(index) = ( field.at(Iregion).at(index) - fmiddle ) / scale_factor;
                 }
             }

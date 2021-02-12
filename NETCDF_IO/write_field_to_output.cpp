@@ -100,7 +100,8 @@ void write_field_to_output(
         }
         #endif
 
-        scale_factor = std::fabs( frange / max_val );
+        //scale_factor = std::fabs( frange / max_val );
+        scale_factor = fabs( frange / max_val );
         if (scale_factor < 1e-25) { scale_factor = 1.; }
         if (scale_factor > 1e+15) { scale_factor = 1e+15; }
 

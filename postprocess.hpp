@@ -86,8 +86,8 @@ void compute_region_avg_and_std_OkuboWeiss(
         );
 
 void compute_time_avg_std(
-        std::vector<std::vector<double>> & time_average,
-        std::vector<std::vector<double>> & time_std_dev,
+        std::vector<std::vector<double> > & time_average,
+        std::vector<std::vector<double> > & time_std_dev,
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<bool> & mask,
         const std::vector<double> & areas,
