@@ -105,15 +105,6 @@ int main(int argc, char *argv[]) {
     read_var_from_file(u_lon, zonal_vel_name,  input_fname, &mask, &myCounts, &myStarts);
     read_var_from_file(u_lat, merid_vel_name,  input_fname, &mask, &myCounts, &myStarts);
 
-    /*
-    // testing
-    if (not(use_mask)) {
-        for (size_t index = 0; index < mask.size(); ++index) {
-            mask.at(index) = true;
-        }
-    }
-    */
-
     // Mask out the pole, if necessary (i.e. set lat = 90 to land)
     mask_out_pole(latitude, mask, Ntime, Ndepth, Nlat, Nlon);
 
