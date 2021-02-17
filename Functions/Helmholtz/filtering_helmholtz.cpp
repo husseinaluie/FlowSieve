@@ -479,25 +479,28 @@ void filtering_helmholtz(
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
 
-                            if (mask.at(index)) { // Skip land areas
-    
-                                // Apply the filter at the point
-                                apply_filter_at_point(
-                                        filtered_vals, filter_fields,
-                                        Ntime, Ndepth, Nlat, Nlon,
-                                        Itime, Idepth, Ilat, Ilon,
-                                        longitude, latitude, LAT_lb, LAT_ub,
-                                        dAreas, scale, mask, filt_use_mask,
-                                        &local_kernel);
+                            // The F_tor and F_pot fields exist over land from the projection
+                            //     procedure, so do those filtering operations on land as well.
+                            // The other stuff (KE, etc), will only be done on water cells
 
-                                // Store the filtered values in the appropriate arrays
-                                coarse_F_pot.at(index) = F_pot_tmp;
-                                coarse_F_tor.at(index) = F_tor_tmp;
+                            // Apply the filter at the point
+                            apply_filter_at_point(
+                                    filtered_vals, filter_fields,
+                                    Ntime, Ndepth, Nlat, Nlon,
+                                    Itime, Idepth, Ilat, Ilon,
+                                    longitude, latitude, LAT_lb, LAT_ub,
+                                    dAreas, scale, mask, filt_use_mask,
+                                    &local_kernel);
+
+                            // Store the filtered values in the appropriate arrays
+                            coarse_F_pot.at(index) = F_pot_tmp;
+                            coarse_F_tor.at(index) = F_tor_tmp;
+
+                            if (mask.at(index)) { // Skip land areas
 
                                 KE_tor_filt.at(index) = tor_KE_tmp;
                                 KE_pot_filt.at(index) = pot_KE_tmp;
                                 KE_tot_filt.at(index) = tot_KE_tmp;
-    
 
                                 //
                                 //// Also get (uiuj)_bar from Cartesian velocities
@@ -575,10 +578,9 @@ void filtering_helmholtz(
 
         // Write to file
         if (not(constants::NO_FULL_OUTPUTS)) {
-            write_field_to_output(coarse_F_tor, "coarse_F_tor", 
-                    starts, counts, fname, &mask);
-            write_field_to_output(coarse_F_pot, "coarse_F_pot", 
-                    starts, counts, fname, &mask);
+            // Don't mask these fields, since they are filled over land from the projection
+            write_field_to_output(coarse_F_tor, "coarse_F_tor", starts, counts, fname, NULL);
+            write_field_to_output(coarse_F_pot, "coarse_F_pot", starts, counts, fname, NULL);
         }
 
         // Get pot and tor velocities
@@ -670,7 +672,7 @@ void filtering_helmholtz(
             }
         }
 
-        if (not(constants::MINIMAL_OUTPUT)) {
+        if (not(constants::NO_FULL_OUTPUTS)) {
             write_field_to_output( KE_tor_filt, "KE_tor_filt", starts, counts, fname, &mask);
             write_field_to_output( KE_pot_filt, "KE_pot_filt", starts, counts, fname, &mask);
             write_field_to_output( KE_tot_filt, "KE_tot_filt", starts, counts, fname, &mask);
@@ -678,7 +680,9 @@ void filtering_helmholtz(
             write_field_to_output( KE_tor_fine, "KE_tor_fine", starts, counts, fname, &mask);
             write_field_to_output( KE_pot_fine, "KE_pot_fine", starts, counts, fname, &mask);
             write_field_to_output( KE_tot_fine, "KE_tot_fine", starts, counts, fname, &mask);
+        }
 
+        if (not(constants::MINIMAL_OUTPUT)) {
             write_field_to_output( KE_tor_fine_mod, "KE_tor_fine_mod", starts, counts, fname, &mask);
             write_field_to_output( KE_pot_fine_mod, "KE_pot_fine_mod", starts, counts, fname, &mask);
             write_field_to_output( KE_tot_fine_mod, "KE_tot_fine_mod", starts, counts, fname, &mask);
