@@ -400,10 +400,11 @@ void filtering_helmholtz(
                 timing_records, clock_on, \
                 longitude, latitude, dAreas, scale, \
                 F_potential, F_toroidal, coarse_F_tor, coarse_F_pot, \
-                u_x_tor, u_y_tor, u_z_tor, u_x_pot, u_y_pot, u_z_pot, u_x_tot, u_y_tot, y_z_tot, \
+                u_x_tor, u_y_tor, u_z_tor, u_x_pot, u_y_pot, u_z_pot, u_x_tot, u_y_tot, u_z_tot, \
                 ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor,\
                 ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot,\
                 ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot,\
+                KE_tor_filt, KE_pot_filt, KE_tot_filt \
                 ) \
         private(Itime, Idepth, Ilat, Ilon, index, \
                 F_tor_tmp, F_pot_tmp, tor_KE_tmp, pot_KE_tmp, tot_KE_tmp, \
@@ -639,8 +640,12 @@ void filtering_helmholtz(
 
         #pragma omp parallel \
         default( none ) \
-        shared( KE_tor, KE_pot, KE_tot, Enst_tor, Enst_pot, Enst_tot, mask, \
-                u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot, u_lon_tot, u_lat_tot) \
+        shared( KE_tor_coarse, KE_tor_fine, KE_tor_filt, KE_tor_fine_mod, KE_tor_orig, \
+                KE_pot_coarse, KE_pot_fine, KE_pot_filt, KE_pot_fine_mod, KE_pot_orig, \
+                KE_tot_coarse, KE_tot_fine, KE_tot_filt, KE_tot_fine_mod, KE_tot_orig, \
+                Enst_tor, Enst_pot, Enst_tot, mask, \
+                u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot, u_lon_tot, u_lat_tot, \
+                vort_tor_r, vort_pot_r, vort_tot_r ) \
         private( index )
         {
             #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
