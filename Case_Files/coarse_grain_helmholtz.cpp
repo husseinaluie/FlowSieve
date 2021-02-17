@@ -52,9 +52,7 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales { 
-        //100e3, 250e3, 400e3, 1000e3
-        
-        //1e3 //129e3
+        //100e3, 250e3, 400e3
 
                                                       4.64e4, 5.99e4, 7.74e4,
         1.e5, 1.29e5, 1.67e5, 2.15e5, 2.78e5, 3.59e5, 4.64e5, 5.99e5, 7.74e5,
@@ -124,8 +122,8 @@ int main(int argc, char *argv[]) {
     const int Nlat   = latitude.size();
 
     // Read in the toroidal and potential fields
-    read_var_from_file(F_potential, tor_field_var_name, pot_input_fname, NULL, &myCounts, &myStarts);
-    read_var_from_file(F_toroidal,  pot_field_var_name, tor_input_fname, NULL, &myCounts, &myStarts);
+    read_var_from_file(F_potential, pot_field_var_name, pot_input_fname, NULL, &myCounts, &myStarts);
+    read_var_from_file(F_toroidal,  tor_field_var_name, tor_input_fname, NULL, &myCounts, &myStarts);
 
     // read in velocity to get the mask
     read_var_from_file(u_tor, vel_field_var_name, vel_input_fname, &mask, &myCounts, &myStarts);
