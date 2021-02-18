@@ -224,7 +224,7 @@ void read_var_from_file(
 
     // If we're at 99% of the fill_val, call it land
     for (size_t II = 0; II < var.size(); II++) {
-        if (fabs(var.at(II)) > 0.99 * (fabs(fill_val*scale) + fabs(offset))) {
+        if (fabs(var.at(II)) > 0.99 * (fabs(fill_val*scale + offset))) {
             if (mask != NULL) { mask->at(II) = false; }
             num_land++;
         } else {
