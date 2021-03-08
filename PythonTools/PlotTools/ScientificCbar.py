@@ -6,7 +6,7 @@ def ScientificCbar(cbar, units='',
         orientation='vertical', 
         centre = True, centre_val=0.,
         labelpad = 20, label='', logbar = False, 
-        force_scale = True, scale_val = 0):
+        force_scale = False, scale_val = 0):
 
     if ( logbar and centre ):
         print("Cannot log a centred colour bar. Setting centre to False")
@@ -37,6 +37,8 @@ def ScientificCbar(cbar, units='',
         else:
             scale = np.log10(np.max(np.abs(ticks)))
             scale = np.floor(scale)
+
+        #print( scale, ticks, np.abs(ticks), np.max(np.abs(ticks)) )
     
         # Label
         if scale != 0:
@@ -49,13 +51,15 @@ def ScientificCbar(cbar, units='',
     
         # Tick labels
         tick_labels = ["{0:.2g}".format(tick/(10**scale)) for tick in ticks]
+
+    #print(tick_labels)
     
     # Add appropriate label to the bar
     if orientation == 'vertical':
         if scale != 0.:
             cbar.ax.set_yticklabels(tick_labels)
         cbar.ax.set_ylabel(cb_label, rotation = '-90', labelpad = labelpad)
-    elif orientation == 'horizontal':
+    else:
         if scale != 0.:
             cbar.ax.set_xticklabels(tick_labels)
         cbar.ax.set_xlabel(cb_label, rotation = '0', labelpad = labelpad)
