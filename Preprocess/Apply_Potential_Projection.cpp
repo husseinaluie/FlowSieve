@@ -58,7 +58,7 @@ void Apply_Potential_Projection(
     compute_spatial_average(u_lat_means, u_lat, dAreas, Ntime, Ndepth, Nlat, Nlon, mask);
 
     // Fill in the land areas with zero velocity
-    //   also subtract the mean off (will be added back later)
+    //   also subtract the mean off (will be added back later - to the Toroidal side)
     for (index = 0; index < (int)u_lon.size(); index++) {
         if (not(mask.at(index))) {
             u_lon.at(index) = 0.;
