@@ -76,6 +76,15 @@ namespace constants
     const signed short fill_value_s = -32767;
 
     /*!
+     * \param DEFORM_AROUND_LAND
+     * \brief Boolean indicating whether or not the kernel should deform around land.
+     * If true, land is given zero weight (i.e. not factored into local average).
+     * If false, land is included in local average (treated as zero velocity
+     * @ingroup constants
+     */
+    const bool DEFORM_AROUND_LAND = true;
+
+    /*!
      * \param CARTESIAN
      * \brief Boolean indicating if the coordinate system is Cartesian. (If false, then spherical)
      * @ingroup constants
@@ -136,7 +145,7 @@ namespace constants
      * \brief Boolean indicating if non-linear transfers (Pi) should be computed.
      * @ingroup constants
      */
-    const bool COMP_TRANSFERS = false;
+    const bool COMP_TRANSFERS = true;
 
     /*!
      * \param COMP_BC_TRANSFERS

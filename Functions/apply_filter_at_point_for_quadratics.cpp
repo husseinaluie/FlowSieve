@@ -98,8 +98,13 @@ void apply_filter_at_point_for_quadratics(
                 kern = local_kernel->at(area_index);
             }
 
+
+            // If cell is water, or if we're not deforming around land, then include the cell area in the integral
+            mask_val = ( mask.at(index) or not(constants::DEFORM_AROUND_LAND) ) ? 1. : 0.;
             area     = dAreas.at(area_index);
-            kA_sum  += kern * area;
+            kA_sum  += kern * area * mask_val;
+
+            // If the cell is water, keep the value, otherwise zero it out
             mask_val = mask.at(index) ? 1. : 0.;
 
             u_x_loc = u_x.at(index);

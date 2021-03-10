@@ -92,13 +92,24 @@ void apply_filter_at_point(
                 kern = local_kernel->at(area_index);
             }
 
-            area      = dAreas.at(area_index);
-            kA_sum   += kern * area;
+            // If cell is water, or if we're not deforming around land, then include the cell area in the integral
+            mask_val = ( mask.at(index) or not(constants::DEFORM_AROUND_LAND) ) ? 1. : 0.;
+
+            area    = dAreas.at(area_index);
+            kA_sum += kern * area * mask_val;
 
             for (size_t II = 0; II < Nfields; ++II) {
-                mask_val = ( not(use_mask.at(II)) or mask.at(index) ) ? 1. : 0.;
+                // If we are not using the mask, or if we are on a water cell, include the value in the integrak
+                if ( mask.at(index) ) {
+                    mask_val == 1.;
+                } else if ( constants::DEFORM_AROUND_LAND or use_mask.at(II) ) {
+                    mask_val == 0;
+                }
+                //mask_val = ( not(use_mask.at(II)) or mask.at(index) ) ? 1. : 0.;
+
                 loc_val = fields.at(II)->at(index);
                 if (weight != NULL) { loc_val *= weight->at(index); }
+
                 tmp_vals.at(II) += loc_val * kern * area * mask_val;
             }
 
