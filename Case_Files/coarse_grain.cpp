@@ -1,6 +1,6 @@
 #include <fenv.h>
 #include <stdio.h>
-#include <string.h>
+#include <string>
 #include <stdlib.h>
 #include <algorithm>
 #include <math.h>
@@ -64,21 +64,27 @@ int main(int argc, char *argv[]) {
         // AVISO full output
         //50e3, 100e3, 215e3, 460e3
 
-        //100e3, 250e3, 400e3
-        //100e3
+        //10e3, 100e3, 250e3, 500e3, 1000e3
 
         // Artifical Dataset
         //0.1, 0.2, 0.3, 0.4, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12
 
         // AVISO paper
-        /*1.e4, 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4,*/ 4.64e4, 5.99e4, 7.74e4,
+        1.e4, 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4, 4.64e4, 5.99e4, 7.74e4,
         1.e5, 1.29e5, 1.67e5, 2.15e5, 2.78e5, 3.59e5, 4.64e5, 5.99e5, 7.74e5,
         1.e6, 1.29e6, 1.67e6, 2.15e6//, 2.78e6, 3.59e6
 
+        // Lo-res (NEMO part of AVISO paper)
         /*
         1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
         1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
-        1e6, //1.58e6, 2.51e6, 3.98e6, 6.31e6,
+        1e6, 
+        */
+
+        // Double resolution of above (i.e. fill in gaps)
+        /*
+        1.26e4,  2.00e4  3.16e4,  5.01e4,  7.94e4,
+        1.26e5,  2.00e5  3.16e5,  5.01e5,  7.94e5,
         */
     };
 
@@ -98,6 +104,11 @@ int main(int argc, char *argv[]) {
     const std::string &depth_dim_name     = input.getCmdOption("--depth",       "depth");
     const std::string &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude");
     const std::string &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+
+    const std::string &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1");
+    const std::string &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const int Nprocs_in_time_input  = stoi(Nprocs_in_time_string);
+    const int Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
     const std::string &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo");
     const std::string &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo");
@@ -127,12 +138,25 @@ int main(int argc, char *argv[]) {
     read_var_from_file(depth,     depth_dim_name,     input_fname);
     read_var_from_file(latitude,  latitude_dim_name,  input_fname);
     read_var_from_file(longitude, longitude_dim_name, input_fname);
+
+    const int Ntime  = time.size();
+    const int Ndepth = depth.size();
+    const int Nlon   = longitude.size();
+    const int Nlat   = latitude.size();
+
+    //
+    const int Nprocs_in_time  = (Ntime  == 1) ? 1 : Nprocs_in_time_input;
+    const int Nprocs_in_depth = (Ndepth == 1) ? 1 : Nprocs_in_depth_input;
+    #if DEBUG >= 0
+    if (wRank == 0) { fprintf(stdout, " Nproc(time, depth) = (%'d, %'d)\n", Nprocs_in_time, Nprocs_in_depth); }
+    #endif
+    assert( Nprocs_in_time * Nprocs_in_depth == wSize );
      
     convert_coordinates(longitude, latitude);
 
     // Read in the velocity fields
-    read_var_from_file(u_lon, zonal_vel_name, input_fname, &mask, &myCounts, &myStarts);
-    read_var_from_file(u_lat, merid_vel_name, input_fname, &mask, &myCounts, &myStarts);
+    read_var_from_file(u_lon, zonal_vel_name, input_fname, &mask, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
+    read_var_from_file(u_lat, merid_vel_name, input_fname, &mask, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
 
     // No u_r in inputs, so initialize as zero
     u_r.resize(u_lon.size());
@@ -146,16 +170,9 @@ int main(int argc, char *argv[]) {
 
     if (constants::COMP_BC_TRANSFERS) {
         // If desired, read in rho and p
-        read_var_from_file(rho, density_var_name,  input_fname);
-        read_var_from_file(p,   pressure_var_name, input_fname);
+        read_var_from_file(rho, density_var_name,  input_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth);
+        read_var_from_file(p,   pressure_var_name, input_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth);
     }
-
-    #if DEBUG >= 1
-    const int Ntime  = time.size();
-    const int Ndepth = depth.size();
-    #endif
-    const int Nlon   = longitude.size();
-    const int Nlat   = latitude.size();
 
     #if DEBUG >= 1
     fprintf(stdout, "Processor %d has (%d, %d, %d, %d) from (%d, %d, %d, %d)\n", 

@@ -56,6 +56,11 @@ int main(int argc, char *argv[]) {
     const std::string &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude");
     const std::string &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
 
+    const std::string &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1");
+    const std::string &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const int Nprocs_in_time_input  = stoi(Nprocs_in_time_string);
+    const int Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
+
     const std::string &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo");
     const std::string &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo");
 
@@ -98,15 +103,25 @@ int main(int argc, char *argv[]) {
     const int Ndepth = depth.size();
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
-     
+
+    //
+    const int Nprocs_in_time  = (Ntime  == 1) ? 1 : Nprocs_in_time_input;
+    const int Nprocs_in_depth = (Ndepth == 1) ? 1 : Nprocs_in_depth_input;
+    #if DEBUG >= 0
+    if (wRank == 0) { fprintf(stdout, " Nproc(time, depth) = (%'d, %'d)\n", Nprocs_in_time, Nprocs_in_depth); }
+    #endif
+    assert( Nprocs_in_time * Nprocs_in_depth == wSize );
+
+
     convert_coordinates(longitude, latitude);
 
     // Read in the velocity fields
-    read_var_from_file(u_lon, zonal_vel_name,  input_fname, &mask, &myCounts, &myStarts);
-    read_var_from_file(u_lat, merid_vel_name,  input_fname, &mask, &myCounts, &myStarts);
+    read_var_from_file(u_lon, zonal_vel_name,  input_fname, &mask, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
+    read_var_from_file(u_lat, merid_vel_name,  input_fname, &mask, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
 
     // Mask out the pole, if necessary (i.e. set lat = 90 to land)
-    mask_out_pole(latitude, mask, Ntime, Ndepth, Nlat, Nlon);
+    //mask_out_pole(latitude, mask, Ntime, Ndepth, Nlat, Nlon);
+    mask_out_pole(latitude, mask, myCounts[0], myCounts[1], myCounts[2], myCounts[3]);
 
     // Read in the seed
     double seed_count;
@@ -118,7 +133,7 @@ int main(int argc, char *argv[]) {
     } else {
         read_attr_from_file(seed_count, "seed_count", seed_fname);
         single_seed = (seed_count < 2);
-        read_var_from_file(seed, "seed", seed_fname, NULL, NULL, NULL, not(single_seed));
+        read_var_from_file(seed, "seed", seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed));
     }
     if (wRank == 0) { fprintf(stdout, " single_seed = %s\n", single_seed ? "true" : "false"); }
 

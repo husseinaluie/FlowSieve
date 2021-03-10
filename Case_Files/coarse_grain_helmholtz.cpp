@@ -54,9 +54,13 @@ int main(int argc, char *argv[]) {
     std::vector<double> filter_scales { 
         //100e3, 250e3, 400e3
 
+        1.e4 , 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4,
+
+        /*
                                                       4.64e4, 5.99e4, 7.74e4,
         1.e5, 1.29e5, 1.67e5, 2.15e5, 2.78e5, 3.59e5, 4.64e5, 5.99e5, 7.74e5,
         1.e6, 1.29e6, 1.67e6, 2.15e6, 
+        */
         
         /*
         1.e4 , 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4, 4.64e4, 5.99e4, 7.74e4,
@@ -86,6 +90,11 @@ int main(int argc, char *argv[]) {
     const std::string &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude");
     const std::string &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
 
+    const std::string &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1");
+    const std::string &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const int Nprocs_in_time_input  = stoi(Nprocs_in_time_string);
+    const int Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
+
     const std::string &tor_field_var_name = input.getCmdOption("--tor_field",   "F");
     const std::string &pot_field_var_name = input.getCmdOption("--pot_field",   "F");
     const std::string &vel_field_var_name = input.getCmdOption("--vel_field",   "u_lat");
@@ -113,23 +122,31 @@ int main(int argc, char *argv[]) {
     read_var_from_file(latitude,  latitude_dim_name,  tor_input_fname);
     read_var_from_file(time,      time_dim_name,      tor_input_fname);
     read_var_from_file(depth,     depth_dim_name,     tor_input_fname);
-     
-    convert_coordinates(longitude, latitude);
 
     const int Ntime  = time.size();
     const int Ndepth = depth.size();
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
+    //
+    const int Nprocs_in_time  = (Ntime  == 1) ? 1 : Nprocs_in_time_input;
+    const int Nprocs_in_depth = (Ndepth == 1) ? 1 : Nprocs_in_depth_input;
+    #if DEBUG >= 0
+    if (wRank == 0) { fprintf(stdout, " Nproc(time, depth) = (%'d, %'d)\n", Nprocs_in_time, Nprocs_in_depth); }
+    #endif
+    assert( Nprocs_in_time * Nprocs_in_depth == wSize );
+     
+    convert_coordinates(longitude, latitude);
+
     // Read in the toroidal and potential fields
-    read_var_from_file(F_potential, pot_field_var_name, pot_input_fname, NULL, &myCounts, &myStarts);
-    read_var_from_file(F_toroidal,  tor_field_var_name, tor_input_fname, NULL, &myCounts, &myStarts);
+    read_var_from_file(F_potential, pot_field_var_name, pot_input_fname, NULL, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
+    read_var_from_file(F_toroidal,  tor_field_var_name, tor_input_fname, NULL, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
 
     // read in velocity to get the mask
-    read_var_from_file(u_tor, vel_field_var_name, vel_input_fname, &mask, &myCounts, &myStarts);
+    read_var_from_file(u_tor, vel_field_var_name, vel_input_fname, &mask, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
 
     // Mask out the pole, if necessary (i.e. set lat = 90 to land)
-    mask_out_pole(latitude, mask, Ntime, Ndepth, Nlat, Nlon);
+    mask_out_pole(latitude, mask, myCounts[0], myCounts[1], myCounts[2], myCounts[3]);
 
     // Compute the area of each 'cell'
     //   which will be necessary for integration

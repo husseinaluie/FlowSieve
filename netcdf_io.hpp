@@ -256,6 +256,8 @@ void read_var_from_file(
         std::vector<bool> *mask = NULL,
         std::vector<int> *myCounts = NULL,
         std::vector<int> *myStarts = NULL,
+        const int Nprocs_in_time = 1,
+        const int Nprocs_in_depth = 1,
         const bool do_splits = true,
         const int force_split_dim = -1,
         const MPI_Comm = MPI_COMM_WORLD 

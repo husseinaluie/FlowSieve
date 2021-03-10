@@ -1,6 +1,7 @@
 
 #include "../netcdf_io.hpp"
 #include "../constants.hpp"
+#include "../functions.hpp"
 #include <cassert>
 #include <math.h>
 
@@ -12,6 +13,8 @@ void read_var_from_file(
         std::vector<bool> *mask,
         std::vector<int> *myCounts,
         std::vector<int> *myStarts,
+        const int Nprocs_in_time,
+        const int Nprocs_in_depth,
         const bool do_splits,
         const int force_split_dim,
         const MPI_Comm comm
@@ -19,7 +22,7 @@ void read_var_from_file(
 
     assert( check_file_existence( filename.c_str() ) );
 
-    int wRank, wSize;
+    int wRank, wSize, Nprocs_in_dim, Iproc_in_dim;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
 
@@ -71,7 +74,8 @@ void read_var_from_file(
     // Get the size of each dimension
     size_t start[num_dims], count[num_dims];
     size_t num_pts = 1;
-    int my_count, overflow;
+    int my_count, overflow,
+        Itime_proc, Idepth_proc, Ilat_proc, Ilon_proc;
     if (myCounts != NULL) {
         myCounts->resize(num_dims);
         myStarts->resize(num_dims);
@@ -90,17 +94,30 @@ void read_var_from_file(
             //
             //   we don't split the last two because those 
             //   are assumed to be lat/lon
-            if ( ( (num_dims > 2) and (wSize > 1) and (II == 0) )
+
+            if ( ( (num_dims > 2) and (wSize > 1) and (II <= 1) )
                  or
                  ( II == force_split_dim )
                ) {
-                // For now, just split in time (assumed to be the first dimension)
-                my_count = ((int)count[II]) / wSize;
-                overflow = (int)( count[II] - my_count * wSize );
+
+                assert( Nprocs_in_time > 0 ); // Must specify the number of processors used in time
+                assert( Nprocs_in_depth > 0 ); // Must specify the number of processors used in depth
+                assert( Nprocs_in_time * Nprocs_in_depth == wSize ); // Total number of processors does no match with specified values
+
+                if      ( II == 0 ) { Nprocs_in_dim = Nprocs_in_time;  }
+                else if ( II == 1 ) { Nprocs_in_dim = Nprocs_in_depth; }
+
+                my_count = ( (int)count[II] ) / Nprocs_in_dim;
+                overflow = (int)( count[II] - my_count * Nprocs_in_dim );
+
+                Index1to4( wRank, Itime_proc,      Idepth_proc,     Ilat_proc, Ilon_proc,
+                                  Nprocs_in_time,  Nprocs_in_depth, 1,         1          );
+                if      ( II == 0 ) { Iproc_in_dim = Itime_proc;  }
+                else if ( II == 1 ) { Iproc_in_dim = Idepth_proc; }
 
                 start[II] = (size_t) (   
-                          std::min(wRank,            overflow) * (my_count + 1)
-                        + std::max(wRank - overflow, 0       ) *  my_count
+                          std::min(Iproc_in_dim,            overflow) * (my_count + 1)
+                        + std::max(Iproc_in_dim - overflow, 0       ) *  my_count
                         );
 
                 // Distribute the remainder over the first chunk of processors
