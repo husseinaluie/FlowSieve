@@ -59,18 +59,25 @@ void Apply_Potential_Projection(
 
     // Fill in the land areas with zero velocity
     //   also subtract the mean off (will be added back later - to the Toroidal side)
-    for (index = 0; index < (int)u_lon.size(); index++) {
-        if (not(mask.at(index))) {
-            u_lon.at(index) = 0.;
-            u_lat.at(index) = 0.;
-        } else {
-            Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                             Ntime, Ndepth, Nlat, Nlon);
-            mean_ind  = Index(0, 0, Itime, Idepth,
-                              1, 1, Ntime, Ndepth);
+    #pragma omp parallel \
+    default(none) \
+    shared( u_lon, u_lat, u_lon_means, u_lat_means, mask ) \
+    private( index, Itime, Idepth, Ilat, Ilon, mean_ind )
+    {
+        #pragma omp for collapse(1) schedule(guided)
+        for (index = 0; index < (int)u_lon.size(); index++) {
+            if (not(mask.at(index))) {
+                u_lon.at(index) = 0.;
+                u_lat.at(index) = 0.;
+            } else {
+                Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                                 Ntime, Ndepth, Nlat, Nlon);
+                mean_ind  = Index(0, 0, Itime, Idepth,
+                                  1, 1, Ntime, Ndepth);
 
-            u_lon.at(index) -= u_lon_means.at(mean_ind);
-            u_lat.at(index) -= u_lat_means.at(mean_ind);
+                u_lon.at(index) -= u_lon_means.at(mean_ind);
+                u_lat.at(index) -= u_lat_means.at(mean_ind);
+            }
         }
     }
 
@@ -98,11 +105,18 @@ void Apply_Potential_Projection(
 
     // Copy the starting seed.
     if (single_seed) {
-        for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-            for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                index = Index(0, 0, Ilat, Ilon,
-                              1, 1, Nlat, Nlon);
-                F_seed.at(index) = seed.at(index);
+        #pragma omp parallel \
+        default(none) \
+        shared(F_seed, seed) \
+        private( Ilat, Ilon, index )
+        {
+            #pragma omp for collapse(2) schedule(static)
+            for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                    index = Index(0, 0, Ilat, Ilon,
+                                  1, 1, Nlat, Nlon);
+                    F_seed.at(index) = seed.at(index);
+                }
             }
         }
     }
@@ -144,13 +158,20 @@ void Apply_Potential_Projection(
 
             // If single_seed == false, then we were provided seed values
             if (not(single_seed)) {
-                for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                    for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                      Ntime, Ndepth, Nlat, Nlon);
-                        index_sub = Index(0, 0, Ilat, Ilon,
-                                          1, 1, Nlat, Nlon);
-                        F_seed.at(index_sub) = seed.at(index);
+                #pragma omp parallel \
+                default(none) \
+                shared( F_seed, seed, Itime, Idepth ) \
+                private( Ilat, Ilon, index, index_sub )
+                {
+                    #pragma omp for collapse(2) schedule(static)
+                    for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                        for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                            index = Index(Itime, Idepth, Ilat, Ilon,
+                                          Ntime, Ndepth, Nlat, Nlon);
+                            index_sub = Index(0, 0, Ilat, Ilon,
+                                              1, 1, Nlat, Nlon);
+                            F_seed.at(index_sub) = seed.at(index);
+                        }
                     }
                 }
             }
@@ -176,16 +197,22 @@ void Apply_Potential_Projection(
             toroidal_Lap_F(F_seed_Lap, F_seed, longitude, latitude,
                     Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
-            for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                    index = Index(Itime, Idepth, Ilat, Ilon,
-                                  Ntime, Ndepth, Nlat, Nlon);
-                    index_sub = Index(0, 0, Ilat, Ilon,
-                                      1, 1, Nlat, Nlon);
-                    div_term.at(index_sub) = 
-                        full_div_orig.at(index) - F_seed_Lap.at(index_sub);
+            #pragma omp parallel \
+            default(none) \
+            shared( div_term, full_div_orig, F_seed_Lap, dAreas, Itime, Idepth ) \
+            private( Ilat, Ilon, index_sub, index )
+            {
+                #pragma omp for collapse(2) schedule(static)
+                for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                    for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                        index = Index(Itime, Idepth, Ilat, Ilon,
+                                      Ntime, Ndepth, Nlat, Nlon);
+                        index_sub = Index(0, 0, Ilat, Ilon,
+                                          1, 1, Nlat, Nlon);
+                        div_term.at(index_sub) = full_div_orig.at(index) - F_seed_Lap.at(index_sub);
 
-                    if (weight_err) { div_term.at(index_sub) *= dAreas.at(index_sub); }
+                        if (weight_err) { div_term.at(index_sub) *= dAreas.at(index_sub); }
+                    }
                 }
             }
 
@@ -240,26 +267,34 @@ void Apply_Potential_Projection(
             //
             //// Store into the full arrays
             //
-            for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                    index = Index(Itime, Idepth, Ilat, Ilon,
-                                  Ntime, Ndepth, Nlat, Nlon);
+            #pragma omp parallel \
+            default(none) \
+            shared( full_u_lon_pot, u_lon_pot, u_lon_means, full_u_lat_pot, u_lat_pot, u_lat_means,\
+                    full_div_pot, div_pot, full_F, F_vector, full_seed, F_seed, full_RHS, div_term, \
+                    Itime, Idepth ) \
+            private( Ilat, Ilon, index, index_sub, mean_ind )
+            {
+                #pragma omp for collapse(2) schedule(static)
+                for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                    for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                        index = Index(Itime, Idepth, Ilat, Ilon,
+                                Ntime, Ndepth, Nlat, Nlon);
 
-                    index_sub = Index(0, 0, Ilat, Ilon,
-                                      1, 1, Nlat, Nlon);
-                    mean_ind  = Index(0, 0, Itime, Idepth,
-                                      1, 1, Ntime, Ndepth);
+                        index_sub = Index(0, 0, Ilat, Ilon,
+                                          1, 1, Nlat, Nlon);
+                        mean_ind  = Index(0, 0, Itime, Idepth,
+                                          1, 1, Ntime, Ndepth);
 
-                    // add the mean velocity back in
-                    full_u_lon_pot.at(index) = u_lon_pot.at(index_sub);
-                    full_u_lat_pot.at(index) = u_lat_pot.at(index_sub);
+                        // add the mean velocity back in
+                        full_u_lon_pot.at(index) = u_lon_pot.at(index_sub);
+                        full_u_lat_pot.at(index) = u_lat_pot.at(index_sub);
 
-                    full_div_pot.at(  index) = div_pot.at(  index_sub);
-                    full_F.at(        index) = F_vector.at( index_sub);
+                        full_div_pot.at(  index) = div_pot.at(  index_sub);
+                        full_F.at(        index) = F_vector.at( index_sub);
 
-                    full_seed.at(index) = F_seed.at(   index_sub);
-                    full_RHS.at( index) = div_term.at( index_sub);
-
+                        full_seed.at(index) = F_seed.at(   index_sub);
+                        full_RHS.at( index) = div_term.at( index_sub);
+                    }
                 }
             }
 
@@ -268,13 +303,16 @@ void Apply_Potential_Projection(
                 F_seed = F_vector;
             }
 
-            // 
-            #if DEBUG >= 0
-            fprintf(stdout, "    Rank %d done time %d\n", wRank, Itime + myStarts.at(0) );
+            #if DEBUG >= 1
+            fprintf(stdout, "  --  --  Rank %d done depth %d\n", wRank, Idepth + myStarts.at(1) );
             fflush(stdout);
             #endif
-
         }
+
+        #if DEBUG >= 1
+        fprintf(stdout, " -- Rank %d done time %d\n", wRank, Itime + myStarts.at(0) );
+        fflush(stdout);
+        #endif
     }
 
     //

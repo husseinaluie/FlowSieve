@@ -59,18 +59,25 @@ void Apply_Toroidal_Projection(
 
     // Fill in the land areas with zero velocity
     //   also subtract the mean off (will be added back later)
-    for (index = 0; index < (int)u_lon.size(); index++) {
-        if (not(mask.at(index))) {
-            u_lon.at(index) = 0.;
-            u_lat.at(index) = 0.;
-        } else {
-            Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                             Ntime, Ndepth, Nlat, Nlon);
-            mean_ind  = Index(0, 0, Itime, Idepth,
-                              1, 1, Ntime, Ndepth);
+    #pragma omp parallel \
+    default(none) \
+    shared( u_lon, u_lat, u_lon_means, u_lat_means, mask ) \
+    private( index, Itime, Idepth, Ilat, Ilon, mean_ind )
+    {
+        #pragma omp for collapse(1) schedule(guided)
+        for (index = 0; index < (int)u_lon.size(); index++) {
+            if (not(mask.at(index))) {
+                u_lon.at(index) = 0.;
+                u_lat.at(index) = 0.;
+            } else {
+                Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                        Ntime, Ndepth, Nlat, Nlon);
+                mean_ind  = Index(0, 0, Itime, Idepth,
+                        1, 1, Ntime, Ndepth);
 
-            u_lon.at(index) -= u_lon_means.at(mean_ind);
-            u_lat.at(index) -= u_lat_means.at(mean_ind);
+                u_lon.at(index) -= u_lon_means.at(mean_ind);
+                u_lat.at(index) -= u_lat_means.at(mean_ind);
+            }
         }
     }
 
@@ -99,11 +106,18 @@ void Apply_Toroidal_Projection(
 
     // Copy the starting seed.
     if (single_seed) {
-        for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-            for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                index = Index(0, 0, Ilat, Ilon,
-                              1, 1, Nlat, Nlon);
-                F_seed.at(index) = seed.at(index);
+        #pragma omp parallel \
+        default(none) \
+        shared(F_seed, seed) \
+        private( Ilat, Ilon, index )
+        {
+            #pragma omp for collapse(2) schedule(static)
+            for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                    index = Index(0, 0, Ilat, Ilon,
+                                  1, 1, Nlat, Nlon);
+                    F_seed.at(index) = seed.at(index);
+                }
             }
         }
     }
@@ -145,13 +159,20 @@ void Apply_Toroidal_Projection(
 
             // If single_seed == false, then we were provided seed values
             if (not(single_seed)) {
-                for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                    for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                        index = Index(Itime, Idepth, Ilat, Ilon,
-                                      Ntime, Ndepth, Nlat, Nlon);
-                        index_sub = Index(0, 0, Ilat, Ilon,
-                                          1, 1, Nlat, Nlon);
-                        F_seed.at(index_sub) = seed.at(index);
+                #pragma omp parallel \
+                default(none) \
+                shared( F_seed, seed, Itime, Idepth ) \
+                private( Ilat, Ilon, index, index_sub )
+                {
+                    #pragma omp for collapse(2) schedule(static)
+                    for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                        for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                            index = Index(Itime, Idepth, Ilat, Ilon,
+                                          Ntime, Ndepth, Nlat, Nlon);
+                            index_sub = Index(0, 0, Ilat, Ilon,
+                                              1, 1, Nlat, Nlon);
+                            F_seed.at(index_sub) = seed.at(index);
+                        }
                     }
                 }
             }
@@ -182,12 +203,19 @@ void Apply_Toroidal_Projection(
 
             if (weight_err) {
                 // Weight by area if requested
-                for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                    for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                        index_sub = Index(0, 0, Ilat, Ilon,
-                                          1, 1, Nlat, Nlon);
+                #pragma omp parallel \
+                default(none) \
+                shared( curl_term, dAreas ) \
+                private( Ilat, Ilon, index_sub )
+                {
+                    #pragma omp for collapse(2) schedule(static)
+                    for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                        for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                            index_sub = Index(0, 0, Ilat, Ilon,
+                                              1, 1, Nlat, Nlon);
 
-                        curl_term.at(index_sub) *= dAreas.at(index_sub);
+                            curl_term.at(index_sub) *= dAreas.at(index_sub);
+                        }
                     }
                 }
             }
@@ -253,28 +281,36 @@ void Apply_Toroidal_Projection(
             //
             //// Store into the full arrays
             //
-            for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                    index = Index(Itime, Idepth, Ilat, Ilon,
-                                  Ntime, Ndepth, Nlat, Nlon);
+            #pragma omp parallel \
+            default(none) \
+            shared( full_u_lon_tor, u_lon_tor, u_lon_means, full_u_lat_tor, u_lat_tor, u_lat_means,\
+                    full_div_tor, div_tor, full_F, F_vector, full_seed, F_seed, full_RHS, curl_term, \
+                    Itime, Idepth ) \
+            private( Ilat, Ilon, index, index_sub, mean_ind )
+            {
+                #pragma omp for collapse(2) schedule(static)
+                for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                    for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                        index = Index(Itime, Idepth, Ilat, Ilon,
+                                      Ntime, Ndepth, Nlat, Nlon);
 
-                    index_sub = Index(0, 0, Ilat, Ilon,
-                                      1, 1, Nlat, Nlon);
-                    mean_ind  = Index(0, 0, Itime, Idepth,
-                                      1, 1, Ntime, Ndepth);
+                        index_sub = Index(0, 0, Ilat, Ilon,
+                                          1, 1, Nlat, Nlon);
+                        mean_ind  = Index(0, 0, Itime, Idepth,
+                                          1, 1, Ntime, Ndepth);
 
-                    // add the mean velocity back in
-                    full_u_lon_tor.at(index) = u_lon_tor.at(index_sub) 
-                        + u_lon_means.at(mean_ind);
-                    full_u_lat_tor.at(index) = u_lat_tor.at(index_sub)
-                        + u_lat_means.at(mean_ind);
+                        // add the mean velocity back in
+                        full_u_lon_tor.at(index) =   u_lon_tor.at(index_sub) 
+                                                   + u_lon_means.at(mean_ind);
+                        full_u_lat_tor.at(index) =   u_lat_tor.at(index_sub)
+                                                   + u_lat_means.at(mean_ind);
 
-                    full_div_tor.at(  index) = div_tor.at(  index_sub);
-                    full_F.at(        index) = F_vector.at( index_sub);
+                        full_div_tor.at(  index) = div_tor.at(  index_sub);
+                        full_F.at(        index) = F_vector.at( index_sub);
 
-                    full_seed.at(index) = F_seed.at(   index_sub);
-                    full_RHS.at( index) = curl_term.at(index_sub);
-
+                        full_seed.at(index) = F_seed.at(   index_sub);
+                        full_RHS.at( index) = curl_term.at(index_sub);
+                    }
                 }
             }
 
@@ -283,13 +319,17 @@ void Apply_Toroidal_Projection(
                 F_seed = F_vector;
             }
 
-            // 
-            #if DEBUG >= 0
-            fprintf(stdout, "    Rank %d done time %d\n", wRank, Itime + myStarts.at(0) );
+            #if DEBUG >= 1
+            fprintf(stdout, "  --  --  Rank %d done depth %d\n", wRank, Idepth + myStarts.at(1) );
             fflush(stdout);
             #endif
 
         }
+
+        #if DEBUG >= 1
+        fprintf(stdout, " -- Rank %d done time %d\n", wRank, Itime + myStarts.at(0) );
+        fflush(stdout);
+        #endif
     }
 
     //
