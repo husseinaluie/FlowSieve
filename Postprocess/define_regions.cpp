@@ -7,9 +7,9 @@ const std::vector< bool(*)(double, double) > RegionTest::all_regions = {
     RegionTest::Global, 
     RegionTest::GulfofMexico,
     RegionTest::GulfStream, 
-    RegionTest::Equator, 
-    RegionTest::NorthofEquator, 
-    RegionTest::SouthofEquator,
+    RegionTest::Tropics, 
+    RegionTest::NorthofTropics, 
+    RegionTest::SouthofTropics,
     RegionTest::Kuroshio,
     RegionTest::AntarcticCircumpolar
 };
@@ -18,11 +18,11 @@ const std::vector< bool(*)(double, double) > RegionTest::all_regions = {
 //   name length should not exceed 20 characters
 const std::vector< std::string > RegionTest::region_names = {
     "Global", 
-    "Gulf_of_Mexico",
+    //"Gulf_of_Mexico", // This one isn't very valuable.
     "Gulf_Stream", 
-    "Equator",
-    "North_of_Equator", 
-    "South_of_Equator",
+    "Tropics",
+    "North_of_Tropics", 
+    "South_of_Tropics",
     "Kuroshio",
     "ACC"
 };
@@ -60,8 +60,8 @@ bool RegionTest::GulfStream(double latitude, double longitude){
 }
 
 
-// Equator
-bool RegionTest::Equator(double latitude, double longitude){
+// Tropics
+bool RegionTest::Tropics(double latitude, double longitude){
     const double lat = latitude * R2D;
 
     if ( fabs(lat) < 15. ) { return true;  }
@@ -70,8 +70,8 @@ bool RegionTest::Equator(double latitude, double longitude){
 }
 
 
-// Northern Hemisphere (less equator)
-bool RegionTest::NorthofEquator(double latitude, double longitude){
+// Northern Hemisphere (setminus tropics)
+bool RegionTest::NorthofTropics(double latitude, double longitude){
     const double lat = latitude * R2D;
 
     if ( lat >= 15. ) { return true;  }
@@ -79,8 +79,8 @@ bool RegionTest::NorthofEquator(double latitude, double longitude){
 }
 
 
-// Souther Hemisphere (less equator)
-bool RegionTest::SouthofEquator(double latitude, double longitude){
+// Souther Hemisphere (setminus tropics)
+bool RegionTest::SouthofTropics(double latitude, double longitude){
     const double lat = latitude * R2D;
 
     if ( lat <= -15. ) { return true;  }
