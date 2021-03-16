@@ -282,18 +282,6 @@ void filtering_helmholtz(
     filter_fields.push_back(&F_toroidal);
     filt_use_mask.push_back(false);
 
-    double tor_KE_tmp;
-    filter_fields.push_back(&KE_tor_orig);
-    filt_use_mask.push_back(true);
-
-    double pot_KE_tmp;
-    filter_fields.push_back(&KE_pot_orig);
-    filt_use_mask.push_back(true);
-
-    double tot_KE_tmp;
-    filter_fields.push_back(&KE_tot_orig);
-    filt_use_mask.push_back(true);
-
     double uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp;
 
     //
@@ -407,8 +395,7 @@ void filtering_helmholtz(
                 KE_tor_filt, KE_pot_filt, KE_tot_filt \
                 ) \
         private(Itime, Idepth, Ilat, Ilon, index, \
-                F_tor_tmp, F_pot_tmp, tor_KE_tmp, pot_KE_tmp, tot_KE_tmp, \
-                uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, \
+                F_tor_tmp, F_pot_tmp, uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, \
                 LAT_lb, LAT_ub, tid, filtered_vals) \
         firstprivate(perc, wRank, local_kernel, perc_count)
         {
@@ -417,10 +404,6 @@ void filtering_helmholtz(
 
             filtered_vals.push_back(&F_pot_tmp);
             filtered_vals.push_back(&F_tor_tmp);
-
-            filtered_vals.push_back(&tor_KE_tmp);
-            filtered_vals.push_back(&pot_KE_tmp);
-            filtered_vals.push_back(&tot_KE_tmp);
 
             #pragma omp for collapse(1) schedule(guided)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -498,10 +481,6 @@ void filtering_helmholtz(
 
                             if (mask.at(index)) { // Skip land areas
 
-                                KE_tor_filt.at(index) = tor_KE_tmp;
-                                KE_pot_filt.at(index) = pot_KE_tmp;
-                                KE_tot_filt.at(index) = tot_KE_tmp;
-
                                 //
                                 //// Also get (uiuj)_bar from Cartesian velocities
                                 //
@@ -523,6 +502,8 @@ void filtering_helmholtz(
                                 uy_uz_tor.at(index) = uyuz_tmp;
                                 uz_uz_tor.at(index) = uzuz_tmp;
 
+                                KE_tor_filt.at(index) = 0.5 * constants::rho0 * (uxux_tmp + uyuy_tmp + uzuz_tmp);
+
                                 // pot
                                 apply_filter_at_point_for_quadratics(
                                         uxux_tmp, uxuy_tmp, uxuz_tmp,
@@ -540,6 +521,8 @@ void filtering_helmholtz(
                                 uy_uz_pot.at(index) = uyuz_tmp;
                                 uz_uz_pot.at(index) = uzuz_tmp;
 
+                                KE_pot_filt.at(index) = 0.5 * constants::rho0 * (uxux_tmp + uyuy_tmp + uzuz_tmp);
+
                                 // tot
                                 apply_filter_at_point_for_quadratics(
                                         uxux_tmp, uxuy_tmp, uxuz_tmp,
@@ -556,6 +539,8 @@ void filtering_helmholtz(
                                 uy_uy_tot.at(index) = uyuy_tmp;
                                 uy_uz_tot.at(index) = uyuz_tmp;
                                 uz_uz_tot.at(index) = uzuz_tmp;
+
+                                KE_tot_filt.at(index) = 0.5 * constants::rho0 * (uxux_tmp + uyuy_tmp + uzuz_tmp);
 
 
                             }  // end if(masked) block
