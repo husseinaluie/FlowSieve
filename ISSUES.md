@@ -1,5 +1,17 @@
 # Solutions to Common Problems
 
+## I/O
+
+### Fails to read in array / zero-dimensional variables (when should have more dimensions)
+
+It is unclear why this happens, but occasionally a netcdf file will appear to have empty variables when trying to read in through the C++ functions in this codebase.
+
+Using python to read in the desired variables and output them to a new netcdf file solves this.
+
+This is not a good solution, but it is the best know solution, since the underlying problem is still unclear.
+
+
+
 ## Interpolation
 
 ### alglib::ap_error
