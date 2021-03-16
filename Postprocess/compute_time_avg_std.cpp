@@ -54,8 +54,8 @@ void compute_time_avg_std(
         for (Ilat = 0; Ilat < Nlat; ++Ilat){
             for (Ilon = 0; Ilon < Nlon; ++Ilon){
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth){
-                    space_index = Index(0, 0, Ilat, Ilon,
-                                        1, 1, Nlat, Nlon);
+                    space_index = Index(0, Idepth, Ilat, Ilon,
+                                        1, Ndepth, Nlat, Nlon);
                     if (not(always_masked.at(space_index))) { // Skip land areas
                         for (Itime = 0; Itime < Ntime; ++Itime){
 
