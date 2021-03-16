@@ -144,10 +144,20 @@ int main(int argc, char *argv[]) {
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
-    //
-    const int Nprocs_in_time  = (Ntime  == 1) ? 1 : Nprocs_in_time_input;
-    const int Nprocs_in_depth = (Ndepth == 1) ? 1 : Nprocs_in_depth_input;
+    // Apply some cleaning to the processor allotments if necessary. 
+    const int Nprocs_in_time  = ( Ntime  == 1 ) ? 1 : 
+                                ( Ndepth == 1 ) ? wSize : 
+                                                  Nprocs_in_time_input;
+    const int Nprocs_in_depth = ( Ndepth == 1 ) ? 1 : 
+                                ( Ntime  == 1 ) ? wSize : 
+                                                  Nprocs_in_depth_input;
     #if DEBUG >= 0
+    if (Nprocs_in_time != Nprocs_in_time_input) { 
+        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in time to %'d from %'d\n", Nprocs_in_time, Nprocs_in_time_input); }
+    }
+    if (Nprocs_in_depth != Nprocs_in_depth_input) { 
+        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in depth to %'d from %'d\n", Nprocs_in_depth, Nprocs_in_depth_input); }
+    }
     if (wRank == 0) { fprintf(stdout, " Nproc(time, depth) = (%'d, %'d)\n", Nprocs_in_time, Nprocs_in_depth); }
     #endif
     assert( Nprocs_in_time * Nprocs_in_depth == wSize );

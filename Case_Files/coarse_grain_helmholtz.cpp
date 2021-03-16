@@ -52,9 +52,9 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales { 
-        //100e3, 250e3, 400e3
+        100e3, 250e3, 400e3
 
-        1.e4 , 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4,
+        //1.e4 , 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4,
 
         /*
                                                       4.64e4, 5.99e4, 7.74e4,
@@ -128,10 +128,20 @@ int main(int argc, char *argv[]) {
     const int Nlon   = longitude.size();
     const int Nlat   = latitude.size();
 
-    //
-    const int Nprocs_in_time  = (Ntime  == 1) ? 1 : Nprocs_in_time_input;
-    const int Nprocs_in_depth = (Ndepth == 1) ? 1 : Nprocs_in_depth_input;
+    // Apply some cleaning to the processor allotments if necessary. 
+    const int Nprocs_in_time  = ( Ntime  == 1 ) ? 1 : 
+                                ( Ndepth == 1 ) ? wSize : 
+                                                  Nprocs_in_time_input;
+    const int Nprocs_in_depth = ( Ndepth == 1 ) ? 1 : 
+                                ( Ntime  == 1 ) ? wSize : 
+                                                  Nprocs_in_depth_input;
     #if DEBUG >= 0
+    if (Nprocs_in_time != Nprocs_in_time_input) { 
+        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in time to %'d from %'d\n", Nprocs_in_time, Nprocs_in_time_input); }
+    }
+    if (Nprocs_in_depth != Nprocs_in_depth_input) { 
+        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in depth to %'d from %'d\n", Nprocs_in_depth, Nprocs_in_depth_input); }
+    }
     if (wRank == 0) { fprintf(stdout, " Nproc(time, depth) = (%'d, %'d)\n", Nprocs_in_time, Nprocs_in_depth); }
     #endif
     assert( Nprocs_in_time * Nprocs_in_depth == wSize );
