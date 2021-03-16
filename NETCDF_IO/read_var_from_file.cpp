@@ -61,6 +61,7 @@ void read_var_from_file(
     // Get information about the variable
     retval = nc_inq_var(ncid, var_id, NULL, NULL, &num_dims, dim_ids, NULL );
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    assert( num_dims > 0 );
     #if DEBUG >= 2
     if (wRank == 0) {
         if (num_dims == 1) {
