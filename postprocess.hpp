@@ -140,9 +140,9 @@ namespace RegionTest
     extern bool Global(double latitude, double longitude);
     extern bool GulfofMexico(double latitude, double longitude);
     extern bool GulfStream(double latitude, double longitude);
-    extern bool Equator(double latitude, double longitude);
-    extern bool NorthofEquator(double latitude, double longitude);
-    extern bool SouthofEquator(double latitude, double longitude);
+    extern bool Tropics(double latitude, double longitude);
+    extern bool NorthofTropics(double latitude, double longitude);
+    extern bool SouthofTropics(double latitude, double longitude);
     extern bool Kuroshio(double latitude, double longitude);
     extern bool AntarcticCircumpolar(double latitude, double longitude);
 
