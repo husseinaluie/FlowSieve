@@ -97,7 +97,7 @@ void Apply_Postprocess_Routines(
     //
    
     // If we're using OkuboWeiss, create dimension values
-    const bool do_OkuboWeiss = (OkuboWeiss.size() > 2);
+    const bool do_OkuboWeiss = constants::DO_OKUBOWEISS_ANALYSIS;
     const int N_Okubo = 601; // Make it odd
     const int N_Ok_by_2 = N_Okubo / 2;
     std::vector<double> OkuboWeiss_dim_vals( do_OkuboWeiss ? N_Okubo : 0 );

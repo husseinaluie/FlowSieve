@@ -82,7 +82,7 @@ namespace constants
      * If false, land is included in local average (treated as zero velocity
      * @ingroup constants
      */
-    const bool DEFORM_AROUND_LAND = true;
+    const bool DEFORM_AROUND_LAND = false;
 
     /*!
      * \param CARTESIAN
@@ -143,6 +143,7 @@ namespace constants
     /*!
      * \param COMP_TRANSFERS
      * \brief Boolean indicating if non-linear transfers (Pi) should be computed.
+     * For coarse_grain.x, this is required to get fine (sub-filter) KE
      * @ingroup constants
      */
     const bool COMP_TRANSFERS = true;
@@ -153,6 +154,13 @@ namespace constants
      * @ingroup constants
      */
     const bool COMP_BC_TRANSFERS = false;
+
+    /*!
+     * \param DO_OKUBOWEISS_ANALYSIS
+     * \brief Boolean to indicate if post-processing should also bin by Okubo-Weiss
+     * @ingroup constants
+     */
+    const bool DO_OKUBOWEISS_ANALYSIS = true;
 
     /*!
      * \param MINIMAL_OUTPUT
