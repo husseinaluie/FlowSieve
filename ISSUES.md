@@ -4,11 +4,11 @@
 
 ### Fails to read in array / zero-dimensional variables (when should have more dimensions)
 
-It is unclear why this happens, but occasionally a netcdf file will appear to have empty variables when trying to read in through the C++ functions in this codebase.
+This appears to be a result of the netcdf format.
+The coarse-graining codebase requires netcdf-4 format.
 
-Using python to read in the desired variables and output them to a new netcdf file solves this.
-
-This is not a good solution, but it is the best know solution, since the underlying problem is still unclear.
+You can check the format of your input file by calling `ncdump -k <filename>`.
+If the returned value is not "netCDF-4", then you can convert it by calling `nccopy -k netCDF-4 sample_data.nc raw_velocity.nc`
 
 
 

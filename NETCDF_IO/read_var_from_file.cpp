@@ -27,7 +27,6 @@ void read_var_from_file(
     MPI_Comm_size( comm, &wSize );
 
     // Open the NETCDF file
-    //int FLAG = NC_NETCDF4 | NC_NOWRITE | NC_MPIIO;
     const int str_len = 100;
     int FLAG = NC_NETCDF4 | NC_MPIIO;
     int ncid=0, retval;
@@ -43,6 +42,12 @@ void read_var_from_file(
 
     retval = nc_open_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+
+    // Check if netcdf-4 format
+    int input_nc_format;
+    retval = nc_inq_format( buffer, &input_nc_format );
+    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    //assert( input_nc_format == NC_FORMAT_NETCDF4 ); // input file must be netCDF-4 format
 
     char varname [str_len];
     snprintf(varname, str_len, var_name.c_str());
