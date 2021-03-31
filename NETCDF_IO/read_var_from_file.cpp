@@ -45,7 +45,7 @@ void read_var_from_file(
 
     // Check if netcdf-4 format
     int input_nc_format;
-    retval = nc_inq_format( buffer, &input_nc_format );
+    retval = nc_inq_format( ncid, &input_nc_format );
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
     //assert( input_nc_format == NC_FORMAT_NETCDF4 ); // input file must be netCDF-4 format
 
