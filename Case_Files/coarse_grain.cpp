@@ -100,20 +100,26 @@ int main(int argc, char *argv[]) {
     // first argument is the flag, second argument is default value (for when flag is not present)
     const std::string &input_fname       = input.getCmdOption("--input_file",  "input.nc");
 
-    const std::string &time_dim_name      = input.getCmdOption("--time",        "time");
-    const std::string &depth_dim_name     = input.getCmdOption("--depth",       "depth");
-    const std::string &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude");
-    const std::string &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
+                        &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude"),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
 
-    const std::string &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1");
-    const std::string &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
-    const int Nprocs_in_time_input  = stoi(Nprocs_in_time_string);
-    const int Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true");
 
-    const std::string &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo");
-    const std::string &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo");
-    const std::string &density_var_name  = input.getCmdOption("--density",     "rho");
-    const std::string &pressure_var_name = input.getCmdOption("--pressure",    "p");
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1"),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
+                Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
+
+    const std::string   &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo"),
+                        &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo"),
+                        &density_var_name  = input.getCmdOption("--density",     "rho"),
+                        &pressure_var_name = input.getCmdOption("--pressure",    "p");
+
+    const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    "region_definitions.nc"),
+                        &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     "region"),
+                        &region_defs_var_name = input.getCmdOption("--region_definitions_var",     "region_definition");
 
     // Set OpenMP thread number
     const int max_threads = omp_get_max_threads();
@@ -122,11 +128,8 @@ int main(int argc, char *argv[]) {
     // Print some header info, depending on debug level
     print_header_info();
 
-    std::vector<double> longitude, latitude, time, depth;
-    std::vector<double> u_r, u_lon, u_lat, rho, p;
-    std::vector<bool> mask;
-    std::vector<int> myCounts, myStarts;
-    size_t II;
+    // Initialize dataset class instance
+    dataset source_data;
 
     // Read in source data / get size information
     #if DEBUG >= 1
@@ -134,80 +137,50 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Read in the grid coordinates
-    read_var_from_file(time,      time_dim_name,      input_fname);
-    read_var_from_file(depth,     depth_dim_name,     input_fname);
-    read_var_from_file(latitude,  latitude_dim_name,  input_fname);
-    read_var_from_file(longitude, longitude_dim_name, input_fname);
-
-    const int Ntime  = time.size();
-    const int Ndepth = depth.size();
-    const int Nlon   = longitude.size();
-    const int Nlat   = latitude.size();
+    source_data.load_time(      time_dim_name,      input_fname );
+    source_data.load_depth(     depth_dim_name,     input_fname );
+    source_data.load_latitude(  latitude_dim_name,  input_fname );
+    source_data.load_longitude( longitude_dim_name, input_fname );
 
     // Apply some cleaning to the processor allotments if necessary. 
-    const int Nprocs_in_time  = ( Ntime  == 1 ) ? 1 : 
-                                ( Ndepth == 1 ) ? wSize : 
-                                                  Nprocs_in_time_input;
-    const int Nprocs_in_depth = ( Ndepth == 1 ) ? 1 : 
-                                ( Ntime  == 1 ) ? wSize : 
-                                                  Nprocs_in_depth_input;
-    #if DEBUG >= 0
-    if (Nprocs_in_time != Nprocs_in_time_input) { 
-        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in time to %'d from %'d\n", Nprocs_in_time, Nprocs_in_time_input); }
-    }
-    if (Nprocs_in_depth != Nprocs_in_depth_input) { 
-        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in depth to %'d from %'d\n", Nprocs_in_depth, Nprocs_in_depth_input); }
-    }
-    if (wRank == 0) { fprintf(stdout, " Nproc(time, depth) = (%'d, %'d)\n", Nprocs_in_time, Nprocs_in_depth); }
-    #endif
-    assert( Nprocs_in_time * Nprocs_in_depth == wSize );
+    source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
      
-    convert_coordinates(longitude, latitude);
+    // Convert to radians, if appropriate
+    if ( latlon_in_degrees == "true" ) {
+        convert_coordinates( source_data.longitude, source_data.latitude );
+    }
+
+    // Compute the area of each 'cell' which will be necessary for integration
+    source_data.compute_cell_areas();
 
     // Read in the velocity fields
-    read_var_from_file(u_lon, zonal_vel_name, input_fname, &mask, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
-    read_var_from_file(u_lat, merid_vel_name, input_fname, &mask, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
+    source_data.load_variable( "u_lon", zonal_vel_name, input_fname, true, true );
+    source_data.load_variable( "u_lat", merid_vel_name, input_fname, true, true );
+
+    // Get the MPI-local dimension sizes
+    source_data.Ntime  = source_data.myCounts[0];
+    source_data.Ndepth = source_data.myCounts[1];
 
     // No u_r in inputs, so initialize as zero
-    u_r.resize(u_lon.size());
-    #pragma omp parallel default(none) private(II) shared(u_r)
-    { 
-        #pragma omp for collapse(1) schedule(static)
-        for (II = 0; II < u_r.size(); II++) {
-            u_r.at(II) = 0.;
-        }
-    }
+    source_data.variables.insert( std::pair< std::string, std::vector<double> >
+                                           ( "u_r",       std::vector<double>(0, source_data.variables.at("u_lon").size()) ) 
+                                );
 
     if (constants::COMP_BC_TRANSFERS) {
         // If desired, read in rho and p
-        read_var_from_file(rho, density_var_name,  input_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth);
-        read_var_from_file(p,   pressure_var_name, input_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth);
+        source_data.load_variable( "rho", density_var_name, input_fname, false, false );
+        source_data.load_variable( "p", pressure_var_name, input_fname, false, false );
     }
 
-    #if DEBUG >= 1
-    fprintf(stdout, "Processor %d has (%d, %d, %d, %d) from (%d, %d, %d, %d)\n", 
-            wRank, 
-            myCounts[0], myCounts[1], myCounts[2], myCounts[3],
-            Ntime, Ndepth, Nlat, Nlon);
-    fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
-    #endif
+    // Mask out the pole, if necessary (i.e. set lat = 90 to land)
+    mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
 
-    // Compute the area of each 'cell'
-    //   which will be necessary for integration
-    #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "Computing the cell areas.\n\n"); }
-    #endif
-
-    std::vector<double> areas(Nlon * Nlat);
-    compute_areas(areas, longitude, latitude);
+    // Read in the region definitions and compute region areas
+    source_data.load_region_definitions( region_defs_fname, region_defs_dim_name, region_defs_var_name );
 
     // Now pass the arrays along to the filtering routines
     const double pre_filter_time = MPI_Wtime();
-    filtering(u_r, u_lon, u_lat, rho, p,
-              filter_scales, areas, 
-              time, depth, longitude, latitude,
-              mask, myCounts, myStarts);
+    filtering( source_data, filter_scales );
     const double post_filter_time = MPI_Wtime();
 
     // Done!

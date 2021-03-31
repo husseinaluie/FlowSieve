@@ -9,23 +9,30 @@
 #include "../postprocess.hpp"
 
 void filtering(
-        const std::vector<double> & full_u_r,
-        const std::vector<double> & full_u_lon,
-        const std::vector<double> & full_u_lat,
-        const std::vector<double> & full_rho,
-        const std::vector<double> & full_p,
+        const dataset & source_data,
         const std::vector<double> & scales,
-        const std::vector<double> & dAreas,
-        const std::vector<double> & time,
-        const std::vector<double> & depth,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const std::vector<bool>   & mask,
-        const std::vector<int>    & myCounts,
-        const std::vector<int>    & myStarts,
         const MPI_Comm comm
         ) {
 
+    // Create some tidy names for variables
+    const std::vector<double>   &time       = source_data.time,
+                                &depth      = source_data.depth,
+                                &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude,
+                                &dAreas     = source_data.areas;
+
+    const std::vector<bool> &mask = source_data.mask;
+
+    const std::vector<int>  &myCounts = source_data.myCounts,
+                            &myStarts = source_data.myStarts;
+
+    const std::vector<double>   &full_u_r   = source_data.variables.at("u_r"),
+                                &full_u_lon = source_data.variables.at("u_lon"),
+                                &full_u_lat = source_data.variables.at("u_lat"),
+                                &full_rho   = constants::COMP_BC_TRANSFERS ? source_data.variables.at("rho") : std::vector<double>(),
+                                &full_p     = constants::COMP_BC_TRANSFERS ? source_data.variables.at("p")   : std::vector<double>();
+
+    // Get some MPI info
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
@@ -35,24 +42,20 @@ void filtering(
     double clock_on;
 
     // Get dimension sizes
-    const int Nscales = scales.size();
-    const int Ntime   = myCounts.at(0);
-    const int Ndepth  = myCounts.at(1);
-    const int Nlat    = myCounts.at(2);
-    const int Nlon    = myCounts.at(3);
+    const int   Nscales = scales.size(),
+                Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
+    const unsigned int num_pts = Ntime * Ndepth * Nlat * Nlon;
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
-    const unsigned int num_pts = Ntime * Ndepth * Nlat * Nlon;
     char fname [50];
     
     const int ndims = 4;
-    size_t starts[ndims] = {
-        size_t(myStarts.at(0)), size_t(myStarts.at(1)), 
-        size_t(myStarts.at(2)), size_t(myStarts.at(3))};
-    size_t counts[ndims] = {
-        size_t(Ntime), size_t(Ndepth), 
-        size_t(Nlat), size_t(Nlon)};
+    size_t starts[ndims] = { size_t(myStarts.at(0)), size_t(myStarts.at(1)), size_t(myStarts.at(2)), size_t(myStarts.at(3))};
+    size_t counts[ndims] = { size_t(Ntime),          size_t(Ndepth),         size_t(Nlat),           size_t(Nlon)};
     std::vector<std::string> vars_to_write;
 
     // Preset some post-processing variables
@@ -848,9 +851,8 @@ void filtering(
 
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             Apply_Postprocess_Routines(
-                    postprocess_fields, postprocess_names, OkuboWeiss,
-                    time, depth, latitude, longitude, mask, dAreas,
-                    myCounts, myStarts, scales.at(Iscale), "postprocess");
+                    source_data, postprocess_fields, postprocess_names, OkuboWeiss,
+                    scales.at(Iscale), "postprocess");
             if (constants::DO_TIMING) { 
                 timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess");
             }

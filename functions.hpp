@@ -342,20 +342,8 @@ void vel_Cart_to_Spher_at_point(
  * @param[in]   comm                                MPI communicator (default MPI_COMM_WORLD)
  *
  */
-void filtering(const std::vector<double> & u_r, 
-               const std::vector<double> & u_lon, 
-               const std::vector<double> & u_lat,
-               const std::vector<double> & rho,
-               const std::vector<double> & p,
+void filtering(const dataset & source_data,
                const std::vector<double> & scales, 
-               const std::vector<double> & dAreas, 
-               const std::vector<double> & time, 
-               const std::vector<double> & depth,
-               const std::vector<double> & longitude, 
-               const std::vector<double> & latitude,
-               const std::vector<bool> & mask,
-               const std::vector<int>    & myCounts,
-               const std::vector<int>    & myStarts,
                const MPI_Comm comm = MPI_COMM_WORLD);
 
 
