@@ -8,6 +8,7 @@
 
 void write_regions_to_post(
         const char * filename,
+        const std::vector< std::string > & region_names,
         const MPI_Comm comm
         ) {
 
@@ -34,7 +35,7 @@ void write_regions_to_post(
         retval = nc_inq_varid(ncid, "region", &region_varid );
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
-        const size_t num_regions = RegionTest::region_names.size();
+        const size_t num_regions = region_names.size();
 
         // This is hackey and awful, but it seems to be necessary
         //    to get from the "vector of strings" to "const char **"
@@ -49,7 +50,7 @@ void write_regions_to_post(
         for (size_t Iregion = 0; Iregion < num_regions; ++Iregion) {
             start[0] = Iregion;
 
-            sprintf(curr_name, "%20s", RegionTest::region_names.at(Iregion).c_str());
+            sprintf(curr_name, "%20s", region_names.at(Iregion).c_str());
 
             retval = nc_put_vara_string(ncid, region_varid, start, count, &ptr_to_name);
             if (retval) { NC_ERR(retval, __LINE__, __FILE__); }

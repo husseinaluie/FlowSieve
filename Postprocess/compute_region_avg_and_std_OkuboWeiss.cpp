@@ -11,22 +11,20 @@ void compute_region_avg_and_std_OkuboWeiss(
         std::vector< std::vector< double > > & field_averages,
         std::vector< std::vector< double > > & field_std_devs,
         std::vector< double > & OkuboWeiss_areas,
+        const dataset & source_data,
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<double> & OkuboWeiss,
-        const std::vector<double> & region_areas,
-        const std::vector<double> & areas,
-        const std::vector<bool> & mask,
         const std::vector<double> OkuboWeiss_bounds,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
-        const int num_fields,
-        const int num_regions,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
         const int NOkubo
         ) {
+
+    const int   Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
+
+    const int   num_regions   = source_data.region_names.size(),
+                num_fields    = postprocess_fields.size();
 
     double reg_area, dA;
 
@@ -39,8 +37,7 @@ void compute_region_avg_and_std_OkuboWeiss(
     private( Ifield, Iregion, Itime, Idepth, Ilat, Ilon, IOkubo,\
             index, reg_index, area_index, int_index, \
             int_vals, OW_areas, dA, reg_area )\
-    shared( mask, areas, latitude, longitude, postprocess_fields, OkuboWeiss,\
-            field_averages, OkuboWeiss_areas, region_areas )
+    shared( source_data, postprocess_fields, OkuboWeiss, field_averages, OkuboWeiss_areas )
     { 
     #pragma omp for collapse(4) schedule(static)
         for (Ifield = 0; Ifield < num_fields; ++Ifield) {
@@ -50,7 +47,7 @@ void compute_region_avg_and_std_OkuboWeiss(
 
                         reg_index = Index(0, Itime, Idepth, Iregion,
                                           1, Ntime, Ndepth, num_regions);
-                        reg_area = region_areas.at(reg_index);
+                        reg_area = source_data.region_areas.at(reg_index);
 
                         int_vals.clear(); int_vals.resize(NOkubo, 0.);
                         OW_areas.clear(); OW_areas.resize(NOkubo, 0.);
@@ -61,16 +58,18 @@ void compute_region_avg_and_std_OkuboWeiss(
                                 index = Index(Itime, Idepth, Ilat, Ilon,
                                               Ntime, Ndepth, Nlat, Nlon);
 
-                                if ( mask.at(index) ) { // Skip land areas
+                                if ( source_data.mask.at(index) ) { // Skip land areas
+
+                                    area_index = Index(0, 0, Ilat, Ilon,
+                                                       1, 1, Nlat, Nlon);
 
                                     IOkubo = std::lower_bound( OkuboWeiss_bounds.begin(), OkuboWeiss_bounds.end(), OkuboWeiss.at(index) ) 
                                              - OkuboWeiss_bounds.begin();
                                     if (IOkubo >= NOkubo) { IOkubo = NOkubo - 1; }
 
-                                    if ( RegionTest::all_regions.at(Iregion)( latitude.at(Ilat), longitude.at(Ilon)) ) {
-                                        area_index = Index(0, 0, Ilat, Ilon,
-                                                           1, 1, Nlat, Nlon);
-                                        dA = areas.at(area_index);
+                                    //if ( RegionTest::all_regions.at(Iregion)( latitude.at(Ilat), longitude.at(Ilon)) ) {
+                                    if ( source_data.regions.at( source_data.region_names.at( Iregion ) ).at( area_index ) ) {
+                                        dA = source_data.areas.at(area_index);
 
                                         int_vals.at(IOkubo) += postprocess_fields.at(Ifield)->at(index) * dA;
                                         OW_areas.at(IOkubo) += dA;

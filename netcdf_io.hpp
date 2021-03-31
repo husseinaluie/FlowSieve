@@ -12,6 +12,8 @@
 #include "netcdf_par.h"
 #include "hdf5.h"
 
+#include "functions.hpp" // this provides class info
+
 /*!
  * \file
  * \brief Collection of functions for handling netcdf IO.
@@ -122,12 +124,8 @@ void initialize_subset_file(
  *
  */
 void initialize_postprocess_file(
-        const std::vector<double> & time,
-        const std::vector<double> & depth,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
+        const dataset & source_data,
         const std::vector<double> & OkuboWeiss_dim_vals,
-        const std::vector<std::string> & regions,
         const std::vector<std::string> & int_vars,
         const char * filename,
         const double & filter_scale,
@@ -229,6 +227,7 @@ void write_time_average_to_post(
 
 void write_regions_to_post(
         const char * filename,
+        const std::vector< std::string > & region_names,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 

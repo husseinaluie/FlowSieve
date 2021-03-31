@@ -7,12 +7,8 @@
 #include "../postprocess.hpp"
 
 void initialize_postprocess_file(
-        const std::vector<double> & time,
-        const std::vector<double> & depth,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
+        const dataset & source_data,
         const std::vector<double> & OkuboWeiss_dim_vals,
-        const std::vector<std::string> & regions,
         const std::vector<std::string> & int_vars,
         const char * filename,
         const double & filter_scale,
@@ -20,6 +16,13 @@ void initialize_postprocess_file(
         const MPI_Comm comm
         ) {
 
+    // Create some tidy names for variables
+    const std::vector<double>   &time       = source_data.time,
+                                &depth      = source_data.depth,
+                                &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude;
+
+    // Get some MPI info
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
@@ -43,12 +46,12 @@ void initialize_postprocess_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Extract dimension sizes
-    const int Ntime   = time.size();
-    const int Ndepth  = depth.size();
-    const int Nlat    = latitude.size();
-    const int Nlon    = longitude.size();
-    const int Nregion = RegionTest::all_regions.size();
-    const int Nokubo  = OkuboWeiss_dim_vals.size();
+    const int   Ntime   = time.size(),
+                Ndepth  = depth.size(),
+                Nlat    = latitude.size(),
+                Nlon    = longitude.size(),
+                Nregion = source_data.region_names.size(),
+                Nokubo  = OkuboWeiss_dim_vals.size();
 
     // Define the dimensions
     int time_dimid, depth_dimid, lat_dimid, lon_dimid, reg_dimid, Okubo_dimid;
@@ -175,6 +178,14 @@ void initialize_postprocess_file(
     add_attr_to_file("differentiation_convergence_order",   (double) constants::DiffOrd,    filename);
     add_attr_to_file("KERNEL_OPT",                          (double) constants::KERNEL_OPT, filename);
     add_attr_to_file("KernPad",                             (double) constants::KernPad,    filename);
+
+    // Write region names - this has to be done separately for reasons
+    write_regions_to_post( filename, source_data.region_names );
+
+    // Write region areas
+    size_t start_r[] = { source_data.myStarts.at(0), source_data.myStarts.at(1),  0       }, 
+           count_r[] = { source_data.Ntime,          source_data.Ndepth,          Nregion };
+    write_field_to_output( source_data.region_areas, "region_areas", start_r, count_r, filename, NULL);
 
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }

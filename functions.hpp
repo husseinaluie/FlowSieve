@@ -14,6 +14,74 @@
  * \brief Collection of all computation-related functions.
  */
 
+/*!
+ * \brief Class to store main variables.
+ *
+ * This class is used to hold the various source data variables
+ *    such as velocity components, mask, region definitions, density, etc
+ *
+ */
+class dataset {
+
+    public:
+
+        // Storage for processor assignments
+        int Nprocs_in_time, Nprocs_in_depth;
+
+        // Vectors to store the dimension variables
+        std::vector<double> time, depth, latitude, longitude;
+        int Ntime = -1, Ndepth = -1, Nlat = -1, Nlon = -1;
+        int full_Ntime = -1, full_Ndepth = -1;
+
+        // Store cell areas
+        std::vector<double> areas;
+
+        // Dictionary for the variables (velocity components, density, etc)
+        std::map< std::string , std::vector<double> > variables;
+
+        // Vectors and dictionary for storing the regions.
+        //    these are what will be used for the post-processing
+        std::vector< std::string > region_names;
+        std::map< std::string, std::vector<bool> > regions;
+        std::vector<double> region_areas;
+
+        // Store mask data (i.e. land vs water)
+        std::vector<bool> mask;
+
+        // Store data-chunking info. These keep track of the MPI divisions to ensure 
+        // that the output is in the same order as the input.
+        std::vector<int> myCounts, myStarts;
+
+
+        // Constructor
+        dataset();
+
+        // Dimension loaders
+        void load_time(      const std::string dim_name, const std::string filename );
+        void load_depth(     const std::string dim_name, const std::string filename );
+        void load_latitude(  const std::string dim_name, const std::string filename );
+        void load_longitude( const std::string dim_name, const std::string filename );
+
+        // Compute areas
+        void compute_cell_areas();
+
+        // Load in variable and store in dictionary
+        void load_variable( const std::string var_name, 
+                            const std::string var_name_in_file, 
+                            const std::string filename,
+                            const bool read_mask = true,
+                            const bool load_counts = true );
+
+        // Load in region definitions
+        void load_region_definitions(   const std::string filename, 
+                                        const std::string dim_name, 
+                                        const std::string var_name, 
+                                        const MPI_Comm = MPI_COMM_WORLD );
+
+        // Check the processors divions between dimensions
+        void check_processor_divisions( const int Nprocs_in_time_input, const int Nprocs_in_depth_input, const MPI_Comm = MPI_COMM_WORLD );
+};
+
 /*! 
  * \brief Compute the area of each computational cell
  *
@@ -292,17 +360,8 @@ void filtering(const std::vector<double> & u_r,
 
 
 void filtering_helmholtz(
-        const std::vector<double> & F_potential,
-        const std::vector<double> & F_toroidal,
+        const dataset & source_data,
         const std::vector<double> & scales,
-        const std::vector<double> & dAreas,
-        const std::vector<double> & time,
-        const std::vector<double> & depth,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const std::vector<bool> & mask,
-        const std::vector<int>    & myCounts,
-        const std::vector<int>    & myStarts,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -808,12 +867,6 @@ void roll_field(
  *   clean expressions. 
  */
 class Timing_Records {
-    /*! Main dictionary for storing timings
-     * 
-     * Keys are strings, which are human-readable labels.
-     * Values are doubles, which are the amount of time that falls under the label
-     */
-    std::map< std::string, double  > time_records;
 
     public:
         //! Constructor. Simply initializes entries to time_records as zero
@@ -831,6 +884,14 @@ class Timing_Records {
 
         //! Print the timing information in a human-readable format.
         void print();
+
+    private:
+        /*! Main dictionary for storing timings
+         * 
+         * Keys are strings, which are human-readable labels.
+         * Values are doubles, which are the amount of time that falls under the label
+         */
+        std::map< std::string, double  > time_records;
 };
 
 

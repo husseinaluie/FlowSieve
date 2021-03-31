@@ -11,25 +11,24 @@
 void compute_time_avg_std(
         std::vector<std::vector<double>> & time_average,
         std::vector<std::vector<double>> & time_std_dev,
+        const dataset & source_data,
         const std::vector<const std::vector<double>*> & postprocess_fields,
-        const std::vector<bool> & mask,
-        const std::vector<double> & areas,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
         const std::vector<int> & mask_count,
         const std::vector<bool> & always_masked,
         const int full_Ntime,
-        const int num_fields,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
         const MPI_Comm comm
         ){
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
+
+    const int   Ntime  = source_data.Ntime,
+                Ndepth = source_data.Ndepth,
+                Nlat   = source_data.Nlat,
+                Nlon   = source_data.Nlon;
+
+    const int num_fields = postprocess_fields.size();
 
     const int chunk_size = get_omp_chunksize(Nlat, Nlon);
 
@@ -44,11 +43,8 @@ void compute_time_avg_std(
     }
 
     #pragma omp parallel default(none)\
-    private(Ifield, Ilat, Ilon, Itime, Idepth, \
-            index, space_index )\
-    shared(latitude, longitude, postprocess_fields, \
-            areas, mask, always_masked, mask_count, \
-            time_average_loc)
+    private(Ifield, Ilat, Ilon, Itime, Idepth, index, space_index )\
+    shared(postprocess_fields, source_data, always_masked, mask_count, time_average_loc)
     { 
         #pragma omp for collapse(3) schedule(guided, chunk_size)
         for (Ilat = 0; Ilat < Nlat; ++Ilat){
@@ -63,7 +59,7 @@ void compute_time_avg_std(
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
 
-                            if ( mask.at(index) ) {
+                            if ( source_data.mask.at(index) ) {
                                 for (Ifield = 0; Ifield < num_fields; ++Ifield) {
 
                                     // compute the time average for 
@@ -84,8 +80,10 @@ void compute_time_avg_std(
     }
 
     // Now communicate with other processors to get the full time average
+    #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  .. .. reducing across processors\n"); }
     fflush(stdout);
+    #endif
 
     for (Ifield = 0; Ifield < num_fields; ++Ifield) {
         MPI_Allreduce(&(time_average_loc.at(Ifield)[0]),
@@ -94,14 +92,14 @@ void compute_time_avg_std(
     }
 
     // Compute the standard deviation
+    #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  .. computing time standard deviations\n"); }
     fflush(stdout);
+    #endif
 
     #pragma omp parallel default(none)\
-    private(Ifield, Ilat, Ilon, Itime, Idepth, \
-            index, space_index )\
-    shared(latitude, longitude, wSize, postprocess_fields, \
-            areas, mask, always_masked, mask_count, \
+    private(Ifield, Ilat, Ilon, Itime, Idepth, index, space_index )\
+    shared(wSize, postprocess_fields, source_data, always_masked, mask_count, \
             time_average_loc, time_std_dev_loc, time_average)
     { 
         #pragma omp for collapse(3) schedule(guided, chunk_size)
@@ -117,7 +115,7 @@ void compute_time_avg_std(
                             index = Index(Itime, Idepth, Ilat, Ilon,
                                           Ntime, Ndepth, Nlat, Nlon);
 
-                            if ( mask.at(index) ) { // Skip land areas
+                            if ( source_data.mask.at(index) ) { // Skip land areas
                                 for (Ifield = 0; Ifield < num_fields; ++Ifield) {
 
                                     // compute the time std. dev. for 
@@ -140,8 +138,10 @@ void compute_time_avg_std(
         }
     }
 
+    #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  .. writing time averages and deviations\n"); }
     fflush(stdout);
+    #endif
 
     // Now communicate with other processors to get the full time average
     for (Ifield = 0; Ifield < num_fields; ++Ifield) {

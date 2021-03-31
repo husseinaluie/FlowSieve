@@ -5,19 +5,13 @@
 #include <string>
 #include <math.h>
 #include <mpi.h>
+#include "functions.hpp" // provides classes
 
 void Apply_Postprocess_Routines(
+        const dataset & source_data,
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<std::string> & vars_to_process,
         const std::vector<double> & OkuboWeiss,
-        const std::vector<double> & time,
-        const std::vector<double> & depth,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
-        const std::vector<bool>   & mask,
-        const std::vector<double> & areas,
-        const std::vector<int>    & myCounts,
-        const std::vector<int>    & myStarts,
         const double filter_scale,
         const std::string filename_base = "postprocess",
         const MPI_Comm comm = MPI_COMM_WORLD
@@ -50,57 +44,29 @@ void compute_region_areas(
 void compute_region_avg_and_std(
         std::vector< std::vector< double > > & field_averages,
         std::vector< std::vector< double > > & field_std_devs,
-        const std::vector<const std::vector<double>*> & postprocess_fields,
-        const std::vector<double> & region_areas,
-        const std::vector<double> & areas,
-        const std::vector<bool> & mask,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
-        const int num_fields,
-        const int num_regions,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon
+        const dataset & source_data,
+        const std::vector<const std::vector<double>*> & postprocess_fields
         );
 
 void compute_region_avg_and_std_OkuboWeiss(
         std::vector< std::vector< double > > & field_averages,
         std::vector< std::vector< double > > & field_std_devs,
         std::vector< double > & OkuboWeiss_areas,
+        const dataset & source_data,
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<double> & OkuboWeiss,
-        const std::vector<double> & region_areas,
-        const std::vector<double> & areas,
-        const std::vector<bool> & mask,
         const std::vector<double> OkuboWeiss_bounds,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
-        const int num_fields,
-        const int num_regions,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
         const int NOkubo
         );
 
 void compute_time_avg_std(
         std::vector<std::vector<double> > & time_average,
         std::vector<std::vector<double> > & time_std_dev,
+        const dataset & source_data,
         const std::vector<const std::vector<double>*> & postprocess_fields,
-        const std::vector<bool> & mask,
-        const std::vector<double> & areas,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
         const std::vector<int> & mask_count,
         const std::vector<bool> & always_masked,
-        const int num_fields,
         const int full_Ntime,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 

@@ -10,19 +10,17 @@
 void compute_region_avg_and_std(
         std::vector< std::vector< double > > & field_averages,
         std::vector< std::vector< double > > & field_std_devs,
-        const std::vector<const std::vector<double>*> & postprocess_fields,
-        const std::vector<double> & region_areas,
-        const std::vector<double> & areas,
-        const std::vector<bool> & mask,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
-        const int num_fields,
-        const int num_regions,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon
+        const dataset & source_data,
+        const std::vector<const std::vector<double>*> & postprocess_fields
         ) {
+
+    const int   Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
+
+    const int   num_regions   = source_data.region_names.size(),
+                num_fields    = postprocess_fields.size();
 
     const int chunk_size = get_omp_chunksize(Nlat, Nlon);
 
@@ -36,16 +34,11 @@ void compute_region_avg_and_std(
             for (Itime = 0; Itime < Ntime; ++Itime) {
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
 
-                    int_index = Index(0, Itime, Idepth, Iregion,
-                                      1, Ntime, Ndepth, num_regions);
-                    reg_area = region_areas.at(int_index);
-
                     int_val = 0.;
 
                     #pragma omp parallel default(none)\
                     private(Ilat, Ilon, index, dA, area_index )\
-                    shared(Ifield, Iregion, Itime, Idepth, int_index, mask, areas,\
-                            latitude, longitude, postprocess_fields) \
+                    shared( source_data, Ifield, Iregion, Itime, Idepth, int_index, postprocess_fields) \
                     reduction(+ : int_val)
                     { 
                         #pragma omp for collapse(2) schedule(guided, chunk_size)
@@ -55,22 +48,24 @@ void compute_region_avg_and_std(
                                 index = Index(Itime, Idepth, Ilat, Ilon,
                                               Ntime, Ndepth, Nlat, Nlon);
 
-                                if ( mask.at(index) ) { // Skip land areas
+                                if ( source_data.mask.at(index) ) { // Skip land areas
 
                                     area_index = Index(0, 0, Ilat, Ilon,
                                                        1, 1, Nlat, Nlon);
 
-                                    dA = areas.at(area_index);
+                                    dA = source_data.areas.at(area_index);
 
-                                    if ( RegionTest::all_regions.at(Iregion)(
-                                                latitude.at(Ilat), longitude.at(Ilon)) ) 
+                                    if ( source_data.regions.at( source_data.region_names.at(Iregion) ).at(area_index) )
                                     {
-                                        int_val +=  postprocess_fields.at(Ifield)->at(index) * dA;
+                                        int_val += postprocess_fields.at(Ifield)->at(index) * dA;
                                     }
                                 }
                             }
                         }
                     }
+                    int_index = Index(0, Itime, Idepth, Iregion,
+                                      1, Ntime, Ndepth, num_regions);
+                    reg_area = source_data.region_areas.at(int_index);
                     field_averages.at(Ifield).at(int_index) = (reg_area == 0) ? 0. : int_val / reg_area;
                 }
             }
@@ -85,14 +80,14 @@ void compute_region_avg_and_std(
 
                     int_index = Index(0, Itime, Idepth, Iregion,
                                       1, Ntime, Ndepth, num_regions);
-                    reg_area = region_areas.at(int_index);
+                    reg_area = source_data.region_areas.at(int_index);
 
                     int_val = 0.;
 
                     #pragma omp parallel default(none)\
                     private(Ilat, Ilon, index, dA, area_index )\
-                    shared(Ifield, Iregion, Itime, Idepth, int_index, mask, areas,\
-                            latitude, longitude, postprocess_fields, field_averages) \
+                    shared( source_data, Ifield, Iregion, Itime, Idepth, int_index,\
+                            postprocess_fields, field_averages) \
                     reduction(+ : int_val)
                     { 
                         #pragma omp for collapse(2) schedule(guided, chunk_size)
@@ -102,15 +97,14 @@ void compute_region_avg_and_std(
                                 index = Index(Itime, Idepth, Ilat, Ilon,
                                               Ntime, Ndepth, Nlat, Nlon);
 
-                                if ( mask.at(index) ) { // Skip land areas
+                                if ( source_data.mask.at(index) ) { // Skip land areas
 
                                     area_index = Index(0, 0, Ilat, Ilon,
                                                        1, 1, Nlat, Nlon);
 
-                                    dA = areas.at(area_index);
+                                    dA = source_data.areas.at(area_index);
 
-                                    if ( RegionTest::all_regions.at(Iregion)(
-                                                latitude.at(Ilat), longitude.at(Ilon)) ) 
+                                    if ( source_data.regions.at( source_data.region_names.at(Iregion) ).at(area_index) )
                                     {
                                         int_val +=
                                             pow(   field_averages.at(Ifield).at(int_index)
@@ -126,5 +120,4 @@ void compute_region_avg_and_std(
             }
         }
     }
-
 }

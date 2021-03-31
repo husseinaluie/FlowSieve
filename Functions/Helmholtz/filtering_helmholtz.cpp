@@ -10,20 +10,27 @@
 #include "../../preprocess.hpp"
 
 void filtering_helmholtz(
-        const std::vector<double> & F_potential,
-        const std::vector<double> & F_toroidal,
+        const dataset & source_data,
         const std::vector<double> & scales,
-        const std::vector<double> & dAreas,
-        const std::vector<double> & time,
-        const std::vector<double> & depth,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const std::vector<bool>   & mask,
-        const std::vector<int>    & myCounts,
-        const std::vector<int>    & myStarts,
         const MPI_Comm comm
         ) {
 
+    // Create some tidy names for variables
+    const std::vector<double>   &time       = source_data.time,
+                                &depth      = source_data.depth,
+                                &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude,
+                                &dAreas     = source_data.areas;
+
+    const std::vector<double>   &F_potential    = source_data.variables.at("F_potential"),
+                                &F_toroidal     = source_data.variables.at("F_toroidal");
+
+    const std::vector<bool> &mask = source_data.mask;
+
+    const std::vector<int>  &myCounts = source_data.myCounts,
+                            &myStarts = source_data.myStarts;
+
+    // Get some MPI info
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
@@ -33,11 +40,11 @@ void filtering_helmholtz(
     double clock_on;
 
     // Get dimension sizes
-    const int Nscales = scales.size();
-    const int Ntime   = myCounts.at(0);
-    const int Ndepth  = myCounts.at(1);
-    const int Nlat    = myCounts.at(2);
-    const int Nlon    = myCounts.at(3);
+    const int   Nscales = scales.size(),
+                Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
@@ -707,19 +714,16 @@ void filtering_helmholtz(
             fflush(stdout);
 
             Apply_Postprocess_Routines(
-                    postprocess_fields_tor, postprocess_names, OkuboWeiss_tor,
-                    time, depth, latitude, longitude, mask, dAreas,
-                    myCounts, myStarts, scales.at(Iscale), "postprocess_toroidal");
+                    source_data, postprocess_fields_tor, postprocess_names, OkuboWeiss_tor,
+                    scales.at(Iscale), "postprocess_toroidal");
 
             Apply_Postprocess_Routines(
-                    postprocess_fields_pot, postprocess_names, OkuboWeiss_pot,
-                    time, depth, latitude, longitude, mask, dAreas,
-                    myCounts, myStarts, scales.at(Iscale), "postprocess_potential");
+                    source_data, postprocess_fields_pot, postprocess_names, OkuboWeiss_pot,
+                    scales.at(Iscale), "postprocess_potential");
 
             Apply_Postprocess_Routines(
-                    postprocess_fields_tot, postprocess_names, OkuboWeiss_tot,
-                    time, depth, latitude, longitude, mask, dAreas,
-                    myCounts, myStarts, scales.at(Iscale), "postprocess_full");
+                    source_data, postprocess_fields_tot, postprocess_names, OkuboWeiss_tot,
+                    scales.at(Iscale), "postprocess_full");
 
             if (constants::DO_TIMING) { 
                 timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess");

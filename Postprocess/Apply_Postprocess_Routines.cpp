@@ -10,28 +10,31 @@
 #include "../netcdf_io.hpp"
 
 void Apply_Postprocess_Routines(
+        const dataset & source_data,
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<std::string> & vars_to_process,
         const std::vector<double> & OkuboWeiss,
-        const std::vector<double> & time,
-        const std::vector<double> & depth,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
-        const std::vector<bool>   & mask,
-        const std::vector<double> & areas,
-        const std::vector<int>    & myCounts,
-        const std::vector<int>    & myStarts,
         const double filter_scale,
         const std::string filename_base,
         const MPI_Comm comm
         ) {
 
-    //static_assert( not(constants::APPLY_POSTPROCESS) or not(constants::CAST_TO_INT) );
+    // Create some tidy names for variables
+    const std::vector<double>   &time       = source_data.time,
+                                &depth      = source_data.depth,
+                                &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude,
+                                &dAreas     = source_data.areas;
 
-    const int Ntime  = myCounts.at(0);
-    const int Ndepth = myCounts.at(1);
-    const int Nlat   = myCounts.at(2);
-    const int Nlon   = myCounts.at(3);
+    const std::vector<bool> &mask = source_data.mask;
+
+    const std::vector<int>  &myCounts = source_data.myCounts,
+                            &myStarts = source_data.myStarts;
+
+    const int   Ntime  = source_data.Ntime,
+                Ndepth = source_data.Ndepth,
+                Nlat   = source_data.Nlat,
+                Nlon   = source_data.Nlon;
 
     // Get full number of time points
     int full_Ntime;
@@ -39,6 +42,9 @@ void Apply_Postprocess_Routines(
 
     const int Stime  = myStarts.at(0);
     const int Sdepth = myStarts.at(1);
+
+    const int num_fields  = vars_to_process.size();
+    const int num_regions = source_data.region_names.size();
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
@@ -84,15 +90,6 @@ void Apply_Postprocess_Routines(
     }
 
     //
-    //// Write a file that defines the regions
-    //
-    char filename[50];
-    snprintf(filename, 50, "postprocess_regions.nc");
-    write_regions(filename, latitude, longitude, mask, areas, myCounts, myStarts);
-    write_regions_to_post(filename);
-
-
-    //
     //// Start by initializing the postprocess file
     //
    
@@ -117,14 +114,11 @@ void Apply_Postprocess_Routines(
     }
 
     // Filename + file
+    char filename[50];
     snprintf(filename, 50, (filename_base + "_%.6gkm.nc").c_str(), filter_scale/1e3);
     initialize_postprocess_file(
-            time, depth, latitude, longitude, OkuboWeiss_dim_vals,
-            RegionTest::region_names,
-            vars_to_process,
-            filename,
-            filter_scale,
-            do_OkuboWeiss
+            source_data, OkuboWeiss_dim_vals, vars_to_process,
+            filename, filter_scale, do_OkuboWeiss
             );
 
     // Add some attributes to the file
@@ -132,43 +126,6 @@ void Apply_Postprocess_Routines(
     add_attr_to_file("kernel_alpha", 
             kern_alpha * pow(filter_scale, 2), 
             filename);
-
-    //
-    //// Compute the area of each region
-    //
-    const int num_fields  = vars_to_process.size();
-    const int num_regions = RegionTest::all_regions.size();
-
-    if (wRank == 0) { fprintf(stdout, "  .. computing the area of each region\n"); }
-    fflush(stdout);
-
-    std::vector<double> region_areas(num_regions * Ntime * Ndepth, 0.);
-    compute_region_areas(region_areas, areas, mask, latitude, longitude,
-            num_regions, Ntime, Ndepth, Nlat, Nlon);
-
-    // Write the region areas
-    size_t start_r[3], count_r[3];
-    start_r[0] = (size_t) Stime;
-    count_r[0] = (size_t) Ntime;
-
-    start_r[1] = (size_t) Sdepth;
-    count_r[1] = (size_t) Ndepth;
-
-    start_r[2] = 0;
-    count_r[2] = (size_t) num_regions;
-
-    write_field_to_output(region_areas, "region_areas", start_r, count_r, filename, NULL);
-
-    if (wRank == 0) { fprintf(stdout, "  .. .. wrote region areas\n"); }
-    fflush(stdout);
-
-    // Write region names
-    //   this has to be done separately for reasons
-    write_regions_to_post(filename);
-
-    if (wRank == 0) { fprintf(stdout, "  .. .. wrote region names\n"); }
-    fflush(stdout);
-
 
     //
     //// Region averages and standard deviations
@@ -181,11 +138,7 @@ void Apply_Postprocess_Routines(
         field_averages(num_fields, std::vector<double>(Ntime * Ndepth * num_regions, 0.)), 
         field_std_devs(num_fields, std::vector<double>(Ntime * Ndepth * num_regions, 0.));
 
-    compute_region_avg_and_std(
-            field_averages, field_std_devs, postprocess_fields, region_areas,
-            areas, mask, latitude, longitude,
-            num_fields, num_regions, Ntime, Ndepth, Nlat, Nlon
-            );
+    compute_region_avg_and_std( field_averages, field_std_devs, source_data, postprocess_fields );
 
     if (wRank == 0) { fprintf(stdout, "  .. writing region averages and deviations\n"); }
     fflush(stdout);
@@ -214,9 +167,7 @@ void Apply_Postprocess_Routines(
 
         compute_region_avg_and_std_OkuboWeiss(
                 field_averages_OW, field_std_devs_OW, OkuboWeiss_areas, 
-                postprocess_fields, OkuboWeiss, region_areas,
-                areas, mask, OkuboWeiss_dim_vals, latitude, longitude,
-                num_fields, num_regions, Ntime, Ndepth, Nlat, Nlon, N_Okubo
+                source_data, postprocess_fields, OkuboWeiss, OkuboWeiss_dim_vals, N_Okubo
                 );
 
         if (wRank == 0) { fprintf(stdout, "  .. writing Okubo results\n"); }
@@ -245,9 +196,8 @@ void Apply_Postprocess_Routines(
     }
 
     compute_time_avg_std(
-            time_average, time_std_dev, postprocess_fields,
-            mask, areas, latitude, longitude, mask_count, always_masked,
-            full_Ntime, num_fields, Ntime, Ndepth, Nlat, Nlon
+            time_average, time_std_dev, source_data, postprocess_fields,
+            mask_count, always_masked, full_Ntime
             );
 
     // Write the time averages

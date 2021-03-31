@@ -52,22 +52,9 @@ int main(int argc, char *argv[]) {
     //   scales are given in metres
     // A zero scale will cause everything to nan out
     std::vector<double> filter_scales { 
-        100e3, 250e3, 400e3
-
-        //1.e4 , 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4,
-
-        /*
                                                       4.64e4, 5.99e4, 7.74e4,
         1.e5, 1.29e5, 1.67e5, 2.15e5, 2.78e5, 3.59e5, 4.64e5, 5.99e5, 7.74e5,
         1.e6, 1.29e6, 1.67e6, 2.15e6, 
-        */
-        
-        /*
-        1.e4 , 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4, 4.64e4, 5.99e4, 7.74e4,
-        1.e5 , 1.29e5, 1.67e5, 2.15e5, 2.78e5, 3.59e5, 4.64e5, 5.99e5, 7.74e5,
-        1.e6 , 1.29e6, 1.67e6, 2.15e6, 2.78e6, 3.59e6, 4.64e6, 5.99e6, 7.74e6,
-        1.e7
-        */
 
     };
 
@@ -81,23 +68,29 @@ int main(int argc, char *argv[]) {
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string &tor_input_fname = input.getCmdOption("--toroidal_input_file",   "toroidal_projection.nc");
-    const std::string &pot_input_fname = input.getCmdOption("--potential_input_file",  "potential_projection.nc");
-    const std::string &vel_input_fname = input.getCmdOption("--velocity_input_file",   "toroidal_projection.nc");
+    const std::string   &tor_input_fname   = input.getCmdOption("--toroidal_input_file",        "toroidal_projection.nc"),
+                        &pot_input_fname   = input.getCmdOption("--potential_input_file",       "potential_projection.nc"),
+                        &vel_input_fname   = input.getCmdOption("--velocity_input_file",        "toroidal_projection.nc");
 
-    const std::string &time_dim_name      = input.getCmdOption("--time",        "time");
-    const std::string &depth_dim_name     = input.getCmdOption("--depth",       "depth");
-    const std::string &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude");
-    const std::string &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
+                        &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude"),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
 
-    const std::string &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1");
-    const std::string &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
-    const int Nprocs_in_time_input  = stoi(Nprocs_in_time_string);
-    const int Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true");
 
-    const std::string &tor_field_var_name = input.getCmdOption("--tor_field",   "F");
-    const std::string &pot_field_var_name = input.getCmdOption("--pot_field",   "F");
-    const std::string &vel_field_var_name = input.getCmdOption("--vel_field",   "u_lat");
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1"),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
+                Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
+
+    const std::string   &tor_field_var_name = input.getCmdOption("--tor_field",   "F"),
+                        &pot_field_var_name = input.getCmdOption("--pot_field",   "F"),
+                        &vel_field_var_name = input.getCmdOption("--vel_field",   "u_lat");
+
+    const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    "region_definitions.nc"),
+                        &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     "region"),
+                        &region_defs_var_name = input.getCmdOption("--region_definitions_var",     "region_definition");
 
     // Print processor assignments
     const int max_threads = omp_get_max_threads();
@@ -106,10 +99,8 @@ int main(int argc, char *argv[]) {
     // Print some header info, depending on debug level
     print_header_info();
 
-    std::vector<double> longitude, latitude, time, depth;
-    std::vector<double> F_potential, F_toroidal, u_tor;
-    std::vector<bool> mask;
-    std::vector<int> myCounts, myStarts;
+    // Initialize dataset class instance
+    dataset source_data;
 
     // Read in source data / get size information
     #if DEBUG >= 1
@@ -118,58 +109,42 @@ int main(int argc, char *argv[]) {
 
     // Read in the grid coordinates
     //   implicitely assume coordinates are the same between input files
-    read_var_from_file(longitude, longitude_dim_name, tor_input_fname);
-    read_var_from_file(latitude,  latitude_dim_name,  tor_input_fname);
-    read_var_from_file(time,      time_dim_name,      tor_input_fname);
-    read_var_from_file(depth,     depth_dim_name,     tor_input_fname);
-
-    const int Ntime  = time.size();
-    const int Ndepth = depth.size();
-    const int Nlon   = longitude.size();
-    const int Nlat   = latitude.size();
+    source_data.load_time(      time_dim_name,      tor_input_fname );
+    source_data.load_depth(     depth_dim_name,     tor_input_fname );
+    source_data.load_latitude(  latitude_dim_name,  tor_input_fname );
+    source_data.load_longitude( longitude_dim_name, tor_input_fname );
 
     // Apply some cleaning to the processor allotments if necessary. 
-    const int Nprocs_in_time  = ( Ntime  == 1 ) ? 1 : 
-                                ( Ndepth == 1 ) ? wSize : 
-                                                  Nprocs_in_time_input;
-    const int Nprocs_in_depth = ( Ndepth == 1 ) ? 1 : 
-                                ( Ntime  == 1 ) ? wSize : 
-                                                  Nprocs_in_depth_input;
-    #if DEBUG >= 0
-    if (Nprocs_in_time != Nprocs_in_time_input) { 
-        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in time to %'d from %'d\n", Nprocs_in_time, Nprocs_in_time_input); }
-    }
-    if (Nprocs_in_depth != Nprocs_in_depth_input) { 
-        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in depth to %'d from %'d\n", Nprocs_in_depth, Nprocs_in_depth_input); }
-    }
-    if (wRank == 0) { fprintf(stdout, " Nproc(time, depth) = (%'d, %'d)\n", Nprocs_in_time, Nprocs_in_depth); }
-    #endif
-    assert( Nprocs_in_time * Nprocs_in_depth == wSize );
+    source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
      
-    convert_coordinates(longitude, latitude);
+    // Convert to radians, if appropriate
+    if ( latlon_in_degrees == "true" ) {
+        convert_coordinates( source_data.longitude, source_data.latitude );
+    }
+
+    // Compute the area of each 'cell' which will be necessary for integration
+    source_data.compute_cell_areas();
 
     // Read in the toroidal and potential fields
-    read_var_from_file(F_potential, pot_field_var_name, pot_input_fname, NULL, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
-    read_var_from_file(F_toroidal,  tor_field_var_name, tor_input_fname, NULL, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
+    source_data.load_variable( "F_potential", pot_field_var_name, pot_input_fname, false, true );
+    source_data.load_variable( "F_toroidal",  tor_field_var_name, tor_input_fname, false, true );
+
+    // Get the MPI-local dimension sizes
+    source_data.Ntime  = source_data.myCounts[0];
+    source_data.Ndepth = source_data.myCounts[1];
 
     // read in velocity to get the mask
-    read_var_from_file(u_tor, vel_field_var_name, vel_input_fname, &mask, &myCounts, &myStarts, Nprocs_in_time, Nprocs_in_depth);
+    source_data.load_variable( "sample_velocity", vel_field_var_name, vel_input_fname, true, true);
 
     // Mask out the pole, if necessary (i.e. set lat = 90 to land)
-    mask_out_pole(latitude, mask, myCounts[0], myCounts[1], myCounts[2], myCounts[3]);
+    mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
 
-    // Compute the area of each 'cell'
-    //   which will be necessary for integration
-    std::vector<double> areas(Nlon * Nlat);
-    compute_areas(areas, longitude, latitude);
+    // Read in the region definitions and compute region areas
+    source_data.load_region_definitions( region_defs_fname, region_defs_dim_name, region_defs_var_name );
 
-    // Now pass the arrays along to the filtering routines
+    // Now pass the data along to the filtering routines
     const double pre_filter_time = MPI_Wtime();
-    filtering_helmholtz(
-            F_potential, F_toroidal,
-            filter_scales, areas, 
-            time, depth, longitude, latitude,
-            mask, myCounts, myStarts);
+    filtering_helmholtz( source_data, filter_scales );
     const double post_filter_time = MPI_Wtime();
 
     // Done!
