@@ -36,13 +36,13 @@ int main(int argc, char **argv)
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo");
-    const std::string &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo");
-    const std::string &salinity_name     = input.getCmdOption("--salinity",    "so");
-    const std::string &temperature_name  = input.getCmdOption("--temperature", "thetao");
-    const std::string &sla_name          = input.getCmdOption("--sla",         "zos");
-    const std::string &input_fname       = input.getCmdOption("--input_file",  "input.nc");
-    const std::string &output_fname      = input.getCmdOption("--output_file", "interp.nc");
+    const std::string   &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo"),
+                        &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo"),
+                        &salinity_name     = input.getCmdOption("--salinity",    "so"),
+                        &temperature_name  = input.getCmdOption("--temperature", "thetao"),
+                        &sla_name          = input.getCmdOption("--sla",         "zos"),
+                        &input_fname       = input.getCmdOption("--input_file",  "input.nc"),
+                        &output_fname      = input.getCmdOption("--output_file", "interp.nc");
 
     // Print some header info, depending on debug level
     print_header_info();

@@ -181,16 +181,10 @@ ALGLIB: ${ALGLIB_OBJS}
 
 # Group together executables with similar compilations
 CORE_TARGET_EXES := Case_Files/coarse_grain.x \
-					Case_Files/integrator.x \
-					Case_Files/coarse_grain_subset.x \
-					Case_Files/do_filtering.x \
 					Case_Files/particles.x \
 					Case_Files/compare_particles.x \
 					Case_Files/project_onto_particles.x
 CORE_TARGET_OBJS := Case_Files/coarse_grain.o \
-					Case_Files/integrator.o \
-					Case_Files/coarse_grain_subset.o \
-					Case_Files/do_filtering.o \
 					Case_Files/particles.o \
 					Case_Files/compare_particles.o \
 					Case_Files/project_onto_particles.o
