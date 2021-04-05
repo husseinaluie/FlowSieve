@@ -330,16 +330,9 @@ void vel_Cart_to_Spher_at_point(
  * loop sequences, calls the other funcations (velocity conversions), and
  * calls the IO functionality.
  *
- * @param[in]   u_r,u_lon,u_lat                     full velocity components
- * @param[in]   rho                                 full density
- * @param[in]   p                                   full pressure
- * @param[in]   scales                              scales at which to filter the data
- * @param[in]   dAreas                              cell areas (2D)
- * @param[in]   time, depth, longitude, latitude    dimension vectors (1D)
- * @param[in]   mask                                vector to distinguish land/water
- * @param[in]   myCounts                            Local (to MPI process) dimension sizes
- * @param[in]   myStarts                            Vector indicating where the local (to MPI process) region fits in the whole
- * @param[in]   comm                                MPI communicator (default MPI_COMM_WORLD)
+ * @param[in]   source_data     dataset class instance containing data (velocities, etc)
+ * @param[in]   scales          scales at which to filter the data
+ * @param[in]   comm            MPI communicator (default MPI_COMM_WORLD)
  *
  */
 void filtering(const dataset & source_data,
@@ -347,6 +340,19 @@ void filtering(const dataset & source_data,
                const MPI_Comm comm = MPI_COMM_WORLD);
 
 
+
+/*!
+ * \brief Main filtering driver for Helmholtz decomposed data
+ *
+ * This function is the main filtering driver. It sets up the appropriate
+ * loop sequences, calls the other funcations (velocity conversions), and
+ * calls the IO functionality.
+ *
+ * @param[in]   source_data     dataset class instance containing data (Psi, Phi, etc)
+ * @param[in]   scales          scales at which to filter the data
+ * @param[in]   comm            MPI communicator (default MPI_COMM_WORLD)
+ *
+ */
 void filtering_helmholtz(
         const dataset & source_data,
         const std::vector<double> & scales,
