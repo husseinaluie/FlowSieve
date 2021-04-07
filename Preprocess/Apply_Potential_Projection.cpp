@@ -58,7 +58,7 @@ void Apply_Potential_Projection(
     compute_spatial_average(u_lat_means, u_lat, dAreas, Ntime, Ndepth, Nlat, Nlon, mask);
 
     // Fill in the land areas with zero velocity
-    //   also subtract the mean off (will be added back later - to the Toroidal side)
+    //   also subtract the mean off (will be stored in output file for reference)
     #pragma omp parallel \
     default(none) \
     shared( u_lon, u_lat, u_lon_means, u_lat_means, mask ) \
@@ -269,7 +269,7 @@ void Apply_Potential_Projection(
             //
             #pragma omp parallel \
             default(none) \
-            shared( full_u_lon_pot, u_lon_pot, u_lon_means, full_u_lat_pot, u_lat_pot, u_lat_means,\
+            shared( full_u_lon_pot, u_lon_pot, full_u_lat_pot, u_lat_pot, \
                     full_div_pot, div_pot, full_F, F_vector, full_seed, F_seed, full_RHS, div_term, \
                     Itime, Idepth ) \
             private( Ilat, Ilon, index, index_sub, mean_ind )
@@ -338,9 +338,6 @@ void Apply_Potential_Projection(
 
     if (not(constants::MINIMAL_OUTPUT)) {
         vars_to_write.push_back("RHS");
-
-        //vars_to_write.push_back("div_orig");
-        //vars_to_write.push_back("div_pot");
     }
 
     initialize_output_file(time, depth, longitude, latitude,
@@ -354,11 +351,23 @@ void Apply_Potential_Projection(
 
     if (not(constants::MINIMAL_OUTPUT)) {
         write_field_to_output(full_RHS,        "RHS",      starts, counts, output_fname.c_str(), &mask);
-
-        //write_field_to_output(full_div_pot,    "div_pot",  starts, counts, output_fname.c_str(), &mask);
-        //write_field_to_output(full_div_orig,   "div_orig", starts, counts, output_fname.c_str(), &mask);
     }
 
+    // Also write the mean velocity
+    if (wRank == 0) {
+        const char* dim_names[] = {"time", "depth"};
+        const int ndims = 2;
+        add_var_to_file("u_lon_mean", dim_names, ndims, output_fname.c_str());
+        add_var_to_file("u_lat_mean", dim_names, ndims, output_fname.c_str());
+    }
+    MPI_Barrier(comm);
+    size_t mean_starts[2] = { size_t(myStarts.at(0)),   size_t(myStarts.at(1)) };
+    size_t mean_counts[2] = { size_t(Ntime),            size_t(Ndepth) };
+
+    write_field_to_output( u_lon_means, "u_lon_mean", mean_starts, mean_counts, output_fname.c_str(), NULL );
+    write_field_to_output( u_lat_means, "u_lat_mean", mean_starts, mean_counts, output_fname.c_str(), NULL );
+
+    // Store some solver information
     add_attr_to_file("rel_tol",    rel_tol,                     output_fname.c_str());
     add_attr_to_file("max_iters",  (double) max_iters,          output_fname.c_str());
     add_attr_to_file("diff_order", (double) constants::DiffOrd, output_fname.c_str());
