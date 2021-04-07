@@ -28,8 +28,10 @@ void initialize_output_file(
     retval = nc_create_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
-    retval = nc_put_att_double(ncid, NC_GLOBAL, "filter_scale", NC_DOUBLE, 1, &filter_scale);
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    if ( filter_scale >= 0 ) {
+        retval = nc_put_att_double(ncid, NC_GLOBAL, "filter_scale", NC_DOUBLE, 1, &filter_scale);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    }
 
     retval = nc_put_att_double(ncid, NC_GLOBAL, "rho0", NC_DOUBLE, 1, &constants::rho0);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
