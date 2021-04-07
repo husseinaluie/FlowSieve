@@ -78,11 +78,25 @@ namespace constants
     /*!
      * \param DEFORM_AROUND_LAND
      * \brief Boolean indicating whether or not the kernel should deform around land.
+     *
      * If true, land is given zero weight (i.e. not factored into local average).
      * If false, land is included in local average (treated as zero velocity
      * @ingroup constants
      */
     const bool DEFORM_AROUND_LAND = false;
+
+    /*!
+     * \param FILTER_OVER_LAND
+     * \brief Boolean to indicate whether or not land values should be filled in with coarse-grained results.
+     *
+     * If true, land values are filled in with the results of coarse-graining. 
+     * Masks are removed when variables are loaded and filled in with constants
+     * If false, land values are maintained as land, and masked out
+     *
+     * Note that this does NOT affect the shape of filtering kernels.
+     * @ingroup constants
+     */
+    const bool FILTER_OVER_LAND = false;
 
     /*!
      * \param CARTESIAN

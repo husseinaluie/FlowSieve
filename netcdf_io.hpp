@@ -85,7 +85,7 @@ void initialize_output_file(
         const std::vector<double> & areas,
         const std::vector<std::string> & vars,
         const char * filename,
-        const double filter_scale,
+        const double filter_scale = -1,
         MPI_Comm = MPI_COMM_WORLD
         );
 
@@ -259,6 +259,7 @@ void read_var_from_file(
         const int Nprocs_in_depth = 1,
         const bool do_splits = true,
         const int force_split_dim = -1,
+        const double land_fill_value = 0.,
         const MPI_Comm = MPI_COMM_WORLD 
         );
 

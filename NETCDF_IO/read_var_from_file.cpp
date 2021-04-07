@@ -17,6 +17,7 @@ void read_var_from_file(
         const int Nprocs_in_depth,
         const bool do_splits,
         const int force_split_dim,
+        const double land_fill_value,
         const MPI_Comm comm
         ) {
 
@@ -141,33 +142,6 @@ void read_var_from_file(
     fflush(stdout);
     #endif
 
-    /*
-    #if DEBUG >= 2
-    char print_buf[str_len];
-    char *target = print_buf;
-
-    // print starst
-    target += sprintf(target, "    Rank %'d: starts =", wRank);
-    for (int Idim = 0; Idim < num_dims; ++Idim) {
-        if (Idim > 0) { target += sprintf(target, " x"); }
-        target += sprintf(target, " %'zu", myStarts == NULL ? start[Idim] : myStarts->at(Idim) );
-    }
-    target += sprintf(target, "\n");
-
-    // print counts
-    target += sprintf(target, "    Rank %'d: counts =", wRank);
-    for (int Idim = 0; Idim < num_dims; ++Idim) {
-        if (Idim > 0) { target += sprintf(target, " x"); }
-        target += sprintf(target, " %'zu", myCounts == NULL ? count[Idim] : myCounts->at(Idim) );
-    }
-    target += sprintf(target, "\n");
-
-    MPI_Barrier(comm);
-    fprintf(stdout, print_buf);
-    MPI_Barrier(comm);
-    #endif
-    */
-
     // Now resize the vector to the appropriate size
     var.resize(num_pts);
 
@@ -233,7 +207,7 @@ void read_var_from_file(
     // Determine masking, if desired
     double fill_val = 1e100;  // backup value
     double var_max = -1e10, var_min = 1e10;
-    size_t num_land = 0, num_water = 0;
+    size_t num_land = 0, num_water = 0, num_unmasked = 0;
 
     if (mask != NULL) { mask->resize(var.size()); }
 
@@ -248,8 +222,15 @@ void read_var_from_file(
     // If we're at 99% of the fill_val, call it land
     for (size_t II = 0; II < var.size(); II++) {
         if (fabs(var.at(II)) > 0.99 * (fabs(fill_val*scale + offset))) {
-            if (mask != NULL) { mask->at(II) = false; }
-            num_land++;
+            if (constants::FILTER_OVER_LAND) {
+                // If requested to filter over land, then fill in the mask now
+                if (mask != NULL) { mask->at(II) = true; }
+                num_unmasked++;
+                var.at(II) = land_fill_value;
+            } else {
+                if (mask != NULL) { mask->at(II) = false; }
+                num_land++;
+            }
         } else {
             var_max = std::max( var_max, var.at(II) );
             var_min = std::min( var_min, var.at(II) );
@@ -260,9 +241,9 @@ void read_var_from_file(
 
     #if DEBUG >= 1
     if (wRank == 0) {
-        fprintf(stdout, "  Land cover = %'.4g%% (%'zu water vs %'zu land) \n", 
-                100 * ((double)num_land) / (num_land + num_water),
-                num_water, num_land);
+        fprintf(stdout, "  Land cover = %'.4g%% (%'zu water vs %'zu land) (%'zu land converted to water) \n", 
+                100 * ((double)num_land) / (num_land + num_water + num_unmasked),
+                num_water + num_unmasked, num_land, num_unmasked);
     }
     #endif
 
