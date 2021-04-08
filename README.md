@@ -21,6 +21,10 @@ This repository stores source code for running coarse graining procedures on net
  * only needs to be done once (unless you call `make hardclean`)
 2. Call `make Case_Files/interpolator.x`
 
+### Helmholtz Decomposition
+
+[Go to this page](./HELMHOLTZ.md)
+
 ### Postprocessing
 
 Post-processing (such as region-averaging, Okubo-Weiss histogram binning, time-averaging, etc) can be enabled and run on-line
