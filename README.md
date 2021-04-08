@@ -5,6 +5,12 @@ This repository stores source code for running coarse graining procedures on net
 
 ---
 
+## Methods
+
+Some details regarding underlying methods are discussed [on this page](./METHODS.md)
+
+---
+
 ## Compilation / Installation
 
 1. Copy the appropriate file from `./Systems/` to `./system.mk`
@@ -47,6 +53,13 @@ The `Systems` directory contains a few sample system files. To prepare a system 
 
 1. `--version`
  * Calling `./coarse_grain.x --version` prints a summary of the constants / variables used when compiling
+
+---
+
+## Known Issues
+
+
+Some known issues (with solutions where available) are [given on this page](./ISSUES.md)
 
 ---
 
