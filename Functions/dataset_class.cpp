@@ -67,12 +67,12 @@ void dataset::check_processor_divisions( const int Nprocs_in_time_input, const i
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
     // Apply some cleaning to the processor allotments if necessary. 
-    Nprocs_in_time  = ( Ntime  == 1 ) ? 1 : 
-                      ( Ndepth == 1 ) ? wSize : 
-                                        Nprocs_in_time_input;
-    Nprocs_in_depth = ( Ndepth == 1 ) ? 1 : 
-                      ( Ntime  == 1 ) ? wSize : 
-                                        Nprocs_in_depth_input;
+    Nprocs_in_time  = ( full_Ntime  == 1 ) ? 1 : 
+                      ( full_Ndepth == 1 ) ? wSize : 
+                                             Nprocs_in_time_input;
+    Nprocs_in_depth = ( full_Ndepth == 1 ) ? 1 : 
+                      ( full_Ntime  == 1 ) ? wSize : 
+                                             Nprocs_in_depth_input;
 
     #if DEBUG >= 0
     if (Nprocs_in_time != Nprocs_in_time_input) { 
@@ -85,4 +85,59 @@ void dataset::check_processor_divisions( const int Nprocs_in_time_input, const i
     #endif
 
     assert( Nprocs_in_time * Nprocs_in_depth == wSize );
+}
+
+
+void dataset::compute_region_areas() {
+
+    assert( mask.size() > 0 ); // must read in mask before computing region areas
+    assert( areas.size() > 0 ); // must compute cell areas before computing region areas
+    const size_t num_regions = region_names.size();
+    region_areas.resize( num_regions * Ntime * Ndepth );
+
+    double local_area;
+    size_t Ilat, Ilon, reg_index, index, area_index;
+
+    const int chunk_size = get_omp_chunksize(Nlat, Nlon);
+
+    for (size_t Iregion = 0; Iregion < num_regions; ++Iregion) {
+        fprintf( stdout, " Read in region %s with %'zu points\n", region_names.at(Iregion).c_str(), regions.at( region_names.at(Iregion) ).size() );
+        for (size_t Itime = 0; Itime < Ntime; ++Itime) {
+            for (size_t Idepth = 0; Idepth < Ndepth; ++Idepth) {
+
+                local_area = 0.;
+
+                #pragma omp parallel default(none)\
+                private( Ilat, Ilon, index, area_index )\
+                shared( mask, areas, Iregion, Itime, Idepth ) \
+                reduction(+ : local_area)
+                { 
+                    #pragma omp for collapse(2) schedule(guided, chunk_size)
+                    for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                        for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+
+                            index = Index(Itime, Idepth, Ilat, Ilon,
+                                          Ntime, Ndepth, Nlat, Nlon);
+
+                            if ( mask.at(index) ) { // Skip land areas
+
+                                area_index = Index(0, 0, Ilat, Ilon,
+                                                   1, 1, Nlat, Nlon);
+
+                                if ( regions.at( region_names.at( Iregion ) ).at(area_index) ) {
+                                    local_area += areas.at(area_index); 
+                                }
+                            }
+                        }
+                    }
+                }
+                reg_index = Index(0, Itime, Idepth, Iregion,
+                                  1, Ntime, Ndepth, num_regions);
+
+                region_areas.at(reg_index) = local_area;
+                
+            }
+        }
+    }
+
 }

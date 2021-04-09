@@ -77,6 +77,7 @@ class dataset {
                                         const std::string dim_name, 
                                         const std::string var_name, 
                                         const MPI_Comm = MPI_COMM_WORLD );
+        void compute_region_areas();
 
         // Check the processors divions between dimensions
         void check_processor_divisions( const int Nprocs_in_time_input, const int Nprocs_in_depth_input, const MPI_Comm = MPI_COMM_WORLD );
