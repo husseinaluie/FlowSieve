@@ -19,7 +19,7 @@ void mask_out_pole(
     size_t index;
     
     const double D2R = M_PI / 180.;
-    const double pole_cut = (90. - 1.) * D2R;
+    const double pole_cut = (90. - 0.5) * D2R;
 
     #if not(CARTESIAN)
     #pragma omp parallel default(none) \
