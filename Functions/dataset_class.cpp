@@ -95,13 +95,20 @@ void dataset::compute_region_areas() {
     const size_t num_regions = region_names.size();
     region_areas.resize( num_regions * Ntime * Ndepth );
 
+    int wRank=-1;
+    MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
+
     double local_area;
     size_t Ilat, Ilon, reg_index, index, area_index;
 
     const int chunk_size = get_omp_chunksize(Nlat, Nlon);
 
     for (size_t Iregion = 0; Iregion < num_regions; ++Iregion) {
-        fprintf( stdout, " Read in region %s with %'zu points\n", region_names.at(Iregion).c_str(), regions.at( region_names.at(Iregion) ).size() );
+        #if DEBUG >= 1
+        if (wRank == 0) {
+            fprintf( stdout, " Read in region %s with %'zu points\n", region_names.at(Iregion).c_str(), regions.at( region_names.at(Iregion) ).size() );
+        }
+        #endif
         for (size_t Itime = 0; Itime < Ntime; ++Itime) {
             for (size_t Idepth = 0; Idepth < Ndepth; ++Idepth) {
 
