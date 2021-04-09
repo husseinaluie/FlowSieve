@@ -7,45 +7,29 @@ This repository stores source code for running coarse graining procedures on net
 
 ## Methods
 
-Some details regarding underlying methods are discussed [on this page](./METHODS.md)
+Some details regarding underlying methods are discussed [on this page](./Documentation/METHODS.md) (warning, math content).
 
 ---
 
 ## Compilation / Installation
 
-1. Copy the appropriate file from `./Systems/` to `./system.mk`
- * The system directory contains files that declare system compiler information.
- * You may need to create a new file to correspond to your system
-2. Call `make all` in the root directory to build the main executable.
-3. Call `make tests` to compile the unit test routines.
- * The resulting executables are then stored in `Tests/`
+For notes on installation, please see [this page](./Documentation/INSTALL.md).
 
-### Interpolator
 
-1. The interpolator requires the ALGLIB package. 
- * Compile via `make ALGLIB`
- * only needs to be done once (unless you call `make hardclean`)
-2. Call `make Case_Files/interpolator.x`
+## Helmholtz Decomposition
 
-### Helmholtz Decomposition
+[Go to this page](./Documentation/HELMHOLTZ.md)
 
-[Go to this page](./HELMHOLTZ.md)
+---
 
-### Postprocessing
+## Postprocessing
 
 Post-processing (such as region-averaging, Okubo-Weiss histogram binning, time-averaging, etc) can be enabled and run on-line
 by setting the **APPLY_POSTPROCESS** flag in constants.hpp to **true**.
 
 This will produce an additional output file for each filtering scale.
 
-### System File
-
-The `Systems` directory contains a few sample system files. To prepare a system file for your machine, there are a few steps.
-1. Copy the most appropraite system file from `Systems` to `system.mk` into the main directory.
-2. Compilers: Indicate your chosen compilers (CXX for C++ and MPICXX for C++ with openmpi)
-3. Links: these may need to change depending on your compiler (e.g. `-fopenmp` to `-qopenmp` for intel compilers)
-4. EXTRA_OPT_FLAGS: this is for other optimizations that you may not want on by default. For example, `-ip -ipo` for intel compilers.
-5. Depending on how your libraries are set up, you may need to add various library and include directories to `LIB_DIRS` and `INC_DIRS`
+Various geographic regions of interest can be provided in a netcdf file.
 
 ---
 
@@ -58,33 +42,17 @@ The `Systems` directory contains a few sample system files. To prepare a system 
 
 ## Known Issues
 
-
-Some known issues (with solutions where available) are [given on this page](./ISSUES.md)
+Some known issues (with solutions where available) are [given on this page](./Documentation/ISSUES.md)
 
 ---
 
-## Function Map
+## Technical Matters
+
+### Function Map
 
 See the function map for [filtering] to get an overview of the function dependencies.
 [filtering]: @ref filtering() "the main filtering function"
 
----
-
-## Makefile
-
-### make arguments
-* `make clean`
- * This removes all object files (\*.o) in the source tree
-* `make hardclean`
- * In addition to the `clean` removals, also removes the executables, symbol table (dSYM)
-* `make Case_Files/<filename>.x`
- * Makes the specified executable. `Case_Files` contains the main files that can be compiled into executables.
-* `make docs`
- * Makes the doxygen-produced documentation. **Note: `doxygen` and `dot` must be installed and on the path**
-* `make cleandocs`
- * Removes the previous documentation build
-* `make tests`
- * Compiles the test routines in `Tests/`
 
 ### DEBUG flag
 
