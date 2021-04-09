@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
 
     // No u_r in inputs, so initialize as zero
     source_data.variables.insert( std::pair< std::string, std::vector<double> >
-                                           ( "u_r",       std::vector<double>(0, source_data.variables.at("u_lon").size()) ) 
+                                           ( "u_r",       std::vector<double>(source_data.variables.at("u_lon").size(), 0.) ) 
                                 );
 
     if (constants::COMP_BC_TRANSFERS) {
