@@ -6,7 +6,9 @@ bool check_file_existence (const std::string& name) {
         fclose(file);
         return true;
     } else {
+        #if DEBUG >= 0
         fprintf(stderr, " %s does not exist.\n", name.c_str() );
+        #endif
         return false;
     }   
 }
