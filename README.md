@@ -5,20 +5,26 @@ This repository stores source code for running coarse graining procedures on net
 
 ---
 
+## Tutorial
+
+A series of [basic tutorials](./Tutorial/TUTORIAL.md) are provided to outline both various usage cases as well as how to use / process the outputs.
+
+
+---
+
 ## Methods
 
 Some details regarding underlying methods are discussed [on this page](./Documentation/METHODS.md) (warning, math content).
+
+### Helmholtz Decomposition
+
+For notes about the Helmholtz decomposition, [go to this page](./Documentation/HELMHOLTZ.md)
 
 ---
 
 ## Compilation / Installation
 
 For notes on installation, please see [this page](./Documentation/INSTALL.md).
-
-
-## Helmholtz Decomposition
-
-[Go to this page](./Documentation/HELMHOLTZ.md)
 
 ---
 
@@ -48,12 +54,6 @@ Some known issues (with solutions where available) are [given on this page](./Do
 
 ## Technical Matters
 
-### Function Map
-
-See the function map for [filtering] to get an overview of the function dependencies.
-[filtering]: @ref filtering() "the main filtering function"
-
-
 ### DEBUG flag
 
 Setting the debug flag in the Makefile specifies how much information is printed
@@ -66,3 +66,9 @@ This list may not be quite up-to-date. Rule of thumb:
  * Use _DEBUG = 2_ if you're running into some issues and want to narrow it down a bit
  * Going beyond this is really only necessary / useful if you're running into some fatal errors that you can't pinpoint
  * Setting _DEBUG_ to be negative is generally not advised. Setting to 0 shouldn't produce overly much output, and certainly not enough to hamper performance. If you're trying to silence errors, make sure you understand _why_ the errors are happening, and that you're really okay with ignoring them.
+
+
+### Function Map
+
+See the function map for [filtering] to get an overview of the function dependencies.
+[filtering]: @ref filtering() "the main filtering function"
