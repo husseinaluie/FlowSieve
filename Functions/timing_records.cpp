@@ -93,8 +93,9 @@ void Timing_Records::print() {
 
         // Print information
         if (wRank == 0) {
-            fprintf(stdout, "  %-25s : %8.6e ( %8.6e )\n", 
-                    entry.first.c_str(), mean_val, std_val);
+            if (mean_val > 0) {
+                fprintf(stdout, "  %-25s : %8.6e ( %8.6e )\n", entry.first.c_str(), mean_val, std_val);
+            }
         }
     }
 }
