@@ -13,6 +13,26 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
+/*
+ * \brief Case file to coarse-grain raw velocity fields (NOT FOR HELMHOLTZ DECOMPOSED FIELDS)
+ *
+ * @param   --input_file            Filename for the primary input. (default is input.nc)
+ * @param   --time                  Name of the time dimension (default is time)
+ * @param   --depth                 Name of the depth dimension (default is depth)
+ * @param   --latitude
+ * @param   --longitude
+ * @param   --is_degrees
+ * @param   --Nprocs_in_time
+ * @param   --Nprocs_in_depth
+ * @param   --zonal_vel
+ * @param   --merid_vel
+ * @param   --density
+ * @param   --pressure
+ * @param   --region_definitions_file
+ * @param   --region_definitions_dim
+ * @param   --region_definitions_var
+ *
+ */
 int main(int argc, char *argv[]) {
     
     // PERIODIC_Y implies UNIFORM_LAT_GRID
@@ -47,47 +67,6 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
-    // For the time being, hard-code the filter scales
-    //   include scales as a comma-separated list
-    //   scales are given in metres
-    // A zero scale will cause everything to nan out
-    std::vector<double> filter_scales { 
-        // Michele 2d-turbulence
-        //2, 5, 10, 15, 20, 30, 45, 65, 90, 125, 180
-
-        // 2d fill-in
-        //7, 12, 17, 24, 37, 54, 72, 81, 256, 500
-
-        // 2d full-output
-        //10, 20, 45, 65
-
-        // AVISO full output
-        //50e3, 100e3, 215e3, 460e3
-
-        //10e3, 100e3, 250e3, 500e3, 1000e3
-
-        // Artifical Dataset
-        //0.1, 0.2, 0.3, 0.4, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12
-
-        // AVISO paper
-        1.e4, 1.29e4, 1.67e4, 2.15e4, 2.78e4, 3.59e4, 4.64e4, 5.99e4, 7.74e4,
-        1.e5, 1.29e5, 1.67e5, 2.15e5, 2.78e5, 3.59e5, 4.64e5, 5.99e5, 7.74e5,
-        1.e6, 1.29e6, 1.67e6, 2.15e6//, 2.78e6, 3.59e6
-
-        // Lo-res (NEMO part of AVISO paper)
-        /*
-        1e4, 1.58e4, 2.51e4, 3.98e4, 6.31e4,
-        1e5, 1.58e5, 2.51e5, 3.98e5, 6.31e5,
-        1e6, 
-        */
-
-        // Double resolution of above (i.e. fill in gaps)
-        /*
-        1.26e4,  2.00e4  3.16e4,  5.01e4,  7.94e4,
-        1.26e5,  2.00e5  3.16e5,  5.01e5,  7.94e5,
-        */
-    };
-
     //
     //// Parse command-line arguments
     //
@@ -121,6 +100,11 @@ int main(int argc, char *argv[]) {
                         &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     "region"),
                         &region_defs_var_name = input.getCmdOption("--region_definitions_var",     "region_definition");
 
+    // Also read in the filter scales from the commandline
+    //   e.g. --filter_scales "10.e3 150.76e3 1000e3" (units are in metres)
+    std::vector<double> filter_scales;
+    input.getFilterScales( filter_scales, "--filter_scales" );
+
     // Set OpenMP thread number
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
@@ -146,7 +130,7 @@ int main(int argc, char *argv[]) {
     source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
      
     // Convert to radians, if appropriate
-    if ( latlon_in_degrees == "true" ) {
+    if ( (latlon_in_degrees == "true") and (not(constants::CARTESIAN)) ) {
         convert_coordinates( source_data.longitude, source_data.latitude );
     }
 

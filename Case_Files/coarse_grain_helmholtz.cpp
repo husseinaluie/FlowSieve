@@ -47,17 +47,6 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
-    // For the time being, hard-code the filter scales
-    //   include scales as a comma-separated list
-    //   scales are given in metres
-    // A zero scale will cause everything to nan out
-    std::vector<double> filter_scales { 
-                                                      4.64e4, 5.99e4, 7.74e4,
-        1.e5, 1.29e5, 1.67e5, 2.15e5, 2.78e5, 3.59e5, 4.64e5, 5.99e5, 7.74e5,
-        1.e6, 1.29e6, 1.67e6, 2.15e6, 
-
-    };
-
     //
     //// Parse command-line arguments
     //
@@ -91,6 +80,11 @@ int main(int argc, char *argv[]) {
     const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    "region_definitions.nc"),
                         &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     "region"),
                         &region_defs_var_name = input.getCmdOption("--region_definitions_var",     "region_definition");
+
+    // Also read in the filter scales from the commandline
+    //   e.g. --filter_scales "10.e3 150.76e3 1000e3" (units are in metres)
+    std::vector<double> filter_scales;
+    input.getFilterScales( filter_scales, "--filter_scales" );
 
     // Print processor assignments
     const int max_threads = omp_get_max_threads();

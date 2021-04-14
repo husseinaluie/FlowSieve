@@ -52,6 +52,8 @@ class dataset {
         // that the output is in the same order as the input.
         std::vector<int> myCounts, myStarts;
 
+        // Store variable descriptions to add to netcdf files
+        std::map< std::string, std::string > variable_descriptions;
 
         // Constructor
         dataset();
@@ -72,6 +74,8 @@ class dataset {
                             const bool read_mask = true,
                             const bool load_counts = true );
 
+        void build_variable_descriptions();
+
         // Load in region definitions
         void load_region_definitions(   const std::string filename, 
                                         const std::string dim_name, 
@@ -81,6 +85,7 @@ class dataset {
 
         // Check the processors divions between dimensions
         void check_processor_divisions( const int Nprocs_in_time_input, const int Nprocs_in_depth_input, const MPI_Comm = MPI_COMM_WORLD );
+
 };
 
 /*! 
@@ -910,6 +915,8 @@ class InputParser {
                 ) const;
 
         bool cmdOptionExists(const std::string &option) const;
+
+        void getFilterScales( std::vector<double> &filter_scales, const std::string &argname ) const;
 
     private:
         std::vector <std::string> tokens;
