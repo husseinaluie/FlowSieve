@@ -9,10 +9,14 @@ Nothing fancy, but introduces the basics of running the code and plotting some o
 
 Tutorial [details are here](./Basic/ABOUT_TUTORIAL).
 
+## Spherical Demo
+
 ### Handling Land 
 
-## Post-processing
+### Post-processing
 
-## Helmholtz Decomposition
+This tutorial shows you how to use post-processing result to generate filtering spectra of different fields.
 
-### Filtering Helmholtz
+### Helmholtz Decomposition
+
+#### Filtering Helmholtz
