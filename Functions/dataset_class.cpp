@@ -8,7 +8,6 @@
 
 // Class constructor
 dataset::dataset() {
-
 };
 
 void dataset::load_time( const std::string dim_name, const std::string filename ) {

@@ -52,9 +52,6 @@ class dataset {
         // that the output is in the same order as the input.
         std::vector<int> myCounts, myStarts;
 
-        // Store variable descriptions to add to netcdf files
-        std::map< std::string, std::string > variable_descriptions;
-
         // Constructor
         dataset();
 
@@ -73,8 +70,6 @@ class dataset {
                             const std::string filename,
                             const bool read_mask = true,
                             const bool load_counts = true );
-
-        void build_variable_descriptions();
 
         // Load in region definitions
         void load_region_definitions(   const std::string filename, 

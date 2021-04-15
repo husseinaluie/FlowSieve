@@ -69,8 +69,7 @@ bool check_file_existence (
  *  The output longitude and latitude fields are given a scale factor
  *    to convert from radians to degrees
  *
- * @param[in] time,depth,longitude,latitude vectors giving the dimensions 
- * @param[in] area                          cell areas
+ * @param[in] source_data                   dataset class storing dimension information (as well as other stuff)
  * @param[in] vars                          name of variables to write
  * @param[in] filename                      name for the output file
  * @param[in] filter_scale                  lengthscale used in the filter
@@ -78,11 +77,7 @@ bool check_file_existence (
  *
  */
 void initialize_output_file(
-        const std::vector<double> & time,
-        const std::vector<double> & depth,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const std::vector<double> & areas,
+        const dataset & source_data,
         const std::vector<std::string> & vars,
         const char * filename,
         const double filter_scale = -1,

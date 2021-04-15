@@ -302,12 +302,12 @@ void filtering_helmholtz(
     postprocess_fields_pot.push_back( &coarse_F_pot );
     postprocess_fields_tot.push_back( &u_r_zero     );
 
-    postprocess_names.push_back( "Coarse_KE" );
+    postprocess_names.push_back( "coarse_KE" );
     postprocess_fields_tor.push_back( &KE_tor_coarse );
     postprocess_fields_pot.push_back( &KE_pot_coarse );
     postprocess_fields_tot.push_back( &KE_tot_coarse );
 
-    postprocess_names.push_back( "Fine_KE" );
+    postprocess_names.push_back( "fine_KE" );
     postprocess_fields_tor.push_back( &KE_tor_fine );
     postprocess_fields_pot.push_back( &KE_pot_fine );
     postprocess_fields_tot.push_back( &KE_tot_fine );
@@ -324,7 +324,7 @@ void filtering_helmholtz(
     postprocess_fields_tot.push_back( &KE_tot_filt );
     */
 
-    postprocess_names.push_back( "Enstrophy" );
+    postprocess_names.push_back( "enstrophy" );
     postprocess_fields_tor.push_back( &Enst_tor );
     postprocess_fields_pot.push_back( &Enst_pot );
     postprocess_fields_tot.push_back( &Enst_tot );
@@ -366,8 +366,7 @@ void filtering_helmholtz(
         // Create the output file
         snprintf(fname, 50, "filter_%.6gkm.nc", scales.at(Iscale)/1e3);
         if (not(constants::NO_FULL_OUTPUTS)) {
-            initialize_output_file(time, depth, longitude, latitude, 
-                    dAreas, vars_to_write, fname, scales.at(Iscale));
+            initialize_output_file( source_data, vars_to_write, fname, scales.at(Iscale));
 
             // Add some attributes to the file
             add_attr_to_file("kernel_alpha", kern_alpha, fname);

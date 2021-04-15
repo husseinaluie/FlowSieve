@@ -75,7 +75,7 @@ void filtering(
     if (not(constants::NO_FULL_OUTPUTS)) {
         vars_to_write.push_back("coarse_u_lon");
         vars_to_write.push_back("coarse_u_lat");
-        vars_to_write.push_back("KE_from_coarse_vels");
+        vars_to_write.push_back("coarse_KE");
     }
     postprocess_names.push_back( "coarse_u_r");
     postprocess_fields.push_back(&coarse_u_r);
@@ -95,7 +95,7 @@ void filtering(
             mask, time, depth, latitude, longitude);
 
     std::vector<double> full_KE(num_pts, 0.), KE_from_coarse_vel(num_pts, 0.);
-    postprocess_names.push_back( "KE_from_coarse_vel");
+    postprocess_names.push_back( "coarse_KE");
     postprocess_fields.push_back(&KE_from_coarse_vel);
     KE_from_vels(full_KE, &u_x, &u_y, &u_z, mask);
 
@@ -215,9 +215,9 @@ void filtering(
         // Also an array for the transfer itself
         energy_transfer.resize(num_pts);
         if (not(constants::NO_FULL_OUTPUTS)) {
-            vars_to_write.push_back("energy_transfer");
+            vars_to_write.push_back("Pi");
         }
-        postprocess_names.push_back( "energy_transfer");
+        postprocess_names.push_back( "Pi");
         postprocess_fields.push_back(&energy_transfer);
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
@@ -334,8 +334,7 @@ void filtering(
         // Create the output file
         snprintf(fname, 50, "filter_%.6gkm.nc", scales.at(Iscale)/1e3);
         if (not(constants::NO_FULL_OUTPUTS)) {
-            initialize_output_file(time, depth, longitude, latitude, 
-                    dAreas, vars_to_write, fname, scales.at(Iscale));
+            initialize_output_file( source_data, vars_to_write, fname, scales.at(Iscale));
 
             // Add some attributes to the file
             add_attr_to_file("kernel_alpha", kern_alpha, fname);
@@ -659,7 +658,7 @@ void filtering(
                     starts, counts, fname, &mask);
             write_field_to_output(coarse_u_lat,       "coarse_u_lat", 
                     starts, counts, fname, &mask);
-            write_field_to_output(KE_from_coarse_vel, "KE_from_coarse_vels", 
+            write_field_to_output(KE_from_coarse_vel, "coarse_KE", 
                     starts, counts, fname, &mask);
         }
 
@@ -736,7 +735,7 @@ void filtering(
 
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             if (not(constants::NO_FULL_OUTPUTS)) {
-                write_field_to_output(energy_transfer, "energy_transfer", 
+                write_field_to_output(energy_transfer, "Pi", 
                         starts, counts, fname, &mask);
                 if (not(constants::NO_FULL_OUTPUTS)) {
                     write_field_to_output(fine_KE, "fine_KE", 

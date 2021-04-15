@@ -147,15 +147,15 @@ void initialize_postprocess_file(
         const char* dim_names[] = {"time", "depth", "region"};
         const int ndims = 3;
         for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
-            add_var_to_file(int_vars.at(varInd)+"_avg", dim_names, ndims, buffer);
-            //add_var_to_file(int_vars.at(varInd)+"_std", dim_names, ndims, buffer);
+            add_var_to_file( int_vars.at(varInd)+"_area_average", dim_names, ndims, buffer);
+            //add_var_to_file(int_vars.at(varInd)+"_area_std_dev", dim_names, ndims, buffer);
         }
 
         // time averages
         const char* dim_names_time_ave[] = {"depth", "latitude", "longitude"};
         const int ndims_time_ave = 3;
         for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
-            add_var_to_file(int_vars.at(varInd)+"_time_average", dim_names_time_ave, ndims_time_ave, buffer);
+            add_var_to_file( int_vars.at(varInd)+"_time_average", dim_names_time_ave, ndims_time_ave, buffer);
             //add_var_to_file(int_vars.at(varInd)+"_time_std_dev", dim_names_time_ave, ndims_time_ave, buffer);
         }
 
@@ -163,10 +163,10 @@ void initialize_postprocess_file(
         if (include_OkuboWeiss) {
             const char* dim_names[] = {"time", "depth", "OkuboWeiss", "region"};
             const int ndims = 4;
-            add_var_to_file("area_OkuboWeiss", dim_names, ndims, buffer);
+            add_var_to_file( "area_OkuboWeiss", dim_names, ndims, buffer);
             for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
-                add_var_to_file(int_vars.at(varInd)+"_avg_OkuboWeiss", dim_names, ndims, buffer);
-                //add_var_to_file(int_vars.at(varInd)+"_std_OkuboWeiss", dim_names, ndims, buffer);
+                add_var_to_file( int_vars.at(varInd)+"_OkuboWeiss_average", dim_names, ndims, buffer);
+                //add_var_to_file(int_vars.at(varInd)+"_OkuboWeiss_std_dev", dim_names, ndims, buffer);
             }
         }
     }

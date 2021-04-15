@@ -39,7 +39,7 @@ void write_region_avg_and_std_OkuboWeiss(
 
     write_field_to_output(OkuboWeiss_areas, "area_OkuboWeiss", start, count, filename);
     for ( int Ifield = 0; Ifield < num_fields; ++Ifield ) {
-        write_field_to_output( field_averages_OW.at(Ifield), vars_to_process.at(Ifield) + "_avg_OkuboWeiss", start, count, filename );
+        write_field_to_output( field_averages_OW.at(Ifield), vars_to_process.at(Ifield) + "_OkuboWeiss_average", start, count, filename );
     }
 
 }

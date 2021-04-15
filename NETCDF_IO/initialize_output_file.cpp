@@ -5,11 +5,7 @@
 #include "../constants.hpp"
 
 void initialize_output_file(
-        const std::vector<double> & time,
-        const std::vector<double> & depth,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const std::vector<double> & areas,
+        const dataset & source_data,
         const std::vector<std::string> & vars,
         const char * filename,
         const double filter_scale,
@@ -19,6 +15,13 @@ void initialize_output_file(
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
+
+    // Create some tidy names for variables
+    const std::vector<double>   &time       = source_data.time,
+                                &depth      = source_data.depth,
+                                &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude,
+                                &areas     = source_data.areas;
 
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_CLOBBER | NC_MPIIO;
@@ -131,7 +134,7 @@ void initialize_output_file(
         const char* dim_names[] = {"time", "depth", "latitude", "longitude"};
         const int ndims = 4;
         for (size_t varInd = 0; varInd < vars.size(); ++varInd) {
-            add_var_to_file(vars.at(varInd), dim_names, ndims, buffer);
+            add_var_to_file( vars.at(varInd), dim_names, ndims, buffer );
         }
     }
 

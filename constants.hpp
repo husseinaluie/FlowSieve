@@ -1,6 +1,8 @@
 #ifndef CONSTANTS_HPP
 #define CONSTANTS_HPP 1
 
+#include <map>
+
 // Default debug value
 #ifndef DEBUG
     #define DEBUG 1
@@ -103,7 +105,7 @@ namespace constants
      * \brief Boolean indicating if the coordinate system is Cartesian. (If false, then spherical)
      * @ingroup constants
      */
-    const bool CARTESIAN = false;
+    const bool CARTESIAN = true;
 
     /*!
      * \param PERIODIC_X
@@ -118,7 +120,7 @@ namespace constants
      * \brief Boolean indicating if the coordinate system is periodic in y / latitute.
      * @ingroup constants
      */
-    const bool PERIODIC_Y = false;
+    const bool PERIODIC_Y = true;
 
     /*!
      * \param UNIFORM_LON_GRID
@@ -174,7 +176,7 @@ namespace constants
      * \brief Boolean to indicate if post-processing should also bin by Okubo-Weiss
      * @ingroup constants
      */
-    const bool DO_OKUBOWEISS_ANALYSIS = true;
+    const bool DO_OKUBOWEISS_ANALYSIS = false;
 
     /*!
      * \param MINIMAL_OUTPUT
@@ -197,7 +199,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool NO_FULL_OUTPUTS = true;
+    const bool NO_FULL_OUTPUTS = false;
 
     /*!
      * \param CAST_TO_SINGLE
@@ -262,6 +264,52 @@ namespace constants
         case 4: const double KernPad =  2.5;
     }
     */
+
+
+    /*!
+     * \param variable_descriptions
+     * \brief A dictionary of variable descriptions to provide details in netcdf outputs
+     *
+     * @ingroup constants
+     */
+    const std::map< std::string, std::string > variable_descriptions = {
+        { "coarse_u_r",         "Coarse-grained vertical/radial velocity." },
+        { "coarse_u_lon",       "Coarse-grained zonal velocity." },
+        { "coarse_u_lat",       "Coarse-grained meridional velocity." },
+        { "coarse_KE",          "Kinetic energy of coarse-grained velocity" },
+        { "fine_KE",            "Small-scale kinetic energy ( filter(KE(u)) - KE(filter(u)) )" },
+        { "coarse_enstrophy",   "Enstrophy of coarse-grained velocity" },
+        { "Pi",                 "Non-linear energy transfer from large-scales to small-scales" },
+        { "OkuboWeiss",         "Okubo-Weiss parameter ( positive -> strain dominated, negative -> vortex dominated )" },
+        { "div_Jtransport",     "divergence of energy transport term" },
+        { "coarse_vort_r",      "Radial (z) vorticity of coarse-grained velocity." },
+        { "coarse_vel_div",     "Divergence of the coarse-grained velocity" }
+    };
+
+    /*!
+     * \param variable_units
+     * \brief A dictionary of variable units to provide details in netcdf outputs
+     *
+     * @ingroup constants
+     */
+    const std::map< std::string, std::string > variable_units = {
+        { "coarse_u_r",         "m/s" },
+        { "coarse_u_lon",       "m/s" },
+        { "coarse_u_lat",       "m/s" },
+        { "coarse_KE",          "J / (m^3)" },
+        { "fine_KE",            "J / (m^3)" },
+        { "coarse_enstrophy",   "J / (m^5)" },
+        { "Pi",                 "Watt / (m^3)" },
+        { "OkuboWeiss",         "1 / (s^2)" },
+        { "div_Jtransport",     "TBD" },
+        { "coarse_vort_r",      "1 / s" },
+        { "coarse_vel_div",     "1 / s" }
+    };
+
+    const std::string spatial_average_description       = "The lat/lon average computed over each defined region (see region dimension).";
+    const std::string time_average_description          = "Time average over the entire provided dataset.";
+    const std::string OkuboWeiss_average_description    = "Variable binned by Okubo-Weiss parameter (i.e. histogram). "
+                                                          "Values in OkuboWeiss dimension indicate the lower bound of each bin.";
 
 }
 /*! @} End of Doxygen Groups*/

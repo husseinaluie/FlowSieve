@@ -56,11 +56,59 @@ void add_var_to_file(
     }
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
-    // Close the file
-    retval = nc_close(ncid);
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-
     #if DEBUG >= 2
     fprintf(stdout, "  - added %s to %s -\n", varname, filename);
     #endif
+
+    ////
+    //    Now add various meta-data statements to the file for clarity (if available)
+    ////
+    
+    // First, check 'type' (i.e. time average, spatial average, toroidal potential, etc)
+    size_t string_index;
+    std::string substring = var_name;
+
+    const size_t    time_avg_index  = var_name.find("_time_average"),
+                    Okubo_avg_index = var_name.find("_OkuboWeiss_average"),
+                    area_avg_index  = var_name.find("_area_average");
+    if ( time_avg_index != std::string::npos ) {
+        nc_put_att_text( ncid, var_id, "variable_type", 
+                         constants::time_average_description.size(), 
+                         constants::time_average_description.c_str() );
+        substring = var_name.substr( 0, time_avg_index );
+
+    } else if ( Okubo_avg_index != std::string::npos ) {
+        nc_put_att_text( ncid, var_id, "variable_type", 
+                         constants::OkuboWeiss_average_description.size(), 
+                         constants::OkuboWeiss_average_description.c_str() );
+        substring = var_name.substr( 0, Okubo_avg_index );
+
+    } else if ( area_avg_index != std::string::npos ) {
+        nc_put_att_text( ncid, var_id, "variable_type", 
+                         constants::spatial_average_description.size(),    
+                         constants::spatial_average_description.c_str() );
+        substring = var_name.substr( 0, area_avg_index );
+
+    }
+
+    // Next, check if we have a long-form description and add that
+    if ( constants::variable_descriptions.count( substring ) ) {
+        nc_put_att_text( ncid, var_id, "long_name", 
+                         constants::variable_descriptions.at( substring ).size(),
+                         constants::variable_descriptions.at( substring ).c_str() );
+    }
+
+    // Next, check if we have defined units, and add them
+    if ( constants::variable_units.count( substring ) ) {
+        nc_put_att_text( ncid, var_id, "units",     
+                         constants::variable_units.at( substring ).size(),
+                         constants::variable_units.at( substring ).c_str() );
+    }
+
+    ////
+    //    Close the file
+    ////
+    retval = nc_close(ncid);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
 }

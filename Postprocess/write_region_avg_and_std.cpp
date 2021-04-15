@@ -33,7 +33,7 @@ void write_region_avg_and_std(
     count[2] = num_regions;
 
     for ( int Ifield = 0; Ifield < num_fields; ++Ifield ) {
-        write_field_to_output( field_averages.at(Ifield), vars_to_process.at(Ifield) + "_avg", start, count, filename );
+        write_field_to_output( field_averages.at(Ifield), vars_to_process.at(Ifield) + "_area_average", start, count, filename );
     }
 
 }
