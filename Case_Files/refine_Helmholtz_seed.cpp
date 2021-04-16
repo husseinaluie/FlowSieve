@@ -178,28 +178,28 @@ int main(int argc, char *argv[]) {
             var_fine.at(II_fine) = coarse_data.variables.at(var_name_coarse).at(II_coarse);
         }
     }
-    fprintf( stdout, "Done refining the grid.\n" );
+    if (wRank == 0) { fprintf( stdout, "Done refining the grid.\n" ); }
 
     // Compute the area of each 'cell' which will be necessary for creating the output file
-    fprintf( stdout, "Computing cell areas.\n" );
+    if (wRank == 0) { fprintf( stdout, "Computing cell areas.\n" ); }
     fine_data.compute_cell_areas();
 
     // Initialize file and write out coarsened fields
-    fprintf( stdout, "Preparing output file\n" );
+    if (wRank == 0) { fprintf( stdout, "Preparing output file\n" ); }
     std::vector<std::string> vars_to_write = { var_name_output, };
-    initialize_output_file( fine_data.time, fine_data.depth, fine_data.longitude, fine_data.latitude, fine_data.areas, 
-                            vars_to_write, output_fname.c_str() );
+    initialize_output_file( fine_data, vars_to_write, output_fname.c_str() );
 
-    fprintf( stdout, "Writing refined field\n" );
+    if (wRank == 0) { fprintf( stdout, "Writing refined field\n" ); }
     size_t starts[4] = { coarse_data.myStarts.at(0), coarse_data.myStarts.at(1), 0,              0              };
     size_t counts[4] = { coarse_data.myCounts.at(0), coarse_data.myCounts.at(1), fine_data.Nlat, fine_data.Nlon };
     write_field_to_output( var_fine, var_name_output, starts, counts, output_fname, NULL );
 
-    fprintf( stdout, "Storing seed count to file\n" );
+    if (wRank == 0) {fprintf( stdout, "Storing seed count to file\n" ); }
     add_attr_to_file( "seed_count", full_Ntime, output_fname.c_str() );
 
-    //
+    #if DEBUG >= 1
     fprintf(stdout, "Processor %d / %d waiting to finalize.\n", wRank + 1, wSize);
+    #endif
     MPI_Finalize();
     return 0;
 }

@@ -14,16 +14,7 @@
 
 void Apply_Potential_Projection(
         const std::string output_fname,
-        std::vector<double> & u_lon,
-        std::vector<double> & u_lat,
-        const std::vector<double> & time,
-        const std::vector<double> & depth,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
-        const std::vector<double> & dAreas,
-        const std::vector<bool>   & mask,
-        const std::vector<int>    & myCounts,
-        const std::vector<int>    & myStarts,
+        dataset & source_data,
         const std::vector<double> & seed,
         const bool single_seed,
         const double rel_tol,
@@ -36,6 +27,21 @@ void Apply_Potential_Projection(
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
+
+    // Create some tidy names for variables
+    const std::vector<double>   &time       = source_data.time,
+                                &depth      = source_data.depth,
+                                &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude,
+                                &dAreas     = source_data.areas;
+
+    const std::vector<bool> &mask = source_data.mask;
+
+    const std::vector<int>  &myCounts = source_data.myCounts,
+                            &myStarts = source_data.myStarts;
+
+    std::vector<double>   &u_lat = source_data.variables.at("u_lat"),
+                          &u_lon = source_data.variables.at("u_lon");
 
     // Create a 'no mask' mask variable
     //   we'll treat land values as zero velocity
@@ -52,13 +58,12 @@ void Apply_Potential_Projection(
 
     int Itime, Idepth, Ilat, Ilon, index, index_sub, mean_ind;
 
-    // Get the velocity means
+    // Get the velocity means ( will be stored in output file for reference )
     std::vector<double> u_lon_means, u_lat_means;
     compute_spatial_average(u_lon_means, u_lon, dAreas, Ntime, Ndepth, Nlat, Nlon, mask);
     compute_spatial_average(u_lat_means, u_lat, dAreas, Ntime, Ndepth, Nlat, Nlon, mask);
 
     // Fill in the land areas with zero velocity
-    //   also subtract the mean off (will be stored in output file for reference)
     #pragma omp parallel \
     default(none) \
     shared( u_lon, u_lat, u_lon_means, u_lat_means, mask ) \
@@ -69,14 +74,6 @@ void Apply_Potential_Projection(
             if (not(mask.at(index))) {
                 u_lon.at(index) = 0.;
                 u_lat.at(index) = 0.;
-            } else {
-                Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                                 Ntime, Ndepth, Nlat, Nlon);
-                mean_ind  = Index(0, 0, Itime, Idepth,
-                                  1, 1, Ntime, Ndepth);
-
-                u_lon.at(index) -= u_lon_means.at(mean_ind);
-                u_lat.at(index) -= u_lat_means.at(mean_ind);
             }
         }
     }
@@ -340,8 +337,7 @@ void Apply_Potential_Projection(
         vars_to_write.push_back("RHS");
     }
 
-    initialize_output_file(time, depth, longitude, latitude,
-            dAreas, vars_to_write, output_fname.c_str(), 0);
+    initialize_output_file( source_data, vars_to_write, output_fname.c_str(), -1);
     
     write_field_to_output(full_u_lon_pot,  "u_lon",    starts, counts, output_fname.c_str(), &mask);
     write_field_to_output(full_u_lat_pot,  "u_lat",    starts, counts, output_fname.c_str(), &mask);
