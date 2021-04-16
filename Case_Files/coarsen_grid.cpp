@@ -146,24 +146,29 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // We need areas for the output file, so just compute them
-    std::vector<double> areas(Nlon_coarse * Nlat_coarse);
-    compute_areas(areas, longitude_coarse, latitude_coarse);
-
     // Initialize file and write out coarsened fields
     size_t starts[4] = { source_data.myStarts.at(0), source_data.myStarts.at(1), source_data.myStarts.at(2), source_data.myStarts.at(3)};
     size_t counts[4] = { Ntime,                      Ndepth,                     Nlat_coarse,                Nlon_coarse };
 
+    // Set up grid vectors for coarse data
+    dataset coarse_data;
+    coarse_data.time      = source_data.time;
+    coarse_data.depth     = source_data.depth;
+    coarse_data.latitude  = longitude_coarse;
+    coarse_data.longitude = latitude_coarse;
+    coarse_data.compute_cell_areas();
+
     std::vector<std::string> vars_to_write = { zonal_vel_name, merid_vel_name };
-    initialize_output_file( source_data.time, source_data.depth, longitude_coarse, latitude_coarse, areas, vars_to_write, output_fname.c_str() );
+    initialize_output_file( coarse_data, vars_to_write, output_fname.c_str() );
 
     write_field_to_output( u_lon_coarse, zonal_vel_name, starts, counts, output_fname, &mask_coarse );
     write_field_to_output( u_lat_coarse, merid_vel_name, starts, counts, output_fname, &mask_coarse );
 
     add_attr_to_file( "seed_count", full_Ntime, output_fname.c_str() );
 
-    //
+    #if DEBUG >= 1
     fprintf(stdout, "Processor %d / %d waiting to finalize.\n", wRank + 1, wSize);
+    #endif
     MPI_Finalize();
     return 0;
 }

@@ -164,7 +164,9 @@ int main(int argc, char *argv[]) {
     }
     #endif
 
+    #if DEBUG >= 1
     fprintf(stdout, "Processor %d / %d waiting to finalize.\n", wRank + 1, wSize);
+    #endif
     MPI_Finalize();
     return 0;
 }
