@@ -105,7 +105,7 @@ namespace constants
      * \brief Boolean indicating if the coordinate system is Cartesian. (If false, then spherical)
      * @ingroup constants
      */
-    const bool CARTESIAN = true;
+    const bool CARTESIAN = false;
 
     /*!
      * \param PERIODIC_X
@@ -120,7 +120,7 @@ namespace constants
      * \brief Boolean indicating if the coordinate system is periodic in y / latitute.
      * @ingroup constants
      */
-    const bool PERIODIC_Y = true;
+    const bool PERIODIC_Y = false;
 
     /*!
      * \param UNIFORM_LON_GRID
@@ -199,7 +199,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool NO_FULL_OUTPUTS = false;
+    const bool NO_FULL_OUTPUTS = true;
 
     /*!
      * \param CAST_TO_SINGLE
@@ -293,15 +293,15 @@ namespace constants
      * @ingroup constants
      */
     const std::map< std::string, std::string > variable_units = {
-        { "coarse_u_r",         "m/s" },
-        { "coarse_u_lon",       "m/s" },
-        { "coarse_u_lat",       "m/s" },
+        { "coarse_u_r",         "m / s" },
+        { "coarse_u_lon",       "m / s" },
+        { "coarse_u_lat",       "m / s" },
         { "coarse_KE",          "J / (m^3)" },
         { "fine_KE",            "J / (m^3)" },
         { "coarse_enstrophy",   "J / (m^5)" },
         { "Pi",                 "Watt / (m^3)" },
         { "OkuboWeiss",         "1 / (s^2)" },
-        { "div_Jtransport",     "TBD" },
+        { "div_Jtransport",     "Watt / (m^3)" },
         { "coarse_vort_r",      "1 / s" },
         { "coarse_vel_div",     "1 / s" }
     };
