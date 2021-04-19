@@ -26,6 +26,9 @@ OPT_FLAGS:=-O3 -fp-model fast=2
 # Extra optimization flags (intel inter-process optimizations)
 EXTRA_OPT_FLAGS:=-ip -ipo
 
+# Specify optimization flags for ALGLIB
+ALGLIB_OPT_FLAGS:=-O3 -DAE_CPU=AE_INTEL
+
 # Modules are automatically on lib dir
 LIB_DIRS:=
 INC_DIRS:=

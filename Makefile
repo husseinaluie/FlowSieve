@@ -21,8 +21,8 @@ VERSION:= -DMAJOR_VERSION=${MAJOR_VERSION} -DMINOR_VERSION=${MINOR_VERSION} -DPA
 DOXY_VERSION:="${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}"
 
 ifeq ($(DEBUG),true)
-	CFLAGS:=$(CFLAGS) $(DEBUG_FLAGS)
-	LINKS:=$(LINKS) $(DEBUG_LDFLAGS)
+    CFLAGS:=$(CFLAGS) $(DEBUG_FLAGS)
+    LINKS:=$(LINKS) $(DEBUG_LDFLAGS)
 endif
 
 ifeq ($(OPT),true)
@@ -30,7 +30,8 @@ ifeq ($(OPT),true)
 endif
 
 ifeq ($(EXTRA_OPT),true)
-	CFLAGS:=$(CFLAGS) $(EXTRA_OPT_FLAGS)
+    CFLAGS:=$(CFLAGS) $(EXTRA_OPT_FLAGS)
+    ALGLIB_OPT_FLAGS:=$(ALGLIB_OPT_FLAGS) $(EXTRA_OPT_FLAGS)
 endif
 
 CFLAGS:=$(CFLAGS) $(LIB_DIRS)
@@ -116,7 +117,7 @@ ALGLIB_CPPS := $(wildcard  ALGLIB/*.cpp)
 ALGLIB_OBJS := $(addprefix ALGLIB/,$(notdir $(ALGLIB_CPPS:.cpp=.o)))
 
 ALGLIB/%.o: ALGLIB/%.cpp
-	$(CXX) -I ./ALGLIB -c -O3 -DAE_CPU=AE_INTEL -o $@ $<
+	$(CXX) -I ./ALGLIB -c $(ALGLIB_OPT_FLAGS) -o $@ $<
 
 
 # Get the list of preprocessing  cpp files
@@ -148,22 +149,20 @@ clean:
 	rm -f Postprocess/*.o
 	rm -f Case_Files/*.o
 hardclean:
-	rm -f *.o 
-	rm -f *.x
-	rm -f Case_Files/*.o
-	rm -f Case_Files/*.x
+	rm -f *.[o,x] 
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
 	rm -f Functions/Differentiation_Tools/*.o 
 	rm -f Functions/Helmholtz/*.o 
 	rm -f Functions/SW_Tools/*.o 
-	rm -f Tests/*.[o,x] 
 	rm -f Functions/Interface_Tools/*.o 
 	rm -f Functions/FFTW_versions/*.o 
 	rm -f Functions/Particles/*.o 
+	rm -f Tests/*.[o,x] 
+	rm -f Preprocess/*.o
+	rm -f Postprocess/*.o
+	rm -f Case_Files/*.[o,x]
 	rm ALGLIB/*.o
-	rm -f Preprocess/*.[o,x]
-	rm -f Postprocess/*.[o,x]
 cleandocs:
 	rm -r docs/html
 	rm -r docs/latex

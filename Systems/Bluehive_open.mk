@@ -25,6 +25,9 @@ OPT_FLAGS:=-O3
 # Extra optimization flags (intel inter-process optimizations)
 EXTRA_OPT_FLAGS:=
 
+# Specify optimization flags for ALGLIB
+ALGLIB_OPT_FLAGS:=-O3
+
 # Modules are automatically on lib dir
 LIB_DIRS:=
 INC_DIRS:=
