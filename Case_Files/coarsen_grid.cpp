@@ -152,12 +152,20 @@ int main(int argc, char *argv[]) {
 
     // Set up grid vectors for coarse data
     dataset coarse_data;
+
     coarse_data.time      = source_data.time;
     coarse_data.depth     = source_data.depth;
-    coarse_data.latitude  = longitude_coarse;
-    coarse_data.longitude = latitude_coarse;
+    coarse_data.latitude  = latitude_coarse;
+    coarse_data.longitude = longitude_coarse;
+
+    coarse_data.Ntime   = Ntime;
+    coarse_data.Ndepth  = Ndepth;
+    coarse_data.Nlat    = Nlat_coarse;
+    coarse_data.Nlon    = Nlon_coarse;
+
     coarse_data.compute_cell_areas();
 
+    // Now write the output file
     std::vector<std::string> vars_to_write = { zonal_vel_name, merid_vel_name };
     initialize_output_file( coarse_data, vars_to_write, output_fname.c_str() );
 
