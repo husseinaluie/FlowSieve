@@ -30,6 +30,7 @@ void toroidal_curl_u_dot_er(
     double dulat_dlon, dulon_dlat, tmp;
     std::vector<double*> lon_deriv_vals, lat_deriv_vals;
     std::vector<const std::vector<double>*> deriv_fields;
+    bool is_pole;
 
     deriv_fields.push_back(&u_lon);
     deriv_fields.push_back(&u_lat);
@@ -38,7 +39,7 @@ void toroidal_curl_u_dot_er(
     default(none) \
     shared( out_arr, latitude, longitude, mask,\
             u_lon, u_lat, deriv_fields, seed )\
-    private(Ilat, Ilon, index, index_sub, tmp, \
+    private(Ilat, Ilon, index, index_sub, tmp, is_pole, \
             dulat_dlon, dulon_dlat, lon_deriv_vals, lat_deriv_vals )
     {
 
@@ -75,10 +76,17 @@ void toroidal_curl_u_dot_er(
                             Ntime, Ndepth, Nlat, Nlon,
                             mask);
 
-                    //  = ddlon(vel_lat) / cos_lat - ddlat( u_lon ) + u_lon * tan_lat
-                    tmp =   dulat_dlon / cos(latitude.at(Ilat))
-                          - dulon_dlat 
-                          + u_lon.at(index) * tan(latitude.at(Ilat));
+                    // If we're too close to the pole (less than 0.01 degrees), bad things happen
+                    is_pole = std::fabs( std::fabs( latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 0.01;
+
+                    if (is_pole) {
+                        tmp = 0.;
+                    } else {
+                        //  = ddlon(vel_lat) / cos_lat - ddlat( u_lon ) + u_lon * tan_lat
+                        tmp =   dulat_dlon / cos(latitude.at(Ilat))
+                              - dulon_dlat 
+                              + u_lon.at(index) * tan(latitude.at(Ilat));
+                    }
 
                     tmp *= 1. / constants::R_earth;
 

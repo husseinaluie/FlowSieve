@@ -23,6 +23,7 @@ void toroidal_vel_div(
     double dulon_dlon, dulat_dlat, ulat, cos_lat, sin_lat, tmp_val;
     std::vector<double*> lon_deriv_vals, lat_deriv_vals;
     std::vector<const std::vector<double>*> lon_deriv_fields, lat_deriv_fields;
+    bool is_pole;
 
     lon_deriv_fields.push_back(&vel_lon);
     lat_deriv_fields.push_back(&vel_lat);
@@ -32,7 +33,7 @@ void toroidal_vel_div(
     shared( latitude, longitude, mask, div, vel_lon, vel_lat, \
             lon_deriv_fields, lat_deriv_fields )\
     private(Itime, Idepth, Ilat, Ilon, index, cos_lat, sin_lat, tmp_val, ulat, \
-            dulon_dlon, dulat_dlat, lon_deriv_vals, lat_deriv_vals)
+            dulon_dlon, dulat_dlat, lon_deriv_vals, lat_deriv_vals, is_pole )
     {
 
         lon_deriv_vals.push_back(&dulon_dlon);
@@ -67,8 +68,15 @@ void toroidal_vel_div(
 
                 ulat = vel_lat.at(index);
 
-                tmp_val = dulon_dlon  +  cos_lat * dulat_dlat  -  ulat * sin_lat ;
-                tmp_val *= 1. / ( cos_lat * constants::R_earth );
+                // If we're too close to the pole (less than 0.01 degrees), bad things happen
+                is_pole = std::fabs( std::fabs( latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 0.01;
+
+                if ( is_pole ) {
+                    tmp_val = 0.;
+                } else {
+                    tmp_val = dulon_dlon  +  cos_lat * dulat_dlat  -  ulat * sin_lat ;
+                    tmp_val *= 1. / ( cos_lat * constants::R_earth );
+                }
 
             }
             div.at(index) = tmp_val;

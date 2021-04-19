@@ -30,11 +30,15 @@ void toroidal_sparse_Lap(
         diff_index, index, index_sub, LB;
     double old_val, tmp, cos2_lat_inv, tan_lat;
     std::vector<double> diff_vec;
+    bool is_pole;
 
     const double R2_inv = 1. / pow(constants::R_earth, 2);
 
     for ( Ilat = 0; Ilat < Nlat; Ilat++ ) {
         for ( Ilon = 0; Ilon < Nlon; Ilon++ ) {
+            
+            // If we're too close to the pole (less than 0.01 degrees), bad things happen
+            is_pole = std::fabs( std::fabs( latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 0.01;
 
             cos2_lat_inv = 1. / pow( cos(latitude.at(Ilat)), 2 );
             tan_lat = tan(latitude.at(Ilat));
@@ -44,7 +48,7 @@ void toroidal_sparse_Lap(
             index_sub = Index(0, 0, Ilat, Ilon,
                               1, 1, Nlat, Nlon);
 
-            if (mask.at(index)) { // Skip land areas
+            if ( (mask.at(index)) or not(is_pole) ) { // Skip land areas and poles
 
                 //
                 //// LON second derivative part
