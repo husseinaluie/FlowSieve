@@ -343,7 +343,7 @@ void Apply_Potential_Projection(
     write_field_to_output(full_u_lat_pot,  "u_lat",    starts, counts, output_fname.c_str(), &mask);
 
     write_field_to_output(full_F,          "F",        starts, counts, output_fname.c_str(), &unmask);
-    write_field_to_output(full_seed,       "F_seed",   starts, counts, output_fname.c_str(), &mask);
+    write_field_to_output(full_seed,       "F_seed",   starts, counts, output_fname.c_str(), &unmask);
 
     if (not(constants::MINIMAL_OUTPUT)) {
         write_field_to_output(full_RHS,        "RHS",      starts, counts, output_fname.c_str(), &mask);
