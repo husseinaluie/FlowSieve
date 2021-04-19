@@ -99,9 +99,6 @@ int main(int argc, char *argv[]) {
     source_data.load_latitude(  latitude_dim_name,  input_fname );
     source_data.load_longitude( longitude_dim_name, input_fname );
 
-    const int Nlon   = longitude.size();
-    const int Nlat   = latitude.size();
-
     // Apply some cleaning to the processor allotments if necessary. 
     source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
      
@@ -127,11 +124,12 @@ int main(int argc, char *argv[]) {
     if (seed_fname == "zero") {
         seed_count = 1.;
         single_seed = (seed_count < 2);
-        seed.resize(Nlat*Nlon, 0.);
+        seed.resize( source_data.Nlat * source_data.Nlon, 0.);
     } else {
         read_attr_from_file(seed_count, "seed_count", seed_fname);
         single_seed = (seed_count < 2);
-        read_var_from_file(seed, "seed", seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed));
+        read_var_from_file(seed, "seed", seed_fname, NULL, NULL, NULL, 
+                            source_data.Nprocs_in_time, source_data.Nprocs_in_depth, not(single_seed));
     }
     if (wRank == 0) { fprintf(stdout, " single_seed = %s\n", single_seed ? "true" : "false"); }
 
