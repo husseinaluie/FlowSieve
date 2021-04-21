@@ -90,6 +90,12 @@ void dataset::load_region_definitions(
         for (size_t II = 0; II < var_buffer.size(); ++II) {
             regions.at( region_name ).at( II ) = var_buffer.at( II ) == 1 ? true : false;
         }
+
+        #if DEBUG >= 1
+        if (wRank == 0) {
+            fprintf( stdout, " Read in region %s\n", region_name.c_str() );
+        }
+        #endif
     }
 
     // While we're here, might as well also compute the area of each region

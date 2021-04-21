@@ -70,7 +70,7 @@ void InputParser::getFilterScales( std::vector<double> &filter_scales, const std
 
     // Convert the strings into doubles
     #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "Filter scales (%zu) are: ", tokens.size()); }
+    if (wRank == 0) { fprintf(stdout, "Filter scales (%zu) are: ", string_of_scales.size()); }
     #endif
     filter_scales.resize( scales_as_strings.size() );
     for (size_t ii = 0; ii < scales_as_strings.size(); ++ii) {
@@ -78,7 +78,7 @@ void InputParser::getFilterScales( std::vector<double> &filter_scales, const std
         filter_scales.at(ii) = strtod( scales_as_strings.at(ii).c_str(), NULL );
         if (filter_scales.at(ii) <= 0) {
             fprintf(stderr, 
-                    "\nReceived bad filter scale (%s). Input must be of form '1.3e4 678e6' etc (i.e. space-separate list of numbers).\n", 
+                    "\nReceived bad filter scale (%s). Input must be of form '1.3e4 678e6' etc (i.e. space-separated list of numbers).\n", 
                     scales_as_strings.at(ii).c_str());
             assert(false);
         }
