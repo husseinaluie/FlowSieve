@@ -2,6 +2,26 @@
 #include <math.h>    
 #include "../constants.hpp"
 
+/*!
+ * \brief Compute the distance (in metres) between two points in the domain.
+ *
+ * In spherical coordinates,computes the distance between two points on
+ *   a spherical shell along a great circle.
+ *   (see https://en.wikipedia.org/wiki/Great-circle_distance)
+ * It should avoid floating point issues for the grid scales that
+ *   we're considering. 
+ *
+ * The last two arguments (Llon and Llat) give the physical 
+ *   length of the two dimensions. This is used in the case
+ *   of periodic Cartesian grids. They are otherwise unused.
+ *
+ * @param[in]   lon1,lat1   coordinates for the first position
+ * @param[in]   lon2,lat2   coordinates for the second position
+ * @param[in]   Llon,Llat   physical length of the dimensions
+ *
+ * @returns returns the distance (in metres) between two points.
+ *
+ */
 double distance(
         const double lon1,
         const double lat1,

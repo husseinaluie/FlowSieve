@@ -5,6 +5,22 @@
 #include "../constants.hpp"
 #include "../differentiation_tools.hpp"
 
+/*!
+ * \brief Compute the full baroclinic transfer term Lambda (see Lees and Aluie 2019)
+ *
+ * Specifically, it computes
+ * \f[
+ *      \Lambda_{\mathrm{rot}} = \frac{1}{\overline{\rho}} \overline{P}_{,j}\overline{\tau}(\rho,u_j) = \overline{P}_{,j}\left(\widetilde{u}-\overline{u}\right)
+ * \f]
+ *
+ * @param[in,out]   Lambda                                      Storage array for computed values
+ * @param[in]       coarse_u_r, coarse_u_lon, coarse_u_lat      Components of velocity (bar filtered)
+ * @param[in]       tilde_u_r,  tilde_u_lon,  tilde_u_lat       Components of velocity (tilde filtered)
+ * @param[in]       coarse_p                                    Coarse pressure 
+ * @param[in]       Ntime, Ndepth, Nlat, Nlon                   Size of time, depth, lat, lon dimensions (respectively)
+ * @param[in]       longitude, latitude                         Grid vectors
+ * @param[in]       mask                                        Mask to distinguish land from water
+ */
 void  compute_Lambda_full(
     std::vector<double> & Lambda,
     const std::vector<double> & coarse_u_r,

@@ -2,6 +2,17 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
+/*!
+ * \brief Compute (local) KE density from the provided velocities.
+ *
+ * KE is simply computed pointwise as 0.5 * rho0 * (u1^2 + u2^2 + u3^2)
+ *
+ * @param[in,out]   KE          Where to storer computed KE (array)
+ * @param[in]       u1,u2,u3    Velocities (pointers to arrays)
+ * @param[in]       mask        2D array to differentiate land from water 
+ * @param[in]       rho0        constant density
+ *
+ */
 void KE_from_vels(
             std::vector<double> & KE,
             std::vector<double> * u1,

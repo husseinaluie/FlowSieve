@@ -4,32 +4,57 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
+/*!
+ * \brief Compute filtered quadratic velocities at a single point
+ *
+ * Computes the integral of each quadratic Cartesian velocity
+ * with the kernel().
+ *
+ * In particular, the quadratic terms being filtered are:
+ * \$u_xu_x\$, \$u_xu_y\$, \$u_xu_z\$, \$u_yu_y\$, \$u_yu_z\$, \$u_zu_z\$
+ *
+ * @param[in,out]   uxux_tmp                where to store filtered (u_x)*(u_x)
+ * @param[in,out]   uxuy_tmp                where to store filtered (u_x)*(u_y)
+ * @param[in,out]   uxuz_tmp                where to store filtered (u_x)*(u_z)
+ * @param[in,out]   uyuy_tmp                where to store filtered (u_y)*(u_y)
+ * @param[in,out]   uyuz_tmp                where to store filtered (u_y)*(u_z)
+ * @param[in,out]   uzuz_tmp                where to store filtered (u_z)*(u_z)
+ * @param[in]       u_x,u_y,u_z             fields to filter
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon  length of time dimension
+ * @param[in]       Itime,Idepth,Ilat,Ilon  current position in time dimension
+ * @param[in]       longitude,latitude      grid vectors (lon,lat)
+ * @param[in]       LAT_lb,LAT_ub           lower/upper boundd on latitude for kernel
+ * @param[in]       dAreas                  array of cell areas (2D - lat,lon)
+ * @param[in]       scale                   filtering scale
+ * @param[in]       mask                    array to distinguish land from water
+ * @param[in]       local_kernel            pointer to pre-computed kernel (NULL indicates not provided)
+ */
 void apply_filter_at_point_for_quadratics(
-        double & uxux_tmp,                      /**< [in] where to store filtered (u_x)*(u_x) */
-        double & uxuy_tmp,                      /**< [in] where to store filtered (u_x)*(u_y) */
-        double & uxuz_tmp,                      /**< [in] where to store filtered (u_x)*(u_z) */
-        double & uyuy_tmp,                      /**< [in] where to store filtered (u_y)*(u_y) */
-        double & uyuz_tmp,                      /**< [in] where to store filtered (u_y)*(u_z) */
-        double & uzuz_tmp,                      /**< [in] where to store filtered (u_z)*(u_z) */
-        const std::vector<double> & u_x,        /**< [in] (full) u_x to filter */
-        const std::vector<double> & u_y,        /**< [in] (full) u_y to filter */
-        const std::vector<double> & u_z,        /**< [in] (full) u_z to filter */
-        const int Ntime,                        /**< [in] Length of time dimension */
-        const int Ndepth,                       /**< [in] Length of depth dimension */
-        const int Nlat,                         /**< [in] Length of latitude dimension */
-        const int Nlon,                         /**< [in] Length of longitude dimension */
-        const int Itime,                        /**< [in] Current position in time dimension */
-        const int Idepth,                       /**< [in] Current position in depth dimension */
-        const int Ilat,                         /**< [in] Current position in latitude dimension */
-        const int Ilon,                         /**< [in] Current position in longitude dimension */
-        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
-        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
+        double & uxux_tmp,
+        double & uxuy_tmp,
+        double & uxuz_tmp,
+        double & uyuy_tmp,
+        double & uyuz_tmp,
+        double & uzuz_tmp,
+        const std::vector<double> & u_x,
+        const std::vector<double> & u_y,
+        const std::vector<double> & u_z,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const int Itime,
+        const int Idepth,
+        const int Ilat
+        const int Ilon,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
         const int LAT_lb,
         const int LAT_ub,
-        const std::vector<double> & dAreas,     /**< [in] Array of cell areas (2D) (compute_areas())*/
-        const double scale,                     /**< [in] The filtering scale */
-        const std::vector<bool>   & mask,       /**< [in] Array to distinguish between land and water cells (2D) */
-        const std::vector<double> * local_kernel    /**< [in] Array of local kernel (if not NULL) */
+        const std::vector<double> & dAreas,
+        const double scale,
+        const std::vector<bool>   & mask,
+        const std::vector<double> * local_kernel
         ) {
 
 

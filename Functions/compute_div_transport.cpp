@@ -6,66 +6,90 @@
 #include <omp.h>
 #include <math.h>
 
-//  
-//  J_transport =   0.5 * rho0 * | u_l |^2 * u_l
-//                + P_l * u_l
-//                - nu * 0.5 * rho * grad( | u_l |^2 )
-//                + rho0 * u_l * tau(u_l, u_l)
-//
-//
-//  (Spherical)
-//     div(J) = ( 
-//                (1 / (r * cos(lat)) ) d/dlon (J_lon),
-//                (1 / (r * cos(lat)) ) d/dlat (J_lat * cos(lat)),
-//                (1 /  r^2           ) d/dr   (J_r * r^2)
-//              )
-//
-//  (Cartesian)
-//     div(J) = ( 
-//                d/dx (J_x),
-//                d/dy (J_y),
-//                d/dz (J_z) 
-//              )
-//
-//
-//  Term 1: 0.5 * rho0 * | u_l |^2 * u_l
-//      This is advection of large-scale KE by the large-scale 
-//      velocity. 
-//
-//      (index form: 0.5 * rho0 * [ (u_i*u_i) * u_j ]    )
-//      (   of grad: 0.5 * rho0 * [ (u_i*u_i) * u_j ],j  )
-//               = 0.5 * rho0 * (u_i*u_i),j * u_j 
-//               =       rho0 * u_i * u_i,j * u_j
-//
-//
-//
-//  Term 2: P_l * u_l
-//      Transport caused by pressure 
-//
-//      (index form:  p * u_j     )
-//      (   of grad: (p * u_j),j  )
-//
-//
-//
-//  Term 3: - nu * 0.5 * rho * grad( | u_l |^2 )
-//      This is diffusion
-//      NOT YET IMPLEMENTED
-//
-//
-//
-//  Term 4: rho0 * u_l * tau(u, u)
-//      This is advection of the large-scale KE
-//      by the small-scale flow.
-//
-//      (index form:  rho0 *   u_i * tau_ij     )
-//      (   of grad:  rho0 * [ u_i * tau_ij ],j )
-//        = rho0 * ( u_i,j * tau_ij  + u_i * tau_ij,j )
-//        = rho0 * 
-//            (  
-//               u_i,j * ( bar(u_i*u_j)   - bar(u_i  )*bar(u_j) )
-//             + u_i   * ( bar(u_i*u_j),j - bar(u_i,j)*bar(u_j) )
-//            )
-//
+
+/*!
+ * \brief Compute KE transport caused by div(J)
+ *
+ *
+ * Currently implements:
+ *    - advection by coarse-scale velocity
+ *    - pressure-induced transport
+ *    - advection by fine-scale velocity
+ *
+ * NOT implemented:
+ *    - Diffusion
+ *
+ * \verbatim
+ *  J_transport =   0.5 * rho0 * | u_l |^2 * u_l
+ *                + P_l * u_l
+ *                - nu * 0.5 * rho * grad( | u_l |^2 )
+ *                + rho0 * u_l * tau(u_l, u_l)
+ *
+ *
+ *  (Spherical)
+ *     div(J) = ( 
+ *                (1 / (r * cos(lat)) ) d/dlon (J_lon),
+ *                (1 / (r * cos(lat)) ) d/dlat (J_lat * cos(lat)),
+ *                (1 /  r^2           ) d/dr   (J_r * r^2)
+ *              )
+ *
+ *  (Cartesian)
+ *     div(J) = ( 
+ *                d/dx (J_x),
+ *                d/dy (J_y),
+ *                d/dz (J_z) 
+ *              )
+ *
+ *
+ *  Term 1: 0.5 * rho0 * | u_l |^2 * u_l
+ *      This is advection of large-scale KE by the large-scale 
+ *      velocity. 
+ *
+ *      (index form: 0.5 * rho0 * [ (u_i*u_i) * u_j ]    )
+ *      (   of grad: 0.5 * rho0 * [ (u_i*u_i) * u_j ],j  )
+ *               = 0.5 * rho0 * (u_i*u_i),j * u_j 
+ *               =       rho0 * u_i * u_i,j * u_j
+ *
+ *
+ *
+ *  Term 2: P_l * u_l
+ *      Transport caused by pressure 
+ *
+ *      (index form:  p * u_j     )
+ *      (   of grad: (p * u_j),j  )
+ *
+ *
+ *
+ *  Term 3: - nu * 0.5 * rho * grad( | u_l |^2 )
+ *      This is diffusion
+ *      NOT YET IMPLEMENTED
+ *
+ *
+ *
+ *  Term 4: rho0 * u_l * tau(u, u)
+ *      This is advection of the large-scale KE
+ *      by the small-scale flow.
+ *
+ *      (index form:  rho0 *   u_i * tau_ij     )
+ *      (   of grad:  rho0 * [ u_i * tau_ij ],j )
+ *        = rho0 * ( u_i,j * tau_ij  + u_i * tau_ij,j )
+ *        = rho0 * 
+ *            (  
+ *               u_i,j * ( bar(u_i*u_j)   - bar(u_i  )*bar(u_j) )
+ *             + u_i   * ( bar(u_i*u_j),j - bar(u_i,j)*bar(u_j) )
+ *            )
+ *  \endverbatim
+ *
+ *
+ * @param[in,out]   div_J                           where to store the computed values (array)
+ * @param[in]       u_x,u_y,u_z                     coarse Cartesian velocity components
+ * @param[in]       uxux,uxuy,uxuz,uyuy,uyuz,uzuz   coarse velocity products (e.g. bar(u*v) )  
+ * @param[in]       coarse_p                        coarse pressure
+ * @param[in]       longitude,latitude              1D dimension vectors
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon          Size of dimensions (MPI-local sizes)
+ * @param[in]       mask                            2D array to distinguish land from water
+ *
+ */
 
 void compute_div_transport(
         std::vector<double> & div_J,

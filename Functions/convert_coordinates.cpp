@@ -7,6 +7,15 @@
 #include "../constants.hpp"
 #include "../functions.hpp"
 
+/*!
+ * \brief Apply degree->radian conversion, if necessary. Applied in-place.
+ *
+ * This is just to provide a clean wrapper to improve some case file readability.
+ * It applies a Cartesian check (via constants.hpp), so it is safe to include by default.
+ *
+ * @param[in,out]   longitude, latitude     Coordinate grids to be converted, if appropriate
+ *
+ */
 void convert_coordinates(
         std::vector<double> & longitude,
         std::vector<double> & latitude

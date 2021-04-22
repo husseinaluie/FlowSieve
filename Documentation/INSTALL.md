@@ -1,4 +1,5 @@
 [TOC]
+\page install1
 
 # Installing
 

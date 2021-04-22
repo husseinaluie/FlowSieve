@@ -3,6 +3,12 @@
 #include <math.h>
 
 
+/*!
+ * \brief Compute alpha value for kernel (for baroclinic transfer)
+ *
+ * @returns Returns a 'size' coefficient for the kernel. 
+ *
+ */
 double kernel_alpha(void) {
 
     // Get integration bounds

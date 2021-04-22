@@ -1,6 +1,21 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
+/*!
+ * \brief Convenience tool to convert physical index (time, depth, lat, lon) to a logical index.
+ *
+ * Index is a function to convert a four-point (physical) index
+ *   (Itime, Idepth, Ilat, Ilon) into a one-point (logical) index
+ *   to access the double arrays.
+ *
+ * Assumes standard CF ordering: time-depth-lat-lon
+ *
+ * @param[in] Itime,Idepth,Ilat,Ilon    4-indices to be converted to a 1-index
+ * @param[in] Ntime,Ndepth,Nlat,Nlon    dimension sizes
+ *
+ * @returns The effective 1-index that corresponds to the 4-index tuplet
+ *
+ */
 size_t Index( 
         const int Itime,
         const int Idepth,

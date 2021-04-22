@@ -8,6 +8,18 @@
 #include "../constants.hpp"
 #include "../postprocess.hpp"
 
+/*!
+ * \brief Main filtering driver
+ *
+ * This function is the main filtering driver. It sets up the appropriate
+ * loop sequences, calls the other funcations (velocity conversions), and
+ * calls the IO functionality.
+ *
+ * @param[in]   source_data     dataset class instance containing data (velocities, etc)
+ * @param[in]   scales          scales at which to filter the data
+ * @param[in]   comm            MPI communicator (default MPI_COMM_WORLD)
+ *
+ */
 void filtering(
         const dataset & source_data,
         const std::vector<double> & scales,

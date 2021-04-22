@@ -2,6 +2,29 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
+/*!
+ * \brief Convert single Cartesian velocity to spherical velocity
+ *
+ * Convert Cartesian velocities to spherical
+ *   velocities.
+ *   (u_x, u_y, u_z) -> (u_r, u_lon, u_lat)
+ *
+ * Note: we are using linear velocities (m/s),
+ *   not angular (rad/s), so 
+ *   \f{eqnarray*}{
+ *   u_\lambda = r\cos(\phi)\cdot\hat{u}_\lambda \\
+ *   u_\phi    = r\cdot\hat{u}_\phi
+ *   \f}
+ *
+ * Note: we are still using a Spherical
+ *   coordinate system, we are only converting
+ *   the velocity fields.
+ *
+ * @param[in,out]   u_r,u_lon,u_lat     Computed Spherical velocities
+ * @param[in]       u_x,u_y,u_z         Cartesian velocities to be converted
+ * @param[in]       lon,lat             coordinates of the location of conversion
+ *
+ */
 void vel_Cart_to_Spher_at_point(
             double & u_r,
             double & u_lon,

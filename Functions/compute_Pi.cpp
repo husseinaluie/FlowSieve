@@ -4,24 +4,39 @@
 #include "../constants.hpp"
 #include "../differentiation_tools.hpp"
 
+/*!
+ * \brief Compute the energy transfer through the current filter scale
+ *
+ * In particular, computes \$ \rho_0 * ( u_i \tau_{ij,j} - (u_i \tau_{ij})_{,j}  ) \$
+ * 
+ * This computation is applied to the Cartesian velocity components
+ *
+ * @param[in,out]   energy_transfer                 where to store the computed values (array)
+ * @param[in]       ux,uy,uz                        coarse Cartesian velocity components
+ * @param[in]       uxux,uxuy,uxuz,uyuy,uyuz,uzuz   coarse velocity products (e.g. bar(u*v) )  
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon          Size of dimensions (MPI-local sizes)
+ * @param[in]       longitude,latitude              1D dimension vectors
+ * @param[in]       mask                            2D array to distinguish land from water
+ *
+ */
 void compute_Pi(
-        std::vector<double> & energy_transfer,  /**< [in] where to store the energy transfer */
-        const std::vector<double> & ux,         /**< [in] coarse u_x */
-        const std::vector<double> & uy,         /**< [in] coarse u_y */
-        const std::vector<double> & uz,         /**< [in] coarse u_z */
-        const std::vector<double> & uxux,       /**< [in] coarse u_x * u_x */
-        const std::vector<double> & uxuy,       /**< [in] coarse u_x * u_y */
-        const std::vector<double> & uxuz,       /**< [in] coarse u_x * u_z */
-        const std::vector<double> & uyuy,       /**< [in] coarse u_y * u_y */
-        const std::vector<double> & uyuz,       /**< [in] coarse u_y * u_z */
-        const std::vector<double> & uzuz,       /**< [in] coarse u_z * u_z */
-        const int Ntime,                        /**< [in] Length of time dimension */
-        const int Ndepth,                       /**< [in] Length of depth dimension */
-        const int Nlat,                         /**< [in] Length of latitude dimension */
-        const int Nlon,                         /**< [in] Length of longitude dimension */
-        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
-        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
-        const std::vector<bool> & mask          /**< [in] Mask array (2D) to distinguish land from water */
+        std::vector<double> & energy_transfer,
+        const std::vector<double> & ux,
+        const std::vector<double> & uy,
+        const std::vector<double> & uz,
+        const std::vector<double> & uxux,
+        const std::vector<double> & uxuy,
+        const std::vector<double> & uxuz,
+        const std::vector<double> & uyuy,
+        const std::vector<double> & uyuz,
+        const std::vector<double> & uzuz,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const std::vector<bool> & mask
         ) {
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);

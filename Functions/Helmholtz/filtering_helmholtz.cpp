@@ -9,6 +9,18 @@
 #include "../../postprocess.hpp"
 #include "../../preprocess.hpp"
 
+/*!
+ * \brief Main filtering driver for Helmholtz decomposed data
+ *
+ * This function is the main filtering driver. It sets up the appropriate
+ * loop sequences, calls the other funcations (velocity conversions), and
+ * calls the IO functionality.
+ *
+ * @param[in]   source_data     dataset class instance containing data (Psi, Phi, etc)
+ * @param[in]   scales          scales at which to filter the data
+ * @param[in]   comm            MPI communicator (default MPI_COMM_WORLD)
+ *
+ */
 void filtering_helmholtz(
         const dataset & source_data,
         const std::vector<double> & scales,
@@ -41,8 +53,8 @@ void filtering_helmholtz(
 
     // Get dimension sizes
     const int   Nscales = scales.size(),
-                Ntime   = source_data.Ntime,
-                Ndepth  = source_data.Ndepth,
+                Ntime   = source_data.Ntime,    // this is the MPI-local Ntime, not the full Ntime
+                Ndepth  = source_data.Ndepth,   // this is the MPI-local Ndepth, not the full Ndepth
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 

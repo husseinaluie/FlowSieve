@@ -6,6 +6,18 @@
 #include <omp.h>
 #include <math.h>
 
+/*!
+ * \brief Given a field, compute the horizontal average.
+ *
+ * The result, means, is a function of time and depth.
+ *
+ *  @param[in,out]  means                       where to store horizontal spatial averages
+ *  @param[in]      field                       array of vector to be averaged
+ *  @param[in]      areas                       2D array of cell areas
+ *  @param[in]      Ntime,Ndepth,Nlat,Nlon      (MPI-local) dimension sizes
+ *  @param[in]      mask                        2D array to distinguish land from water
+ *
+ */
 void compute_spatial_average(
         std::vector<double> & means,
         const std::vector<double> & field,

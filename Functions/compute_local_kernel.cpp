@@ -3,6 +3,23 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
+/*!
+ * \brief Compute an array of the kernel values from a 
+ * given reference point to every other point in the domain
+ *
+ * (ref_ilat, ref_ilon) is the reference point from which 
+ *   the kernel values are computed.
+ *
+ * LAT_lb and LAT_ub are the (pre-computed) latitudinal bounds for the kernel.
+ *
+ * @param[in,out]   local_kernel            where to store the local kernel
+ * @param[in]       scale                   Filtering scale
+ * @param[in]       longitude,latitude      grid vectors (1D)
+ * @param[in]       Ilat,Ilon               reference coordinate (kernel centre)
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon  dimension sizes
+ * @param[in]       LAT_lb,LAT_ub           upper and lower latitudinal bounds for kernel
+ *
+ */
 void compute_local_kernel(
         std::vector<double> & local_kernel,
         const double scale,

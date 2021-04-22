@@ -1,3 +1,4 @@
+\page issues1
 # Solutions to Common Problems
 
 ## I/O

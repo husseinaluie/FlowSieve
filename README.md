@@ -7,24 +7,24 @@ This repository stores source code for running coarse graining procedures on net
 
 ## Tutorial
 
-A series of [basic tutorials](./Tutorial/TUTORIAL.md) are provided to outline both various usage cases as well as how to use / process the outputs.
+A series of [basic tutorials](./Tutorial/TUTORIAL.md) (\ref tutorials1) are provided to outline both various usage cases as well as how to use / process the outputs.
 
 
 ---
 
 ## Methods
 
-Some details regarding underlying methods are discussed [on this page](./Documentation/METHODS.md) (warning, math content).
+Some details regarding underlying methods are discussed [on this page](./Documentation/METHODS.md) (\ref methods1) (warning, math content).
 
 ### Helmholtz Decomposition
 
-For notes about the Helmholtz decomposition, [go to this page](./Documentation/HELMHOLTZ.md)
+For notes about the Helmholtz decomposition, [go to this page](./Documentation/HELMHOLTZ.md) (\ref helmholtz1).
 
 ---
 
 ## Compilation / Installation
 
-For notes on installation, please see [this page](./Documentation/INSTALL.md).
+For notes on installation, please see [this page](./Documentation/INSTALL.md) (\ref install1).
 
 ---
 
@@ -48,7 +48,7 @@ Various geographic regions of interest can be provided in a netcdf file.
 
 ## Known Issues
 
-Some known issues (with solutions where available) are [given on this page](./Documentation/ISSUES.md)
+Some known issues (with solutions where available) are [given on this page](./Documentation/ISSUES.md) (\ref issues1).
 
 ---
 

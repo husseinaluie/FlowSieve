@@ -5,6 +5,14 @@
 #include "../../constants.hpp"
 #include "../../functions.hpp"
 
+/*!
+ * \brief Print summary of compile-time variables.
+ *
+ * This is triggered by passing --version to the executable.
+ *
+ * @param[in]   scales      Scales used for filtering
+ *
+ */
 void print_compile_info(
         const std::vector<double> * scales
         ) {

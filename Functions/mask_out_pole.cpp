@@ -6,6 +6,17 @@
 #include "../constants.hpp"
 #include "../functions.hpp"
 
+/*!
+ *
+ * \brief If the grid includes the poles (lat = 90 degrees), then mask it out
+ *
+ * Modifies mask in-place
+ *
+ * @param[in]       latitude                    Latitude grid
+ * @param[in,out]   mask                        Mask array to differentiate land/water
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon      Dimension sizes
+ *
+ */
 void mask_out_pole(
         const std::vector<double> & latitude,
         std::vector<bool> & mask,
@@ -19,7 +30,7 @@ void mask_out_pole(
     size_t index;
     
     const double D2R = M_PI / 180.;
-    const double pole_cut = (90. - 0.5) * D2R;
+    const double pole_cut = (90. - 0.1) * D2R;
 
     if (not(constants::CARTESIAN)) {
         #pragma omp parallel default(none) \

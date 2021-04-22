@@ -5,6 +5,17 @@
 #include "../constants.hpp"
 #include "../functions.hpp"
 
+/*!
+ * \brief Get latitude bounds for coarse-graining.
+ *
+ *  See the methods documentation (\ref methods1) for more details.
+ *
+ *  @param[in,out]  LAT_lb,LAT_ub       logical index bounds for the filtering domain
+ *  @param[in]      latitude            1D latitude vector
+ *  @param[in]      Ilat                logical index of current position
+ *  @param[in]      scale               filtering scale (metres)
+ *
+ */
 void get_lat_bounds(
         int & LAT_lb,
         int & LAT_ub,

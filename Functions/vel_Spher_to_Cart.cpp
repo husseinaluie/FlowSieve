@@ -2,6 +2,15 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
+/*!
+ * \brief Wrapper that applies vel_Spher_to_Cart_at_point to every point in the domain.
+ *
+ * @param[in,out]   u_x,u_y,u_z                         Computed Cartesian velocities
+ * @param[in]       u_r,u_lon,u_lat                     Spherical velocities to convert
+ * @param[in]       mask                                differentiate land from water 
+ * @param[in]       time, depth, latitude, longitude    grid vectors (1D)
+ *
+ */
 void vel_Spher_to_Cart(
             std::vector<double> & u_x,
             std::vector<double> & u_y,

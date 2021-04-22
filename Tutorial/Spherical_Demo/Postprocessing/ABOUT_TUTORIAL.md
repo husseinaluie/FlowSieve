@@ -1,4 +1,5 @@
 [TOC]
+\pagetutorials3
 
 This tutorial shows the basic functionality of the coarse-graining codebase.
 

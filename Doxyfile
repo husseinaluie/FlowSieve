@@ -793,6 +793,7 @@ WARN_LOGFILE           =
 
 INPUT                  =    . \
                             ./Documentation \
+                            ./Tutorial \
                             ./NETCDF_IO \
                             ./Functions \
                             ./Functions/Differentiation_Tools \

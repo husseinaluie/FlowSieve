@@ -5,6 +5,26 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
+/*!
+ * \brief Compute filtered field at a single point
+ *
+ * Computes the integral of the provided field with the
+ * kernel().
+ *
+ * @param[in,out]   coarse_val              where to store filtered value
+ * @param[in]       fields                  fields to filter
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon  length of time dimension
+ * @param[in]       Itime,Idepth,Ilat,Ilon  current position in time dimension
+ * @param[in]       longitude,latitude      grid vectors (lon,lat)
+ * @param[in]       LAT_lb,LAT_ub           lower/upper boundd on latitude for kernel
+ * @param[in]       dAreas                  array of cell areas (2D - lat,lon)
+ * @param[in]       scale                   filtering scale
+ * @param[in]       mask                    array to distinguish land from water
+ * @param[in]       use_mask                array of booleans indicating whether or not to use mask (i.e. zero out land) or to use the array value
+ * @param[in]       local_kernel            pointer to pre-computed kernel (NULL indicates not provided)
+ * @param[in]       weight                  pointer to spatial weight (i.e. rho) (NULL indicates not provided)
+ *
+ */
 void apply_filter_at_point(
         std::vector<double*> & coarse_vals,
         const std::vector<const std::vector<double>*> & fields,

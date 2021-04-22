@@ -1,11 +1,20 @@
 #include "../functions.hpp"
 
+/*!
+ *  \brief Convert potential temperature to actual temperature
+ *   following equation 1.154a from Vallis (p.36)
+ *
+ *  @param[in]  p       Pressure (Pascales)
+ *  @param[in]  theta   potential temperature (Celcius)
+ *
+ *  @returns non-potential temperature (Celcius)
+ *
+ */
 double depotential_temperature(
         const double p,     /**< [in] pressure at point  */
         const double theta  /**< [in] potential temperature at point (Celsius) */
         ) {
 
-    // Following equation 1.154a from Vallis (p.36)
 
     // 0C = 273.15K
 

@@ -2,6 +2,12 @@
 #include "../constants.hpp"
 #include <math.h>
 
+/*!
+ * \brief sinc function that uses Taylor approximation near zero for stability.
+ *
+ * This is only used in the case of a sinc kernel
+ *
+ */
 double sinc(const double &x) {
     double s;
 
@@ -12,6 +18,15 @@ double sinc(const double &x) {
     return s;
 }
 
+/*!
+ * \brief Primary kernel function coarse-graining procedure (G in publications)
+ *
+ * @param[in]   distance    distance for evaluating the kernel
+ * @param[in]   scale       filter scale (in metres)
+ * 
+ * @returns The kernel value for a given distance and filter scale
+ *
+ */
 double kernel(
         const double dist,  /**< [in] Distance as argument to the kernel */
         const double scale  /**< [in] Filtering scale */

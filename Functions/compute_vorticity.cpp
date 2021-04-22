@@ -3,22 +3,39 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
+/*!
+ * \brief Wrapper for computing vorticity
+ *
+ * This wrapper applies compute_vorticity_at_point() at each point in the
+ * grid. If the compiler flag COMP_VORT is set to false, then this procedure
+ * is skipped.
+ *
+ *  @param[in,out]      vort_r,vort_lon,vort_lat    where to store computed vorticity components (array)
+ *  @param[in,out]      vel_div                     where to store computed velocity divergence (array)
+ *  @param[in,out]      OkuboWeiss                  where to store computed OkuboWeiss (array)
+ *  @param[in]          u_r,u_lon,u_lat             velocity components
+ *  @param[in]          Ntime,Ndepth,Nlat,Nlon      (MPI-local) dimension sizes
+ *  @param[in]          longitude,latitude          1D grid vectors
+ *  @param[in]          mask                        2D array to distinguish land from water
+ *  @param[in]          comm                        MPI communicator object
+ *
+ */
 void compute_vorticity(
-        std::vector<double> & vort_r,           /**< [in] where to store vort_r */
-        std::vector<double> & vort_lon,         /**< [in] where to store vort_lon */
-        std::vector<double> & vort_lat,         /**< [in] where to store vort_lat */
+        std::vector<double> & vort_r,
+        std::vector<double> & vort_lon,
+        std::vector<double> & vort_lat,
         std::vector<double> & vel_div,
         std::vector<double> & OkuboWeiss,
-        const std::vector<double> & u_r,        /**< [in] full u_r for calculation */
-        const std::vector<double> & u_lon,      /**< [in] full u_lon for calculation */
-        const std::vector<double> & u_lat,      /**< [in] full u_lat for calculation */
-        const int Ntime,                        /**< [in] Length of time dimension */
-        const int Ndepth,                       /**< [in] Length of depth dimension */
-        const int Nlat,                         /**< [in] Length of latitude dimension */
-        const int Nlon,                         /**< [in] Length of longitude dimension */
-        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
-        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
-        const std::vector<bool> & mask,         /**< [in] Mask array (2D) to distinguish land from water */
+        const std::vector<double> & u_r,
+        const std::vector<double> & u_lon,
+        const std::vector<double> & u_lat,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const std::vector<bool> & mask,
         const MPI_Comm comm
         ) {
 

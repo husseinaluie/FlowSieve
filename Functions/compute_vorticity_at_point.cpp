@@ -5,26 +5,44 @@
 #include "../differentiation_tools.hpp"
 #include "../constants.hpp"
 
+/*!
+ * \brief Compute the vorticity, divergnce, and OkuboWeiss at a point
+ *
+ * Since we're computing derivatives anyways, might as well get a few things out of it.
+ *
+ *
+ * At the moment, only computes the vort_r component of vorticity
+ *
+ * @param[in,out]   vort_r_tmp,vort_lon_tmp,vort_lat_tmp    where to store vorticity components
+ * @param[in,out]   div_tmp                                 where to store velocity divergence
+ * @param[in,out]   OkuboWeiss_tmp                          where to store OkuboWeiss result
+ * @param[in]       u_r,u_lon,u_lat                         velocity components
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon                  (MPI-local) sizes of dimensions
+ * @param[in]       Itime,Idepth,Ilat,Ilon                  Current index in time and space
+ * @param[in]       longitude,latitude                      1D grid vectors
+ * @param[in]       mask                                    array (2D) to distinguish land from water
+ *
+ */
 void compute_vorticity_at_point(
-        double & vort_r_tmp,                    /**< [in] where to store vort_r */
-        double & vort_lon_tmp,                  /**< [in] where to store vort_lon */
-        double & vort_lat_tmp,                  /**< [in] where to store vort_lat */
+        double & vort_r_tmp,
+        double & vort_lon_tmp,
+        double & vort_lat_tmp,
         double & div_tmp,
         double & OkuboWeiss_tmp,
-        const std::vector<double> & u_r,        /**< [in] full u_r for calculation */
-        const std::vector<double> & u_lon,      /**< [in] full u_lon for calculation */
-        const std::vector<double> & u_lat,      /**< [in] full u_lat for calculation */
-        const int Ntime,                        /**< [in] Length of time dimension */
-        const int Ndepth,                       /**< [in] Length of depth dimension */
-        const int Nlat,                         /**< [in] Length of latitude dimension */
-        const int Nlon,                         /**< [in] Length of longitude dimension */
-        const int Itime,                        /**< [in] Current position in time dimension */
-        const int Idepth,                       /**< [in] Current position in depth dimension */
-        const int Ilat,                         /**< [in] Current position in latitude dimension */
-        const int Ilon,                         /**< [in] Current position in longitude dimension */
-        const std::vector<double> & longitude,  /**< [in] Longitude dimension (1D) */
-        const std::vector<double> & latitude,   /**< [in] Latitude dimension (1D) */
-        const std::vector<bool> & mask          /**< [in] Mask array (2D) to distinguish land from water*/
+        const std::vector<double> & u_r,
+        const std::vector<double> & u_lon,
+        const std::vector<double> & u_lat,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
+        const int Nlon,
+        const int Itime,
+        const int Idepth,
+        const int Ilat,
+        const int Ilon,
+        const std::vector<double> & longitude,
+        const std::vector<double> & latitude,
+        const std::vector<bool> & mask
         ) {
 
     // For the moment, only compute vort_r

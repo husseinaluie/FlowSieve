@@ -1,17 +1,26 @@
 #include <math.h>
 #include "../functions.hpp"
 
+/*!
+ * \brief UNESCO 1981 equation of state
+ *
+ *  Valid for  0 < T < 40  (Celcius),  0 < S < 42  (PSU)
+ *
+ *  https://link.springer.com/content/pdf/bbm%3A978-3-319-18908-6%2F1.pdf
+ *
+ *  @param[in]  T   temperature (degrees Celcius)
+ *  @param[in]  S   salinity (PSU)
+ *  @param[in]  p   pressure (bars)
+ *
+ *  @returns density
+ *
+ */
 double equation_of_state(
         const double T, /**< [in] temperature (degrees C) */
         const double S, /**< [in] salinity (PSU) */
         const double p  /**< [in] pressure (bars) */
         ) {
 
-
-    // UNESCO 1981
-    //   Valid for  0 < T < 40  (Celcius)
-    //              0 < S < 42  (PSU)
-    //   https://link.springer.com/content/pdf/bbm%3A978-3-319-18908-6%2F1.pdf
 
     // First, define a whole whack of constants
 

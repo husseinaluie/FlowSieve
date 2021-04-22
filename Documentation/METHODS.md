@@ -1,4 +1,5 @@
 [TOC]
+\page methods1
 # Methods
 
 This file will outline some of the computational methodologies.

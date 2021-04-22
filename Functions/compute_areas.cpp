@@ -5,6 +5,17 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 
+/*! 
+ * \brief Compute the area of each computational cell
+ *
+ * Works for both spherical and Cartesian coordinated (based on constants.hpp)
+ * as well as uniform and non-uniform grids (also based on constants.hpp).
+ *
+ * @param[in,out]   areas       array in which areas will be stored
+ * @param[in]       longitude   longitude vector (1D)
+ * @param[in]       latitude    latitude vector (1D)
+ *
+ */
 void compute_areas(
         std::vector<double> &areas,
         const std::vector<double> &longitude,

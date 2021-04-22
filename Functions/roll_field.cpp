@@ -4,6 +4,18 @@
 #include <cassert>
 #include "../functions.hpp"
 
+/*!
+ *
+ * \brief Roll field along dimension
+ *
+ * Currently hard-coded to roll along lon dimension only.
+ *
+ * @param[in,out]   field_to_roll               field to be rolled
+ * @param[in]       dimension                   dimension to roll (currently must be 0)
+ * @param[in]       roll_count                  ammount by which to roll (currently must be 1)
+ * @param[in]       Ntime,Ndepth,Nlat,Nlon      (MPI-local) dimension sizes
+ *
+ */
 void roll_field(
         std::vector<double> & field_to_roll,
         const std::string dimension,

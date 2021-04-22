@@ -5,6 +5,19 @@
 #include "../constants.hpp"
 #include "../functions.hpp"
 
+/*!
+ * \brief Get longitude integratation bounds for a specific latitude
+ *
+ *  See the methods documentation (\ref methods1) for more details.
+ *
+ *  @param[in,out]  LON_lb,LON_ub       logical index bounds for the filtering domain
+ *  @param[in]      longitude           1D longitude vector
+ *  @param[in]      Ilon                logical index of current position
+ *  @param[in]      centre_lat          latitude for the centre of the filtering kernel
+ *  @param[in]      curr_lat            current latitude
+ *  @param[in]      scale               filtering scale (metres)
+ *
+ */
 void get_lon_bounds(
         int & LON_lb,
         int & LON_ub,
