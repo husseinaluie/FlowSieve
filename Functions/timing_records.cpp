@@ -33,7 +33,6 @@ void Timing_Records::add_to_record( double delta, std::string record_name ) {
     } else {
         // Otherwise, just create it
         time_records.insert( std::pair< std::string, double >( record_name, delta ) );
-        record_names.push_back( record_name );
     }
 }
 
