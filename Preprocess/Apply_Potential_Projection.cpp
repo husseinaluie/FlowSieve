@@ -49,16 +49,18 @@ void Apply_Potential_Projection(
     //   to introduce strong numerical issues
     const std::vector<bool> unmask(mask.size(), true);
 
-    const int Ntime   = myCounts.at(0);
-    const int Ndepth  = myCounts.at(1);
-    const int Nlat    = myCounts.at(2);
-    const int Nlon    = myCounts.at(3);
+    const int   Ntime   = myCounts.at(0),
+                Ndepth  = myCounts.at(1),
+                Nlat    = myCounts.at(2),
+                Nlon    = myCounts.at(3);
 
     const int Npts = Nlat * Nlon;
 
-    int Itime, Idepth, Ilat, Ilon, index, index_sub, mean_ind;
+    int Itime, Idepth, Ilat, Ilon; 
+    size_t index, index_sub;
 
     // Get the velocity means ( will be stored in output file for reference )
+    //      mean meridional flow will be captured by the potential (ulat * sin_lat is non-zero)
     std::vector<double> u_lon_means, u_lat_means;
     compute_spatial_average(u_lon_means, u_lon, dAreas, Ntime, Ndepth, Nlat, Nlon, mask);
     compute_spatial_average(u_lat_means, u_lat, dAreas, Ntime, Ndepth, Nlat, Nlon, mask);
@@ -66,11 +68,11 @@ void Apply_Potential_Projection(
     // Fill in the land areas with zero velocity
     #pragma omp parallel \
     default(none) \
-    shared( u_lon, u_lat, u_lon_means, u_lat_means, mask ) \
-    private( index, Itime, Idepth, Ilat, Ilon, mean_ind )
+    shared( u_lon, u_lat, mask ) \
+    private( index )
     {
         #pragma omp for collapse(1) schedule(guided)
-        for (index = 0; index < (int)u_lon.size(); index++) {
+        for (index = 0; index < u_lon.size(); index++) {
             if (not(mask.at(index))) {
                 u_lon.at(index) = 0.;
                 u_lat.at(index) = 0.;
@@ -269,7 +271,7 @@ void Apply_Potential_Projection(
             shared( full_u_lon_pot, u_lon_pot, full_u_lat_pot, u_lat_pot, \
                     full_div_pot, div_pot, full_F, F_vector, full_seed, F_seed, full_RHS, div_term, \
                     Itime, Idepth ) \
-            private( Ilat, Ilon, index, index_sub, mean_ind )
+            private( Ilat, Ilon, index, index_sub )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -279,8 +281,6 @@ void Apply_Potential_Projection(
 
                         index_sub = Index(0, 0, Ilat, Ilon,
                                           1, 1, Nlat, Nlon);
-                        mean_ind  = Index(0, 0, Itime, Idepth,
-                                          1, 1, Ntime, Ndepth);
 
                         // add the mean velocity back in
                         full_u_lon_pot.at(index) = u_lon_pot.at(index_sub);
