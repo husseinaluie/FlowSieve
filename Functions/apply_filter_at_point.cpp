@@ -53,43 +53,30 @@ void apply_filter_at_point(
 
     double dist, kern, area, loc_val;
     size_t index, area_index;
-    int curr_lon, curr_lat;
 
-    double kA_sum = 0.;
+    double  kA_sum   = 0.,
+            mask_val = 0.;
     std::vector<double> tmp_vals(Nfields);
-    double mask_val = 0.;
 
-    double dlat_m, dlon_m; 
-    int LON_lb, LON_ub;
+    int curr_lon, curr_lat, LON_lb, LON_ub;
 
-    double lat_at_curr, lat_at_ilat;
-    lat_at_ilat = latitude.at(Ilat);
+    double lat_at_curr;
+    const double lat_at_ilat = latitude.at(Ilat);
 
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
-        // Handle periodicity
-        if (constants::PERIODIC_Y) {
-            if      (LAT <  0   ) { curr_lat = LAT + Nlat; } 
-            else if (LAT >= Nlat) { curr_lat = LAT - Nlat; }
-            else                  { curr_lat = LAT; }
-        } else {
-            curr_lat = LAT;
-        }
+        // Handle periodicity if necessary
+        if (constants::PERIODIC_Y) { curr_lat = ( LAT % Nlat + Nlat ) % Nlat; }
+        else                       { curr_lat = LAT; }
         lat_at_curr = latitude.at(curr_lat);
 
-        get_lon_bounds(LON_lb, LON_ub, longitude, Ilon, 
-                lat_at_ilat, lat_at_curr, scale);
+        get_lon_bounds(LON_lb, LON_ub, longitude, Ilon, lat_at_ilat, lat_at_curr, scale);
 
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
-            // Handle periodicity
-            if (constants::PERIODIC_X) {
-                if      (LON <  0   ) { curr_lon = LON + Nlon; }
-                else if (LON >= Nlon) { curr_lon = LON - Nlon; }
-                else                  { curr_lon = LON; }
-            } else {
-                curr_lon = LON;
-            }
+            // Handle periodicity if necessary
+            if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
+            else                       { curr_lon = LON; }
 
             index = Index(Itime, Idepth, curr_lat, curr_lon,
                           Ntime, Ndepth, Nlat,     Nlon);
@@ -97,9 +84,12 @@ void apply_filter_at_point(
                                Ntime, Ndepth, Nlat,     Nlon);
 
             if (local_kernel == NULL) {
+                // If no pre-computed kernel was provided, then compute it now.
+                //  NOTE: This is generally very inefficient. Better to compute
+                //        ahead of time
                 if (constants::CARTESIAN) {
-                    dlat_m = latitude.at( 1) - latitude.at( 0);
-                    dlon_m = longitude.at(1) - longitude.at(0);
+                    double dlat_m = latitude.at( 1) - latitude.at( 0);
+                    double dlon_m = longitude.at(1) - longitude.at(0);
                     dist = distance(longitude.at(Ilon),     lat_at_ilat,
                                     longitude.at(curr_lon), lat_at_curr,
                                     dlon_m * Nlon, dlat_m * Nlat);
@@ -109,7 +99,17 @@ void apply_filter_at_point(
                 }
                 kern = kernel(dist, scale);
             } else {
-                kern = local_kernel->at(area_index);
+                size_t kernel_index;
+                // If the kernel was provided, then just grab the appropraite point.
+                if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X ) ) {
+                    // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
+                    //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
+                    kernel_index = Index(0,     0,      curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon,
+                                         Ntime, Ndepth, Nlat,     Nlon);
+                } else {
+                    kernel_index = area_index;
+                }
+                kern = local_kernel->at(kernel_index);
             }
 
             // If cell is water, or if we're not deforming around land, then include the cell area in the integral

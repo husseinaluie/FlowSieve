@@ -45,7 +45,7 @@ void apply_filter_at_point_for_quadratics(
         const int Nlon,
         const int Itime,
         const int Idepth,
-        const int Ilat
+        const int Ilat,
         const int Ilon,
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
@@ -58,12 +58,11 @@ void apply_filter_at_point_for_quadratics(
         ) {
 
 
-    double kA_sum, dist, kern, area, mask_val;
-    double u_x_loc, u_y_loc, u_z_loc;
-    int index, area_index;
-    int curr_lon, curr_lat;
+    double  dist, kern, area, mask_val = 0, kA_sum = 0, local_weight,
+            u_x_loc, u_y_loc, u_z_loc;
+    size_t index, area_index;
 
-    kA_sum  = 0.;
+    // Zero out the coarse values before we start accumulating (integrating) over space
     uxux_tmp = 0.;
     uxuy_tmp = 0.;
     uxuz_tmp = 0.;
@@ -71,20 +70,15 @@ void apply_filter_at_point_for_quadratics(
     uyuz_tmp = 0.;
     uzuz_tmp = 0.;
 
-    int    LON_lb, LON_ub;
-    double lat_at_curr, lat_at_ilat;
-    lat_at_ilat = latitude.at(Ilat);
+    int    curr_lon, curr_lat, LON_lb, LON_ub;
+    double lat_at_curr;
+    const double lat_at_ilat = latitude.at(Ilat);
 
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
-        // Handle periodicity
-        if (constants::PERIODIC_Y) {
-            if      (LAT <  0   ) { curr_lat = LAT + Nlat; } 
-            else if (LAT >= Nlat) { curr_lat = LAT - Nlat; }
-            else                  { curr_lat = LAT; }
-        } else {
-            curr_lat = LAT;
-        }
+        // Handle periodicity if necessary
+        if (constants::PERIODIC_Y) { curr_lat = ( LAT % Nlat + Nlat ) % Nlat; }
+        else                       { curr_lat = LAT; }
         lat_at_curr = latitude.at(curr_lat);
 
         get_lon_bounds(LON_lb, LON_ub, longitude, Ilon, 
@@ -92,14 +86,9 @@ void apply_filter_at_point_for_quadratics(
 
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
-            // Handle periodicity
-            if (constants::PERIODIC_X) {
-                if      (LON <  0   ) { curr_lon = LON + Nlon; }
-                else if (LON >= Nlon) { curr_lon = LON - Nlon; }
-                else                  { curr_lon = LON; }
-            } else {
-                curr_lon = LON;
-            }
+            // Handle periodicity if necessary
+            if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
+            else                       { curr_lon = LON; }
 
             index = Index(Itime, Idepth, curr_lat, curr_lon,
                           Ntime, Ndepth, Nlat,     Nlon);
@@ -120,14 +109,25 @@ void apply_filter_at_point_for_quadratics(
                 }
                 kern = kernel(dist, scale);
             } else {
-                kern = local_kernel->at(area_index);
+                size_t kernel_index;
+                if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X ) ) {
+                    // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
+                    //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
+                    kernel_index = Index(0,     0,      curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon,
+                                         Ntime, Ndepth, Nlat,     Nlon);
+                } else {
+                    kernel_index = area_index;
+                }
+                kern = local_kernel->at(kernel_index);
             }
 
 
             // If cell is water, or if we're not deforming around land, then include the cell area in the integral
             mask_val = ( mask.at(index) or not(constants::DEFORM_AROUND_LAND) ) ? 1. : 0.;
             area     = dAreas.at(area_index);
-            kA_sum  += kern * area * mask_val;
+
+            local_weight = kern * area * mask_val;
+            kA_sum  += local_weight;
 
             // If the cell is water, keep the value, otherwise zero it out
             mask_val = mask.at(index) ? 1. : 0.;
@@ -136,12 +136,12 @@ void apply_filter_at_point_for_quadratics(
             u_y_loc = u_y.at(index);
             u_z_loc = u_z.at(index);
 
-            uxux_tmp += u_x_loc * u_x_loc * kern * area * mask_val;
-            uxuy_tmp += u_x_loc * u_y_loc * kern * area * mask_val;
-            uxuz_tmp += u_x_loc * u_z_loc * kern * area * mask_val;
-            uyuy_tmp += u_y_loc * u_y_loc * kern * area * mask_val;
-            uyuz_tmp += u_y_loc * u_z_loc * kern * area * mask_val;
-            uzuz_tmp += u_z_loc * u_z_loc * kern * area * mask_val;
+            uxux_tmp += u_x_loc * u_x_loc * local_weight;
+            uxuy_tmp += u_x_loc * u_y_loc * local_weight;
+            uxuz_tmp += u_x_loc * u_z_loc * local_weight;
+            uyuy_tmp += u_y_loc * u_y_loc * local_weight;
+            uyuz_tmp += u_y_loc * u_z_loc * local_weight;
+            uzuz_tmp += u_z_loc * u_z_loc * local_weight;
 
         }
     }
