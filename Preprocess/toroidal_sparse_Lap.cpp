@@ -48,7 +48,7 @@ void toroidal_sparse_Lap(
             index_sub = Index(0, 0, Ilat, Ilon,
                               1, 1, Nlat, Nlon);
 
-            if ( (mask.at(index)) or not(is_pole) ) { // Skip land areas and poles
+            if ( (mask.at(index)) and not(is_pole) ) { // Skip land areas and poles
 
                 //
                 //// LON second derivative part
