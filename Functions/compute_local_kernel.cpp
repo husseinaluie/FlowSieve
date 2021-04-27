@@ -39,20 +39,15 @@ void compute_local_kernel(
     size_t index;
     int curr_lon, curr_lat, LON_lb, LON_ub;
 
-    const double lat_at_ilat = latitude.at(Ilat);
-    const double lon_at_ilon = longitude.at(Ilon);
+    const double    lat_at_ilat = latitude.at(Ilat),
+                    lon_at_ilon = longitude.at(Ilon);
     double lat_at_curr;
 
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
         // Handle periodicity
-        if (constants::PERIODIC_Y) {
-            if      (LAT <  0   ) { curr_lat = LAT + Nlat; } 
-            else if (LAT >= Nlat) { curr_lat = LAT - Nlat; }
-            else                  { curr_lat = LAT; }
-        } else {
-            curr_lat = LAT;
-        }
+        if (constants::PERIODIC_Y) { curr_lat = ( LAT % Nlat + Nlat ) % Nlat; }
+        else                       { curr_lat = LAT; }
         lat_at_curr = latitude.at(curr_lat);
 
         // Get lon bounds at the latitude
@@ -61,13 +56,8 @@ void compute_local_kernel(
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
             // Handle periodicity
-            if (constants::PERIODIC_X) {
-                if      (LON <  0   ) { curr_lon = LON + Nlon; }
-                else if (LON >= Nlon) { curr_lon = LON - Nlon; }
-                else                  { curr_lon = LON; }
-            } else {
-                curr_lon = LON;
-            }
+            if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
+            else                       { curr_lon = LON; }
 
             index = Index(0,     0,      curr_lat, curr_lon,
                           Ntime, Ndepth, Nlat,     Nlon);
