@@ -113,7 +113,7 @@ void dataset::compute_region_areas() {
                 shared( mask, areas, Iregion, Itime, Idepth ) \
                 reduction(+ : local_area)
                 { 
-                    #pragma omp for collapse(2) schedule(guided, chunk_size)
+                    #pragma omp for collapse(2) schedule(dynamic, chunk_size)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                         for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 
