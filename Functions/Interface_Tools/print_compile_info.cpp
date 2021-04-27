@@ -20,6 +20,7 @@ void print_compile_info(
     fprintf(stdout, "\n");
     fprintf(stdout, "Compiled at %s on %s.\n", __TIME__, __DATE__);
     fprintf(stdout, "  Code version: %d.%d.%d \n", MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION);
+    fprintf(stdout, "  Git version : %s\n", GIT_VERSION);
     #if defined(__ICC) || defined(__INTEL_COMPILER)
     fprintf(stdout, "  compiler: intel (%s)\n", __VERSION__);
     #elif defined(__GNUC__) || defined(__GNUG__)

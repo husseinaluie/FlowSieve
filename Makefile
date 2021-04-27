@@ -19,6 +19,8 @@ EXTRA_OPT:=true
 # Flag to pass version info to code
 VERSION:= -DMAJOR_VERSION=${MAJOR_VERSION} -DMINOR_VERSION=${MINOR_VERSION} -DPATCH_VERSION=${PATCH_VERSION}
 DOXY_VERSION:="${MAJOR_VERSION}.${MINOR_VERSION}.${PATCH_VERSION}"
+GIT_VERSION := "$(shell git describe --dirty --always --all --long)"
+VERSION:=${VERSION} -DGIT_VERSION=\"$(GIT_VERSION)\"
 
 ifeq ($(DEBUG),true)
     CFLAGS:=$(CFLAGS) $(DEBUG_FLAGS)
