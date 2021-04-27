@@ -35,13 +35,18 @@ void mask_out_pole(
     if (not(constants::CARTESIAN)) {
         #pragma omp parallel default(none) \
             private(Itime, Idepth, Ilat, Ilon, index) \
-            shared(latitude, mask)
+            shared(latitude, mask, stdout)
         { 
             #pragma omp for collapse(1) schedule(static)
             for (index = 0; index < mask.size(); ++index) {
                 Index1to4(index, Itime, Idepth, Ilat, Ilon,
                                  Ntime, Ndepth, Nlat, Nlon);
                 if ( fabs(latitude.at(Ilat)) >= pole_cut) {
+                    #if DEBUG >= 0
+                    if ( (Itime == 0) and (Idepth == 0) and (Ilon == 0) ) {
+                        fprintf(stdout, "Masking out Ilat %d (too close to pole (%g))\n", Ilat, latitude.at(Ilat)/D2R);
+                    }
+                    #endif
                     mask.at(index) = false;
                 }
             }
