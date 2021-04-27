@@ -8,29 +8,7 @@
 // This file provides the implementation details for the Timing_Records class
 
 // Class constructor
-//   create a key-value pair for each desired record
-//   initialize them to zero
-//   order here does not matter
 Timing_Records::Timing_Records() {
-
-    time_records["kernel_precomputation"] = 0.;
-
-    time_records["filter_main"] = 0.;
-    time_records["filter_for_Pi"] = 0.;
-    time_records["filter_for_Lambda"] = 0.;
-    time_records["land"] = 0.;
-
-    time_records["filter_tor_pot"] = 0.;
-
-    time_records["compute_vorticity"] = 0.;
-    time_records["compute_Pi"] = 0.;
-    time_records["compute_Lambda"] = 0.;
-    time_records["compute_transport"] = 0.;
-
-    time_records["writing"] = 0.;
-
-    time_records["postprocess"] = 0.;
-
 }
 
 // Reset all records to zero.
@@ -47,20 +25,15 @@ void Timing_Records::reset() {
 //    by adding delta to the previous value.
 //
 //    If record_name does not map to a valid record,
-//    then print an error statement and halt.
+//    then create a new record for that name
 void Timing_Records::add_to_record( double delta, std::string record_name ) {
-
-    int wRank = -1;
-
     if (time_records.count(record_name) == 1) {
+        // If the record already exists, add on to it
         time_records[record_name] += delta;
     } else {
-        MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
-        if (wRank == 0) {
-            fprintf(stderr, "%s is not a valid key of time_records."
-                    " Aborting\n", record_name.c_str());
-        }
-        assert(false);
+        // Otherwise, just create it
+        time_records.insert( std::pair< std::string, double >( record_name, delta ) );
+        record_names.push_back( record_name );
     }
 }
 
@@ -94,7 +67,7 @@ void Timing_Records::print() {
         // Print information
         if (wRank == 0) {
             if (mean_val > 0) {
-                fprintf(stdout, "  %-25s : %8.6e ( %8.6e )\n", entry.first.c_str(), mean_val, std_val);
+                fprintf(stdout, "  %-35s : %8.6e ( %8.6e )\n", entry.first.c_str(), mean_val, std_val);
             }
         }
     }
