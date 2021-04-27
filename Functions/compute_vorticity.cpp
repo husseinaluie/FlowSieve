@@ -72,7 +72,7 @@ void compute_vorticity(
             vort_r_tmp, vort_lon_tmp, vort_lat_tmp,\
             div_tmp, OkuboWeiss_tmp)
     {
-        #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
+        #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
         for (index = 0; index < Npts; index++) {
 
             vort_r_tmp   = constants::fill_value;

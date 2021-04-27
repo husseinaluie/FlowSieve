@@ -131,7 +131,7 @@ void compute_Pi(
             shared(tau_ij, u_i_tau_ij, mask, ui, uj, uiuj)\
             private(index, uiuj_loc, ui_loc, uj_loc)
             {
-                #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
+                #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
                 for (index = 0; index < Npts; index++) {
 
                     if ( mask.at(index) ) {

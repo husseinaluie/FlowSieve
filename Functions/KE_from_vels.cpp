@@ -27,7 +27,7 @@ void KE_from_vels(
 
     #pragma omp parallel default(none) private(index, tmp) shared(KE, u1, u2, u3, mask)
     {
-        #pragma omp for collapse(1) schedule(guided)
+        #pragma omp for collapse(1) schedule(dynamic)
         for (index = 0; index < u1->size(); ++index) {
 
             if ( mask.at(index) ) { // Skip land areas

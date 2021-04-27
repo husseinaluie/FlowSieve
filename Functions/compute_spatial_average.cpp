@@ -48,7 +48,7 @@ void compute_spatial_average(
             private( Ilat, Ilon, index, sub_index )\
             reduction(+ : integrated_area,integrated_sum)
             {
-                #pragma omp for collapse(2) schedule(guided, OMP_chunksize)
+                #pragma omp for collapse(2) schedule(dynamic, OMP_chunksize)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                     for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 
