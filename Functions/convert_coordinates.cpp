@@ -24,14 +24,15 @@ void convert_coordinates(
     int wRank=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
 
-    #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "Converting grid coordinates (if appropriate).\n"); }
-    #endif
-
     // Convert coordinate to radians
     const double D2R = M_PI / 180.;
     size_t ii;
     if (not(constants::CARTESIAN)) {
+
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "Converting grid coordinates (if appropriate).\n"); }
+        #endif
+
         #pragma omp parallel default(none) private(ii) shared(longitude, latitude)
         { 
             #pragma omp for collapse(1) schedule(static)
