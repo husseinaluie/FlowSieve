@@ -122,15 +122,19 @@ int main(int argc, char *argv[]) {
     std::vector<double> var_fine(Npts_fine);
 
     // Next, the coarse velocities
-    int Itime, Idepth, Ilat_fine, Ilon_fine, Ilat_coarse, Ilon_coarse, lat_lb, lon_lb;
-    double target_lat, target_lon;
-    size_t II_fine, II_coarse;
+    int Itime, Idepth, Ilat_fine, Ilon_fine, lat_lb, lon_lb, LEFT, RIGHT, BOT, TOP;
+    double target_lat, target_lon, LR_perc, TB_perc, 
+           BL_val, BR_val, TL_val, TR_val, L_interp, R_interp, interp_val;
+    size_t II_fine, BL_coarse, BR_coarse, TL_coarse, TR_coarse;
     #pragma omp parallel \
     default(none) \
     shared( coarse_data, fine_data, var_fine, var_name_coarse, stdout ) \
     private( lat_lb, lon_lb, target_lat, target_lon, \
              Itime, Idepth, II_fine, Ilat_fine, Ilon_fine, \
-             II_coarse, Ilat_coarse, Ilon_coarse )
+             RIGHT, LEFT, BOT, TOP, LR_perc, TB_perc, \
+             BL_coarse, BR_coarse, TL_coarse, TR_coarse, \
+             BL_val, BR_val, TL_val, TR_val, \
+             L_interp, R_interp, interp_val )
     {
         #pragma omp for collapse(1) schedule(static)
         for (II_fine = 0; II_fine < Npts_fine; ++II_fine) {
@@ -138,21 +142,12 @@ int main(int argc, char *argv[]) {
             Index1to4( II_fine, Itime, Idepth, Ilat_fine, Ilon_fine,
                                 Ntime, Ndepth, Nlat_fine, Nlon_fine );
 
-            //fprintf( stdout, "%d, %d, %d, %d\n", Itime, Idepth, Ilat_fine, Ilon_fine );
-
 
             // lat_lb is the smallest index such that coarse_lat(lat_lb) >= fine_lat(Ilat_fine)
             target_lat = fine_data.latitude.at(Ilat_fine);
             lat_lb =  std::lower_bound( coarse_data.latitude.begin(), coarse_data.latitude.end(), target_lat )
                     - coarse_data.latitude.begin();
             lat_lb = (lat_lb < 0) ? 0 : (lat_lb >= Nlat_coarse) ? Nlat_coarse - 1 : lat_lb;
-            //fprintf( stdout, "  LAT: (%d, %g -> %d) \n", Ilat_fine, target_lat, lat_lb );
-            if ( ( lat_lb > 0 ) and (   ( target_lat                      - coarse_data.latitude.at(lat_lb-1) ) 
-                                      < ( coarse_data.latitude.at(lat_lb) - target_lat                        ) 
-                                    ) 
-               ) {
-                lat_lb--;
-            }
 
 
             // lon_lb is the smallest index such that coarse_lon(lon_lb) >= fine_lon(Ilon_fine)
@@ -160,22 +155,40 @@ int main(int argc, char *argv[]) {
             lon_lb =  std::lower_bound( coarse_data.longitude.begin(), coarse_data.longitude.end(), target_lon )
                     - coarse_data.longitude.begin();
             lon_lb = (lon_lb < 0) ? 0 : (lon_lb >= Nlon_coarse) ? Nlon_coarse - 1 : lon_lb;
-            //fprintf( stdout, "  LON: (%d, %g -> %d) \n", Ilon_fine, target_lon, lon_lb );
-            if ( ( lon_lb > 0 ) and (   ( target_lon                       - coarse_data.longitude.at(lon_lb-1) ) 
-                                      < ( coarse_data.longitude.at(lon_lb) - target_lon                         ) 
-                                    ) 
-               ) {
-                lon_lb--;
-            }
 
+            // Get the points for the bounding box in the coarse grid
+            RIGHT   = lon_lb == 0 ? 1 : lon_lb;
+            LEFT    = RIGHT - 1;
+            LR_perc = ( target_lon - coarse_data.longitude.at(LEFT) ) / ( coarse_data.longitude.at(RIGHT) - coarse_data.longitude.at(LEFT) );
 
-            // Get the corresponding index in the coarse grid
-            II_coarse = Index( Itime, Idepth, lat_lb,      lon_lb,
+            TOP = lat_lb == 0 ? 1 : lat_lb;
+            BOT = TOP - 1;
+            TB_perc = ( target_lat - coarse_data.latitude.at(BOT) ) / ( coarse_data.latitude.at(TOP) - coarse_data.latitude.at(BOT) );
+
+            // Get the corresponding indices in the coarse grid
+            BL_coarse = Index( Itime, Idepth, BOT,         LEFT,
+                               Ntime, Ndepth, Nlat_coarse, Nlon_coarse );
+            BR_coarse = Index( Itime, Idepth, BOT,         RIGHT,
+                               Ntime, Ndepth, Nlat_coarse, Nlon_coarse );
+            TL_coarse = Index( Itime, Idepth, TOP,         LEFT,
+                               Ntime, Ndepth, Nlat_coarse, Nlon_coarse );
+            TR_coarse = Index( Itime, Idepth, TOP,         RIGHT,
                                Ntime, Ndepth, Nlat_coarse, Nlon_coarse );
 
+            // Pull out the values
+            BL_val = coarse_data.variables.at(var_name_coarse).at( BL_coarse );
+            BR_val = coarse_data.variables.at(var_name_coarse).at( BR_coarse );
+            TL_val = coarse_data.variables.at(var_name_coarse).at( TL_coarse );
+            TR_val = coarse_data.variables.at(var_name_coarse).at( TR_coarse );
+
+            // Get the interpolation value
+            L_interp = BL_val * (1 - TB_perc) + TL_val * TB_perc;
+            R_interp = BR_val * (1 - TB_perc) + TR_val * TB_perc;
+
+            interp_val = L_interp * (1 - LR_perc) + R_interp * LR_perc;
+
             // And drop into the fine grid
-            //fprintf( stdout, "  MAP: c(%zu) -> f(%zu)\n", II_coarse, II_fine );
-            var_fine.at(II_fine) = coarse_data.variables.at(var_name_coarse).at(II_coarse);
+            var_fine.at(II_fine) = interp_val;
         }
     }
     if (wRank == 0) { fprintf( stdout, "Done refining the grid.\n" ); }
