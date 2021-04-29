@@ -34,6 +34,10 @@
  *
  */
 int main(int argc, char *argv[]) {
+
+    //
+    static_assert( not(constants::FULL_LON_SPAN and constants::UNIFORM_LON_GRID and constants::PERIODIC_X),
+           "Coarse-grain code not set up to use longitude-wide kernel precomputation, which is activated by these flags.\n" );
     
     // PERIODIC_Y implies UNIFORM_LAT_GRID
     static_assert( (constants::UNIFORM_LAT_GRID) or (not(constants::PERIODIC_Y)),
