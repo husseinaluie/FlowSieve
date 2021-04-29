@@ -48,32 +48,34 @@ double distance(
     } else {
         // If not on a Cartesian grid, then we're on a spherical grid.
         //   Compute distances along great circles.
-        double numer, denom, Delta_sigma;
 
-        const double Delta_lon = lon2 - lon1;
-        const double cos_lat2 = cos(lat2);
-        const double sin_lat2 = sin(lat2);
-        const double cos_lat1 = cos(lat1);
-        const double sin_lat1 = sin(lat1);
-        const double cos_Delta_lon = cos(Delta_lon);
+        const double    Delta_lon       = lon2 - lon1,
+                        cos_lat2        = cos( lat2 ),
+                        sin_lat2        = sin( lat2 ),
+                        cos_lat1        = cos( lat1 ),
+                        sin_lat1        = sin( lat1 ),
+                        cos_Delta_lon   = cos( Delta_lon );
 
-        numer =   pow(                                    cos_lat2 * sin(Delta_lon), 2 ) 
-                + pow( cos_lat1 * sin_lat2  -  sin_lat1 * cos_lat2 * cos_Delta_lon , 2 );
-        numer =  sqrt(numer);
+        double Delta_sigma;
 
-        denom =        sin_lat1 * sin_lat2  +  cos_lat1 * cos_lat2 * cos_Delta_lon ;
+        if (not(constants::USE_HIGH_PRECISION_DISTANCE)) {
+            // This is far cheaper, and so long as our distances are at least a couple metres, the floating-point
+            //      issues shouldn't arise.
+            Delta_sigma = acos( sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * cos_Delta_lon );
+        } else {
+            // If desired, use the more expensive distance calculator
+            double numer, denom;
+            numer =   pow(                                    cos_lat2 * sin(Delta_lon), 2 ) 
+                    + pow( cos_lat1 * sin_lat2  -  sin_lat1 * cos_lat2 * cos_Delta_lon , 2 );
+            numer =  sqrt(numer);
 
-        Delta_sigma = atan2(numer, denom);
+            denom =        sin_lat1 * sin_lat2  +  cos_lat1 * cos_lat2 * cos_Delta_lon ;
 
+            Delta_sigma = atan2(numer, denom);
+        }
         distance = constants::R_earth * Delta_sigma;
 
     }
 
-    #if DEBUG >= 6
-    fprintf(stdout, "dist(lon1 = %.5g, lat1 = %.5g, lon2 = %.5g, lat2 = %.5g) = %.5g\n",
-            lon1, lat1, lon2, lat2, distance);
-    #endif
-
     return distance;
-
 }

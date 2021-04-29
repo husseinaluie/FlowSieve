@@ -43,6 +43,23 @@ namespace constants
     const double R_earth = 6371e3;
 
     /*!
+     * \param USE_HIGH_PRECISION_DISTANCE
+     * \brief If spatial resolution is very high on sphere (less than ~50 metres or so), 
+     * and high presision is needed in distance calculations, turn this on.
+     *
+     * The default spherical distance caluclation, spherical law of cosines, has floating point
+     * errors for small distances (a couple metres or so). However, so long as your grid is very high resolution,
+     * this shouldn't be an issue. This is particularly true if: you are also using a continuous kernel and the filtering scales
+     * themselves also aren't very short (couple of metres or so).
+     *
+     * The test routine (Tests/distance_formulas.cpp) uses both methods on a specified grid and outputs the result.
+     * If you think you might need the high precision scheme, test it out there first.
+     *
+     * @ingroup constants
+     */
+    const bool USE_HIGH_PRECISION_DISTANCE = true;
+
+    /*!
      * \param rho0
      * \brief Mean fluid density
      * @ingroup constants
@@ -98,7 +115,7 @@ namespace constants
      * Note that this does NOT affect the shape of filtering kernels.
      * @ingroup constants
      */
-    const bool FILTER_OVER_LAND = false;
+    const bool FILTER_OVER_LAND = true;
 
     /*!
      * \param CARTESIAN
