@@ -50,7 +50,7 @@ double mask_func(const double lat, const double lon) {
     //double r_val = (double)rand() / RAND_MAX;
     //if (r_val > 0.995) { ret_val *= 0.; }
 
-    return ret_val;
+    return ret_val == 1.;
 }
 
 double true_deriv_lon(const double lat, const double lon) {
@@ -73,7 +73,7 @@ void apply_test(double & err2_lon, double & err2_lat,
         const std::vector<double> &latitude,
         const std::vector<double> &field,
         const std::vector<double> &dArea,
-        const std::vector<double> &mask,
+        const std::vector<bool>   &mask,
         const int Nlat, const int Nlon) {
 
     // Now compute the derivatives
@@ -136,13 +136,13 @@ void apply_test(double & err2_lon, double & err2_lat,
     size_t starts[4] = {0, 0, 0, 0};
     size_t counts[4] = {1, 1, size_t(Nlat), size_t(Nlon)};
 
-    write_field_to_output(field, "field", starts, counts, fname);
+    write_field_to_output(field, "field", starts, counts, fname, &mask);
 
-    write_field_to_output(numer_lon_deriv, "numer_lon_deriv", starts, counts, fname);
-    write_field_to_output(numer_lat_deriv, "numer_lat_deriv", starts, counts, fname);
+    write_field_to_output(numer_lon_deriv, "numer_lon_deriv", starts, counts, fname, &mask);
+    write_field_to_output(numer_lat_deriv, "numer_lat_deriv", starts, counts, fname, &mask);
 
-    write_field_to_output(true_lon_deriv, "true_lon_deriv", starts, counts, fname);
-    write_field_to_output(true_lat_deriv, "true_lat_deriv", starts, counts, fname);
+    write_field_to_output(true_lon_deriv, "true_lon_deriv", starts, counts, fname, &mask);
+    write_field_to_output(true_lat_deriv, "true_lat_deriv", starts, counts, fname, &mask);
     #endif
 
     // Now measure the error
@@ -158,7 +158,7 @@ void apply_test(double & err2_lon, double & err2_lat,
         for (int Ilon = 0; Ilon < Nlon; Ilon++) {
             index = Ilat * Nlon + Ilon;
 
-            if (mask.at(index) == 1) {
+            if (mask.at(index)) {
                 lon_true  = true_deriv_lon(latitude.at(Ilat), longitude.at(Ilon));
                 lon_numer = numer_lon_deriv.at(index);
 
@@ -197,9 +197,9 @@ int main(int argc, char *argv[]) {
     assert(wSize==1);
 
     // Only if we're not set on a Cartesian grid
-    static_assert(!constants::CARTESIAN);
-    static_assert(!constants::PERIODIC_Y);
-    static_assert( constants::PERIODIC_X);
+    static_assert(!constants::CARTESIAN, "Spherical only\n");
+    static_assert(!constants::PERIODIC_Y, "Not periodic in y\n");
+    static_assert( constants::PERIODIC_X, "Periodic in x\n");
 
     const int num_tests = 8;
     const int base_nlon = 32;
@@ -221,8 +221,8 @@ int main(int argc, char *argv[]) {
     double lon_min, lon_max, lat_min, lat_max, dlat, dlon;
     double lon2_err, lat2_err, loninf_err, latinf_err;
 
-    std::vector<double> longitude, latitude, dArea, 
-        mask, field;
+    std::vector<double> longitude, latitude, dArea, field;
+    std::vector<bool> mask;
 
     for (int test_ind = 0; test_ind < num_tests; test_ind++) {
 
@@ -261,8 +261,21 @@ int main(int argc, char *argv[]) {
         vars_to_write.push_back("numer_lat_deriv");
         char fname[50];
         snprintf(fname, 50, "test_%d_%d.nc", Nlat, Nlon);
-        initialize_output_file(times, depth, longitude, latitude, mask,
-                vars_to_write, fname, 0.);
+
+        dataset output_data;
+        output_data.time      = times;
+        output_data.depth     = depth;
+        output_data.latitude  = latitude;
+        output_data.longitude = longitude;
+
+        output_data.Ntime   = times.size();
+        output_data.Ndepth  = depth.size();
+        output_data.Nlat    = latitude.size();
+        output_data.Nlon    = longitude.size();
+
+        output_data.compute_cell_areas();
+
+        initialize_output_file( output_data, vars_to_write, fname );
         #endif
 
         compute_areas(dArea, longitude, latitude);
