@@ -44,6 +44,21 @@ Various geographic regions of interest can be provided in a netcdf file.
 1. `--version`
  * Calling `./coarse_grain.x --version` prints a summary of the constants / variables used when compiling
 
+
+### Specifying Filtering Scales
+
+When specifying filtering scales, consider a wide sweep. It can also be beneficial to use logarithmically-spaced scales, for plotting purposes.
+Python can be helpful for this. For example, `numpy.logspace( np.log(50e3), np.log(2000e3), 10 )` would produce 10 logarithmically-spaced
+filter scales between 50km and 2000km.
+
+Hint: to print filter scales to only three significant digits, the `numpy.format_float_scientific` function can help.
+> import numpy
+> number_of_scales = 10
+> smallest_scale = 50e3
+> largest_scale  = 2000e3
+> scales = numpy.logspace( numpy.log(smallest_scale), numpy.log(largest_scale), number_of_scales )
+> [print( numpy.format_float_scientific( scale, precision = 2 ) ) for scale in scales]
+
 ---
 
 ## Known Issues
