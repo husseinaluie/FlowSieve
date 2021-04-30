@@ -6,6 +6,14 @@
 # Don't keep data files
 *.nc
 
+# Don't keep image files
+*.png
+*.pdf
+
+# Don't keep log files
+*.err
+*.log
+
 # Some nonesense that comes up on OS X
 *.DS_Store
 
