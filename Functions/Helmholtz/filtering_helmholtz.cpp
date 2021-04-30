@@ -47,6 +47,10 @@ void filtering_helmholtz(
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
 
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "\nEntered filtering_helmholtz\n\n"); }
+    #endif
+
     // If we've passed the DO_TIMING flag, then create some timing vars
     Timing_Records timing_records;
     double clock_on;
@@ -58,18 +62,18 @@ void filtering_helmholtz(
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf( stdout, "\nPreparing to apply %d filters to data with (MPI-local) sizes (%'d - %'d - %'d - %'d) \n", Nscales, Ntime, Ndepth, Nlat, Nlon ); }
+    #endif
+
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
     const unsigned int num_pts = Ntime * Ndepth * Nlat * Nlon;
     char fname [50];
     
     const int ndims = 4;
-    size_t starts[ndims] = {
-        size_t(myStarts.at(0)), size_t(myStarts.at(1)), 
-        size_t(myStarts.at(2)), size_t(myStarts.at(3))};
-    size_t counts[ndims] = {
-        size_t(Ntime), size_t(Ndepth), 
-        size_t(Nlat), size_t(Nlon)};
+    size_t starts[ndims] = { size_t(myStarts.at(0)), size_t(myStarts.at(1)), size_t(myStarts.at(2)), size_t(myStarts.at(3)) };
+    size_t counts[ndims] = { size_t(Ntime),          size_t(Ndepth),         size_t(Nlat),           size_t(Nlon)           };
     size_t index;
     std::vector<std::string> vars_to_write;
 
@@ -79,90 +83,93 @@ void filtering_helmholtz(
 
     std::vector<double> null_vector(0);
 
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "\nInitializing storage arrays.\n"); }
+    #endif
     std::vector<double> 
         // Arrays to store filtered Phi and Psi fields (potential, pseudo-potential)
-        coarse_F_tor(   num_pts, constants::fill_value ), 
-        coarse_F_pot(   num_pts, constants::fill_value ),
+        coarse_F_tor(   num_pts, 0. ),
+        coarse_F_pot(   num_pts, 0. ),
 
         // Original KE
-        KE_tor_orig(    num_pts, constants::fill_value ),
-        KE_pot_orig(    num_pts, constants::fill_value ),
-        KE_tot_orig(    num_pts, constants::fill_value ),
+        KE_tor_orig(    num_pts, 0. ),
+        KE_pot_orig(    num_pts, 0. ),
+        KE_tot_orig(    num_pts, 0. ),
 
         // Coarse KE (computed from velocities)
-        KE_tor_coarse(  num_pts, constants::fill_value ),
-        KE_pot_coarse(  num_pts, constants::fill_value ),
-        KE_tot_coarse(  num_pts, constants::fill_value ),
+        KE_tor_coarse(  num_pts, 0. ),
+        KE_pot_coarse(  num_pts, 0. ),
+        KE_tot_coarse(  num_pts, 0. ),
 
         // Fine KE ( tau(uu) = bar(uu) - bar(u)bar(u) )
-        KE_tor_fine(    num_pts, constants::fill_value ),
-        KE_pot_fine(    num_pts, constants::fill_value ),
-        KE_tot_fine(    num_pts, constants::fill_value ),
+        KE_tor_fine(    num_pts, 0. ),
+        KE_pot_fine(    num_pts, 0. ),
+        KE_tot_fine(    num_pts, 0. ),
 
         // Fine KE modified ( uu - bar(u)bar(u) )
-        KE_tor_fine_mod(    num_pts, constants::fill_value ),
-        KE_pot_fine_mod(    num_pts, constants::fill_value ),
-        KE_tot_fine_mod(    num_pts, constants::fill_value ),
+        KE_tor_fine_mod(    num_pts, 0. ),
+        KE_pot_fine_mod(    num_pts, 0. ),
+        KE_tot_fine_mod(    num_pts, 0. ),
 
         // Filtered KE (used to compute fine KE)
-        KE_tor_filt(    num_pts, constants::fill_value ),
-        KE_pot_filt(    num_pts, constants::fill_value ),
-        KE_tot_filt(    num_pts, constants::fill_value ),
+        KE_tor_filt(    num_pts, 0. ),
+        KE_pot_filt(    num_pts, 0. ),
+        KE_tot_filt(    num_pts, 0. ),
 
         // Enstrophy
-        Enst_tor(       num_pts, constants::fill_value ),
-        Enst_pot(       num_pts, constants::fill_value ),
-        Enst_tot(       num_pts, constants::fill_value ),
+        Enst_tor(       num_pts, 0. ),
+        Enst_pot(       num_pts, 0. ),
+        Enst_tot(       num_pts, 0. ),
 
         // Velocity divergences
-        div_tor(        num_pts, constants::fill_value ),
-        div_pot(        num_pts, constants::fill_value ),
-        div_tot(        num_pts, constants::fill_value ),
+        div_tor(        num_pts, 0. ),
+        div_pot(        num_pts, 0. ),
+        div_tot(        num_pts, 0. ),
 
         // Cartensian velocities
-        u_x_tor( num_pts, constants::fill_value ),
-        u_y_tor( num_pts, constants::fill_value ),
-        u_z_tor( num_pts, constants::fill_value ),
+        u_x_tor( num_pts, 0. ),
+        u_y_tor( num_pts, 0. ),
+        u_z_tor( num_pts, 0. ),
 
-        u_x_pot( num_pts, constants::fill_value ),
-        u_y_pot( num_pts, constants::fill_value ),
-        u_z_pot( num_pts, constants::fill_value ),
+        u_x_pot( num_pts, 0. ),
+        u_y_pot( num_pts, 0. ),
+        u_z_pot( num_pts, 0. ),
 
-        u_x_tot( num_pts, constants::fill_value ),
-        u_y_tot( num_pts, constants::fill_value ),
-        u_z_tot( num_pts, constants::fill_value ),
+        u_x_tot( num_pts, 0. ),
+        u_y_tot( num_pts, 0. ),
+        u_z_tot( num_pts, 0. ),
 
-        u_x_coarse( num_pts, constants::fill_value ),
-        u_y_coarse( num_pts, constants::fill_value ),
-        u_z_coarse( num_pts, constants::fill_value ),
+        u_x_coarse( num_pts, 0. ),
+        u_y_coarse( num_pts, 0. ),
+        u_z_coarse( num_pts, 0. ),
 
         //
         //// Diadic (Cartesian) velocity components
         //
 
         // tor
-        ux_ux_tor( num_pts, constants::fill_value ),
-        ux_uy_tor( num_pts, constants::fill_value ),
-        ux_uz_tor( num_pts, constants::fill_value ),
-        uy_uy_tor( num_pts, constants::fill_value ),
-        uy_uz_tor( num_pts, constants::fill_value ),
-        uz_uz_tor( num_pts, constants::fill_value ),
+        ux_ux_tor( num_pts, 0. ),
+        ux_uy_tor( num_pts, 0. ),
+        ux_uz_tor( num_pts, 0. ),
+        uy_uy_tor( num_pts, 0. ),
+        uy_uz_tor( num_pts, 0. ),
+        uz_uz_tor( num_pts, 0. ),
 
         // pot
-        ux_ux_pot( num_pts, constants::fill_value ),
-        ux_uy_pot( num_pts, constants::fill_value ),
-        ux_uz_pot( num_pts, constants::fill_value ),
-        uy_uy_pot( num_pts, constants::fill_value ),
-        uy_uz_pot( num_pts, constants::fill_value ),
-        uz_uz_pot( num_pts, constants::fill_value ),
+        ux_ux_pot( num_pts, 0. ),
+        ux_uy_pot( num_pts, 0. ),
+        ux_uz_pot( num_pts, 0. ),
+        uy_uy_pot( num_pts, 0. ),
+        uy_uz_pot( num_pts, 0. ),
+        uz_uz_pot( num_pts, 0. ),
 
         // tot
-        ux_ux_tot( num_pts, constants::fill_value ),
-        ux_uy_tot( num_pts, constants::fill_value ),
-        ux_uz_tot( num_pts, constants::fill_value ),
-        uy_uy_tot( num_pts, constants::fill_value ),
-        uy_uz_tot( num_pts, constants::fill_value ),
-        uz_uz_tot( num_pts, constants::fill_value ),
+        ux_ux_tot( num_pts, 0. ),
+        ux_uy_tot( num_pts, 0. ),
+        ux_uz_tot( num_pts, 0. ),
+        uy_uy_tot( num_pts, 0. ),
+        uy_uz_tot( num_pts, 0. ),
+        uz_uz_tot( num_pts, 0. ),
 
         //
         //// Spherical velocity components
@@ -172,41 +179,44 @@ void filtering_helmholtz(
         u_r_zero(       num_pts, 0.),
 
         // Spherical - zonal velocities
-        u_lon_tor(      num_pts, constants::fill_value ),
-        u_lon_pot(      num_pts, constants::fill_value ),
-        u_lon_tot(      num_pts, constants::fill_value ),
+        u_lon_tor(      num_pts, 0. ),
+        u_lon_pot(      num_pts, 0. ),
+        u_lon_tot(      num_pts, 0. ),
 
         // Spherical - meridional velocities
-        u_lat_tor(      num_pts, constants::fill_value ),
-        u_lat_pot(      num_pts, constants::fill_value ),
-        u_lat_tot(      num_pts, constants::fill_value ),
+        u_lat_tor(      num_pts, 0. ),
+        u_lat_pot(      num_pts, 0. ),
+        u_lat_tot(      num_pts, 0. ),
 
         // Vorticity (only r component)
-        vort_tor_r(     num_pts, constants::fill_value ),
-        vort_pot_r(     num_pts, constants::fill_value ),
-        vort_tot_r(     num_pts, constants::fill_value ),
+        vort_tor_r(     num_pts, 0. ),
+        vort_pot_r(     num_pts, 0. ),
+        vort_tot_r(     num_pts, 0. ),
 
         // Okubo-Weiss values
-        OkuboWeiss_tor( num_pts, constants::fill_value ),
-        OkuboWeiss_pot( num_pts, constants::fill_value ),
-        OkuboWeiss_tot( num_pts, constants::fill_value ),
+        OkuboWeiss_tor( num_pts, 0. ),
+        OkuboWeiss_pot( num_pts, 0. ),
+        OkuboWeiss_tot( num_pts, 0. ),
 
         // Pi
-        Pi_tor( num_pts, constants::fill_value ),
-        Pi_pot( num_pts, constants::fill_value ),
-        Pi_tot( num_pts, constants::fill_value );
+        Pi_tor( num_pts, 0. ),
+        Pi_pot( num_pts, 0. ),
+        Pi_tot( num_pts, 0. );
 
     //
     //// Compute original (unfiltered) KE
     //
      
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "\nExtracting velocities from Phi and Psi\n"); }
+    #endif
     // Get pot and tor velocities
-    toroidal_vel_from_F( u_lon_tor, u_lat_tor, F_toroidal,
-            longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+    toroidal_vel_from_F(  u_lon_tor, u_lat_tor, F_toroidal,  longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+    potential_vel_from_F( u_lon_pot, u_lat_pot, F_potential, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
 
-    potential_vel_from_F(u_lon_pot, u_lat_pot, F_potential,
-            longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
-
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "\nComputing KE of unfiltered velocities\n"); }
+    #endif
     #pragma omp parallel \
     default( none ) \
     shared( KE_tor_orig, KE_pot_orig, KE_tot_orig, mask, \
@@ -221,15 +231,25 @@ void filtering_helmholtz(
                 KE_tor_orig.at(index) = 0.5 * constants::rho0 * ( pow(u_lon_tor.at(index), 2.) + pow(u_lat_tor.at(index), 2.) );
                 KE_pot_orig.at(index) = 0.5 * constants::rho0 * ( pow(u_lon_pot.at(index), 2.) + pow(u_lat_pot.at(index), 2.) );
                 KE_tot_orig.at(index) = 0.5 * constants::rho0 * ( pow(u_lon_tot.at(index), 2.) + pow(u_lat_tot.at(index), 2.) );
+            } else {
+                KE_tor_orig.at(index) = 0.;
+                KE_pot_orig.at(index) = 0.;
+                KE_tot_orig.at(index) = 0.;
             }
         }
     }
 
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "\nGetting Cartesian velocity components\n"); }
+    #endif
     // Get Cartesian velocities, will need them for Pi
     vel_Spher_to_Cart( u_x_tor, u_y_tor, u_z_tor, u_r_zero, u_lon_tor, u_lat_tor, mask, time, depth, latitude, longitude );
     vel_Spher_to_Cart( u_x_pot, u_y_pot, u_z_pot, u_r_zero, u_lon_pot, u_lat_pot, mask, time, depth, latitude, longitude );
     vel_Spher_to_Cart( u_x_tot, u_y_tot, u_z_tot, u_r_zero, u_lon_tot, u_lat_tot, mask, time, depth, latitude, longitude );
 
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "\nFlagging variables for output\n"); }
+    #endif
     if (not(constants::NO_FULL_OUTPUTS)) {
         //
         // These variables are output unless full outputs are turned off
@@ -262,9 +282,11 @@ void filtering_helmholtz(
         vars_to_write.push_back("div_pot");
         vars_to_write.push_back("div_tot");
 
-        vars_to_write.push_back("OkuboWeiss_tor");
-        vars_to_write.push_back("OkuboWeiss_pot");
-        vars_to_write.push_back("OkuboWeiss_tot");
+        if (constants::DO_OKUBOWEISS_ANALYSIS) {
+            vars_to_write.push_back("OkuboWeiss_tor");
+            vars_to_write.push_back("OkuboWeiss_pot");
+            vars_to_write.push_back("OkuboWeiss_tot");
+        }
 
         vars_to_write.push_back("Pi_tor");
         vars_to_write.push_back("Pi_pot");
@@ -273,6 +295,14 @@ void filtering_helmholtz(
         vars_to_write.push_back("KE_tor_filt");
         vars_to_write.push_back("KE_pot_filt");
         vars_to_write.push_back("KE_tot_filt");
+
+        vars_to_write.push_back("Enstrophy_tor");
+        vars_to_write.push_back("Enstrophy_pot");
+        vars_to_write.push_back("Enstrophy_tot");
+
+        vars_to_write.push_back("vort_r_tor");
+        vars_to_write.push_back("vort_r_pot");
+        vars_to_write.push_back("vort_r_tot");
     }
 
     // Compute the kernal alpha value (for baroclinic transfers)
@@ -305,6 +335,9 @@ void filtering_helmholtz(
     //
     //// Set up post-processing variables
     //
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "\nFlagging variables for post-processing\n"); }
+    #endif
     std::vector<const std::vector<double>*> postprocess_fields_tor, postprocess_fields_pot, postprocess_fields_tot;
     std::vector<std::string> postprocess_names;
 
@@ -350,10 +383,12 @@ void filtering_helmholtz(
     postprocess_fields_pot.push_back( &u_lat_pot );
     postprocess_fields_tot.push_back( &u_lat_tot );
 
-    postprocess_names.push_back( "OkuboWeiss" );
-    postprocess_fields_tor.push_back( &OkuboWeiss_tor );
-    postprocess_fields_pot.push_back( &OkuboWeiss_pot );
-    postprocess_fields_tot.push_back( &OkuboWeiss_tot );
+    if (constants::DO_OKUBOWEISS_ANALYSIS) {
+        postprocess_names.push_back( "OkuboWeiss" );
+        postprocess_fields_tor.push_back( &OkuboWeiss_tor );
+        postprocess_fields_pot.push_back( &OkuboWeiss_pot );
+        postprocess_fields_tot.push_back( &OkuboWeiss_tot );
+    }
 
     postprocess_names.push_back( "Pi" );
     postprocess_fields_tor.push_back( &Pi_tor );
@@ -370,7 +405,7 @@ void filtering_helmholtz(
     //// Begin the main filtering loop
     //
     #if DEBUG>=1
-    if (wRank == 0) { fprintf(stdout, "Beginning main filtering loop.\n\n"); }
+    if (wRank == 0) { fprintf(stdout, "\nBeginning main filtering loop.\n\n"); }
     #endif
     for (int Iscale = 0; Iscale < Nscales; Iscale++) {
 
@@ -642,6 +677,12 @@ void filtering_helmholtz(
             write_field_to_output(div_tor, "div_tor", starts, counts, fname, &mask);
             write_field_to_output(div_pot, "div_pot", starts, counts, fname, &mask);
             write_field_to_output(div_tot, "div_tot", starts, counts, fname, &mask);
+
+            if (constants::DO_OKUBOWEISS_ANALYSIS) {
+                write_field_to_output(OkuboWeiss_tor, "OkuboWeiss_tor", starts, counts, fname, &mask);
+                write_field_to_output(OkuboWeiss_pot, "OkuboWeiss_pot", starts, counts, fname, &mask);
+                write_field_to_output(OkuboWeiss_tot, "OkuboWeiss_tot", starts, counts, fname, &mask);
+            }
         }
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
@@ -692,6 +733,14 @@ void filtering_helmholtz(
             write_field_to_output( KE_tor_fine_mod, "KE_tor_fine_mod", starts, counts, fname, &mask);
             write_field_to_output( KE_pot_fine_mod, "KE_pot_fine_mod", starts, counts, fname, &mask);
             write_field_to_output( KE_tot_fine_mod, "KE_tot_fine_mod", starts, counts, fname, &mask);
+
+            write_field_to_output( Enst_tor, "Enstrophy_tor", starts, counts, fname, &mask);
+            write_field_to_output( Enst_pot, "Enstrophy_pot", starts, counts, fname, &mask);
+            write_field_to_output( Enst_tot, "Enstrophy_tot", starts, counts, fname, &mask);
+
+            write_field_to_output( vort_tor_r, "vort_r_tor", starts, counts, fname, &mask);
+            write_field_to_output( vort_pot_r, "vort_r_pot", starts, counts, fname, &mask);
+            write_field_to_output( vort_tot_r, "vort_r_tot", starts, counts, fname, &mask);
         }
 
         // Compute Pi
@@ -740,6 +789,9 @@ void filtering_helmholtz(
             Apply_Postprocess_Routines(
                     source_data, postprocess_fields_tot, postprocess_names, OkuboWeiss_tot,
                     scales.at(Iscale), "postprocess_full");
+
+            if (wRank == 0) { fprintf(stdout, "Finished post-process routines\n"); }
+            fflush(stdout);
 
             if (constants::DO_TIMING) { 
                 timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess");
