@@ -57,9 +57,10 @@ void compute_vorticity_at_point(
         double ux_x, ux_y, ux_z,
                uy_x, uy_y, uy_z,
                uz_x, uz_y, uz_z;
-        std::vector<double*> x_deriv_vals {&ux_x, &uy_x, &uz_x};
-        std::vector<double*> y_deriv_vals {&ux_y, &uy_y, &uz_y};
-        std::vector<double*> z_deriv_vals {&ux_z, &uy_z, &uz_z};
+
+        std::vector<double*>    x_deriv_vals {&ux_x, &uy_x, &uz_x},
+                                y_deriv_vals {&ux_y, &uy_y, &uz_y},
+                                z_deriv_vals {&ux_z, &uy_z, &uz_z};
 
         Cart_derivatives_at_point(
            x_deriv_vals, y_deriv_vals,
@@ -83,11 +84,10 @@ void compute_vorticity_at_point(
         double ur_r,   ur_lon,   ur_lat, 
                ulon_r, ulon_lon, ulon_lat, 
                ulat_r, ulat_lon, ulat_lat;
-        double lat = latitude.at(Ilat);
 
-        std::vector<double*> lon_deriv_vals {&ulon_lon, &ulat_lon, &ur_lon};
-        std::vector<double*> lat_deriv_vals {&ulon_lat, &ulat_lat, &ur_lat};
-        std::vector<double*> r_deriv_vals   {&ulon_r,   &ulat_r,   &ur_r  };
+        std::vector<double*>    lon_deriv_vals {&ulon_lon, &ulat_lon, &ur_lon},
+                                lat_deriv_vals {&ulon_lat, &ulat_lat, &ur_lat},
+                                r_deriv_vals   {&ulon_r,   &ulat_r,   &ur_r  };
 
         spher_derivative_at_point(
                 lat_deriv_vals, deriv_fields,
@@ -103,31 +103,35 @@ void compute_vorticity_at_point(
                 Ntime, Ndepth, Nlat, Nlon,
                 mask);
 
-        const double cos_lat = cos(lat);
-        const double sin_lat = sin(lat);
-        const double tan_lat = tan(lat);
+        const double    lat       = latitude.at(Ilat),
+                        cos_lat   = cos(lat),
+                        sin_lat   = sin(lat),
+                        tan_lat   = tan(lat),
+                        u_r_loc   = u_r.at(index),
+                        u_lon_loc = u_lon.at(index),
+                        u_lat_loc = u_lat.at(index);
 
         //
         //// First, do vorticity
         //
-        vort_r_tmp   = ( ulat_lon - cos_lat * ulon_lat + sin_lat * u_lon.at(index) ) / ( constants::R_earth * cos_lat );
-        vort_lon_tmp = ( ur_lat - constants::R_earth * ulat_r - u_lat.at(index) ) / ( constants::R_earth );
-        vort_lat_tmp = ( cos_lat * u_lon.at(index) + constants::R_earth * cos_lat * ulon_r - ur_lon ) / ( constants::R_earth * cos_lat );
+        vort_r_tmp   = ( ulat_lon / cos_lat - ulon_lat + tan_lat * u_lon_loc )         / ( constants::R_earth );
+        vort_lon_tmp = ( ur_lat - constants::R_earth * ulat_r - u_lat_loc )            / ( constants::R_earth );
+        vort_lat_tmp = ( u_lon_loc + constants::R_earth * ulon_r - ur_lon / cos_lat )  / ( constants::R_earth );
 
         //
         //// Now the divergence
         //
-        div_tmp =   ( 2 * u_r.at(index) / constants::R_earth )
+        div_tmp =   ( 2 * u_r_loc / constants::R_earth )
                   + ( ur_r )
                   + ( ulon_lon / ( constants::R_earth * cos_lat ) )
                   + ( ulat_lat / constants::R_earth )
-                  - ( u_lat.at(index) * tan_lat / constants::R_earth );
+                  - ( u_lat_loc * tan_lat / constants::R_earth );
 
         //
         //// Now the Okubo-Weiss parameter
         //
-        const double s_n = ( cos_lat * ulon_lon - ulat_lat ) / constants::R_earth;
-        const double s_s = ( cos_lat * ulat_lon + ulon_lat ) / constants::R_earth;
+        const double    s_n = ( cos_lat * ulon_lon - ulat_lat ) / constants::R_earth,
+                        s_s = ( cos_lat * ulat_lon + ulon_lat ) / constants::R_earth;
         OkuboWeiss_tmp = pow(s_n, 2) + pow(s_s, 2) - pow(vort_r_tmp, 2);
 
     }
