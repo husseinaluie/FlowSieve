@@ -140,6 +140,7 @@ void read_var_from_file(
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }
     fflush(stdout);
+    if (num_dims == 4) { fprintf( stdout, " MPI rank %d has sizes:a %'zu %'zu %'zu %'zu\n", wRank, count[0], count[1], count[2], count[3] ); }
     #endif
 
     // Now resize the vector to the appropriate size
@@ -150,6 +151,9 @@ void read_var_from_file(
         retval = nc_get_vara_double(ncid, var_id, start, count, &var[0]);
         if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
     } else {
+        #if DEBUG >= 2
+        if (wRank == 0) { fprintf(stdout, "Data is large, so will read in chunks\n"); }
+        #endif
         // We can't read in more than 4 * 512^3 at a time, so break into chunks 
         //   right now we assume that splitting the first dimension is sufficient
         const unsigned int num_chunks = ceil( num_pts / ( 4 * pow(512,3) ) );
