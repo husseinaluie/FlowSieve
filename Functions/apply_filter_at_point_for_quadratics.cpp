@@ -95,6 +95,7 @@ void apply_filter_at_point_for_quadratics(
 
             area_index = Index(0,     0,      curr_lat, curr_lon,
                                Ntime, Ndepth, Nlat,     Nlon);
+            area = dAreas.at(area_index);
 
             if (local_kernel == NULL) {
                 if (constants::CARTESIAN) {
@@ -122,27 +123,26 @@ void apply_filter_at_point_for_quadratics(
             }
 
 
-            // If cell is water, or if we're not deforming around land, then include the cell area in the integral
-            mask_val = ( mask.at(index) or not(constants::DEFORM_AROUND_LAND) ) ? 1. : 0.;
-            area     = dAreas.at(area_index);
+            // If cell is water, or if we're not deforming around land, then include the cell area in the denominator
+            if ( mask.at(index) or not(constants::DEFORM_AROUND_LAND) ) {
+                kA_sum += kern * area;
+            }
 
-            local_weight = kern * area * mask_val;
-            kA_sum  += local_weight;
+            // If the cell is water, add to the numerator
+            if ( mask.at(index) ) {
+                local_weight = kern * area;
 
-            // If the cell is water, keep the value, otherwise zero it out
-            mask_val = mask.at(index) ? 1. : 0.;
+                u_x_loc = u_x.at(index);
+                u_y_loc = u_y.at(index);
+                u_z_loc = u_z.at(index);
 
-            u_x_loc = u_x.at(index);
-            u_y_loc = u_y.at(index);
-            u_z_loc = u_z.at(index);
-
-            uxux_tmp += u_x_loc * u_x_loc * local_weight;
-            uxuy_tmp += u_x_loc * u_y_loc * local_weight;
-            uxuz_tmp += u_x_loc * u_z_loc * local_weight;
-            uyuy_tmp += u_y_loc * u_y_loc * local_weight;
-            uyuz_tmp += u_y_loc * u_z_loc * local_weight;
-            uzuz_tmp += u_z_loc * u_z_loc * local_weight;
-
+                uxux_tmp += u_x_loc * u_x_loc * local_weight;
+                uxuy_tmp += u_x_loc * u_y_loc * local_weight;
+                uxuz_tmp += u_x_loc * u_z_loc * local_weight;
+                uyuy_tmp += u_y_loc * u_y_loc * local_weight;
+                uyuz_tmp += u_y_loc * u_z_loc * local_weight;
+                uzuz_tmp += u_z_loc * u_z_loc * local_weight;
+            }
         }
     }
 
