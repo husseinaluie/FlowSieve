@@ -33,6 +33,8 @@ eddy_scales = [ 250e3, 750e3, 3500e3 ]
 eddy_counts = [ 1e3,   3e2,   5e1 ]
 eddy_velocs = [ 0.2,   0.4,   0.1 ]
 
+u_lon_mean_value = 0.01
+
 
 # Function to compute distances on sphere
 def dist( lon0, lat0, LON = LON, LAT = LAT, R = 6371e3 ):
@@ -88,8 +90,8 @@ u_lat =   ddlon.dot( Psi.T ).T / ( 6371e3 * np.cos(LAT) )
 u_lon_mean = np.sum( u_lon * dAreas ) / np.sum( dAreas )
 u_lat_mean = np.sum( u_lat * dAreas ) / np.sum( dAreas )
 
-u_lon -= u_lon_mean
-u_lat -= u_lat_mean
+u_lon += - u_lon_mean + u_lon_mean_value
+u_lat += - u_lat_mean
 
 # Save flow to a file
 dtype_dim = np.float64
