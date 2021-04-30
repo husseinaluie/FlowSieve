@@ -95,8 +95,10 @@ void Apply_Postprocess_Routines(
     //// Region averages and standard deviations
     //
 
+    #if DEBUG >= 1
     if (wRank == 0) { fprintf(stdout, "  .. computing the average and std. dev. in each region\n"); }
     fflush(stdout);
+    #endif
 
     std::vector< std::vector< double > >
         field_averages(num_fields, std::vector<double>(Ntime * Ndepth * num_regions, 0.)), 
@@ -104,8 +106,10 @@ void Apply_Postprocess_Routines(
 
     compute_region_avg_and_std( field_averages, field_std_devs, source_data, postprocess_fields );
 
+    #if DEBUG >= 1
     if (wRank == 0) { fprintf(stdout, "  .. writing region averages and deviations\n"); }
     fflush(stdout);
+    #endif
 
     write_region_avg_and_std(
             field_averages, field_std_devs, vars_to_process, filename,
@@ -120,8 +124,10 @@ void Apply_Postprocess_Routines(
     if (constants::DO_OKUBOWEISS_ANALYSIS) {
         std::vector< double > OkuboWeiss_areas;
 
+        #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "  .. Applying Okubo-Weiss processing\n"); }
         fflush(stdout);
+        #endif
 
         std::vector< std::vector< double > > 
             field_averages_OW(num_fields, std::vector<double>(Ntime * Ndepth * N_Okubo * num_regions, 0.)), 
@@ -134,8 +140,10 @@ void Apply_Postprocess_Routines(
                 source_data, postprocess_fields, OkuboWeiss, OkuboWeiss_dim_vals, N_Okubo
                 );
 
+        #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "  .. writing Okubo results\n"); }
         fflush(stdout);
+        #endif
 
         write_region_avg_and_std_OkuboWeiss(
                 field_averages_OW, field_std_devs_OW, OkuboWeiss_areas,
@@ -184,8 +192,10 @@ void Apply_Postprocess_Routines(
         }
 
 
+        #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "  .. computing time-averages of fields\n"); }
         fflush(stdout);
+        #endif
 
         // Time-average the fields
         std::vector<std::vector<double>> time_average(num_fields), time_std_dev(num_fields);
