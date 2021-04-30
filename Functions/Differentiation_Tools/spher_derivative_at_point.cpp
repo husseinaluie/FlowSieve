@@ -69,29 +69,32 @@ void spher_derivative_at_point(
     int LB = Iref, lb;
     while (LB > LLB) {
 
+        // If we have enough points, stop
         if ( (Iref - LB) > diff_ord ) { break; }
        
-        lb = ( LB < 0 ) ? LB + Nref : LB ;
-        if (do_lon) { index = Index(0, 0, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
-        else        { index = Index(0, 0, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        // Check if the next point would be land
+        lb = ( ( LB - 1 ) % Nref + Nref ) % Nref;
+        if (do_lon) { index = Index(Itime, Idepth, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
+        else        { index = Index(Itime, Idepth, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
         
-        if ( not(mask.at(index)) ) { LB++; break; }
-
-        LB--;
+        if ( mask.at(index) )   { LB--;  }
+        else                    { break; }
     }
 
     // ub (lower case) will be the periodicity-adjusted value of UB 
     int UB = Iref, ub;
     while (UB < UUB) {
+
+        // If we have enough points, stop
         if ( (UB - Iref) > diff_ord ) { break; }
        
-        ub = ( UB > Nref - 1 ) ? UB - Nref : UB ;
-        if (do_lon) { index = Index(0, 0, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
-        else        { index = Index(0, 0, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        // Check if the next point would be land
+        ub = ( ( UB + 1 ) % Nref + Nref ) % Nref;
+        if (do_lon) { index = Index(Itime, Idepth, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
+        else        { index = Index(Itime, Idepth, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
-        if ( not(mask.at(index)) ) { UB--; break; }
-
-        UB++;
+        if ( mask.at(index) )   { UB++;  }
+        else                    { break; }
     }
 
     // NOTE
@@ -118,7 +121,7 @@ void spher_derivative_at_point(
             //   differentiation coefficients
             differentiation_vector(ddl, dl, Iref - LB, order_of_deriv, diff_ord);
         } else {
-            // We're on a non-uniform grid, so we can guarantee the
+            // We're on a non-uniform grid, so we can't guarantee the
             //   differentiation coefficients a priori, so we need
             //   to actually compute them now.
             // This will get expensive (or ugly...) for higher orders of accuracy.
@@ -128,14 +131,10 @@ void spher_derivative_at_point(
         for (int IND = LB; IND <= UB; IND++) {
 
             // Apply periodicity adjustment
-            if      (IND < 0    )   { ind = IND + Nref; }
-            else if (IND >= Nref)   { ind = IND - Nref; }
-            else                    { ind = IND; }
+            ind = ( IND % Nref + Nref ) % Nref;
 
-            if (do_lon) { index = Index(Itime, Idepth, Ilat, ind,  
-                                        Ntime, Ndepth, Nlat, Nlon); }
-            else        { index = Index(Itime, Idepth, ind,  Ilon, 
-                                        Ntime, Ndepth, Nlat, Nlon); }
+            if (do_lon) { index = Index(Itime, Idepth, Ilat, ind,  Ntime, Ndepth, Nlat, Nlon); }
+            else        { index = Index(Itime, Idepth, ind,  Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
             for (int ii = 0; ii < num_deriv; ii++) {
                 if (deriv_vals.at(ii) != NULL) {
