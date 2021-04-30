@@ -40,8 +40,8 @@ void potential_vel_from_F(
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < (int)F.size(); ++index) {
 
-            tmp_lon = constants::fill_value;
-            tmp_lat = constants::fill_value;
+            tmp_lon = 0.;
+            tmp_lat = 0.;
 
             if (mask.at(index)) { // Skip land areas
 
