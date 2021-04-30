@@ -70,11 +70,10 @@ void InputParser::getFilterScales( std::vector<double> &filter_scales, const std
 
     // Convert the strings into doubles
     #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "Filter scales (%zu) are: ", string_of_scales.size()); }
+    if (wRank == 0) { fprintf(stdout, "Filter scales (%zu) are: ", scales_as_strings.size()); }
     #endif
     filter_scales.resize( scales_as_strings.size() );
     for (size_t ii = 0; ii < scales_as_strings.size(); ++ii) {
-        //filter_scales.at(ii) = atof( scales_as_strings.at(ii).c_str() );
         filter_scales.at(ii) = strtod( scales_as_strings.at(ii).c_str(), NULL );
         if (filter_scales.at(ii) <= 0) {
             fprintf(stderr, 
