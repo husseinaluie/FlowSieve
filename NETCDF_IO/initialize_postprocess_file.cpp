@@ -89,11 +89,9 @@ void initialize_postprocess_file(
 
     if (not(constants::CARTESIAN)) {
         const double rad_to_degree = 180. / M_PI;
-        retval = nc_put_att_double(ncid, lon_varid, "scale_factor", 
-                NC_DOUBLE, 1, &rad_to_degree);
+        retval = nc_put_att_double(ncid, lon_varid, "scale_factor", NC_DOUBLE, 1, &rad_to_degree);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-        retval = nc_put_att_double(ncid, lat_varid, "scale_factor", 
-                NC_DOUBLE, 1, &rad_to_degree);
+        retval = nc_put_att_double(ncid, lat_varid, "scale_factor", NC_DOUBLE, 1, &rad_to_degree);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     }
 
@@ -152,11 +150,13 @@ void initialize_postprocess_file(
         }
 
         // time averages
-        const char* dim_names_time_ave[] = {"depth", "latitude", "longitude"};
-        const int ndims_time_ave = 3;
-        for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
-            add_var_to_file( int_vars.at(varInd)+"_time_average", dim_names_time_ave, ndims_time_ave, buffer);
-            //add_var_to_file(int_vars.at(varInd)+"_time_std_dev", dim_names_time_ave, ndims_time_ave, buffer);
+        if (constants::POSTPROCESS_DO_TIME_MEANS) {
+            const char* dim_names_time_ave[] = {"depth", "latitude", "longitude"};
+            const int ndims_time_ave = 3;
+            for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
+                add_var_to_file( int_vars.at(varInd)+"_time_average", dim_names_time_ave, ndims_time_ave, buffer);
+                //add_var_to_file(int_vars.at(varInd)+"_time_std_dev", dim_names_time_ave, ndims_time_ave, buffer);
+            }
         }
 
         // region averages : averaged over OkuboWeiss contours

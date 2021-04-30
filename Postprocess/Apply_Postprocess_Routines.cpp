@@ -50,44 +50,8 @@ void Apply_Postprocess_Routines(
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
-    //double dA, local_area;
     int Ilat, Ilon, Itime, Idepth;
     size_t index, area_index;
-
-    // Extract a common mask that determines what points are always masked.
-    //    Also keep a tally of how often a cell is masked
-    std::vector<bool> always_masked(   Ndepth * Nlat * Nlon, true );
-    std::vector<int>  mask_count(      Ndepth * Nlat * Nlon, 0 ),
-                      mask_count_loc(  Ndepth * Nlat * Nlon, 0 );
-
-    #pragma omp parallel default(none) \
-    private( index, area_index, Itime, Idepth, Ilat, Ilon ) \
-    shared( mask_count_loc, mask )
-    { 
-        #pragma omp for collapse(1) schedule(static)
-        for (index = 0; index < mask.size(); ++index) {
-            Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                             Ntime, Ndepth, Nlat, Nlon);
-
-            area_index = Index(0, Idepth, Ilat, Ilon,
-                               1, Ndepth, Nlat, Nlon);
-
-            // Add up the number of times a cell is water (not masked)
-            if ( mask.at(index) ) { mask_count_loc.at(area_index) = mask_count_loc.at(area_index) + 1; }
-        }
-    }
-    MPI_Allreduce( &(mask_count_loc[0]),
-                   &(mask_count[0]),
-                   Ndepth * Nlat * Nlon, MPI_INT, MPI_SUM, comm);
-
-    #pragma omp parallel default(none) \
-    private( index ) shared( mask_count, always_masked )
-    { 
-        #pragma omp for collapse(1) schedule(static)
-        for (index = 0; index < mask_count.size(); ++index) {
-            always_masked.at(index) = mask_count.at(index) == 0 ? true : false;
-        }
-    }
 
     //
     //// Start by initializing the postprocess file
@@ -153,11 +117,11 @@ void Apply_Postprocess_Routines(
     //// If we have OkuboWeiss data, then also do processing along OW contours
     //
 
-    if (wRank == 0) { fprintf(stdout, "  .. Applying Okubo-Weiss processing\n"); }
-    fflush(stdout);
+    if (constants::DO_OKUBOWEISS_ANALYSIS) {
+        std::vector< double > OkuboWeiss_areas;
 
-    std::vector< double > OkuboWeiss_areas;
-    if (do_OkuboWeiss) {
+        if (wRank == 0) { fprintf(stdout, "  .. Applying Okubo-Weiss processing\n"); }
+        fflush(stdout);
 
         std::vector< std::vector< double > > 
             field_averages_OW(num_fields, std::vector<double>(Ntime * Ndepth * N_Okubo * num_regions, 0.)), 
@@ -180,50 +144,77 @@ void Apply_Postprocess_Routines(
                 );
     }
 
+
     //
     //// Time averages
     //
+    if (constants::POSTPROCESS_DO_TIME_MEANS) {
 
-    if (wRank == 0) { fprintf(stdout, "  .. computing time-averages of fields\n"); }
-    fflush(stdout);
+        // Extract a common mask that determines what points are always masked.
+        //    Also keep a tally of how often a cell is masked
+        std::vector<bool>   always_masked(   Ndepth * Nlat * Nlon, true );
+        std::vector<int>    mask_count(      Ndepth * Nlat * Nlon, 0 ),
+                            mask_count_loc(  Ndepth * Nlat * Nlon, 0 );
 
-    // Time-average the fields
-    std::vector<std::vector<double>> time_average(num_fields), time_std_dev(num_fields);
-    int Ifield;
-    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-        time_average.at( Ifield ).resize( Ndepth * Nlat * Nlon, 0. );
-        time_std_dev.at( Ifield ).resize( Ndepth * Nlat * Nlon, 0. );
-    }
+        #pragma omp parallel default(none) \
+        private( index, area_index, Itime, Idepth, Ilat, Ilon ) \
+        shared( mask_count_loc, mask )
+        { 
+            #pragma omp for collapse(1) schedule(static)
+            for (index = 0; index < mask.size(); ++index) {
+                Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                        Ntime, Ndepth, Nlat, Nlon);
 
-    compute_time_avg_std(
-            time_average, time_std_dev, source_data, postprocess_fields,
-            mask_count, always_masked, full_Ntime
-            );
+                area_index = Index(0, Idepth, Ilat, Ilon,
+                        1, Ndepth, Nlat, Nlon);
 
-    // Write the time averages
-    //   dimension order: depth - lat - lon
-    const int Slat   = myStarts.at(2);
-    const int Slon   = myStarts.at(3);
+                // Add up the number of times a cell is water (not masked)
+                if ( mask.at(index) ) { mask_count_loc.at(area_index) = mask_count_loc.at(area_index) + 1; }
+            }
+        }
+        MPI_Allreduce( &(mask_count_loc[0]), &(mask_count[0]), Ndepth * Nlat * Nlon, MPI_INT, MPI_SUM, comm);
 
-    size_t start[3], count[3];
-    start[0] = Sdepth;
-    count[0] = Ndepth;
+        #pragma omp parallel default(none) \
+        private( index ) shared( mask_count, always_masked )
+        { 
+            #pragma omp for collapse(1) schedule(static)
+            for (index = 0; index < mask_count.size(); ++index) {
+                always_masked.at(index) = mask_count.at(index) == 0 ? true : false;
+            }
+        }
 
-    start[1] = Slat;
-    count[1] = Nlat;
 
-    start[2] = Slon;
-    count[2] = Nlon;
+        if (wRank == 0) { fprintf(stdout, "  .. computing time-averages of fields\n"); }
+        fflush(stdout);
 
-    for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
-        write_field_to_output( time_average.at(Ifield), vars_to_process.at(Ifield) + "_time_average", 
-                start, count, filename, &mask );
+        // Time-average the fields
+        std::vector<std::vector<double>> time_average(num_fields), time_std_dev(num_fields);
+        int Ifield;
+        for (Ifield = 0; Ifield < num_fields; ++Ifield) {
+            time_average.at( Ifield ).resize( Ndepth * Nlat * Nlon, 0. );
+            time_std_dev.at( Ifield ).resize( Ndepth * Nlat * Nlon, 0. );
+        }
 
-        /*
-        write_time_average_to_post(time_average.at(Ifield), vars_to_process.at(Ifield), 
-                "_time_average", start, count, filename, &mask);
-        write_time_average_to_post(time_std_dev.at(Ifield), vars_to_process.at(Ifield), 
-                "_time_std_dev", start, count, filename, &mask);
-        */
+        compute_time_avg_std( time_average, time_std_dev, source_data, postprocess_fields, mask_count, always_masked, full_Ntime );
+
+        // Write the time averages
+        //   dimension order: depth - lat - lon
+        const int   Slat = myStarts.at(2),
+                    Slon = myStarts.at(3);
+
+        size_t start[3], count[3];
+        start[0] = Sdepth;
+        count[0] = Ndepth;
+
+        start[1] = Slat;
+        count[1] = Nlat;
+
+        start[2] = Slon;
+        count[2] = Nlon;
+
+        for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
+            write_field_to_output( time_average.at(Ifield), vars_to_process.at(Ifield) + "_time_average", start, count, filename, &mask );
+            //write_field_to_output( time_std_dev.at(Ifield), vars_to_process.at(Ifield) + "_time_std_dev", start, count, filename, &mask );
+        }
     }
 }

@@ -251,6 +251,13 @@ namespace constants
     const bool APPLY_POSTPROCESS = true;
 
     /*!
+     * \param POSTPROCESS_DO_TIME_MEANS
+     * \brief Boolean indicating whether or not the postprocess routines should include time means (i.e. spatial maps)
+     * @ingroup constants
+     */
+    const bool POSTPROCESS_DO_TIME_MEANS = false;
+
+    /*!
      * \param KERNEL_OPT
      * \brief Integer flag indicating the choice of kernel
      *
