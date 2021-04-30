@@ -31,7 +31,9 @@ void add_attr_to_file(
         retval = nc_close(ncid);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
+        #if DEBUG >= 2
         fprintf(stdout, "  - added %s to %s -\n", varname, buffer);
+        #endif
     }
 
 }
