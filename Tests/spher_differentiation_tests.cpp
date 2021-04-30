@@ -21,36 +21,27 @@ double field_func(const double lat, const double lon) {
     return ret_val;
 }
 
-double mask_func(const double lat, const double lon) {
+bool mask_func(const double lat, const double lon) {
     // 1 indicates water, 0 indicates land
-    double ret_val = 1.;
+    bool ret_val = true;
     
     // Make a circular island, radius pi/6
     if ( sqrt( lat*lat + lon*lon ) < M_PI/6 ) {
-        ret_val *= 0.;
+        ret_val = false;
     }
 
     // Add a square island poking out in the corners
     // Essentially, just don't make the island too smooth
     if ( (fabs(lat) < M_PI/7) and (fabs(lon) < M_PI/7) ) {
-        ret_val *= 0.;
+        ret_val = false;
+    }
+
+    // Add a wide east-west rectangle that just out of all of it
+    if ( (fabs(lat) < M_PI/10) and (fabs(lon) < M_PI/4) ) {
+        ret_val = false;
     }
     
-    // Add some circular bits on the East and West ends of previous bit
-    double sm_r = M_PI / 12;
-    double lon_c = M_PI / 6 + 0.8 * sm_r;
-    if ( sqrt( lat*lat + (lon - lon_c)*(lon - lon_c) ) < sm_r ) {
-        ret_val *= 0.;
-    }
-    if ( sqrt( lat*lat + (lon + lon_c)*(lon + lon_c) ) < sm_r ) {
-        ret_val *= 0.;
-    }
-
-    // Randomly flip to make some noise
-    //double r_val = (double)rand() / RAND_MAX;
-    //if (r_val > 0.995) { ret_val *= 0.; }
-
-    return ret_val == 1.;
+    return ret_val;
 }
 
 double true_deriv_lon(const double lat, const double lon) {
