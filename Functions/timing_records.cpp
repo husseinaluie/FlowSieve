@@ -26,7 +26,7 @@ void Timing_Records::reset() {
 //
 //    If record_name does not map to a valid record,
 //    then create a new record for that name
-void Timing_Records::add_to_record( double delta, std::string record_name ) {
+void Timing_Records::add_to_record( const double delta, const std::string record_name ) {
     if (time_records.count(record_name) == 1) {
         // If the record already exists, add on to it
         time_records[record_name] += delta;
@@ -39,13 +39,13 @@ void Timing_Records::add_to_record( double delta, std::string record_name ) {
 // Print the results.
 //    Compute mean and standard deviations (across processors)
 //    and print the results. 
-void Timing_Records::print() {
+void Timing_Records::print() const{
 
     int wRank = -1, wSize = -1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
-    double time_val, mean_val, std_val, tmp;
+    double time_val, mean_val, std_val, tmp, total_time, total_variance;
     if (wRank == 0) {
         fprintf(stdout, "\n\n## Internal Timings : mean ( standard deviation )\n\n");
     }
@@ -54,20 +54,28 @@ void Timing_Records::print() {
         time_val = entry.second;
 
         // Get mean timing value
-        MPI_Allreduce( &time_val, &mean_val, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        //MPI_Allreduce( &time_val, &mean_val, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+        MPI_Reduce( &time_val, &mean_val, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD );
         mean_val = mean_val / wSize;
 
         // Get standard deviation timing value
         tmp = pow(time_val - mean_val, 2);
 
-        MPI_Allreduce( &tmp, &std_val, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        //MPI_Allreduce( &tmp, &std_val, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD );
+        MPI_Reduce( &tmp, &std_val, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD );
         std_val = pow(std_val, 0.5) / wSize;
+
+        // Also accumulate total values
+        total_time += mean_val;
+        total_variance += pow( std_val, 2.);
 
         // Print information
         if (wRank == 0) {
-            if (mean_val > 0) {
-                fprintf(stdout, "  %-35s : %8.6e ( %8.6e )\n", entry.first.c_str(), mean_val, std_val);
-            }
+            fprintf(stdout, "  %-35s : %8.4e ( %8.4e )\n", entry.first.c_str(), mean_val, std_val);
         }
+    }
+    if (wRank == 0) {
+        fprintf(stdout, " --------------------------------------- \n" );
+        fprintf(stdout, "  Total : %8.4e ( %8.4e )\n", total_time, sqrt( total_variance ) );
     }
 }

@@ -417,10 +417,10 @@ class Timing_Records {
          * @param delta a double indicating the amount of time to add to the record
          * @param record_name a string indicating which record should be updating
          */
-        void add_to_record(double delta, std::string record_name);
+        void add_to_record( const double delta, const std::string record_name );
 
         //! Print the timing information in a human-readable format.
-        void print();
+        void print() const;
 
     private:
         /*! Main dictionary for storing timings
