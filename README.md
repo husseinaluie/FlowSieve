@@ -53,10 +53,15 @@ filter scales between 50km and 2000km.
 
 Hint: to print filter scales to only three significant digits, the `numpy.format_float_scientific` function can help.
 > import numpy
+>
 > number_of_scales = 10
+> 
 > smallest_scale = 50e3
+> 
 > largest_scale  = 2000e3
+> 
 > scales = numpy.logspace( numpy.log(smallest_scale), numpy.log(largest_scale), number_of_scales )
+> 
 > [print( numpy.format_float_scientific( scale, precision = 2 ) ) for scale in scales]
 
 ---
