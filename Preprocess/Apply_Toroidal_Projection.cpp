@@ -90,9 +90,18 @@ void Apply_Toroidal_Projection(
         full_F(         u_lon.size(), 0. ),
         full_u_lon_tor( u_lon.size(), 0. ),
         full_u_lat_tor( u_lon.size(), 0. ),
-        full_div_tor(   u_lon.size(), 0. ),
-        full_RHS(       u_lon.size(), 0. ),
-        full_seed(      u_lon.size(), 0. );
+        full_seed(      u_lon.size(), 0. ),
+        full_div_tor,
+        full_RHS,
+        full_u_lon_seed,
+        full_u_lat_seed;
+
+    if (not(constants::MINIMAL_OUTPUT)) {
+        full_RHS.resize(        u_lon.size(), 0. );
+        full_u_lon_seed.resize( u_lon.size(), 0. );
+        full_u_lat_seed.resize( u_lon.size(), 0. );
+        full_div_tor.resize(    u_lon.size(), 0. );
+    }
 
     // alglib variables
     alglib::real_1d_array rhs;
@@ -268,8 +277,8 @@ void Apply_Toroidal_Projection(
                                 Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
             // Get velocity associated with seed F field
-            std::vector<double> 
-                u_lon_seed(Npts, 0.), u_lat_seed(Npts, 0.);
+
+            std::vector<double> u_lon_seed(Npts, 0.), u_lat_seed(Npts, 0.);
             toroidal_vel_from_F(u_lon_seed, u_lat_seed, F_seed, longitude, latitude,
                                 Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
@@ -283,6 +292,7 @@ void Apply_Toroidal_Projection(
             #pragma omp parallel \
             default(none) \
             shared( full_u_lon_tor, u_lon_tor, full_u_lat_tor, u_lat_tor, \
+                    full_u_lon_seed, full_u_lat_seed, u_lon_seed, u_lat_seed, \
                     full_div_tor, div_tor, full_F, F_vector, full_seed, F_seed, full_RHS, curl_term, \
                     Itime, Idepth ) \
             private( Ilat, Ilon, index, index_sub )
@@ -297,14 +307,17 @@ void Apply_Toroidal_Projection(
                                           1, 1, Nlat, Nlon);
 
                         // add the mean velocity back in
-                        full_u_lon_tor.at(index) =   u_lon_tor.at(index_sub) ;
-                        full_u_lat_tor.at(index) =   u_lat_tor.at(index_sub) ;
+                        full_u_lon_tor.at(index) = u_lon_tor.at(index_sub) ;
+                        full_u_lat_tor.at(index) = u_lat_tor.at(index_sub) ;
 
                         full_div_tor.at(  index) = div_tor.at(  index_sub);
                         full_F.at(        index) = F_vector.at( index_sub);
 
                         full_seed.at(index) = F_seed.at(   index_sub);
                         full_RHS.at( index) = curl_term.at(index_sub);
+
+                        full_u_lon_seed.at(index) = u_lon_seed.at(index_sub) ;
+                        full_u_lat_seed.at(index) = u_lat_seed.at(index_sub) ;
                     }
                 }
             }
@@ -350,6 +363,9 @@ void Apply_Toroidal_Projection(
 
     if (not(constants::MINIMAL_OUTPUT)) {
         vars_to_write.push_back("RHS");
+        vars_to_write.push_back("u_lon_seed");
+        vars_to_write.push_back("u_lat_seed");
+        vars_to_write.push_back("vel_div");
     }
 
     initialize_output_file( source_data, vars_to_write, output_fname.c_str(), -1);
@@ -361,7 +377,10 @@ void Apply_Toroidal_Projection(
     write_field_to_output(full_seed,       "F_seed",   starts, counts, output_fname.c_str(), &unmask);
 
     if (not(constants::MINIMAL_OUTPUT)) {
-        write_field_to_output(full_RHS,        "RHS",      starts, counts, output_fname.c_str(), &mask);
+        write_field_to_output(full_RHS,        "RHS",        starts, counts, output_fname.c_str(), &mask);
+        write_field_to_output(full_div_tor,    "vel_div",    starts, counts, output_fname.c_str(), &mask);
+        write_field_to_output(full_u_lon_seed, "u_lon_seed", starts, counts, output_fname.c_str(), &mask);
+        write_field_to_output(full_u_lat_seed, "u_lat_seed", starts, counts, output_fname.c_str(), &mask);
     }
 
     // Also write the mean velocity
