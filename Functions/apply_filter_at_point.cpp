@@ -71,8 +71,7 @@ void apply_filter_at_point(
         lat_at_curr = latitude.at(curr_lat);
 
         get_lon_bounds(LON_lb, LON_ub, longitude, Ilon, lat_at_ilat, lat_at_curr, scale);
-
-        for (int LON = LON_lb; LON < LON_ub; LON++) {
+        for (int LON = LON_lb; LON < LON_ub; LON++ ) {
 
             // Handle periodicity if necessary
             if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
@@ -89,11 +88,10 @@ void apply_filter_at_point(
                 //  NOTE: This is generally very inefficient. Better to compute
                 //        ahead of time
                 if (constants::CARTESIAN) {
-                    double dlat_m = latitude.at( 1) - latitude.at( 0);
-                    double dlon_m = longitude.at(1) - longitude.at(0);
                     dist = distance(longitude.at(Ilon),     lat_at_ilat,
                                     longitude.at(curr_lon), lat_at_curr,
-                                    dlon_m * Nlon, dlat_m * Nlat);
+                                    ( longitude.at(1) - longitude.at(0) ) * Nlon, 
+                                    ( latitude.at( 1) - latitude.at( 0) ) * Nlat);
                 } else {
                     dist = distance(longitude.at(Ilon),     lat_at_ilat,
                                     longitude.at(curr_lon), lat_at_curr);
@@ -126,7 +124,6 @@ void apply_filter_at_point(
                     tmp_vals.at(II) += loc_val * kern * area;
                 }
             }
-
         }
     }
 
