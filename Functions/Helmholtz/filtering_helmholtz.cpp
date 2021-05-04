@@ -409,6 +409,9 @@ void filtering_helmholtz(
     #endif
     for (int Iscale = 0; Iscale < Nscales; Iscale++) {
 
+        // Rest our timing records
+        timing_records.reset();
+
         // Create the output file
         snprintf(fname, 50, "filter_%.6gkm.nc", scales.at(Iscale)/1e3);
         if (not(constants::NO_FULL_OUTPUTS)) {
@@ -457,6 +460,8 @@ void filtering_helmholtz(
             filtered_vals.push_back(&F_pot_tmp);
             filtered_vals.push_back(&F_tor_tmp);
 
+            tid = omp_get_thread_num();
+
             #pragma omp for collapse(1) schedule(dynamic)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
 
@@ -468,19 +473,18 @@ void filtering_helmholtz(
                 // If our longitude grid is uniform, and spans the full periodic domain,
                 // then we can just compute it once and translate it at each lon index
                 if ( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) {
-                    if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+                    if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
                     std::fill(local_kernel.begin(), local_kernel.end(), 0);
                     compute_local_kernel(
                             local_kernel, scale, longitude, latitude,
                             Ilat, 0, Ntime, Ndepth, Nlat, Nlon,
                             LAT_lb, LAT_ub);
-                    if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_outer"); }
+                    if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_outer"); }
                 }
 
                 for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
                     #if DEBUG >= 0
-                    tid = omp_get_thread_num();
                     if ( (tid == 0) and (wRank == 0) ) {
                         // Every perc_base percent, print a dot, but only the first thread
                         if ( ((double)(Ilat*Nlon + Ilon + 1) / (Nlon*Nlat)) * 100 >= perc ) {
@@ -494,17 +498,17 @@ void filtering_helmholtz(
                     #endif
 
                     if ( not( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) ) {
-                        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+                        if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
                         // If we couldn't precompute the kernel earlier, then do it now
                         std::fill(local_kernel.begin(), local_kernel.end(), 0);
                         compute_local_kernel(
                                 local_kernel, scale, longitude, latitude,
                                 Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
                                 LAT_lb, LAT_ub);
-                        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_inner"); }
+                        if ( constants::DO_TIMING and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_inner"); }
                     }
 
-                    if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+                    if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
                     for (Itime = 0; Itime < Ntime; Itime++) {
                         for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
@@ -596,9 +600,7 @@ void filtering_helmholtz(
                             }  // end if(masked) block
                         }  // end for(depth) block
                     }  // end for(time) block
-                    if (constants::DO_TIMING) { 
-                        timing_records.add_to_record(MPI_Wtime() - clock_on, "Apply filtering");
-                    }
+                    if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Apply filtering"); }
                 }  // end for(longitude) block
             }  // end for(latitude) block
         }  // end pragma parallel block
@@ -775,8 +777,10 @@ void filtering_helmholtz(
             MPI_Barrier(MPI_COMM_WORLD);
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
 
+            #if DEBUG >= 1
             if (wRank == 0) { fprintf(stdout, "Beginning post-process routines\n"); }
             fflush(stdout);
+            #endif
 
             Apply_Postprocess_Routines(
                     source_data, postprocess_fields_tor, postprocess_names, OkuboWeiss_tor,
@@ -790,8 +794,10 @@ void filtering_helmholtz(
                     source_data, postprocess_fields_tot, postprocess_names, OkuboWeiss_tot,
                     scales.at(Iscale), "postprocess_full");
 
+            #if DEBUG >= 1
             if (wRank == 0) { fprintf(stdout, "Finished post-process routines\n"); }
             fflush(stdout);
+            #endif
 
             if (constants::DO_TIMING) { 
                 timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess");
