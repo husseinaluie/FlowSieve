@@ -86,9 +86,8 @@ void toroidal_curl_u_dot_er(
                         tmp =   dulat_dlon / cos(latitude.at(Ilat))
                               - dulon_dlat 
                               + u_lon.at(index) * tan(latitude.at(Ilat));
+                        tmp *= 1. / constants::R_earth;
                     }
-
-                    tmp *= 1. / constants::R_earth;
 
                     // If we have a seed, then subtract it off now
                     if ( not(seed == NULL) ) {
