@@ -6,7 +6,6 @@ import matplotlib.colors as colors
 
 from netCDF4 import Dataset
 
-from PlotTools import ScientificCbar
 from pyproj import Proj
 
 # Get the grid and apply a mapping projection
@@ -74,8 +73,11 @@ for kind in ['u_lon', 'u_lat', 'KE']:
     fine_tor,   fine_pot,   fine_src,   fine_proj,   fine_diff   = get_results( 'fine', kind )
 
     cmap = 'viridis' if (kind == 'KE') else 'bwr'
-    #norm = colors.LogNorm( vmin = fine_src.max() / 1e5, vmax = fine_src.max() ) if (kind == 'KE') else colors.Normalize( vmin = -1, vmax = 1 )
-    norm = colors.Normalize( vmin = -1, vmax = 1)
+    cv = np.max(np.abs(fine_src))
+    norm = colors.LogNorm( vmin = cv / 1e5, vmax = cv ) if (kind == 'KE') else colors.Normalize( vmin = -cv, vmax = cv )
+
+    cv_diff = max( np.max(np.abs( fine_diff ) ), np.max(np.abs( coarse_diff ) ) )
+    norm_diff = colors.LogNorm( vmin = cv_diff / 1e5, vmax = cv_diff ) if (kind == 'KE') else  colors.Normalize( vmin = -cv_diff, vmax = cv_diff )
 
     gridspec_props = dict(wspace = 0.075, hspace = 0.05, left = 0.05, right = 0.95, bottom = 0.05, top = 0.9)
 
@@ -87,17 +89,17 @@ for kind in ['u_lon', 'u_lat', 'KE']:
     qms[1,0] = axes[1,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_pot,  cmap = cmap, norm = norm )
     qms[2,0] = axes[2,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_proj, cmap = cmap, norm = norm )
     qms[3,0] = axes[3,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_src,  cmap = cmap, norm = norm )
-    qms[4,0] = axes[4,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_diff, cmap = cmap, norm = norm )
+    qms[4,0] = axes[4,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_diff, cmap = cmap, norm = norm_diff )
 
     qms[0,1] = axes[0,1].pcolormesh( Xp_fine, Yp_fine, fine_tor,  cmap = cmap, norm = norm )
     qms[1,1] = axes[1,1].pcolormesh( Xp_fine, Yp_fine, fine_pot,  cmap = cmap, norm = norm )
     qms[2,1] = axes[2,1].pcolormesh( Xp_fine, Yp_fine, fine_proj, cmap = cmap, norm = norm )
     qms[3,1] = axes[3,1].pcolormesh( Xp_fine, Yp_fine, fine_src,  cmap = cmap, norm = norm )
-    qms[4,1] = axes[4,1].pcolormesh( Xp_fine, Yp_fine, fine_diff, cmap = cmap, norm = norm )
+    qms[4,1] = axes[4,1].pcolormesh( Xp_fine, Yp_fine, fine_diff, cmap = cmap, norm = norm_diff )
 
 
-    cb = plt.colorbar( qms[0,0], ax = axes )
-    ScientificCbar(cb)
+    cb = plt.colorbar( qms[0,0], ax = axes[:-1,:] )
+    cb = plt.colorbar( qms[-1,0], ax = axes[-1,:] )
             
     for ax in axes.ravel():
         ax.set_xticklabels([])
@@ -118,7 +120,7 @@ for kind in ['u_lon', 'u_lat', 'KE']:
 
 
 
-fig, axes = plt.subplots( 3, 2, sharex = True, sharey = True, figsize = (6,5) )
+fig, axes = plt.subplots( 3, 2, sharex = True, sharey = True, figsize = (6,5), gridspec_kw = dict( left = 0.05, bottom = 0.05, top = 0.95, right = 0.95 ) )
 
 with Dataset('toroidal_projection.nc', 'r') as tor_set:
     F_tor       = tor_set['F'     ][0,0,:,:]
@@ -152,11 +154,11 @@ axes[0,0].set_ylabel('Coarse Result')
 axes[1,0].set_ylabel('Fine Seed')
 axes[2,0].set_ylabel('Fine Result')
 
+axes[0,0].set_title('Toroidal')
+axes[0,1].set_title('Potential')
+
 cb0 = plt.colorbar( qms[0,0], ax = axes[:,0] )
 cb1 = plt.colorbar( qms[0,1], ax = axes[:,1] )
-
-ScientificCbar(cb0)
-ScientificCbar(cb1)
 
 for ax in axes.ravel():
     ax.set_xticklabels([])
