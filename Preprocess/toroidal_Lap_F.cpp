@@ -82,15 +82,14 @@ void toroidal_Lap_F(
                     // If we're too close to the pole (less than 0.01 degrees), bad things happen
                     is_pole = std::fabs( std::fabs( latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 0.01;
 
-                    if ( not(is_pole) ) {
-                        tmp =     d2Fdlon2 / pow(cos(latitude.at(Ilat)), 2)
-                                - d1Fdlat1 * tan(latitude.at(Ilat));
-                                + d2Fdlat2;
-                    } else {
+                    if ( is_pole ) {
                         tmp = 0.;
+                    } else {
+                        tmp =     d2Fdlon2 / pow(cos(latitude.at(Ilat)), 2)
+                                - d1Fdlat1 * tan(latitude.at(Ilat))
+                                + d2Fdlat2;
+                        tmp *= 1. / pow(constants::R_earth, 2.);
                     }
-
-                    tmp *= 1. / pow(constants::R_earth, 2.);
 
                 }
                 out_arr.at(index) = tmp;
