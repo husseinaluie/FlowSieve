@@ -6,6 +6,9 @@ This tutorial shows how to use the Helmholtz projection code.
 Additionally, it uses a coarsen-refine approach that is very helpful for higher resolution settings.
 Multiple coarsenings can also be used, which can substantially speed up convergence on a high resolution grid.
 
+For instance, a 1/12 degree grid can be well projected in approximately 24 hours by using coarsened grids of 1 degree and 1/3 degree resolution.
+In constrast, several days / a few weeks of directly projecting the 1/12 degree grid is still likely to not have sufficienly captured the largest scales.
+
 The general idea
 1. coarsen the velocity field to a lower resolution
 2. compute the Helmholtz decomposition on the coarse data
@@ -15,17 +18,19 @@ The general idea
 This tutorial includes:
 - a python script to generate a sample dataset: `generate_data.py`
 - sample submit script for a SLURM-scheduled computing cluster: `submit_all_Helmholtz_steps.sh`
+- a python script to produce some plots of the results
 - this tutorial outline
 
 ## About the sample data
  
  - `generate_data.py` script creates a file (`velocity_sample.nc`) that contains zonal- and meridional- velocity components
- - full spherical domain, 0.5 degree resolution, points at poles removed
+ - full spherical domain, 0.5 degree resolution, polar 'continents'
  - velocity field is a collection of eddies of varying sizes, randomly placed throughout the globe
+ - non-zero mean zonal flow
 
 ## What to do
 
-Note: Steps 3-6 are all included in the sample submit script
+Note: After step 1, all of the subsequent steps are included in `submit_all_Helmholtz_steps.sh`
 
 1. Compile `Case_Files/toroidal_projection.x`, `Case_Files/potential_projection.x`, `Case_Files/coarsen_grid.x`, `Case_Files/refine_Helmholtz_seed.x` (see notes below) and copy into this directory.
 2. Create the sample dataset (`python generate_data.py`)
@@ -33,6 +38,7 @@ Note: Steps 3-6 are all included in the sample submit script
 4. Run the Helmholtz projection on the coarsen data
 5. Refine the coarse projection results to make a seed for the full resolution
 6. Run the Helmholtz projection on the full resolution data
+7. Run the python analysis script to make some plots of the projection
 
 
 ### Parallelization
@@ -47,7 +53,7 @@ As this example only has one point in time and depth, we cannot use more than on
 ### Openmp
 
 The Helmholtz decomposition routine has minimal OpenMP optimization (the free version of ALGLIB does not support it).
-In general, extra OpenMP threads has pretty low return.
+The other `for` loops (such as computing velocities, setting up the least squares problem, etc) are parellelized with OpenMP, but in general, extra OpenMP threads has pretty low return for the Helmholtz projection scripts.
 
 ### Notes when compiling
 
@@ -58,3 +64,4 @@ Make sure that the variables in `constants.hpp` are set appropraitely. These inc
 - The grid is uniform, and so `UNIFORM_LON_GRID` and `UNIFORM_LAT_GRID` should be set accordingly. However, these are strictly optimization flags, and d not impact the output.
 - `FULL_LON_SPAN = true`
 - `CAST_TO_SINGLE` and `CAST_TO_INT` simply modify the data type (i.e. precision) used to store the outputs, and can be set however you wish
+- `MINIMAL_OUTPUT = false` to get extra output variables

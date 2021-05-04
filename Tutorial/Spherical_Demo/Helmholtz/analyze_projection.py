@@ -74,7 +74,8 @@ for kind in ['u_lon', 'u_lat', 'KE']:
     fine_tor,   fine_pot,   fine_src,   fine_proj,   fine_diff   = get_results( 'fine', kind )
 
     cmap = 'viridis' if (kind == 'KE') else 'bwr'
-    norm = colors.LogNorm( vmin = fine_src.max() / 1e5, vmax = fine_src.max() ) if (kind == 'KE') else colors.Normalize( vmin = -1, vmax = 1 )
+    #norm = colors.LogNorm( vmin = fine_src.max() / 1e5, vmax = fine_src.max() ) if (kind == 'KE') else colors.Normalize( vmin = -1, vmax = 1 )
+    norm = colors.Normalize( vmin = -1, vmax = 1)
 
     gridspec_props = dict(wspace = 0.075, hspace = 0.05, left = 0.05, right = 0.95, bottom = 0.05, top = 0.9)
 

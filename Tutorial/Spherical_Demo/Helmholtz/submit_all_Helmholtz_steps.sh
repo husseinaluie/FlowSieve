@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --output=sim-%j.log 
 #SBATCH --error=sim-%j.err
-#SBATCH --time=00-00:20:00         # time (DD-HH:MM:SS)
+#SBATCH --time=00-00:40:00         # time (DD-HH:MM:SS)
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=4G
@@ -14,7 +14,13 @@ export KMP_AFFINITY="compact"
 export I_MPI_PIN_DOMAIN="auto"
 
 ###
-##      First, extract a coarsened grid
+##      First, create the dataset
+###
+
+python generate_data_sphere.py
+
+###
+##      Then extract a coarsened grid
 ###
 
 mpirun -np ${SLURM_NTASKS} ./coarsen_grid.x \
@@ -41,7 +47,6 @@ mpirun -np ${SLURM_NTASKS} ./potential_projection.x \
     --output_file coarse_potential_projection.nc \
     --max_iterations 50000 \
     --tolerance 1e-12
-
 
 
 ###
@@ -80,3 +85,10 @@ mpirun -np ${SLURM_NTASKS} ./potential_projection.x \
     --output_file potential_projection.nc \
     --max_iterations 5000 \
     --tolerance 1e-8
+
+
+###
+##      Once that's all done, run the final analysis / plotting script 
+###
+
+python analyze_projection.py
