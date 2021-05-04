@@ -48,6 +48,11 @@ void dataset::load_region_definitions(
     retval = nc_inq_dim(ncid, dim_id, NULL, &num_regions);
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
     region_names.resize(num_regions);
+    #if DEBUG >= 1
+    if (wRank == 0) {
+        fprintf(stdout, "  %'zu regions to be read in\n", num_regions);
+    }
+    #endif
 
     int var_id;
     retval = nc_inq_varid(ncid, var_name.c_str(), &var_id );
