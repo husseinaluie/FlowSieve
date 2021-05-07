@@ -262,7 +262,8 @@ void compute_Pi(
         const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
         const std::vector<double> & longitude, 
         const std::vector<double> & latitude,
-        const std::vector<bool> & mask);
+        const std::vector<bool> & mask,
+        const MPI_Comm comm = MPI_COMM_WORLD);
 
 void compute_Lambda_rotational(
     std::vector<double> & Lambda_rot,

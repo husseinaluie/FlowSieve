@@ -17,6 +17,7 @@
  * @param[in]       Ntime,Ndepth,Nlat,Nlon          Size of dimensions (MPI-local sizes)
  * @param[in]       longitude,latitude              1D dimension vectors
  * @param[in]       mask                            2D array to distinguish land from water
+ * @param[in]       comm                            MPI communicator object
  *
  */
 void compute_Pi(
@@ -36,10 +37,19 @@ void compute_Pi(
         const int Nlon,
         const std::vector<double> & longitude,
         const std::vector<double> & latitude,
-        const std::vector<bool> & mask
+        const std::vector<bool> & mask,
+        const MPI_Comm comm
         ) {
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
+
+    #if DEBUG >= 2
+    int wRank, wSize;
+    MPI_Comm_rank( comm, &wRank );
+    MPI_Comm_size( comm, &wSize );
+
+    if (wRank == 0) { fprintf(stdout, "  Starting Pi computation.\n"); }
+    #endif
 
     double pi_tmp;
     int Itime, Idepth, Ilat, Ilon, ii, jj;
@@ -201,4 +211,7 @@ void compute_Pi(
             }
         }
     }
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "     ... done.\n"); }
+    #endif
 }
