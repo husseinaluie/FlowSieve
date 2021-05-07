@@ -62,7 +62,7 @@ Hint: to print filter scales to only three significant digits, the `numpy.format
 > 
 > scales = numpy.logspace( numpy.log(smallest_scale), numpy.log(largest_scale), number_of_scales )
 > 
-> [print( numpy.format_float_scientific( scale, precision = 2 ) ) for scale in scales]
+> [print( numpy.format_float_scientific( scale, precision = 2 ), end = ' ' ) for scale in scales]
 
 ---
 
