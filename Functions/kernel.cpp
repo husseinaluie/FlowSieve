@@ -28,12 +28,12 @@ double sinc(const double &x) {
  *
  */
 double kernel(
-        const double dist,  /**< [in] Distance as argument to the kernel */
-        const double scale  /**< [in] Filtering scale */
+        const double dist,
+        const double scale
         ) {
    
     double kern;
-    const double D = dist / ( scale / 2. );
+    const double D = ( scale > 0 ) ? ( dist / ( scale / 2. ) ) : ( dist == 0 ) ? 1. : 0.;
 
     switch (constants::KERNEL_OPT) {
         case 0: kern = D < 1 ? 1. : 0;
