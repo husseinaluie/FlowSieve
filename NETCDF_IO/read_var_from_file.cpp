@@ -63,6 +63,7 @@ void read_var_from_file(
     // This should return an error if the variable doesn't exist
     retval = nc_inq_var(ncid, var_id, NULL, NULL, NULL, NULL, NULL);
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    if (retval == NC_ENOTVAR ) { NC_ERR(NC_ENOTVAR, __LINE__, __FILE__); }
 
     // Get information about the variable
     retval = nc_inq_var(ncid, var_id, NULL, NULL, &num_dims, dim_ids, NULL );
