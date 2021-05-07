@@ -82,7 +82,14 @@ void InputParser::getFilterScales( std::vector<double> &filter_scales, const std
             assert(false);
         }
         #if DEBUG >= 1
-        if (wRank == 0) { fprintf(stdout, " %'g, ", filter_scales.at(ii)); }
+        if (wRank == 0) { 
+            double curr_scale = filter_scales.at(ii);
+            if ( curr_scale >= 1000. ) {
+                fprintf(stdout, " %'gkm, ", curr_scale / 1e3 ); 
+            } else {
+                fprintf(stdout, " %'gm, ",  curr_scale ); 
+            }
+        }
         #endif
     }
     #if DEBUG >= 1
