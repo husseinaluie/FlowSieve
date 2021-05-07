@@ -508,7 +508,6 @@ void filtering_helmholtz(
                         if ( constants::DO_TIMING and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_inner"); }
                     }
 
-                    if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
                     for (Itime = 0; Itime < Ntime; Itime++) {
                         for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
@@ -521,6 +520,7 @@ void filtering_helmholtz(
                             // The other stuff (KE, etc), will only be done on water cells
 
                             // Apply the filter at the point
+                            if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
                             apply_filter_at_point(
                                     filtered_vals, filter_fields,
                                     Ntime, Ndepth, Nlat, Nlon,
@@ -528,12 +528,14 @@ void filtering_helmholtz(
                                     longitude, latitude, LAT_lb, LAT_ub,
                                     dAreas, scale, mask, filt_use_mask,
                                     &local_kernel);
+                            if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_at_point"); }
 
                             // Store the filtered values in the appropriate arrays
                             coarse_F_pot.at(index) = F_pot_tmp;
                             coarse_F_tor.at(index) = F_tor_tmp;
 
                             if ( mask.at(index) ) {
+                                if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
 
                                 //
                                 //// Also get (uiuj)_bar from Cartesian velocities
@@ -596,11 +598,13 @@ void filtering_helmholtz(
 
                                 KE_tot_filt.at(index) = 0.5 * constants::rho0 * (uxux_tmp + uyuy_tmp + uzuz_tmp);
 
+                                if ( (constants::DO_TIMING) and (tid == 0) ) { 
+                                    timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_at_point_for_quadratics"); 
+                                }
 
                             }  // end if(masked) block
                         }  // end for(depth) block
                     }  // end for(time) block
-                    if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Apply filtering"); }
                 }  // end for(longitude) block
             }  // end for(latitude) block
         }  // end pragma parallel block
