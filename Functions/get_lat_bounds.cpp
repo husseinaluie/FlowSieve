@@ -23,13 +23,9 @@ void get_lat_bounds(
         const int Ilat,
         const double scale) {
 
-    const double dlat    = fabs(latitude.at( 1) - latitude.at( 0));
     const double KernPad = constants::KernPad;
     const double ref_lat = latitude.at(Ilat);
     const int    Nlat    = (int) latitude.size();
-
-    double dlat_m;
-    int dlat_N, tmp_lb, tmp_ub;
     
     if (KernPad < 0) {
         // KernPad < 0 means we use the entire domain, so don't bother
@@ -42,6 +38,10 @@ void get_lat_bounds(
             //      very expensive. So when the grid is uniform, we
             //      avoid extra calls to distance with the extra
             //      information that we have.
+
+            const double dlat = fabs(latitude.at( 1) - latitude.at( 0));
+            double dlat_m;
+            int dlat_N;
 
             // The spacing (in metres and points) betwee latitude gridpoints
             //   The factor of 2 is diameter->radius 
@@ -69,7 +69,7 @@ void get_lat_bounds(
             // Binary search for the first time comparison returns false
             //      on the interval [0, Ilat]
             //   Embedded lambda operator gives comparison
-            tmp_lb = 
+            int tmp_lb = 
                 std::lower_bound(
                         latitude.begin(), 
                         latitude.begin()+Ilat, 
@@ -85,7 +85,7 @@ void get_lat_bounds(
             // Binary search for the first time comparison returns false
             //      on the interval [Ilat, Nlat]
             //   Embedded lambda operator gives comparison
-            tmp_ub = 
+            int tmp_ub = 
                 std::lower_bound(
                         latitude.begin()+Ilat, 
                         latitude.end(), 

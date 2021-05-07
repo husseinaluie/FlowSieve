@@ -30,9 +30,6 @@ void get_lon_bounds(
     const double dlon    = longitude.at( 1) - longitude.at( 0);
     const double KernPad = constants::KernPad;
     const int    Nlon    = (int) longitude.size();
-
-    double dlon_m, delta_lat, local_scale, cosrat;
-    int dlon_N;
     
     if (KernPad < 0) {
         // KernPad < 0 means we use the entire domain, so don't bother
@@ -40,13 +37,11 @@ void get_lon_bounds(
         LON_lb = 0;
         LON_ub = Nlon;
     } else {
-        // On spherical coordinates, the distance calculator is
-        //      very expensive. So when the grid is uniform, we
-        //      avoid extra calls to distance with the extra
-        //      information that we have.
+        // This is how big of a 'circle' we actually want (i.e. padded out to capture kernel tapering)
+        const double padded_scale = KernPad * scale;
 
-        // The spacing (in metres and points) betwee longitude gridpoints
-        //   The factor of 2 is diameter->radius 
+        // The spacing (in metres) between longitude gridpoints at current latitude
+        double dlon_m;
         if (constants::CARTESIAN) { dlon_m = dlon; } 
         else                      { dlon_m = dlon * constants::R_earth * cos(curr_lat); }
 
@@ -56,33 +51,31 @@ void get_lon_bounds(
         // Essentially, use 'circular' integration regions, not square
         //    this will reduce the number of cells
         //    required, which should improve performance.
-        // The abs in local_scale is to handle the 'comfort zone'
-        //    where delta_lat > scale (from the KernPad factor in dlat_N)
+        double local_scale;
         if (constants::CARTESIAN) { 
-            delta_lat = centre_lat - curr_lat; 
             // Simply use Cartesian pythagorean
-            local_scale = sqrt( fabs( scale*scale - delta_lat*delta_lat ));
+            const double delta_lat = fabs( centre_lat - curr_lat ); 
+            const double square_diff = pow(padded_scale, 2.) - pow(delta_lat, 2.);
+            local_scale = sqrt( fmax( square_diff, 0. ) );
         }
         else { 
-            delta_lat = constants::R_earth * ( centre_lat - curr_lat ); 
             // Spherical law of cosines, simplified because we know
             //   that lines of longitude are perpendicular to
             //   lines of latitude
-            if ( delta_lat < scale ) { 
-                cosrat =   cos( scale     / constants::R_earth ) 
-                         / cos( delta_lat / constants::R_earth );
+            const double delta_lat = constants::R_earth * fabs( centre_lat - curr_lat ); 
+            if ( delta_lat < padded_scale ) { 
+                const double cosrat =   cos( padded_scale     / constants::R_earth ) 
+                                      / cos( delta_lat        / constants::R_earth );
+                local_scale = acos( cosrat ) * constants::R_earth;
             } else {
-                cosrat =   cos( delta_lat / constants::R_earth ) 
-                         / cos( scale     / constants::R_earth );
+                local_scale = 0.;
             }
-            local_scale = acos( cosrat ) * constants::R_earth;
         }
 
 
         // Now find the appropriate integration region
         //   The factor of 2 is diameter->radius 
-        dlon_N = ceil( ( KernPad * local_scale / dlon_m ) / 2.);
-        dlon_N = std::min(Nlon, dlon_N);
+        int dlon_N = std::min( Nlon, (int) ceil( ( local_scale / dlon_m ) / 2.) );
 
         if (constants::PERIODIC_X) {
             LON_lb = Ilon - dlon_N;
