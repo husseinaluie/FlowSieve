@@ -41,10 +41,6 @@ void compute_vorticity(
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
-    int wRank, wSize;
-    MPI_Comm_rank( comm, &wRank );
-    MPI_Comm_size( comm, &wSize );
-
     double vort_r_tmp, vort_lon_tmp, vort_lat_tmp, div_tmp, OkuboWeiss_tmp;
     int Itime, Idepth, Ilat, Ilon;
     size_t index; 
@@ -60,6 +56,10 @@ void compute_vorticity(
     const bool do_OkuboWeiss = OkuboWeiss.size() > 0;
 
     #if DEBUG >= 2
+    int wRank, wSize;
+    MPI_Comm_rank( comm, &wRank );
+    MPI_Comm_size( comm, &wSize );
+
     if (wRank == 0) { fprintf(stdout, "  Starting vorticity computation.\n"); }
     #endif
 
