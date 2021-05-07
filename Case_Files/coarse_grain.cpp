@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
             "Please update constants.hpp accordingly.");
 
     // Enable all floating point exceptions but FE_INEXACT
-    //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
+    feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
 
     // Specify the number of OpenMP threads
     //   and initialize the MPI world
