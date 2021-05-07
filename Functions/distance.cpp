@@ -31,6 +31,11 @@ double distance(
         const double Llat
         ) {
 
+    // If they're the same point, just return zero. Otherwise, might encounter
+    // some floating point issues in the inverse trigs (specifically the arccos call,
+    // since rounding might push the argument to be slightly larger than 1.)
+    if ( ( lon1 == lon2 ) and ( lat1 == lat2 ) ) { return 0.; }
+
     double distance;
 
     if (constants::CARTESIAN) {
@@ -49,22 +54,23 @@ double distance(
         // If not on a Cartesian grid, then we're on a spherical grid.
         //   Compute distances along great circles.
 
-        const double    Delta_lon       = lon2 - lon1,
-                        cos_lat2        = cos( lat2 ),
-                        sin_lat2        = sin( lat2 ),
-                        cos_lat1        = cos( lat1 ),
-                        sin_lat1        = sin( lat1 ),
-                        cos_Delta_lon   = cos( Delta_lon );
+        const long double   Delta_lon       = lon2 - lon1,
+                            cos_lat2        = cos( lat2 ),
+                            sin_lat2        = sin( lat2 ),
+                            cos_lat1        = cos( lat1 ),
+                            sin_lat1        = sin( lat1 ),
+                            cos_Delta_lon   = cos( Delta_lon );
+        // Since cos is even and cos(2pi - x) = cos(x), we don't need to worry about periodicity in computing Delta_lon for cos(Delta_lon)
+        //      for sin(Delta_lon), sin is odd and sin(2pi - x) = -sin(x), but since the result is being squared, it's not a concern either
 
-        double Delta_sigma;
+        long double Delta_sigma;
 
         if (not(constants::USE_HIGH_PRECISION_DISTANCE)) {
-            // This is far cheaper, and so long as our distances are at least a couple metres, the floating-point
-            //      issues shouldn't arise.
+            // This is cheaper, and so long as our distances are at least a couple metres, the floating-point issues shouldn't arise.
             Delta_sigma = acos( sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * cos_Delta_lon );
         } else {
             // If desired, use the more expensive distance calculator
-            double numer, denom;
+            long double numer, denom;
             numer =   pow(                                    cos_lat2 * sin(Delta_lon), 2 ) 
                     + pow( cos_lat1 * sin_lat2  -  sin_lat1 * cos_lat2 * cos_Delta_lon , 2 );
             numer =  sqrt(numer);
