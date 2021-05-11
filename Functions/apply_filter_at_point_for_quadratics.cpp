@@ -25,7 +25,7 @@
  * @param[in]       Itime,Idepth,Ilat,Ilon  current position in time dimension
  * @param[in]       LAT_lb,LAT_ub           lower/upper boundd on latitude for kernel
  * @param[in]       scale                   filtering scale
- * @param[in]       local_kernel            pointer to pre-computed kernel (NULL indicates not provided)
+ * @param[in]       local_kernel            pre-computed kernel (NULL indicates not provided)
  */
 void apply_filter_at_point_for_quadratics(
         double & uxux_tmp,
@@ -45,7 +45,7 @@ void apply_filter_at_point_for_quadratics(
         const int LAT_lb,
         const int LAT_ub,
         const double scale,
-        const std::vector<double> * local_kernel
+        const std::vector<double> & local_kernel
         ) {
 
 
@@ -93,44 +93,29 @@ void apply_filter_at_point_for_quadratics(
 
             index = Index(Itime, Idepth, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
 
-            if (local_kernel == NULL) {
-                fprintf( stderr, "Shouldn't actually be doing this anymore. Kernel should be precomputed.\n" );
-                assert(false);
-                if (constants::CARTESIAN) {
-                    double dlat_m = latitude.at( 1) - latitude.at( 0);
-                    double dlon_m = longitude.at(1) - longitude.at(0);
-                    dist = distance(longitude.at(Ilon),     lat_at_ilat,
-                                    longitude.at(curr_lon), lat_at_curr,
-                                    dlon_m * Nlon, dlat_m * Nlat);
-                } else {
-                    dist = distance(longitude.at(Ilon),     lat_at_ilat,
-                                    longitude.at(curr_lon), lat_at_curr);
-                }
-                kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
-                kern = kernel(dist, scale);
+            if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X ) ) {
+                // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
+                //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
+                kernel_index = Index(0, 0, curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon, Ntime, Ndepth, Nlat, Nlon);
             } else {
-                if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X ) ) {
-                    // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
-                    //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
-                    kernel_index = Index(0, 0, curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon, Ntime, Ndepth, Nlat, Nlon);
-                } else {
-                    kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
-                }
-                kern = local_kernel->at(kernel_index);
+                kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
             }
             #if DEBUG >= 1
+            kern = local_kernel.at(kernel_index);
             area = dAreas.at(kernel_index);
+            bool is_water = mask.at(index);
             #else
+            kern = local_kernel[kernel_index];
             area = dAreas[kernel_index];
+            bool is_water = mask[index];
             #endif
             local_weight = kern * area;
 
-
             // If cell is water, or if we're not deforming around land, then include the cell area in the denominator
-            if ( not(constants::DEFORM_AROUND_LAND) or mask.at(index) ) { kA_sum += local_weight; }
+            if ( not(constants::DEFORM_AROUND_LAND) or is_water ) { kA_sum += local_weight; }
 
             // If the cell is water, add to the numerator
-            if ( mask.at(index) ) {
+            if ( is_water ) {
                 #if DEBUG >= 1
                 u_x_loc = u_x.at(index);
                 u_y_loc = u_y.at(index);

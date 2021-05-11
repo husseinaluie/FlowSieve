@@ -467,7 +467,7 @@ void filtering(
                                 #endif
 
                                 apply_filter_at_point(  filtered_vals, filter_fields, source_data, Itime, Idepth, Ilat, Ilon,
-                                                        LAT_lb, LAT_ub, scale, filt_use_mask, &local_kernel );
+                                                        LAT_lb, LAT_ub, scale, filt_use_mask, local_kernel );
 
                                 // Convert the filtered fields back to spherical
                                 #if DEBUG >= 3
@@ -510,7 +510,7 @@ void filtering(
 
                                     apply_filter_at_point_for_quadratics(
                                             uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,
-                                            u_x, u_y, u_z, source_data, Itime, Idepth, Ilat, Ilon, LAT_lb, LAT_ub, scale, &local_kernel);
+                                            u_x, u_y, u_z, source_data, Itime, Idepth, Ilat, Ilon, LAT_lb, LAT_ub, scale, local_kernel);
 
                                     vel_Spher_to_Cart_at_point(
                                             u_x_tmp, u_y_tmp, u_z_tmp,
@@ -566,7 +566,7 @@ void filtering(
                                     // If we have rho, then also compute tilde fields
                                     //
                                     apply_filter_at_point(  tilde_vals, filter_fields, source_data, Itime, Idepth, Ilat, Ilon,
-                                                            LAT_lb, LAT_ub, scale, filt_use_mask, &local_kernel, &full_rho );
+                                                            LAT_lb, LAT_ub, scale, filt_use_mask, local_kernel, &full_rho );
 
                                     vel_Cart_to_Spher_at_point(
                                             u_r_tmp,    u_lon_tmp, u_lat_tmp,

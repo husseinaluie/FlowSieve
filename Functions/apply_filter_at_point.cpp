@@ -18,7 +18,7 @@
  * @param[in]       LAT_lb,LAT_ub           lower/upper boundd on latitude for kernel
  * @param[in]       scale                   filtering scale
  * @param[in]       use_mask                array of booleans indicating whether or not to use mask (i.e. zero out land) or to use the array value
- * @param[in]       local_kernel            pointer to pre-computed kernel (NULL indicates not provided)
+ * @param[in]       local_kernel            pre-computed kernel (NULL indicates not provided)
  * @param[in]       weight                  pointer to spatial weight (i.e. rho) (NULL indicates not provided)
  *
  */
@@ -34,7 +34,7 @@ void apply_filter_at_point(
         const int LAT_ub,
         const double scale,
         const std::vector<bool> & use_mask,
-        const std::vector<double> * local_kernel,
+        const std::vector<double> & local_kernel,
         const std::vector<double> * weight
         ) {
 
@@ -80,48 +80,31 @@ void apply_filter_at_point(
 
             index = Index(Itime, Idepth, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
 
-            if (local_kernel == NULL) {
-                fprintf( stderr, "Shouldn't actually be doing this anymore. Kernel should be precomputed.\n" );
-                assert(false);
-                // If no pre-computed kernel was provided, then compute it now.
-                //  NOTE: This is generally very inefficient. Better to compute
-                //        ahead of time
-                if (constants::CARTESIAN) {
-                    dist = distance(longitude.at(Ilon),     lat_at_ilat,
-                                    longitude.at(curr_lon), lat_at_curr,
-                                    ( longitude.at(1) - longitude.at(0) ) * Nlon, 
-                                    ( latitude.at( 1) - latitude.at( 0) ) * Nlat);
-                } else {
-                    dist = distance(longitude.at(Ilon),     lat_at_ilat,
-                                    longitude.at(curr_lon), lat_at_curr);
-                }
-                kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
-                kern = kernel(dist, scale);
+            size_t kernel_index;
+            if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X) ) {
+                // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
+                //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
+                kernel_index = Index(0, 0, curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon, Ntime, Ndepth, Nlat, Nlon);
             } else {
-                size_t kernel_index;
-                // If the kernel was provided, then just grab the appropraite point.
-                if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X) ) {
-                    // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
-                    //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
-                    kernel_index = Index(0, 0, curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon, Ntime, Ndepth, Nlat, Nlon);
-                } else {
-                    kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
-                }
-                kern = local_kernel->at(kernel_index);
+                kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
             }
             #if DEBUG >= 1
+            kern = local_kernel.at(kernel_index);
             area = dAreas.at(kernel_index);
+            bool is_water = mask.at(index);
             #else
+            kern = local_kernel[kernel_index];
             area = dAreas[kernel_index];
+            bool is_water = mask[index];
             #endif
             loc_weight = kern * area;
 
             // If cell is water, or if we're not deforming around land, then include the cell area in the denominator
-            if ( not(constants::DEFORM_AROUND_LAND) or mask.at(index) ) { kA_sum += loc_weight; }
+            if ( not(constants::DEFORM_AROUND_LAND) or is_water ) { kA_sum += loc_weight; }
 
             // If we are not using the mask, or if we are on a water cell, include the value in the numerator
             if (weight != NULL) { loc_weight *= weight->at(index); }
-            if ( mask.at(index) ) {
+            if ( is_water ) {
                 for (size_t II = 0; II < Nfields; ++II) {
                     #if DEBUG >= 1
                     loc_val = fields.at(II)->at(index);

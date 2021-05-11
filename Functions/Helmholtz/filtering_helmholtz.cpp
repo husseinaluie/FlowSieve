@@ -515,7 +515,7 @@ void filtering_helmholtz(
                             // Apply the filter at the point
                             if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
                             apply_filter_at_point(  filtered_vals, filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
-                                                    LAT_lb, LAT_ub, scale, filt_use_mask, &local_kernel );
+                                                    LAT_lb, LAT_ub, scale, filt_use_mask, local_kernel );
                             if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_at_point"); }
 
                             // Store the filtered values in the appropriate arrays
@@ -533,7 +533,7 @@ void filtering_helmholtz(
                                 apply_filter_at_point_for_quadratics(
                                         uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,
                                         u_x_tor,  u_y_tor,  u_z_tor, source_data, Itime, Idepth, Ilat, Ilon,
-                                        LAT_lb, LAT_ub, scale, &local_kernel);
+                                        LAT_lb, LAT_ub, scale, local_kernel);
 
                                 ux_ux_tor.at(index) = uxux_tmp;
                                 ux_uy_tor.at(index) = uxuy_tmp;
@@ -548,7 +548,7 @@ void filtering_helmholtz(
                                 apply_filter_at_point_for_quadratics(
                                         uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,
                                         u_x_pot,  u_y_pot,  u_z_pot, source_data, Itime, Idepth, Ilat, Ilon,
-                                        LAT_lb, LAT_ub, scale, &local_kernel);
+                                        LAT_lb, LAT_ub, scale, local_kernel);
 
                                 ux_ux_pot.at(index) = uxux_tmp;
                                 ux_uy_pot.at(index) = uxuy_tmp;
@@ -563,7 +563,7 @@ void filtering_helmholtz(
                                 apply_filter_at_point_for_quadratics(
                                         uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,
                                         u_x_tot,  u_y_tot,  u_z_tot, source_data, Itime, Idepth, Ilat, Ilon,
-                                        LAT_lb, LAT_ub, scale, &local_kernel);
+                                        LAT_lb, LAT_ub, scale, local_kernel);
 
                                 ux_ux_tot.at(index) = uxux_tmp;
                                 ux_uy_tot.at(index) = uxuy_tmp;
