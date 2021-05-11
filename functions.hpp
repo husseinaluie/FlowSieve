@@ -102,11 +102,8 @@ double distance(const double lon1,     const double lat1,
 void compute_local_kernel(
         std::vector<double> & local_kernel,
         const double scale,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
+        const dataset & source_data,
         const int Ilat,     const int Ilon,
-        const int Ntime,    const int Ndepth,
-        const int Nlat,     const int Nlon,
         const int LAT_lb,   const int LAT_ub);
 
 void KE_from_vels(
@@ -125,11 +122,7 @@ void vel_Spher_to_Cart(
             const std::vector<double> & u_r,
             const std::vector<double> & u_lon,
             const std::vector<double> & u_lat,
-            const std::vector<bool> & mask,
-            const std::vector<double> & time,
-            const std::vector<double> & depth,
-            const std::vector<double> & latitude,
-            const std::vector<double> & longitude
+            const dataset & source_data
             );
 
 void vel_Spher_to_Cart_at_point(
@@ -151,11 +144,7 @@ void vel_Cart_to_Spher(
             const std::vector<double> & u_x,
             const std::vector<double> & u_y,
             const std::vector<double> & u_z,
-            const std::vector<bool> & mask,
-            const std::vector<double> & time,
-            const std::vector<double> & depth,
-            const std::vector<double> & latitude,
-            const std::vector<double> & longitude
+            const dataset & source_data
             );
 
 
@@ -183,15 +172,11 @@ void filtering_helmholtz(
 void apply_filter_at_point(
         std::vector<double*> & coarse_val,   
         const std::vector<const std::vector<double>*> & fields,
-        const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
+        const dataset & source_data,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
-        const std::vector<double> & longitude, 
-        const std::vector<double> & latitude,
         const int LAT_lb,
         const int LAT_ub,
-        const std::vector<double> & dAreas, 
         const double scale,
-        const std::vector<bool> & mask,
         const std::vector<bool> & use_mask,
         const std::vector<double> * local_kernel,
         const std::vector<double> * weight = NULL
@@ -237,15 +222,11 @@ void apply_filter_at_point_for_quadratics(
         const std::vector<double> & u_x, 
         const std::vector<double> & u_y, 
         const std::vector<double> & u_z,
-        const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
+        const dataset & source_data,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
-        const std::vector<double> & longitude, 
-        const std::vector<double> & latitude,
         const int LAT_lb,
         const int LAT_ub,
-        const std::vector<double> & dAreas, 
         const double scale,
-        const std::vector<bool> & mask,
         const std::vector<double> * local_kernel);
 
 void compute_Pi(

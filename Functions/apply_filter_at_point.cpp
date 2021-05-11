@@ -13,13 +13,10 @@
  *
  * @param[in,out]   coarse_val              where to store filtered value
  * @param[in]       fields                  fields to filter
- * @param[in]       Ntime,Ndepth,Nlat,Nlon  length of time dimension
+ * @param[in]       source_data             dataset class instance containing data (Psi, Phi, etc)
  * @param[in]       Itime,Idepth,Ilat,Ilon  current position in time dimension
- * @param[in]       longitude,latitude      grid vectors (lon,lat)
  * @param[in]       LAT_lb,LAT_ub           lower/upper boundd on latitude for kernel
- * @param[in]       dAreas                  array of cell areas (2D - lat,lon)
  * @param[in]       scale                   filtering scale
- * @param[in]       mask                    array to distinguish land from water
  * @param[in]       use_mask                array of booleans indicating whether or not to use mask (i.e. zero out land) or to use the array value
  * @param[in]       local_kernel            pointer to pre-computed kernel (NULL indicates not provided)
  * @param[in]       weight                  pointer to spatial weight (i.e. rho) (NULL indicates not provided)
@@ -28,21 +25,14 @@
 void apply_filter_at_point(
         std::vector<double*> & coarse_vals,
         const std::vector<const std::vector<double>*> & fields,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
+        const dataset & source_data,
         const int Itime,
         const int Idepth,
         const int Ilat,
         const int Ilon,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
         const int LAT_lb,
         const int LAT_ub,
-        const std::vector<double> & dAreas,
         const double scale,
-        const std::vector<bool> & mask,
         const std::vector<bool> & use_mask,
         const std::vector<double> * local_kernel,
         const std::vector<double> * weight
@@ -51,8 +41,19 @@ void apply_filter_at_point(
     assert(coarse_vals.size() == fields.size());
     const size_t Nfields = fields.size();
 
-    double dist, kern, area, loc_val;
-    size_t index, area_index;
+    const std::vector<double>   &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude,
+                                &dAreas     = source_data.areas;
+
+    const std::vector<bool> &mask = source_data.mask;
+
+    const int   Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
+
+    double dist, kern, area, loc_val, loc_weight;
+    size_t index, kernel_index;
 
     double  kA_sum   = 0.,
             mask_val = 0.;
@@ -77,13 +78,11 @@ void apply_filter_at_point(
             if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
             else                       { curr_lon = LON; }
 
-            index = Index(Itime, Idepth, curr_lat, curr_lon,
-                          Ntime, Ndepth, Nlat,     Nlon);
-            area_index = Index(0,     0,      curr_lat, curr_lon,
-                               Ntime, Ndepth, Nlat,     Nlon);
-            area = dAreas.at(area_index);
+            index = Index(Itime, Idepth, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
 
             if (local_kernel == NULL) {
+                fprintf( stderr, "Shouldn't actually be doing this anymore. Kernel should be precomputed.\n" );
+                assert(false);
                 // If no pre-computed kernel was provided, then compute it now.
                 //  NOTE: This is generally very inefficient. Better to compute
                 //        ahead of time
@@ -96,32 +95,41 @@ void apply_filter_at_point(
                     dist = distance(longitude.at(Ilon),     lat_at_ilat,
                                     longitude.at(curr_lon), lat_at_curr);
                 }
+                kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
                 kern = kernel(dist, scale);
             } else {
                 size_t kernel_index;
                 // If the kernel was provided, then just grab the appropraite point.
-                if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X ) ) {
+                if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X) ) {
                     // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
                     //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
-                    kernel_index = Index(0,     0,      curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon,
-                                         Ntime, Ndepth, Nlat,     Nlon);
+                    kernel_index = Index(0, 0, curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon, Ntime, Ndepth, Nlat, Nlon);
                 } else {
-                    kernel_index = area_index;
+                    kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
                 }
                 kern = local_kernel->at(kernel_index);
             }
+            #if DEBUG >= 1
+            area = dAreas.at(kernel_index);
+            #else
+            area = dAreas[kernel_index];
+            #endif
+            loc_weight = kern * area;
 
             // If cell is water, or if we're not deforming around land, then include the cell area in the denominator
-            if ( mask.at(index) or not(constants::DEFORM_AROUND_LAND) ) {
-                kA_sum += kern * area;
-            }
+            if ( not(constants::DEFORM_AROUND_LAND) or mask.at(index) ) { kA_sum += loc_weight; }
 
-            for (size_t II = 0; II < Nfields; ++II) {
-                // If we are not using the mask, or if we are on a water cell, include the value in the numerator
-                if ( mask.at(index) ) {
+            // If we are not using the mask, or if we are on a water cell, include the value in the numerator
+            if (weight != NULL) { loc_weight *= weight->at(index); }
+            if ( mask.at(index) ) {
+                for (size_t II = 0; II < Nfields; ++II) {
+                    #if DEBUG >= 1
                     loc_val = fields.at(II)->at(index);
-                    if (weight != NULL) { loc_val *= weight->at(index); }
-                    tmp_vals.at(II) += loc_val * kern * area;
+                    tmp_vals.at(II) += loc_val * loc_weight;
+                    #else
+                    loc_val = fields[II]->at(index);
+                    tmp_vals[II] += loc_val * loc_weight;
+                    #endif
                 }
             }
         }
@@ -129,8 +137,6 @@ void apply_filter_at_point(
 
     // On the off chance that the kernel was null (size zero), just return zero
     for (size_t II = 0; II < Nfields; ++II) {
-        if (coarse_vals.at(II) != NULL) {
-            *(coarse_vals.at(II)) = (kA_sum == 0) ? 0. : tmp_vals.at(II) / kA_sum;
-        }
+        if (coarse_vals.at(II) != NULL) { *(coarse_vals.at(II)) = (kA_sum == 0) ? 0. : tmp_vals.at(II) / kA_sum; }
     }
 }

@@ -5,10 +5,9 @@
 /*!
  * \brief Wrapper that applies vel_Spher_to_Cart_at_point to every point in the domain.
  *
- * @param[in,out]   u_x,u_y,u_z                         Computed Cartesian velocities
- * @param[in]       u_r,u_lon,u_lat                     Spherical velocities to convert
- * @param[in]       mask                                differentiate land from water 
- * @param[in]       time, depth, latitude, longitude    grid vectors (1D)
+ * @param[in,out]   u_x,u_y,u_z         Computed Cartesian velocities
+ * @param[in]       u_r,u_lon,u_lat     Spherical velocities to convert
+ * @param[in]       source_data         dataset class instance containing data (Psi, Phi, etc)
  *
  */
 void vel_Spher_to_Cart(
@@ -18,22 +17,25 @@ void vel_Spher_to_Cart(
             const std::vector<double> & u_r,
             const std::vector<double> & u_lon,
             const std::vector<double> & u_lat,
-            const std::vector<bool> & mask,
-            const std::vector<double> & time,
-            const std::vector<double> & depth,
-            const std::vector<double> & latitude,
-            const std::vector<double> & longitude
+            const dataset & source_data
         ) {
+
+    const std::vector<double>   &time       = source_data.time,
+                                &depth      = source_data.depth,
+                                &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude;
+
+    const std::vector<bool> &mask = source_data.mask;
+
+    const int   Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
 
     size_t index;
     int Itime, Idepth, Ilat, Ilon;
 
-    const int Ntime  = time.size();
-    const int Ndepth = depth.size();
-    const int Nlat   = latitude.size();
-    const int Nlon   = longitude.size();
-
-    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
+    const int OMP_chunksize = get_omp_chunksize( Nlat, Nlon );
 
     if (constants::CARTESIAN) {
         u_x = u_lon;
@@ -41,15 +43,14 @@ void vel_Spher_to_Cart(
         u_z = u_r;
     } else {
         #pragma omp parallel default(none) \
-        private(Itime, Idepth, Ilat, Ilon, index) \
-        shared(u_x, u_y, u_z, u_r, u_lon, u_lat, longitude, latitude, mask)
+        private( Itime, Idepth, Ilat, Ilon, index ) \
+        shared( u_x, u_y, u_z, u_r, u_lon, u_lat, longitude, latitude, mask, source_data )
         {
             #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
             for (index = 0; index < u_lon.size(); ++index) {
 
                 if ( mask.at(index) ) { // Skip land areas
-                    Index1to4( index, Itime, Idepth, Ilat, Ilon,
-                                      Ntime, Ndepth, Nlat, Nlon );
+                    Index1to4( index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
 
                     vel_Spher_to_Cart_at_point(     
                             u_x.at(index), u_y.at(  index), u_z.at(  index),
@@ -59,5 +60,4 @@ void vel_Spher_to_Cart(
             }
         }
     }
-
 }

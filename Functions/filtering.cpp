@@ -102,9 +102,7 @@ void filtering(
     // Now convert the Spherical velocities to Cartesian
     //   (although we will still be on a spherical
     //     coordinate system)
-    vel_Spher_to_Cart(u_x, u_y, u_z,
-            full_u_r, full_u_lon, full_u_lat,
-            mask, time, depth, latitude, longitude);
+    vel_Spher_to_Cart( u_x, u_y, u_z, full_u_r, full_u_lon, full_u_lat, source_data );
 
     std::vector<double> full_KE(num_pts, 0.), KE_from_coarse_vel(num_pts, 0.);
     postprocess_names.push_back( "coarse_KE");
@@ -369,7 +367,7 @@ void filtering(
 
         #pragma omp parallel \
         default(none) \
-        shared(mask, u_x, u_y, u_z, stdout, \
+        shared( source_data, mask, u_x, u_y, u_z, stdout, \
                 filter_fields, filt_use_mask, \
                 timing_records, clock_on, \
                 longitude, latitude, dAreas, scale,\
@@ -425,8 +423,7 @@ void filtering(
                 for (Ilon = 0; Ilon < Nlon; Ilon++) {
 
                     get_lat_bounds(LAT_lb, LAT_ub, latitude,  Ilat, scale); 
-                    horiz_index = Index(0,     0,      Ilat, Ilon,
-                                        Ntime, Ndepth, Nlat, Nlon);
+                    horiz_index = Index(0, 0, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                     #if DEBUG >= 0
                     tid = omp_get_thread_num();
@@ -445,10 +442,7 @@ void filtering(
 
                     if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                     std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                    compute_local_kernel(
-                            local_kernel, scale, longitude, latitude,
-                            Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
-                            LAT_lb, LAT_ub);
+                    compute_local_kernel( local_kernel, scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
                     if (constants::DO_TIMING) { 
                         timing_records.add_to_record(MPI_Wtime() - clock_on,
                                 "kernel_precomputation");
@@ -458,8 +452,7 @@ void filtering(
                         for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
                             // Convert our four-index to a one-index
-                            index = Index(Itime, Idepth, Ilat, Ilon,
-                                          Ntime, Ndepth, Nlat, Nlon);
+                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                             if ( mask.at(index) ) { // Skip land areas
 
@@ -473,13 +466,8 @@ void filtering(
                                 fflush(stdout);
                                 #endif
 
-                                apply_filter_at_point(
-                                        filtered_vals, filter_fields,
-                                        Ntime, Ndepth, Nlat, Nlon,
-                                        Itime, Idepth, Ilat, Ilon,
-                                        longitude, latitude, LAT_lb, LAT_ub,
-                                        dAreas, scale, mask, filt_use_mask,
-                                        &local_kernel);
+                                apply_filter_at_point(  filtered_vals, filter_fields, source_data, Itime, Idepth, Ilat, Ilon,
+                                                        LAT_lb, LAT_ub, scale, filt_use_mask, &local_kernel );
 
                                 // Convert the filtered fields back to spherical
                                 #if DEBUG >= 3
@@ -521,13 +509,8 @@ void filtering(
                                 if (constants::COMP_TRANSFERS) {
 
                                     apply_filter_at_point_for_quadratics(
-                                            uxux_tmp, uxuy_tmp, uxuz_tmp,
-                                            uyuy_tmp, uyuz_tmp, uzuz_tmp,
-                                            u_x,      u_y,      u_z,
-                                            Ntime, Ndepth, Nlat, Nlon,
-                                            Itime, Idepth, Ilat, Ilon,
-                                            longitude, latitude, LAT_lb, LAT_ub,
-                                            dAreas, scale, mask, &local_kernel);
+                                            uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,
+                                            u_x, u_y, u_z, source_data, Itime, Idepth, Ilat, Ilon, LAT_lb, LAT_ub, scale, &local_kernel);
 
                                     vel_Spher_to_Cart_at_point(
                                             u_x_tmp, u_y_tmp, u_z_tmp,
@@ -582,13 +565,8 @@ void filtering(
                                     //
                                     // If we have rho, then also compute tilde fields
                                     //
-                                    apply_filter_at_point(
-                                            tilde_vals, filter_fields,
-                                            Ntime, Ndepth, Nlat, Nlon,
-                                            Itime, Idepth, Ilat, Ilon,
-                                            longitude, latitude, LAT_lb, LAT_ub,
-                                            dAreas, scale, mask, filt_use_mask,
-                                            &local_kernel, &full_rho);
+                                    apply_filter_at_point(  tilde_vals, filter_fields, source_data, Itime, Idepth, Ilat, Ilon,
+                                                            LAT_lb, LAT_ub, scale, filt_use_mask, &local_kernel, &full_rho );
 
                                     vel_Cart_to_Spher_at_point(
                                             u_r_tmp,    u_lon_tmp, u_lat_tmp,

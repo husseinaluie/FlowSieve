@@ -1,6 +1,7 @@
 #include <math.h>
 #include <algorithm>
 #include <vector>
+#include <cassert>
 #include "../functions.hpp"
 #include "../constants.hpp"
 
@@ -20,13 +21,10 @@
  * @param[in,out]   uyuz_tmp                where to store filtered (u_y)*(u_z)
  * @param[in,out]   uzuz_tmp                where to store filtered (u_z)*(u_z)
  * @param[in]       u_x,u_y,u_z             fields to filter
- * @param[in]       Ntime,Ndepth,Nlat,Nlon  length of time dimension
+ * @param[in]       source_data             dataset class instance containing data (Psi, Phi, etc)
  * @param[in]       Itime,Idepth,Ilat,Ilon  current position in time dimension
- * @param[in]       longitude,latitude      grid vectors (lon,lat)
  * @param[in]       LAT_lb,LAT_ub           lower/upper boundd on latitude for kernel
- * @param[in]       dAreas                  array of cell areas (2D - lat,lon)
  * @param[in]       scale                   filtering scale
- * @param[in]       mask                    array to distinguish land from water
  * @param[in]       local_kernel            pointer to pre-computed kernel (NULL indicates not provided)
  */
 void apply_filter_at_point_for_quadratics(
@@ -39,28 +37,32 @@ void apply_filter_at_point_for_quadratics(
         const std::vector<double> & u_x,
         const std::vector<double> & u_y,
         const std::vector<double> & u_z,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
+        const dataset & source_data,
         const int Itime,
         const int Idepth,
         const int Ilat,
         const int Ilon,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
         const int LAT_lb,
         const int LAT_ub,
-        const std::vector<double> & dAreas,
         const double scale,
-        const std::vector<bool>   & mask,
         const std::vector<double> * local_kernel
         ) {
 
 
     double  dist, kern, area, mask_val = 0, kA_sum = 0, local_weight,
             u_x_loc, u_y_loc, u_z_loc;
-    size_t index, area_index;
+    size_t index, kernel_index;
+
+    const std::vector<double>   &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude,
+                                &dAreas     = source_data.areas;
+
+    const std::vector<bool> &mask = source_data.mask;
+
+    const int   Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
 
     // Zero out the coarse values before we start accumulating (integrating) over space
     uxux_tmp = 0.;
@@ -81,8 +83,7 @@ void apply_filter_at_point_for_quadratics(
         else                       { curr_lat = LAT; }
         lat_at_curr = latitude.at(curr_lat);
 
-        get_lon_bounds(LON_lb, LON_ub, longitude, Ilon, 
-                lat_at_ilat, lat_at_curr, scale);
+        get_lon_bounds(LON_lb, LON_ub, longitude, Ilon, lat_at_ilat, lat_at_curr, scale);
 
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
@@ -90,14 +91,11 @@ void apply_filter_at_point_for_quadratics(
             if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
             else                       { curr_lon = LON; }
 
-            index = Index(Itime, Idepth, curr_lat, curr_lon,
-                          Ntime, Ndepth, Nlat,     Nlon);
-
-            area_index = Index(0,     0,      curr_lat, curr_lon,
-                               Ntime, Ndepth, Nlat,     Nlon);
-            area = dAreas.at(area_index);
+            index = Index(Itime, Idepth, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
 
             if (local_kernel == NULL) {
+                fprintf( stderr, "Shouldn't actually be doing this anymore. Kernel should be precomputed.\n" );
+                assert(false);
                 if (constants::CARTESIAN) {
                     double dlat_m = latitude.at( 1) - latitude.at( 0);
                     double dlon_m = longitude.at(1) - longitude.at(0);
@@ -108,33 +106,40 @@ void apply_filter_at_point_for_quadratics(
                     dist = distance(longitude.at(Ilon),     lat_at_ilat,
                                     longitude.at(curr_lon), lat_at_curr);
                 }
+                kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
                 kern = kernel(dist, scale);
             } else {
-                size_t kernel_index;
                 if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X ) ) {
                     // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
                     //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
-                    kernel_index = Index(0,     0,      curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon,
-                                         Ntime, Ndepth, Nlat,     Nlon);
+                    kernel_index = Index(0, 0, curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon, Ntime, Ndepth, Nlat, Nlon);
                 } else {
-                    kernel_index = area_index;
+                    kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
                 }
                 kern = local_kernel->at(kernel_index);
             }
+            #if DEBUG >= 1
+            area = dAreas.at(kernel_index);
+            #else
+            area = dAreas[kernel_index];
+            #endif
+            local_weight = kern * area;
 
 
             // If cell is water, or if we're not deforming around land, then include the cell area in the denominator
-            if ( mask.at(index) or not(constants::DEFORM_AROUND_LAND) ) {
-                kA_sum += kern * area;
-            }
+            if ( not(constants::DEFORM_AROUND_LAND) or mask.at(index) ) { kA_sum += local_weight; }
 
             // If the cell is water, add to the numerator
             if ( mask.at(index) ) {
-                local_weight = kern * area;
-
+                #if DEBUG >= 1
                 u_x_loc = u_x.at(index);
                 u_y_loc = u_y.at(index);
                 u_z_loc = u_z.at(index);
+                #else
+                u_x_loc = u_x[index];
+                u_y_loc = u_y[index];
+                u_z_loc = u_z[index];
+                #endif
 
                 uxux_tmp += u_x_loc * u_x_loc * local_weight;
                 uxuy_tmp += u_x_loc * u_y_loc * local_weight;

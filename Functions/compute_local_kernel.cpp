@@ -12,28 +12,30 @@
  *
  * LAT_lb and LAT_ub are the (pre-computed) latitudinal bounds for the kernel.
  *
- * @param[in,out]   local_kernel            where to store the local kernel
- * @param[in]       scale                   Filtering scale
- * @param[in]       longitude,latitude      grid vectors (1D)
- * @param[in]       Ilat,Ilon               reference coordinate (kernel centre)
- * @param[in]       Ntime,Ndepth,Nlat,Nlon  dimension sizes
- * @param[in]       LAT_lb,LAT_ub           upper and lower latitudinal bounds for kernel
+ * @param[in,out]   local_kernel        where to store the local kernel
+ * @param[in]       scale               Filtering scale
+ * @param[in]       source_data         dataset class instance containing data (Psi, Phi, etc)
+ * @param[in]       Ilat,Ilon           reference coordinate (kernel centre)
+ * @param[in]       LAT_lb,LAT_ub       upper and lower latitudinal bounds for kernel
  *
  */
 void compute_local_kernel(
         std::vector<double> & local_kernel,
         const double scale,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
+        const dataset & source_data,
         const int Ilat,
         const int Ilon,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
         const int LAT_lb,
         const int LAT_ub
         ){
+
+    const std::vector<double>   &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude;
+
+    const int   Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
 
     double dist, kern, dlat_m, dlon_m;
     size_t index;
@@ -59,8 +61,7 @@ void compute_local_kernel(
             if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
             else                       { curr_lon = LON; }
 
-            index = Index(0,     0,      curr_lat, curr_lon,
-                          Ntime, Ndepth, Nlat,     Nlon);
+            index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
 
             if (constants::CARTESIAN) {
                 dlat_m = latitude.at( 1) - latitude.at( 0);

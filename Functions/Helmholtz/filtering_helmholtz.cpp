@@ -243,9 +243,9 @@ void filtering_helmholtz(
     if (wRank == 0) { fprintf(stdout, "\nGetting Cartesian velocity components\n"); }
     #endif
     // Get Cartesian velocities, will need them for Pi
-    vel_Spher_to_Cart( u_x_tor, u_y_tor, u_z_tor, u_r_zero, u_lon_tor, u_lat_tor, mask, time, depth, latitude, longitude );
-    vel_Spher_to_Cart( u_x_pot, u_y_pot, u_z_pot, u_r_zero, u_lon_pot, u_lat_pot, mask, time, depth, latitude, longitude );
-    vel_Spher_to_Cart( u_x_tot, u_y_tot, u_z_tot, u_r_zero, u_lon_tot, u_lat_tot, mask, time, depth, latitude, longitude );
+    vel_Spher_to_Cart( u_x_tor, u_y_tor, u_z_tor, u_r_zero, u_lon_tor, u_lat_tor, source_data );
+    vel_Spher_to_Cart( u_x_pot, u_y_pot, u_z_pot, u_r_zero, u_lon_pot, u_lat_pot, source_data );
+    vel_Spher_to_Cart( u_x_tot, u_y_tot, u_z_tot, u_r_zero, u_lon_tot, u_lat_tot, source_data );
 
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\nFlagging variables for output\n"); }
@@ -438,7 +438,7 @@ void filtering_helmholtz(
 
         #pragma omp parallel \
         default(none) \
-        shared(mask, stdout, perc_base, \
+        shared( source_data, mask, stdout, perc_base, \
                 filter_fields, filt_use_mask, \
                 timing_records, clock_on, \
                 longitude, latitude, dAreas, scale, \
@@ -475,10 +475,7 @@ void filtering_helmholtz(
                 if ( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) {
                     if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
                     std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                    compute_local_kernel(
-                            local_kernel, scale, longitude, latitude,
-                            Ilat, 0, Ntime, Ndepth, Nlat, Nlon,
-                            LAT_lb, LAT_ub);
+                    compute_local_kernel( local_kernel, scale, source_data, Ilat, 0, LAT_lb, LAT_ub );
                     if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_outer"); }
                 }
 
@@ -501,10 +498,7 @@ void filtering_helmholtz(
                         if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
                         // If we couldn't precompute the kernel earlier, then do it now
                         std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                        compute_local_kernel(
-                                local_kernel, scale, longitude, latitude,
-                                Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
-                                LAT_lb, LAT_ub);
+                        compute_local_kernel( local_kernel, scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
                         if ( constants::DO_TIMING and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_inner"); }
                     }
 
@@ -512,8 +506,7 @@ void filtering_helmholtz(
                         for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
                             // Convert our four-index to a one-index
-                            index = Index(Itime, Idepth, Ilat, Ilon,
-                                          Ntime, Ndepth, Nlat, Nlon);
+                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                             // The F_tor and F_pot fields exist over land from the projection
                             //     procedure, so do those filtering operations on land as well.
@@ -521,13 +514,8 @@ void filtering_helmholtz(
 
                             // Apply the filter at the point
                             if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
-                            apply_filter_at_point(
-                                    filtered_vals, filter_fields,
-                                    Ntime, Ndepth, Nlat, Nlon,
-                                    Itime, Idepth, Ilat, Ilon,
-                                    longitude, latitude, LAT_lb, LAT_ub,
-                                    dAreas, scale, mask, filt_use_mask,
-                                    &local_kernel);
+                            apply_filter_at_point(  filtered_vals, filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
+                                                    LAT_lb, LAT_ub, scale, filt_use_mask, &local_kernel );
                             if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_at_point"); }
 
                             // Store the filtered values in the appropriate arrays
@@ -543,13 +531,9 @@ void filtering_helmholtz(
 
                                 // tor
                                 apply_filter_at_point_for_quadratics(
-                                        uxux_tmp, uxuy_tmp, uxuz_tmp,
-                                        uyuy_tmp, uyuz_tmp, uzuz_tmp,
-                                        u_x_tor,  u_y_tor,  u_z_tor,
-                                        Ntime, Ndepth, Nlat, Nlon,
-                                        Itime, Idepth, Ilat, Ilon,
-                                        longitude, latitude, LAT_lb, LAT_ub,
-                                        dAreas, scale, mask, &local_kernel);
+                                        uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,
+                                        u_x_tor,  u_y_tor,  u_z_tor, source_data, Itime, Idepth, Ilat, Ilon,
+                                        LAT_lb, LAT_ub, scale, &local_kernel);
 
                                 ux_ux_tor.at(index) = uxux_tmp;
                                 ux_uy_tor.at(index) = uxuy_tmp;
@@ -562,13 +546,9 @@ void filtering_helmholtz(
 
                                 // pot
                                 apply_filter_at_point_for_quadratics(
-                                        uxux_tmp, uxuy_tmp, uxuz_tmp,
-                                        uyuy_tmp, uyuz_tmp, uzuz_tmp,
-                                        u_x_pot,  u_y_pot,  u_z_pot,
-                                        Ntime, Ndepth, Nlat, Nlon,
-                                        Itime, Idepth, Ilat, Ilon,
-                                        longitude, latitude, LAT_lb, LAT_ub,
-                                        dAreas, scale, mask, &local_kernel);
+                                        uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,
+                                        u_x_pot,  u_y_pot,  u_z_pot, source_data, Itime, Idepth, Ilat, Ilon,
+                                        LAT_lb, LAT_ub, scale, &local_kernel);
 
                                 ux_ux_pot.at(index) = uxux_tmp;
                                 ux_uy_pot.at(index) = uxuy_tmp;
@@ -581,13 +561,9 @@ void filtering_helmholtz(
 
                                 // tot
                                 apply_filter_at_point_for_quadratics(
-                                        uxux_tmp, uxuy_tmp, uxuz_tmp,
-                                        uyuy_tmp, uyuz_tmp, uzuz_tmp,
-                                        u_x_tot,  u_y_tot,  u_z_tot,
-                                        Ntime, Ndepth, Nlat, Nlon,
-                                        Itime, Idepth, Ilat, Ilon,
-                                        longitude, latitude, LAT_lb, LAT_ub,
-                                        dAreas, scale, mask, &local_kernel);
+                                        uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,
+                                        u_x_tot,  u_y_tot,  u_z_tot, source_data, Itime, Idepth, Ilat, Ilon,
+                                        LAT_lb, LAT_ub, scale, &local_kernel);
 
                                 ux_ux_tot.at(index) = uxux_tmp;
                                 ux_uy_tot.at(index) = uxuy_tmp;
@@ -751,17 +727,17 @@ void filtering_helmholtz(
 
         // Compute Pi
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_tor, u_lat_tor, mask, time, depth, latitude, longitude );
+        vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_tor, u_lat_tor, source_data );
         compute_Pi( Pi_tor, u_x_coarse,  u_y_coarse,  u_z_coarse,
                     ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor,
                     Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
 
-        vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_pot, u_lat_pot, mask, time, depth, latitude, longitude );
+        vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_pot, u_lat_pot, source_data );
         compute_Pi( Pi_pot, u_x_coarse,  u_y_coarse,  u_z_coarse,
                     ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot,
                     Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
 
-        vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_tot, u_lat_tot, mask, time, depth, latitude, longitude );
+        vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_tot, u_lat_tot, source_data );
         compute_Pi( Pi_tot, u_x_coarse,  u_y_coarse,  u_z_coarse,
                     ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot,
                     Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
