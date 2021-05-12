@@ -1,3 +1,4 @@
+#include <fenv.h>
 #include <vector>
 #include <string>
 #include <mpi.h>
@@ -14,6 +15,10 @@ void write_field_to_output(
         const std::vector<bool> * mask,
         MPI_Comm comm
         ) {
+
+    // During writing, ignore floating point exceptions
+    std::fenv_t fe_env;
+    feholdexcept( &fe_env );
 
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
@@ -108,9 +113,7 @@ void write_field_to_output(
         #endif
 
         // Get the multiplicative scale factor. If it's extreme, then truncate it.
-        scale_factor = fabs( frange / max_val );
-        if (scale_factor < 1e-25) { scale_factor = 1.; }
-        if (scale_factor > 1e+15) { scale_factor = 1e+15; }
+        scale_factor = frange == 0. ? 1. : fabs( frange / max_val );
 
         #if DEBUG >= 2
         if (wRank == 0) { 
@@ -157,4 +160,6 @@ void write_field_to_output(
         fflush(stdout);
     }
     #endif
+
+    fesetenv( &fe_env );
 }
