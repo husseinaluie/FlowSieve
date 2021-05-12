@@ -11,7 +11,8 @@ void compute_region_avg_and_std(
         std::vector< std::vector< double > > & field_averages,
         std::vector< std::vector< double > > & field_std_devs,
         const dataset & source_data,
-        const std::vector<const std::vector<double>*> & postprocess_fields
+        const std::vector<const std::vector<double>*> & postprocess_fields,
+        const MPI_Comm comm
         ) {
 
     const int   Ntime   = source_data.Ntime,
@@ -29,7 +30,15 @@ void compute_region_avg_and_std(
     int Ifield, Iregion, Itime, Idepth, Ilat, Ilon;
     size_t int_index, area_index, index;
 
+    #if DEBUG >= 2
+    int wRank;
+    MPI_Comm_rank( comm, &wRank );
+    #endif
+
     for (Ifield = 0; Ifield < num_fields; ++Ifield) {
+        #if DEBUG >= 2
+        if (wRank == 0) { fprintf(stdout, "    processing field %d of %d means\n", Ifield + 1, num_fields); }
+        #endif
         for (Iregion = 0; Iregion < num_regions; ++Iregion) {
             for (Itime = 0; Itime < Ntime; ++Itime) {
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
@@ -41,7 +50,7 @@ void compute_region_avg_and_std(
                     shared( source_data, Ifield, Iregion, Itime, Idepth, int_index, postprocess_fields) \
                     reduction(+ : int_val)
                     { 
-                        #pragma omp for collapse(2) schedule(guided, chunk_size)
+                        #pragma omp for collapse(2) schedule(dynamic, chunk_size)
                         for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                             for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 
@@ -74,6 +83,9 @@ void compute_region_avg_and_std(
 
     // Now that we have region averages, get region standard deviations
     for (Ifield = 0; Ifield < num_fields; ++Ifield) {
+        #if DEBUG >= 2
+        if (wRank == 0) { fprintf(stdout, "    processing field %d of %d standard deviations\n", Ifield + 1, num_fields); }
+        #endif
         for (Iregion = 0; Iregion < num_regions; ++Iregion) {
             for (Itime = 0; Itime < Ntime; ++Itime) {
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
@@ -90,7 +102,7 @@ void compute_region_avg_and_std(
                             postprocess_fields, field_averages) \
                     reduction(+ : int_val)
                     { 
-                        #pragma omp for collapse(2) schedule(guided, chunk_size)
+                        #pragma omp for collapse(2) schedule(dynamic, chunk_size)
                         for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                             for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 

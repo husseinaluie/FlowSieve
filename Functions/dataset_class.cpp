@@ -94,8 +94,12 @@ void dataset::compute_region_areas() {
     const size_t num_regions = region_names.size();
     region_areas.resize( num_regions * Ntime * Ndepth );
 
+    #if DEBUG >= 2
     int wRank=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
+
+    if (wRank == 0) { fprintf(stdout, "  Computing geographic region areas\n"); }
+    #endif
 
     double local_area;
     size_t Ilat, Ilon, reg_index, index, area_index;
