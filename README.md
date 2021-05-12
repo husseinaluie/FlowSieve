@@ -48,7 +48,7 @@ Various geographic regions of interest can be provided in a netcdf file.
 ### Specifying Filtering Scales
 
 When specifying filtering scales, consider a wide sweep. It can also be beneficial to use logarithmically-spaced scales, for plotting purposes.
-Python can be helpful for this. For example, `numpy.logspace( np.log(50e3), np.log(2000e3), 10 )` would produce 10 logarithmically-spaced
+Python can be helpful for this. For example, `numpy.logspace( np.log10(50e3), np.log10(2000e3), 10 )` would produce 10 logarithmically-spaced
 filter scales between 50km and 2000km.
 
 Hint: to print filter scales to only three significant digits, the `numpy.format_float_scientific` function can help.
