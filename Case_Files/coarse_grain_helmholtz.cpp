@@ -133,6 +133,10 @@ int main(int argc, char *argv[]) {
     // Mask out the pole, if necessary (i.e. set lat = 90 to land)
     mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
 
+    // If we're using FILTER_OVER_LAND, then the mask has been wiped out. Load in a mask that still includes land references
+    //      so that we have both. Will be used to get 'water-only' region areas.
+    if (constants::FILTER_OVER_LAND) { read_mask_from_file( source_data.reference_mask, vel_field_var_name, vel_input_fname ); }
+
     // Read in the region definitions and compute region areas
     if ( check_file_existence( region_defs_fname ) ) {
         // If the file exists, then read in from that

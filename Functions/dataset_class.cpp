@@ -93,6 +93,7 @@ void dataset::compute_region_areas() {
     assert( areas.size() > 0 ); // must compute cell areas before computing region areas
     const size_t num_regions = region_names.size();
     region_areas.resize( num_regions * Ntime * Ndepth );
+    if (constants::FILTER_OVER_LAND) { region_areas_water_only.resize( region_areas.size() ); }
 
     #if DEBUG >= 2
     int wRank=-1;
@@ -101,7 +102,7 @@ void dataset::compute_region_areas() {
     if (wRank == 0) { fprintf(stdout, "  Computing geographic region areas\n"); }
     #endif
 
-    double local_area;
+    double local_area, local_area_water_only;
     size_t Ilat, Ilon, reg_index, index, area_index;
 
     const int chunk_size = get_omp_chunksize(Nlat, Nlon);
@@ -111,38 +112,47 @@ void dataset::compute_region_areas() {
             for (size_t Idepth = 0; Idepth < Ndepth; ++Idepth) {
 
                 local_area = 0.;
+                local_area_water_only = 0.;
 
                 #pragma omp parallel default(none)\
                 private( Ilat, Ilon, index, area_index )\
                 shared( mask, areas, Iregion, Itime, Idepth ) \
-                reduction(+ : local_area)
+                reduction(+ : local_area, local_area_water_only)
                 { 
                     #pragma omp for collapse(2) schedule(dynamic, chunk_size)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                         for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 
-                            index = Index(Itime, Idepth, Ilat, Ilon,
-                                          Ntime, Ndepth, Nlat, Nlon);
+                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                             if ( mask.at(index) ) { // Skip land areas
 
-                                area_index = Index(0, 0, Ilat, Ilon,
-                                                   1, 1, Nlat, Nlon);
+                                area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
 
                                 if ( regions.at( region_names.at( Iregion ) ).at(area_index) ) {
                                     local_area += areas.at(area_index); 
                                 }
                             }
+
+                            if (constants::FILTER_OVER_LAND) {
+                                if ( reference_mask.at(index) ) { // Skip land areas
+
+                                    area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
+
+                                    if ( regions.at( region_names.at( Iregion ) ).at(area_index) ) {
+                                        local_area_water_only += areas.at(area_index); 
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                reg_index = Index(0, Itime, Idepth, Iregion,
-                                  1, Ntime, Ndepth, num_regions);
+                reg_index = Index(0, Itime, Idepth, Iregion, 1, Ntime, Ndepth, num_regions);
 
                 region_areas.at(reg_index) = local_area;
+                if (constants::FILTER_OVER_LAND) { region_areas_water_only.at(reg_index) = local_area_water_only; }
                 
             }
         }
     }
-
 }

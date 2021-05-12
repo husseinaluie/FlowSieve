@@ -128,6 +128,10 @@ void initialize_postprocess_file(
     int reg_area_varid;
     retval = nc_def_var(ncid, "region_areas", NC_DOUBLE, 3, area_dims, &reg_area_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    if (constants::FILTER_OVER_LAND) {
+        retval = nc_def_var(ncid, "region_areas_water_only", NC_DOUBLE, 3, area_dims, &reg_area_varid);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    }
 
     // Close the file
     retval = nc_close(ncid);
@@ -177,7 +181,9 @@ void initialize_postprocess_file(
     add_attr_to_file("g",                                            constants::g,          filename);
     add_attr_to_file("differentiation_convergence_order",   (double) constants::DiffOrd,    filename);
     add_attr_to_file("KERNEL_OPT",                          (double) constants::KERNEL_OPT, filename);
-    add_attr_to_file("KernPad",                             (double) constants::KernPad,    filename);
+    if (constants::COMP_BC_TRANSFERS) {
+        add_attr_to_file("KernPad",                             (double) constants::KernPad,    filename);
+    }
 
     // Write region names - this has to be done separately for reasons
     write_regions_to_post( filename, source_data.region_names );
@@ -186,6 +192,10 @@ void initialize_postprocess_file(
     size_t start_r[] = { source_data.myStarts.at(0), source_data.myStarts.at(1),  0       }, 
            count_r[] = { source_data.Ntime,          source_data.Ndepth,          Nregion };
     write_field_to_output( source_data.region_areas, "region_areas", start_r, count_r, filename, NULL);
+
+    if (constants::FILTER_OVER_LAND) {
+        write_field_to_output( source_data.region_areas_water_only, "region_areas_water_only", start_r, count_r, filename, NULL);
+    }
 
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }
