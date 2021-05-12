@@ -142,10 +142,12 @@ void Apply_Toroidal_Projection(
     //
     //// Build the LHS part of the problem (Lap)
     //
+    #if DEBUG >= 1
     if (wRank == 0) {
         fprintf(stdout, "Building the LHS of the least squares problem.\n");
         fflush(stdout);
     }
+    #endif
 
     alglib::sparsematrix Lap;
     alglib::sparsecreate(Npts, Npts, Lap);
@@ -154,10 +156,12 @@ void Apply_Toroidal_Projection(
             Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask, dAreas, weight_err);
     alglib::sparseconverttocrs(Lap);
 
+    #if DEBUG >= 1
     if (wRank == 0) {
         fprintf(stdout, "Declaring the least squares problem.\n");
         fflush(stdout);
     }
+    #endif
     alglib::linlsqrcreate(Npts, Npts, state);
     alglib::linlsqrsetcond(state, rel_tol, rel_tol, max_iters);
 
@@ -188,10 +192,12 @@ void Apply_Toroidal_Projection(
             //
             //// Build the RHS of the problem (curl term)
             //
+            #if DEBUG >= 1
             if ( (wRank == 0) and (Itime == 0) ) {
                 fprintf(stdout, "Building the RHS of the least squares problem.\n");
                 fflush(stdout);
             }
+            #endif
 
             // Get Lap of computed F term
             //
@@ -231,10 +237,12 @@ void Apply_Toroidal_Projection(
             //
             //// Now apply the least-squares solver
             //
+            #if DEBUG >= 1
             if ( (wRank == 0) and (Itime == 0) ) {
                 fprintf(stdout, "Solving the least squares problem.\n");
                 fflush(stdout);
             }
+            #endif
             alglib::linlsqrsolvesparse(state, Lap, rhs);
             alglib::linlsqrresults(state, F_alglib, report);
 
@@ -261,6 +269,13 @@ void Apply_Toroidal_Projection(
                 * NMV countains number of matrix-vector calculations
             */
 
+            #if DEBUG >= 1
+            if ( (wRank == 0) and (Itime == 0) ) {
+                fprintf(stdout, " Done solving the least squares problem.\n");
+                fflush(stdout);
+            }
+            #endif
+
             // Extract the solution and add the seed back in
             F_array = F_alglib.getcontent();
             std::vector<double> F_vector(F_array, F_array + Npts);
@@ -269,6 +284,13 @@ void Apply_Toroidal_Projection(
             }
 
             // Get velocity associated to computed F field
+            #if DEBUG >= 1
+            if ( (wRank == 0) and (Itime == 0) ) {
+                fprintf(stdout, " Extracting velocities and divergence from toroidal field.\n");
+                fflush(stdout);
+            }
+            #endif
+
             std::vector<double> 
                 u_lon_tor(Npts, 0.), u_lat_tor(Npts, 0.), div_tor(Npts, 0.);
             toroidal_vel_from_F(u_lon_tor, u_lat_tor, F_vector, longitude, latitude,
@@ -277,18 +299,37 @@ void Apply_Toroidal_Projection(
                                 Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
             // Get velocity associated with seed F field
+            #if DEBUG >= 1
+            if ( (wRank == 0) and (Itime == 0) ) {
+                fprintf(stdout, " Extracting velocities and divergence from seed field.\n");
+                fflush(stdout);
+            }
+            #endif
 
             std::vector<double> u_lon_seed(Npts, 0.), u_lat_seed(Npts, 0.);
             toroidal_vel_from_F(u_lon_seed, u_lat_seed, F_seed, longitude, latitude,
                                 Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
             // Get Lap of computed F term
+            #if DEBUG >= 1
+            if ( (wRank == 0) and (Itime == 0) ) {
+                fprintf(stdout, " Computing the Laplacian of the toroidal field.\n");
+                fflush(stdout);
+            }
+            #endif
+
             toroidal_Lap_F(Lap_F_tor, F_vector, longitude, latitude,
                     Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
 
             //
             //// Store into the full arrays
             //
+            #if DEBUG >= 1
+            if ( (wRank == 0) and (Itime == 0) ) {
+                fprintf(stdout, " Storing values into output arrays\n");
+                fflush(stdout);
+            }
+            #endif
             #pragma omp parallel \
             default(none) \
             shared( full_u_lon_tor, u_lon_tor, full_u_lat_tor, u_lat_tor, \
@@ -310,14 +351,16 @@ void Apply_Toroidal_Projection(
                         full_u_lon_tor.at(index) = u_lon_tor.at(index_sub) ;
                         full_u_lat_tor.at(index) = u_lat_tor.at(index_sub) ;
 
-                        full_div_tor.at(  index) = div_tor.at(  index_sub);
-                        full_F.at(        index) = F_vector.at( index_sub);
-
+                        full_F.at(   index) = F_vector.at( index_sub);
                         full_seed.at(index) = F_seed.at(   index_sub);
-                        full_RHS.at( index) = curl_term.at(index_sub);
 
-                        full_u_lon_seed.at(index) = u_lon_seed.at(index_sub) ;
-                        full_u_lat_seed.at(index) = u_lat_seed.at(index_sub) ;
+                        if (not(constants::MINIMAL_OUTPUT)) {
+                            full_RHS.at(     index) = curl_term.at(index_sub);
+                            full_div_tor.at( index) = div_tor.at(  index_sub);
+
+                            full_u_lon_seed.at(index) = u_lon_seed.at(index_sub) ;
+                            full_u_lat_seed.at(index) = u_lat_seed.at(index_sub) ;
+                        }
                     }
                 }
             }
