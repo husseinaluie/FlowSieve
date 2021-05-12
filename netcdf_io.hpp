@@ -226,23 +226,6 @@ void write_regions_to_post(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
-/*!
- *  \brief Read a specific variable from a specific file.
- *
- *  Accounts for variable attributes 'scale_factor' and 'add_offset'.
- *
- *  If mask != NULL, then determine the mask based on variable attribute '_FillValue'
- *
- *  @param[in,out]  var         vector into which to store the loaded variable
- *  @param[in]      var_name    name of the variable to be read
- *  @param[in]      filename    name of the file from which to load the variable
- *  @param[in,out]  mask        point to where a mask array should be stored (if not NULL) (true = water, false = land)
- *  @param[in,out]  myCounts    the sizes of each dimension (on this MPI process) if not NULL
- *  @param[in,out]  myStarts    the starting index for each dimension, if not NULL
- *  @param[in]      do_splits   boolean indicating if the arrays should be split over MPI procs.
- *  @param[in]      comm        the MPI communicator world
- *
- */
 void read_var_from_file(
         std::vector<double> &var,
         const std::string & var_name,
@@ -250,6 +233,18 @@ void read_var_from_file(
         std::vector<bool> *mask = NULL,
         std::vector<int> *myCounts = NULL,
         std::vector<int> *myStarts = NULL,
+        const int Nprocs_in_time = 1,
+        const int Nprocs_in_depth = 1,
+        const bool do_splits = true,
+        const int force_split_dim = -1,
+        const double land_fill_value = 0.,
+        const MPI_Comm = MPI_COMM_WORLD 
+        );
+
+void read_mask_from_file(
+        std::vector<bool> &mask,
+        const std::string & var_name,
+        const std::string & filename,
         const int Nprocs_in_time = 1,
         const int Nprocs_in_depth = 1,
         const bool do_splits = true,
