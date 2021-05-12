@@ -43,10 +43,10 @@ class dataset {
         //    these are what will be used for the post-processing
         std::vector< std::string > region_names;
         std::map< std::string, std::vector<bool> > regions;
-        std::vector<double> region_areas;
+        std::vector<double> region_areas, region_areas_water_only;
 
         // Store mask data (i.e. land vs water)
-        std::vector<bool> mask;
+        std::vector<bool> mask, reference_mask;
 
         // Store data-chunking info. These keep track of the MPI divisions to ensure 
         // that the output is in the same order as the input.
@@ -217,31 +217,22 @@ void compute_vorticity(
         const MPI_Comm comm = MPI_COMM_WORLD);
 
 void apply_filter_at_point_for_quadratics(
-        double & uxux_tmp,   double & uxuy_tmp,   double & uxuz_tmp,
-        double & uyuy_tmp,   double & uyuz_tmp,   double & uzuz_tmp,
+        double & uxux_tmp,    double & uxuy_tmp,    double & uxuz_tmp,
+        double & uyuy_tmp,    double & uyuz_tmp,    double & uzuz_tmp,
+        double & vort_ux_tmp, double & vort_uy_tmp, double & vort_uz_tmp,
         const std::vector<double> & u_x, 
         const std::vector<double> & u_y, 
         const std::vector<double> & u_z,
+        const std::vector<double> & vort_r,
         const dataset & source_data,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
         const int LAT_lb, const int LAT_ub,
         const double scale,
         const std::vector<double> & local_kernel);
 
-void apply_filter_at_point_for_Vortquadratics(
-        double & vort_ux_tmp, double & vort_uy_tmp, double & vort_uz_tmp,
-        const std::vector<double> & u_x,
-        const std::vector<double> & u_y,
-        const std::vector<double> & u_z,
-        const std::vector<double> & vort_r,
-        const dataset & source_data,
-        const int Itime, const int Idepth, const int Ilat, const int Ilon,
-        const int LAT_lb, const int LAT_ub,
-        const double scale,
-        const std::vector<double> & local_kernel );
-
 void compute_Pi(
         std::vector<double> & energy_transfer,
+        const dataset & source_data,
         const std::vector<double> & ux,   
         const std::vector<double> & uy,   
         const std::vector<double> & uz,
@@ -251,14 +242,11 @@ void compute_Pi(
         const std::vector<double> & uyuy, 
         const std::vector<double> & uyuz, 
         const std::vector<double> & uzuz,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & longitude, 
-        const std::vector<double> & latitude,
-        const std::vector<bool> & mask,
         const MPI_Comm comm = MPI_COMM_WORLD);
 
 void compute_Z(
         std::vector<double> & enstrophy_transfer,
+        const dataset & source_data,
         const std::vector<double> & ux,
         const std::vector<double> & uy,
         const std::vector<double> & uz,
@@ -266,10 +254,6 @@ void compute_Z(
         const std::vector<double> & vort_ux,
         const std::vector<double> & vort_uy,
         const std::vector<double> & vort_uz,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const std::vector<bool> & mask,
         const MPI_Comm comm = MPI_COMM_WORLD);
 
 void compute_Lambda_rotational(

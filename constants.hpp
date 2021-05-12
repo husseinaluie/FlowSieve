@@ -57,7 +57,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool USE_HIGH_PRECISION_DISTANCE = true;
+    const bool USE_HIGH_PRECISION_DISTANCE = false;
 
     /*!
      * \param rho0
@@ -255,7 +255,7 @@ namespace constants
      * \brief Boolean indicating whether or not the postprocess routines should include time means (i.e. spatial maps)
      * @ingroup constants
      */
-    const bool POSTPROCESS_DO_TIME_MEANS = false;
+    const bool POSTPROCESS_DO_TIME_MEANS = true;
 
     /*!
      * \param KERNEL_OPT
@@ -304,6 +304,7 @@ namespace constants
         { "fine_KE",            "Small-scale kinetic energy ( filter(KE(u)) - KE(filter(u)) )" },
         { "coarse_enstrophy",   "Enstrophy of coarse-grained velocity" },
         { "Pi",                 "Non-linear energy transfer from large-scales to small-scales" },
+        { "Z",                  "Non-linear enstrophy transfer from large-scales to small-scales" },
         { "OkuboWeiss",         "Okubo-Weiss parameter ( positive -> strain dominated, negative -> vortex dominated )" },
         { "div_Jtransport",     "divergence of energy transport term" },
         { "coarse_vort_r",      "Radial (z) vorticity of coarse-grained velocity." },
@@ -324,6 +325,7 @@ namespace constants
         { "fine_KE",            "J / (m^3)" },
         { "coarse_enstrophy",   "J / (m^5)" },
         { "Pi",                 "Watt / (m^3)" },
+        { "Z",                  "1 / (s^3)" },
         { "OkuboWeiss",         "1 / (s^2)" },
         { "div_Jtransport",     "Watt / (m^3)" },
         { "coarse_vort_r",      "1 / s" },

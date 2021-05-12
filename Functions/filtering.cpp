@@ -147,13 +147,18 @@ void filtering(
     postprocess_names.push_back( "filtered_KE");
     postprocess_fields.push_back(&filtered_KE);
 
+    std::vector<double> null_vector(0);
+
     std::vector<double> fine_vort_r, fine_vort_lat, fine_vort_lon,
         coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
+        full_vort_r,
         div, OkuboWeiss;
     if (constants::COMP_VORT) {
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "Initializing COMP_VORT fields.\n"); }
         #endif
+
+        full_vort_r.resize(num_pts);
 
         coarse_vort_r.resize(  num_pts);
         coarse_vort_lon.resize(num_pts);
@@ -190,11 +195,13 @@ void filtering(
     }
 
 
-    double uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp;
+    double uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, vort_ux_tmp, vort_uy_tmp, vort_uz_tmp;
     double KE_tmp;
     std::vector<double> coarse_uxux, coarse_uxuy, coarse_uxuz,
-        coarse_uyuy, coarse_uyuz, coarse_uzuz, coarse_u_x,
-        coarse_u_y, coarse_u_z, energy_transfer;
+        coarse_uyuy, coarse_uyuz, coarse_uzuz, 
+        coarse_vort_ux, coarse_vort_uy, coarse_vort_uz,
+        coarse_u_x, coarse_u_y, coarse_u_z, 
+        energy_transfer, enstrophy_transfer;
     if (constants::COMP_TRANSFERS) {
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "Initializing COMP_TRANSFERS fields.\n"); }
@@ -206,6 +213,10 @@ void filtering(
         coarse_uyuy.resize(num_pts);
         coarse_uyuz.resize(num_pts);
         coarse_uzuz.resize(num_pts);
+
+        coarse_vort_ux.resize(num_pts);
+        coarse_vort_uy.resize(num_pts);
+        coarse_vort_uz.resize(num_pts);
 
         // We'll also need to keep the coarse velocities
         coarse_u_x.resize(num_pts);
@@ -226,9 +237,12 @@ void filtering(
         energy_transfer.resize(num_pts);
         if (not(constants::NO_FULL_OUTPUTS)) {
             vars_to_write.push_back("Pi");
+            vars_to_write.push_back("Z");
         }
         postprocess_names.push_back( "Pi");
         postprocess_fields.push_back(&energy_transfer);
+        postprocess_names.push_back( "Z");
+        postprocess_fields.push_back(&enstrophy_transfer);
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
         #endif
@@ -286,14 +300,6 @@ void filtering(
             vars_to_write.push_back("tilde_u_lat");
         }
 
-        // We'll need vorticity, so go ahead and compute it
-        compute_vorticity(
-                coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
-                div, OkuboWeiss,
-                full_u_r, full_u_lon, full_u_lat,
-                Ntime, Ndepth, Nlat, Nlon,
-                longitude, latitude, mask);
-
         // We also have what we need to compute the PEtoKE term
         //    rho_bar * g * w_bar
         PEtoKE.resize(num_pts);
@@ -304,6 +310,15 @@ void filtering(
         if (wRank == 0) { fprintf(stdout, "   ... done.\n"); }
         #endif
     }
+
+        // We'll need vorticity, so go ahead and compute it
+        compute_vorticity( coarse_vort_r, coarse_vort_lon, coarse_vort_lat, div, OkuboWeiss,
+                full_u_r, full_u_lon, full_u_lat,
+                Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+
+        compute_vorticity( full_vort_r, null_vector, null_vector, null_vector, null_vector,
+                full_u_r, full_u_lon, full_u_lat,
+                Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
 
     int perc_base = 5;
     int perc, perc_count=0;
@@ -372,12 +387,13 @@ void filtering(
                 timing_records, clock_on, \
                 longitude, latitude, dAreas, scale,\
                 full_KE, filtered_KE, fine_KE, \
-                full_u_r, full_u_lon, full_u_lat,\
+                full_u_r, full_u_lon, full_u_lat, full_vort_r, \
                 coarse_u_r, coarse_u_lon, coarse_u_lat,\
                 tilde_u_r,  tilde_u_lon,  tilde_u_lat,\
                 coarse_u_x, coarse_u_y,   coarse_u_z,\
                 coarse_uxux, coarse_uxuy, coarse_uxuz,\
                 coarse_uyuy, coarse_uyuz, coarse_uzuz,\
+                coarse_vort_ux, coarse_vort_uy, coarse_vort_uz,\
                 full_rho, full_p, coarse_rho, coarse_p,\
                 fine_rho, fine_p, PEtoKE,\
                 fine_u_r, fine_u_lon, fine_u_lat, perc_base)\
@@ -387,6 +403,7 @@ void filtering(
                 u_r_tmp, u_lat_tmp, u_lon_tmp,\
                 uxux_tmp, uxuy_tmp, uxuz_tmp,\
                 uyuy_tmp, uyuz_tmp, uzuz_tmp,\
+                vort_ux_tmp, vort_uy_tmp, vort_uz_tmp,\
                 KE_tmp, rho_tmp, p_tmp,\
                 LAT_lb, LAT_ub, tid, filtered_vals, tilde_vals ) \
         firstprivate(perc, wRank, local_kernel, perc_count)
@@ -509,8 +526,8 @@ void filtering(
                                 if (constants::COMP_TRANSFERS) {
 
                                     apply_filter_at_point_for_quadratics(
-                                            uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp,
-                                            u_x, u_y, u_z, source_data, Itime, Idepth, Ilat, Ilon, LAT_lb, LAT_ub, scale, local_kernel);
+                                            uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, vort_ux_tmp, vort_uy_tmp, vort_uz_tmp,
+                                            u_x, u_y, u_z, full_vort_r, source_data, Itime, Idepth, Ilat, Ilon, LAT_lb, LAT_ub, scale, local_kernel);
 
                                     vel_Spher_to_Cart_at_point(
                                             u_x_tmp, u_y_tmp, u_z_tmp,
@@ -525,6 +542,10 @@ void filtering(
                                     coarse_uyuy.at(index) = uyuy_tmp;
                                     coarse_uyuz.at(index) = uyuz_tmp;
                                     coarse_uzuz.at(index) = uzuz_tmp;
+
+                                    coarse_vort_ux.at(index) = vort_ux_tmp;
+                                    coarse_vort_uy.at(index) = vort_uy_tmp;
+                                    coarse_vort_uz.at(index) = vort_uz_tmp;
 
                                     coarse_u_x.at(index) = u_x_tmp;
                                     coarse_u_y.at(index) = u_y_tmp;
@@ -712,29 +733,19 @@ void filtering(
             if (wRank == 0) { fprintf(stdout, "Starting compute_Pi\n"); }
             fflush(stdout);
             #endif
-            compute_Pi(
-                    energy_transfer, 
-                    coarse_u_x,  coarse_u_y,  coarse_u_z,
-                    coarse_uxux, coarse_uxuy, coarse_uxuz,
-                    coarse_uyuy, coarse_uyuz, coarse_uzuz,
-                    Ntime, Ndepth, Nlat, Nlon,
-                    longitude, latitude, mask);
-            if (constants::DO_TIMING) { 
-                timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_Pi");
-            }
+            compute_Pi( energy_transfer, source_data, coarse_u_x,  coarse_u_y,  coarse_u_z, 
+                    coarse_uxux, coarse_uxuy, coarse_uxuz, coarse_uyuy, coarse_uyuz, coarse_uzuz );
+            compute_Z(  enstrophy_transfer, source_data, coarse_u_x,  coarse_u_y,  coarse_u_z, coarse_vort_r, 
+                    coarse_vort_ux, coarse_vort_uy, coarse_vort_uz );
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_Pi"); }
 
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             if (not(constants::NO_FULL_OUTPUTS)) {
-                write_field_to_output(energy_transfer, "Pi", 
-                        starts, counts, fname, &mask);
-                if (not(constants::NO_FULL_OUTPUTS)) {
-                    write_field_to_output(fine_KE, "fine_KE", 
-                            starts, counts, fname, &mask);
-                }
+                write_field_to_output(energy_transfer, "Pi", starts, counts, fname, &mask);
+                write_field_to_output(enstrophy_transfer, "Z", starts, counts, fname, &mask);
+                write_field_to_output(fine_KE, "fine_KE", starts, counts, fname, &mask);
             }
-            if (constants::DO_TIMING) { 
-                timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");
-            }
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing"); }
         }
 
         if (constants::COMP_BC_TRANSFERS) {

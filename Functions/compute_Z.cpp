@@ -14,17 +14,16 @@
  * This computation is applied to the Cartesian velocity components
  *
  * @param[in,out]   enstrophy_transfer              where to store the computed values (array)
+ * @param[in]       source_data                     dataset class instance containing data (Psi, Phi, etc)
  * @param[in]       ux,uy,uz                        coarse Cartesian velocity components
  * @param[in]       coarse_vort_r                   coarse radial vorticity
  * @param[in]       vort_ux,vort_uy,vort_uz         coarse vort-velocity products (e.g. bar(omega * u_x) )  
- * @param[in]       Ntime,Ndepth,Nlat,Nlon          Size of dimensions (MPI-local sizes)
- * @param[in]       longitude,latitude              1D dimension vectors
- * @param[in]       mask                            2D array to distinguish land from water
  * @param[in]       comm                            MPI communicator object
  *
  */
 void compute_Z(
         std::vector<double> & enstrophy_transfer,
+        const dataset & source_data,
         const std::vector<double> & ux,
         const std::vector<double> & uy,
         const std::vector<double> & uz,
@@ -32,15 +31,18 @@ void compute_Z(
         const std::vector<double> & vort_ux,
         const std::vector<double> & vort_uy,
         const std::vector<double> & vort_uz,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const std::vector<bool> & mask,
         const MPI_Comm comm
         ) {
+
+    const std::vector<double>   &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude;
+
+    const std::vector<bool> &mask = source_data.mask;
+
+    const int   Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
@@ -67,8 +69,8 @@ void compute_Z(
     // Some convenience handles
     //   note: the pointers aren't constant, but the things
     //         to which they are pointing are
-    double ui_loc, uj_loc, uiuj_loc;
-    const std::vector<double> *uiuj, *ui, *uj;
+    double omega_loc, uj_loc, omega_uj_loc;
+    const std::vector<double> *omega_uj, *omega, *uj;
 
     // Set up the derivatives to pass through the differentiation functions
     std::vector<double*> x_deriv_vals, y_deriv_vals, z_deriv_vals;
@@ -78,26 +80,18 @@ void compute_Z(
     deriv_fields.push_back(&u_i_tau_ij);
 
     // Zero out enstrophy transfer before we start
-    #pragma omp parallel \
-    default(none) shared(mask, enstrophy_transfer) \
-    private(index)
-    {
-        #pragma omp for collapse(1) schedule(static)
-        for (index = 0; index < Npts; index++) {
-            enstrophy_transfer.at(index) = mask.at(index) ? 0. : constants::fill_value;
-        }
-    }
+    std::fill( enstrophy_transfer.begin(), enstrophy_transfer.end(), 0. );
+
+    // omega
+    omega = &coarse_vort_r;
 
     for (jj = 0; jj < 3; jj++) {
 
-        //   Assign the handy pointers: uiuj, ui, uj
+        //   Assign the handy pointers: omega_uj, uj
         //
         //   0 -> x
         //   1 -> y
         //   2 -> z
-
-        // ui
-        ui = &coarse_vort_r;
 
         // uj
         switch (jj) {
@@ -106,11 +100,11 @@ void compute_Z(
             case 2 : uj = &uz; break;
         }
 
-        // uiuj (note that they're symmetric i.e. uiuj = ujui)
+        // omega_uj 
         switch (jj) {
-            case 0 : uiuj = &vort_ux; break;
-            case 1 : uiuj = &vort_uy; break;
-            case 2 : uiuj = &vort_uz; break;
+            case 0 : omega_uj = &vort_ux; break;
+            case 1 : omega_uj = &vort_uy; break;
+            case 2 : omega_uj = &vort_uz; break;
         }
         
             
@@ -118,20 +112,20 @@ void compute_Z(
         //   tau_ij and u_i * tau_ij
         #pragma omp parallel \
         default(none) \
-        shared(tau_ij, u_i_tau_ij, mask, ui, uj, uiuj)\
-        private(index, uiuj_loc, ui_loc, uj_loc)
+        shared(tau_ij, u_i_tau_ij, mask, omega, uj, omega_uj)\
+        private(index, omega_uj_loc, omega_loc, uj_loc)
         {
             #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
             for (index = 0; index < Npts; index++) {
 
                 if ( mask.at(index) ) {
 
-                    ui_loc   = ui->at(  index);
-                    uj_loc   = uj->at(  index);
-                    uiuj_loc = uiuj->at(index);
+                    omega_loc    = omega->at(index);
+                    uj_loc       = uj->at(index);
+                    omega_uj_loc = omega_uj->at(index);
 
-                    tau_ij.at(index) = uiuj_loc - ui_loc * uj_loc;
-                    u_i_tau_ij.at(index) = ui_loc * tau_ij.at(index);
+                    tau_ij.at(index) = omega_uj_loc - omega_loc * uj_loc;
+                    u_i_tau_ij.at(index) = omega_loc * tau_ij.at(index);
 
                 }
             }
@@ -140,7 +134,7 @@ void compute_Z(
         #pragma omp parallel \
         default(none) \
         shared(enstrophy_transfer, latitude, longitude, mask, stdout, \
-                jj, ui, tau_ij, u_i_tau_ij, deriv_fields,std::cout)\
+                jj, omega, tau_ij, u_i_tau_ij, deriv_fields,std::cout)\
         private(Itime, Idepth, Ilat, Ilon, index,\
                 Z_tmp, tau_ij_j, u_i_tau_ij_j,\
                 x_deriv_vals, y_deriv_vals, z_deriv_vals)
@@ -181,7 +175,7 @@ void compute_Z(
                             mask);
 
                     // u_i * tau_ij,j - (u_i * tau_ij)_,j
-                    Z_tmp = ui->at(index) * tau_ij_j  -  u_i_tau_ij_j;
+                    Z_tmp = omega->at(index) * tau_ij_j  -  u_i_tau_ij_j;
                     enstrophy_transfer.at(index) += Z_tmp;
                         
                 }

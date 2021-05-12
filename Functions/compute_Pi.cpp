@@ -12,16 +12,15 @@
  * This computation is applied to the Cartesian velocity components
  *
  * @param[in,out]   energy_transfer                 where to store the computed values (array)
+ * @param[in]       source_data                     dataset class instance containing data (Psi, Phi, etc)
  * @param[in]       ux,uy,uz                        coarse Cartesian velocity components
  * @param[in]       uxux,uxuy,uxuz,uyuy,uyuz,uzuz   coarse velocity products (e.g. bar(u*v) )  
- * @param[in]       Ntime,Ndepth,Nlat,Nlon          Size of dimensions (MPI-local sizes)
- * @param[in]       longitude,latitude              1D dimension vectors
- * @param[in]       mask                            2D array to distinguish land from water
  * @param[in]       comm                            MPI communicator object
  *
  */
 void compute_Pi(
         std::vector<double> & energy_transfer,
+        const dataset & source_data,
         const std::vector<double> & ux,
         const std::vector<double> & uy,
         const std::vector<double> & uz,
@@ -31,15 +30,18 @@ void compute_Pi(
         const std::vector<double> & uyuy,
         const std::vector<double> & uyuz,
         const std::vector<double> & uzuz,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const std::vector<bool> & mask,
         const MPI_Comm comm
         ) {
+
+    const std::vector<double>   &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude;
+
+    const std::vector<bool> &mask = source_data.mask;
+
+    const int   Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
@@ -76,15 +78,7 @@ void compute_Pi(
     deriv_fields.push_back(&u_i_tau_ij);
 
     // Zero out energy transfer before we start
-    #pragma omp parallel \
-    default(none) shared(mask, energy_transfer) \
-    private(index)
-    {
-        #pragma omp for collapse(1) schedule(static)
-        for (index = 0; index < Npts; index++) {
-            energy_transfer.at(index) = mask.at(index) ? 0. : constants::fill_value;
-        }
-    }
+    std::fill( energy_transfer.begin(), energy_transfer.end(), 0.);
 
     for (ii = 0; ii < 3; ii++) {
         for (jj = 0; jj < 3; jj++) {

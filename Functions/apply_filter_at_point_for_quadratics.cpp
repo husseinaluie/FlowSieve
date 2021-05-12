@@ -20,7 +20,11 @@
  * @param[in,out]   uyuy_tmp                where to store filtered (u_y)*(u_y)
  * @param[in,out]   uyuz_tmp                where to store filtered (u_y)*(u_z)
  * @param[in,out]   uzuz_tmp                where to store filtered (u_z)*(u_z)
+ * @param[in,out]   vort_ux_tmp             where to store filtered (vort_r)*(u_x)
+ * @param[in,out]   vort_uy_tmp             where to store filtered (vort_r)*(u_y)
+ * @param[in,out]   vort_uz_tmp             where to store filtered (vort_r)*(u_z)
  * @param[in]       u_x,u_y,u_z             fields to filter
+ * @param[in]       vort_r                  vorticity field to filter
  * @param[in]       source_data             dataset class instance containing data (Psi, Phi, etc)
  * @param[in]       Itime,Idepth,Ilat,Ilon  current position in time dimension
  * @param[in]       LAT_lb,LAT_ub           lower/upper boundd on latitude for kernel
@@ -34,9 +38,13 @@ void apply_filter_at_point_for_quadratics(
         double & uyuy_tmp,
         double & uyuz_tmp,
         double & uzuz_tmp,
+        double & vort_ux_tmp,
+        double & vort_uy_tmp,
+        double & vort_uz_tmp,
         const std::vector<double> & u_x,
         const std::vector<double> & u_y,
         const std::vector<double> & u_z,
+        const std::vector<double> & vort_r,
         const dataset & source_data,
         const int Itime,
         const int Idepth,
@@ -50,7 +58,7 @@ void apply_filter_at_point_for_quadratics(
 
 
     double  dist, kern, area, mask_val = 0, kA_sum = 0, local_weight,
-            u_x_loc, u_y_loc, u_z_loc;
+            u_x_loc, u_y_loc, u_z_loc, vort_r_loc;
     size_t index, kernel_index;
 
     const std::vector<double>   &latitude   = source_data.latitude,
@@ -117,13 +125,15 @@ void apply_filter_at_point_for_quadratics(
             // If the cell is water, add to the numerator
             if ( is_water ) {
                 #if DEBUG >= 1
-                u_x_loc = u_x.at(index);
-                u_y_loc = u_y.at(index);
-                u_z_loc = u_z.at(index);
+                u_x_loc     = u_x.at(index);
+                u_y_loc     = u_y.at(index);
+                u_z_loc     = u_z.at(index);
+                vort_r_loc  = vort_r.at(index);
                 #else
-                u_x_loc = u_x[index];
-                u_y_loc = u_y[index];
-                u_z_loc = u_z[index];
+                u_x_loc     = u_x[index];
+                u_y_loc     = u_y[index];
+                u_z_loc     = u_z[index];
+                vort_r_loc  = vort_r[index];
                 #endif
 
                 uxux_tmp += u_x_loc * u_x_loc * local_weight;
@@ -132,6 +142,10 @@ void apply_filter_at_point_for_quadratics(
                 uyuy_tmp += u_y_loc * u_y_loc * local_weight;
                 uyuz_tmp += u_y_loc * u_z_loc * local_weight;
                 uzuz_tmp += u_z_loc * u_z_loc * local_weight;
+
+                vort_ux_tmp += vort_r_loc * u_x_loc * local_weight;
+                vort_uy_tmp += vort_r_loc * u_y_loc * local_weight;
+                vort_uz_tmp += vort_r_loc * u_z_loc * local_weight;
             }
         }
     }
@@ -142,5 +156,9 @@ void apply_filter_at_point_for_quadratics(
     uyuy_tmp *= 1. / kA_sum;
     uyuz_tmp *= 1. / kA_sum;
     uzuz_tmp *= 1. / kA_sum;
+
+    vort_ux_tmp *= 1. / kA_sum;
+    vort_uy_tmp *= 1. / kA_sum;
+    vort_uz_tmp *= 1. / kA_sum;
 }
 
