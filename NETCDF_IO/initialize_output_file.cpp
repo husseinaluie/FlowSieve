@@ -144,7 +144,9 @@ void initialize_output_file(
     add_attr_to_file("g",                                            constants::g,          filename);
     add_attr_to_file("differentiation_convergence_order",   (double) constants::DiffOrd,    filename);
     add_attr_to_file("KERNEL_OPT",                          (double) constants::KERNEL_OPT, filename);
-    add_attr_to_file("KernPad",                             (double) constants::KernPad,    filename);
+    if (constants::COMP_BC_TRANSFERS) {
+        add_attr_to_file("KernPad",                             (double) constants::KernPad,    filename);
+    }
 
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }

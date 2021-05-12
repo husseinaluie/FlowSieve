@@ -5,7 +5,28 @@
 #include <cassert>
 #include <math.h>
 
-// Write to netcdf file
+/*!
+ *  \brief Read a specific variable from a specific file.
+ *
+ *  Accounts for variable attributes 'scale_factor' and 'add_offset'.
+ *
+ *  If mask != NULL, then determine the mask based on variable attribute '_FillValue'
+ *
+ *  @param[in,out]  var                 vector into which to store the loaded variable
+ *  @param[in]      var_name            name of the variable to be read
+ *  @param[in]      filename            name of the file from which to load the variable
+ *  @param[in,out]  mask                point to where a mask array should be stored (if not NULL) (true = water, false = land)
+ *  @param[in,out]  myCounts            the sizes of each dimension (on this MPI process) if not NULL
+ *  @param[in,out]  myStarts            the starting index for each dimension, if not NULL
+ *  @param[in]      Nprocs_in_time      Number of MPI processors in time (for dividing data)
+ *  @param[in]      Nprocs_in_depth     Number of MPI processors in depth (for dividing data)
+ *  @param[in]      do_splits           boolean indicating if the arrays should be split over MPI procs.
+ *  @param[in]      force_split_dim     Dimension along which data splitting should be force
+ *  @param[in]      land_fill_value     Value to place at 'land' areas, if needed
+ *  @param[in]      comm                the MPI communicator world
+ *
+ */
+
 void read_var_from_file(
         std::vector<double> &var,
         const std::string & var_name,
@@ -193,9 +214,7 @@ void read_var_from_file(
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  scale factor = %'g\n", scale); }
     #endif
-    if (scale != 1.) {
-        for (size_t II = 0; II < num_pts; II++) { var.at(II) = var.at(II) * scale; }
-    }
+    if (scale != 1.) { for (size_t II = 0; II < num_pts; II++) { var.at(II) = var.at(II) * scale; } }
 
     // Apply offset if appropriate
     double offset = 0.;
@@ -204,9 +223,7 @@ void read_var_from_file(
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  additive offset = %'g\n", offset); }
     #endif
-    if (offset != 0.) {
-        for (size_t II = 0; II < num_pts; II++) { var.at(II) = var.at(II) + offset; }
-    }
+    if (offset != 0.) { for (size_t II = 0; II < num_pts; II++) { var.at(II) = var.at(II) + offset; } }
 
 
     // Determine masking, if desired
@@ -226,7 +243,7 @@ void read_var_from_file(
 
     // If we're at 99% of the fill_val, call it land
     for (size_t II = 0; II < var.size(); II++) {
-        if (fabs(var.at(II)) > 0.99 * (fabs(fill_val*scale + offset))) {
+        if (fabs(var.at(II)) > 0.999 * (fabs(fill_val*scale + offset))) {
             if (constants::FILTER_OVER_LAND) {
                 // If requested to filter over land, then fill in the mask now
                 if (mask != NULL) { mask->at(II) = true; }
