@@ -45,7 +45,8 @@ void compute_region_avg_and_std(
         std::vector< std::vector< double > > & field_averages,
         std::vector< std::vector< double > > & field_std_devs,
         const dataset & source_data,
-        const std::vector<const std::vector<double>*> & postprocess_fields
+        const std::vector<const std::vector<double>*> & postprocess_fields,
+        const MPI_Comm comm = MPI_COMM_WORLD
         );
 
 void compute_region_avg_and_std_OkuboWeiss(
