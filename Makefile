@@ -5,12 +5,13 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=1 $(CFLAGS)
+CFLAGS:=-DDEBUG=0 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
 DEBUG:=false
 EXTRA_OPT:=true
+USE_GPROF:=false
 
 ##
 ## Shouldn't need to modify anything beyond this point
@@ -34,6 +35,10 @@ endif
 ifeq ($(EXTRA_OPT),true)
     CFLAGS:=$(CFLAGS) $(EXTRA_OPT_FLAGS)
     ALGLIB_OPT_FLAGS:=$(ALGLIB_OPT_FLAGS) $(EXTRA_OPT_FLAGS)
+endif
+
+ifeq ($(USE_GPROF),true)
+    LINKS:=$(LINKS) -pg
 endif
 
 CFLAGS:=$(CFLAGS) $(LIB_DIRS)
