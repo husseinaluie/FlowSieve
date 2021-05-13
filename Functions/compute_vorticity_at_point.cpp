@@ -89,19 +89,11 @@ void compute_vorticity_at_point(
                                 lat_deriv_vals {&ulon_lat, &ulat_lat, &ur_lat},
                                 r_deriv_vals   {&ulon_r,   &ulat_r,   &ur_r  };
 
-        spher_derivative_at_point(
-                lat_deriv_vals, deriv_fields,
-                latitude, "lat",
-                Itime, Idepth, Ilat, Ilon,
-                Ntime, Ndepth, Nlat, Nlon,
-                mask);
+        spher_derivative_at_point( lat_deriv_vals, deriv_fields, latitude, "lat",
+                Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask);
 
-        spher_derivative_at_point(
-                lon_deriv_vals, deriv_fields,
-                longitude, "lon",
-                Itime, Idepth, Ilat, Ilon,
-                Ntime, Ndepth, Nlat, Nlon,
-                mask);
+        spher_derivative_at_point( lon_deriv_vals, deriv_fields, longitude, "lon",
+                Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask);
 
         const double    lat       = latitude.at(Ilat),
                         cos_lat   = cos(lat),
@@ -114,14 +106,14 @@ void compute_vorticity_at_point(
         //
         //// First, do vorticity
         //
-        vort_r_tmp   = ( ulat_lon / cos_lat - ulon_lat + tan_lat * u_lon_loc )         / ( constants::R_earth );
-        vort_lon_tmp = ( ur_lat - constants::R_earth * ulat_r - u_lat_loc )            / ( constants::R_earth );
-        vort_lat_tmp = ( u_lon_loc + constants::R_earth * ulon_r - ur_lon / cos_lat )  / ( constants::R_earth );
+        vort_r_tmp   = ( ulat_lon / cos_lat - ulon_lat + tan_lat * u_lon_loc ) / ( constants::R_earth );
+        vort_lon_tmp = ( ur_lat - u_lat_loc ) / ( constants::R_earth ) - ulat_r;
+        vort_lat_tmp = ( u_lon_loc - ur_lon / cos_lat ) / ( constants::R_earth ) + ulon_r;
 
         //
         //// Now the divergence
         //
-        div_tmp =   ( 2 * u_r_loc / constants::R_earth )
+        div_tmp =   ( 2. * u_r_loc / constants::R_earth )
                   + ( ur_r )
                   + ( ulon_lon / ( constants::R_earth * cos_lat ) )
                   + ( ulat_lat / constants::R_earth )

@@ -75,13 +75,13 @@ void compute_vorticity(
         #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
         for (index = 0; index < Npts; index++) {
 
-            vort_r_tmp   = constants::fill_value;
-            vort_lon_tmp = constants::fill_value;
-            vort_lat_tmp = constants::fill_value;
+            vort_r_tmp   = 0.; //constants::fill_value;
+            vort_lon_tmp = 0.; //constants::fill_value;
+            vort_lat_tmp = 0.; //constants::fill_value;
 
-            div_tmp = constants::fill_value;
+            div_tmp = 0.; //constants::fill_value;
 
-            OkuboWeiss_tmp = constants::fill_value;
+            OkuboWeiss_tmp = 0.; //constants::fill_value;
 
             if ( mask.at(index) ) { // Skip land areas
 
@@ -89,14 +89,10 @@ void compute_vorticity(
                                  Ntime, Ndepth, Nlat, Nlon);
 
                 compute_vorticity_at_point(
-                        vort_r_tmp, vort_lon_tmp, vort_lat_tmp,
-                        div_tmp, 
-                        OkuboWeiss_tmp,
+                        vort_r_tmp, vort_lon_tmp, vort_lat_tmp, div_tmp, OkuboWeiss_tmp,
                         u_r,        u_lon,        u_lat,
-                        Ntime, Ndepth, Nlat, Nlon,
-                        Itime, Idepth, Ilat, Ilon,
-                        longitude, latitude,
-                        mask);
+                        Ntime, Ndepth, Nlat, Nlon, Itime, Idepth, Ilat, Ilon,
+                        longitude, latitude, mask);
             }
 
             if (do_vort_r)   { vort_r.at(  index) = vort_r_tmp; }
