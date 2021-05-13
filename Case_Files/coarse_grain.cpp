@@ -35,10 +35,6 @@
  */
 int main(int argc, char *argv[]) {
 
-    //
-    static_assert( not(constants::FULL_LON_SPAN and constants::UNIFORM_LON_GRID and constants::PERIODIC_X),
-           "Coarse-grain code not set up to use longitude-wide kernel precomputation, which is activated by these flags.\n" );
-    
     // PERIODIC_Y implies UNIFORM_LAT_GRID
     static_assert( (constants::UNIFORM_LAT_GRID) or (not(constants::PERIODIC_Y)),
             "PERIODIC_Y requires UNIFORM_LAT_GRID.\n"
@@ -57,8 +53,13 @@ int main(int argc, char *argv[]) {
             "or MINIMAL_OUTPUT to true.\n" 
             "Please update constants.hpp accordingly.");
 
-    // Enable all floating point exceptions but FE_INEXACT
-    feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
+    // Enable all floating point exceptions but FE_INEXACT and FE_UNDERFLOW
+    //      for reasons that I do not understand, FE_ALL_EXCEPT is __NOT__ equal
+    //      to the bit-wise or of the five exceptions. So instead of say "all except these"
+    //      we'll just list the ones that we want
+    //feenableexcept( FE_ALL_EXCEPT & ~FE_INEXACT & ~FE_UNDERFLOW );
+    //fprintf( stdout, " %d : %d \n", FE_ALL_EXCEPT, FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW | FE_INEXACT | FE_UNDERFLOW );
+    feenableexcept( FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW );
 
     // Specify the number of OpenMP threads
     //   and initialize the MPI world
@@ -156,12 +157,16 @@ int main(int argc, char *argv[]) {
 
     if (constants::COMP_BC_TRANSFERS) {
         // If desired, read in rho and p
-        source_data.load_variable( "rho", density_var_name, input_fname, false, false );
-        source_data.load_variable( "p", pressure_var_name, input_fname, false, false );
+        source_data.load_variable( "rho", density_var_name,  input_fname, false, false );
+        source_data.load_variable( "p",   pressure_var_name, input_fname, false, false );
     }
 
     // Mask out the pole, if necessary (i.e. set lat = 90 to land)
     mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
+
+    // If we're using FILTER_OVER_LAND, then the mask has been wiped out. Load in a mask that still includes land references
+    //      so that we have both. Will be used to get 'water-only' region areas.
+    if (constants::FILTER_OVER_LAND) { read_mask_from_file( source_data.reference_mask, zonal_vel_name, input_fname ); }
 
     // Read in the region definitions and compute region areas
     if ( check_file_existence( region_defs_fname ) ) {
