@@ -30,11 +30,14 @@ void compute_region_avg_and_std(
     int Ifield, Iregion, Itime, Idepth, Ilat, Ilon;
     size_t int_index, area_index, index;
 
-    #if DEBUG >= 2
+    #if DEBUG >= 1
     int wRank;
     MPI_Comm_rank( comm, &wRank );
     #endif
 
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf(stdout, "  Computing region means\n"); }
+    #endif
     for (Ifield = 0; Ifield < num_fields; ++Ifield) {
         #if DEBUG >= 2
         if (wRank == 0) { fprintf(stdout, "    processing field %d of %d means\n", Ifield + 1, num_fields); }
@@ -54,13 +57,11 @@ void compute_region_avg_and_std(
                         for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                             for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 
-                                index = Index(Itime, Idepth, Ilat, Ilon,
-                                              Ntime, Ndepth, Nlat, Nlon);
+                                index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                                 if ( source_data.mask.at(index) ) { // Skip land areas
 
-                                    area_index = Index(0, 0, Ilat, Ilon,
-                                                       1, 1, Nlat, Nlon);
+                                    area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
 
                                     dA = source_data.areas.at(area_index);
 
@@ -72,8 +73,7 @@ void compute_region_avg_and_std(
                             }
                         }
                     }
-                    int_index = Index(0, Itime, Idepth, Iregion,
-                                      1, Ntime, Ndepth, num_regions);
+                    int_index = Index(0, Itime, Idepth, Iregion, 1, Ntime, Ndepth, num_regions);
                     reg_area = source_data.region_areas.at(int_index);
                     field_averages.at(Ifield).at(int_index) = (reg_area == 0) ? 0. : int_val / reg_area;
                 }
@@ -82,6 +82,9 @@ void compute_region_avg_and_std(
     }
 
     // Now that we have region averages, get region standard deviations
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf(stdout, "  Computing region standard deviations\n"); }
+    #endif
     for (Ifield = 0; Ifield < num_fields; ++Ifield) {
         #if DEBUG >= 2
         if (wRank == 0) { fprintf(stdout, "    processing field %d of %d standard deviations\n", Ifield + 1, num_fields); }
@@ -90,8 +93,7 @@ void compute_region_avg_and_std(
             for (Itime = 0; Itime < Ntime; ++Itime) {
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
 
-                    int_index = Index(0, Itime, Idepth, Iregion,
-                                      1, Ntime, Ndepth, num_regions);
+                    int_index = Index(0, Itime, Idepth, Iregion, 1, Ntime, Ndepth, num_regions);
                     reg_area = source_data.region_areas.at(int_index);
 
                     int_val = 0.;
@@ -106,13 +108,11 @@ void compute_region_avg_and_std(
                         for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                             for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 
-                                index = Index(Itime, Idepth, Ilat, Ilon,
-                                              Ntime, Ndepth, Nlat, Nlon);
+                                index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                                 if ( source_data.mask.at(index) ) { // Skip land areas
 
-                                    area_index = Index(0, 0, Ilat, Ilon,
-                                                       1, 1, Nlat, Nlon);
+                                    area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
 
                                     dA = source_data.areas.at(area_index);
 
