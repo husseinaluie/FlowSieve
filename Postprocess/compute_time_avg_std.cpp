@@ -46,32 +46,27 @@ void compute_time_avg_std(
     private(Ifield, Ilat, Ilon, Itime, Idepth, index, space_index )\
     shared(postprocess_fields, source_data, always_masked, mask_count, time_average_loc)
     { 
-        #pragma omp for collapse(3) schedule(guided, chunk_size)
+        #pragma omp for collapse(3) schedule(dynamic, chunk_size)
         for (Ilat = 0; Ilat < Nlat; ++Ilat){
             for (Ilon = 0; Ilon < Nlon; ++Ilon){
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth){
-                    space_index = Index(0, Idepth, Ilat, Ilon,
-                                        1, Ndepth, Nlat, Nlon);
+
+                    space_index = Index(0, Idepth, Ilat, Ilon, 1, Ndepth, Nlat, Nlon);
+
                     if (not(always_masked.at(space_index))) { // Skip land areas
                         for (Itime = 0; Itime < Ntime; ++Itime){
 
                             // get some indices
-                            index = Index(Itime, Idepth, Ilat, Ilon,
-                                          Ntime, Ndepth, Nlat, Nlon);
+                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                             if ( source_data.mask.at(index) ) {
                                 for (Ifield = 0; Ifield < num_fields; ++Ifield) {
 
-                                    // compute the time average for 
-                                    // the part on this processor
+                                    // compute the time average for the part on this processor
                                     time_average_loc.at(Ifield).at(space_index) 
                                         += postprocess_fields.at(Ifield)->at(index) / mask_count.at(space_index);
                                 }
                             }
-                        }
-                    } else {
-                        for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-                            time_average_loc.at(Ifield).at(space_index) = constants::fill_value;
                         }
                     }
                 }
@@ -90,6 +85,10 @@ void compute_time_avg_std(
                       &(time_average.at(    Ifield)[0]),
                       Ndepth * Nlat * Nlon, MPI_DOUBLE, MPI_SUM, comm);
     }
+
+    /*
+     *  We've silenced time standard deviation outputs for now, so don't waste time computing them
+     *
 
     // Compute the standard deviation
     #if DEBUG >= 2
@@ -112,8 +111,7 @@ void compute_time_avg_std(
                         for (Itime = 0; Itime < Ntime; ++Itime){
 
                             // get some indices
-                            index = Index(Itime, Idepth, Ilat, Ilon,
-                                          Ntime, Ndepth, Nlat, Nlon);
+                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                             if ( source_data.mask.at(index) ) { // Skip land areas
                                 for (Ifield = 0; Ifield < num_fields; ++Ifield) {
@@ -139,7 +137,7 @@ void compute_time_avg_std(
     }
 
     #if DEBUG >= 2
-    if (wRank == 0) { fprintf(stdout, "  .. writing time averages and deviations\n"); }
+    if (wRank == 0) { fprintf(stdout, "  .. .. reducing across processors and taking square root\n"); }
     fflush(stdout);
     #endif
 
@@ -156,18 +154,13 @@ void compute_time_avg_std(
         private(index, space_index)\
         shared(Ifield, time_average, time_std_dev, always_masked)
         { 
-            #pragma omp for collapse(3) schedule(guided, chunk_size)
+            #pragma omp for collapse(3) schedule(dynamic, chunk_size)
             for (Idepth = 0; Idepth < Ndepth; ++Idepth){
                 for (Ilat = 0; Ilat < Nlat; ++Ilat){
                     for (Ilon = 0; Ilon < Nlon; ++Ilon){
-                        space_index = Index(0, Idepth, Ilat, Ilon,
-                                            1, Ndepth, Nlat, Nlon);
-                        if (not(always_masked.at(space_index))) { // Skip land areas
-                            time_std_dev.at(Ifield).at(index) = 
-                                sqrt(time_std_dev.at(Ifield).at(index));
-                        } else {
-                            time_std_dev.at(Ifield).at(index) = constants::fill_value;
-                            time_average.at(Ifield).at(index) = constants::fill_value;
+                        space_index = Index(0, Idepth, Ilat, Ilon, 1, Ndepth, Nlat, Nlon);
+                        if ( not( always_masked.at(space_index) ) ) {
+                            time_std_dev.at(Ifield).at(index) = sqrt(time_std_dev.at(Ifield).at(index));
                         }
                     }
                 }
@@ -175,5 +168,8 @@ void compute_time_avg_std(
         }
     }
 
+    *
+    * 
+    */
 
 }

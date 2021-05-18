@@ -34,6 +34,7 @@ void write_region_avg_and_std(
 
     for ( int Ifield = 0; Ifield < num_fields; ++Ifield ) {
         write_field_to_output( field_averages.at(Ifield), vars_to_process.at(Ifield) + "_area_average", start, count, filename );
+        // To turn standard deviation outputs back on, also need to turn back on the calculations in compute_region_avg_and_std
     }
 
 }

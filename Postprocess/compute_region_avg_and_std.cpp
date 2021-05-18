@@ -81,6 +81,10 @@ void compute_region_avg_and_std(
         }
     }
 
+    /*
+     *  We've silenced standard deviation outputs for now, so don't waste time computing them
+     *
+     
     // Now that we have region averages, get region standard deviations
     #if DEBUG >= 1
     if (wRank == 0) { fprintf(stdout, "  Computing region standard deviations\n"); }
@@ -132,4 +136,9 @@ void compute_region_avg_and_std(
             }
         }
     }
+
+    *
+    * 
+    */
+
 }

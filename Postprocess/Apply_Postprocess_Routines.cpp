@@ -207,6 +207,11 @@ void Apply_Postprocess_Routines(
 
         compute_time_avg_std( time_average, time_std_dev, source_data, postprocess_fields, mask_count, always_masked, full_Ntime );
 
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "  .. writing time-averages of fields\n"); }
+        fflush(stdout);
+        #endif
+
         // Write the time averages
         //   dimension order: depth - lat - lon
         const int   Slat = myStarts.at(2),
@@ -224,6 +229,7 @@ void Apply_Postprocess_Routines(
 
         for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
             write_field_to_output( time_average.at(Ifield), vars_to_process.at(Ifield) + "_time_average", start, count, filename, &mask );
+            // To turn these outputs back on, also need to turn back on the calculations in compute_time_avg_std
             //write_field_to_output( time_std_dev.at(Ifield), vars_to_process.at(Ifield) + "_time_std_dev", start, count, filename, &mask );
         }
     }
