@@ -12,8 +12,6 @@ Tutorial [details are here](./Basic/ABOUT_TUTORIAL) (\ref tutorials2).
 
 ## Spherical Demo
 
-### Handling Land 
-
 ### Post-processing
 
 This tutorial shows you how to use post-processing result to generate filtering spectra of different fields.
@@ -22,4 +20,6 @@ Tutorial [details are here](./Spherical_Demo/Postprocessing/ABOUT_TUTORIAL) (\re
 
 ### Helmholtz Decomposition
 
-#### Filtering Helmholtz
+This tutorial shows you how to use the Helmholtz projection rouines and then apply the Helmholtz-specific coarse graining routines.
+
+Tutorial [details are here](./Spherical_Demo/Helmholtz/ABOUT_TUTORIAL) (\ref tutorials3).

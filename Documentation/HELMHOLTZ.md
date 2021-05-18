@@ -31,4 +31,4 @@ These steps can be summarized as:
 
 Two auxiliary executables are provided for this purpose.
 * `coarsen_grid` takes in velocity data and produces another data file on a coarse lat/lon grid (user specifies the coarsening factor as a command-line input)
-* `refine_Helmholtz_seed` takes in the Helmholtz outputs from one grid and interpolates (nearest neighbours, the solver smooths it out quick enough) onto a finer grid. The result is then output to a file that can be read in by the main Helmholtz decomposition routines.
+* `refine_Helmholtz_seed` takes in the Helmholtz outputs from one grid and interpolates (linear interpolation) onto a finer grid. The result is then output to a file that can be read in by the main Helmholtz decomposition routines.

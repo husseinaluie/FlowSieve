@@ -28,6 +28,19 @@ For notes on installation, please see [this page](./Documentation/INSTALL.md) (\
 
 ---
 
+## Input / Output Files and Filetypes
+
+The coarse-graining codebase uses netcdf files for both input and output.
+Dimension orderings are assumed to follow the CF-convention of (time, depth, latitude, longitude).
+
+*scale_factor*,  *offset*, and *fill_value* attributes are applied to output variables following CF-convention usage.
+
+Where possible, units and variables descriptions (which are provided in constants.hpp) are also include as variable attributes in the output files.
+
+Currently, no other filetypes are supported.
+
+---
+
 ## Postprocessing
 
 Post-processing (such as region-averaging, Okubo-Weiss histogram binning, time-averaging, etc) can be enabled and run on-line
@@ -64,6 +77,12 @@ Hint: to print filter scales to only three significant digits, the `numpy.format
 > 
 > [print( numpy.format_float_scientific( scale, precision = 2 ), end = ' ' ) for scale in scales]
 
+If you are using a bash script (e.g. a job-submission script), an easy way to pass the filter scales on to the coarse-graining executable is to define 
+a variable that has the list of scales, and then just pass that to the executable using the **--filter_scales** flag.
+> FILTER_SCALES="1e4 5e4 10e4"
+>
+> --filter_scales "${FILTER_SCALES}"
+
 ---
 
 ## Known Issues
@@ -86,6 +105,9 @@ This list may not be quite up-to-date. Rule of thumb:
  * Use _DEBUG = 2_ if you're running into some issues and want to narrow it down a bit
  * Going beyond this is really only necessary / useful if you're running into some fatal errors that you can't pinpoint
  * Setting _DEBUG_ to be negative is generally not advised. Setting to 0 shouldn't produce overly much output, and certainly not enough to hamper performance. If you're trying to silence errors, make sure you understand _why_ the errors are happening, and that you're really okay with ignoring them.
+
+Additionally, setting _DEBUG>=1_ will result in *slower runtime*, since it enables bounds-checking in the apply-filter routines ( i.e. vector.at() vs vector[] ).
+These routines account for the vast majority of runtime outside of very small filter scales (which are fast enough to not be a concern), and so this optimization was only applied those those routines.
 
 
 ### Function Map

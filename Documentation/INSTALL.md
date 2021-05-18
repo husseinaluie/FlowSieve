@@ -25,7 +25,7 @@ The `Systems` directory contains a few sample system files. To prepare a system 
 
 A makefile is included to simplify compiling. 
 As a first test of your install, try `make clean; make Case_Files/coarse_grain.x`.
-If the executable compiles successfully, then a good next step is to check out the [tutorials that are provided](./TUTORIALS) to familiarize yourself with the code usage.
+If the executable compiles successfully, then a good next step is to check out the [tutorials that are provided](../Tutorial/TUTORIAL.md) (\ref tutorials1) to familiarize yourself with the code usage.
 
 ## make arguments
 * `make clean`
@@ -38,10 +38,8 @@ If the executable compiles successfully, then a good next step is to check out t
  * Makes the doxygen-produced documentation. **Note: `doxygen` and `dot` must be installed and on the path**
 * `make cleandocs`
  * Removes the previous documentation build
-* `make tests`
- * Compiles the test routines in `Tests/`
 
 ## ALGLIB
 
 Some of the executables (such as interpolator.x, toroidal_projection.x, and potential_projection.x) require the use of a third-party library, ALGLIB.
-To compile this library, simply call `make ALGLIB` (should only need to be done once, unless you cal `make hardclean`).
+To compile this library, simply call `make ALGLIB` (should only need to be done once, unless you call `make hardclean`).
