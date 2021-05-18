@@ -180,21 +180,17 @@ void compute_Pi(
                 // Now actually compute Pi
                 //   in particular, compute
                 //           u_i * tau_ij,j - (u_i * tau_ij)_,j
-                #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
+                #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
                 for (index = 0; index < Npts; index++) {
 
                     if ( mask.at(index) ) {
 
-                        Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                                         Ntime, Ndepth, Nlat, Nlon);
+                        Index1to4(index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                         // Compute the desired derivatives
                         Cart_derivatives_at_point(
-                                x_deriv_vals, y_deriv_vals,
-                                z_deriv_vals, deriv_fields,
-                                latitude, longitude,
-                                Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon,
+                                x_deriv_vals, y_deriv_vals, z_deriv_vals, deriv_fields,
+                                latitude, longitude, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
                                 mask);
 
                         // u_i * tau_ij,j - (u_i * tau_ij)_,j
