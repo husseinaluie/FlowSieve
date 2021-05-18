@@ -106,23 +106,17 @@ void Cart_derivatives_at_point(
 
         // Compute x derivatives
         if (x_deriv_vals.at(ii) != NULL) {
-            *(x_deriv_vals.at(ii)) = 
-                  cx_lon * dfields_dlon.at(ii) 
-                + cx_lat * dfields_dlat.at(ii);
+            *(x_deriv_vals.at(ii)) = cx_lon * dfields_dlon.at(ii) + cx_lat * dfields_dlat.at(ii);
         }
 
         // Compute y derivatives
         if (y_deriv_vals.at(ii) != NULL) {
-            *(y_deriv_vals.at(ii)) = 
-                  cy_lon * dfields_dlon.at(ii) 
-                + cy_lat * dfields_dlat.at(ii);
+            *(y_deriv_vals.at(ii)) = cy_lon * dfields_dlon.at(ii) + cy_lat * dfields_dlat.at(ii);
         }
 
         // Compute z derivatives
         if (z_deriv_vals.at(ii) != NULL) {
-            *(z_deriv_vals.at(ii)) = 
-                  cz_lon * dfields_dlon.at(ii) 
-                + cz_lat * dfields_dlat.at(ii);
+            *(z_deriv_vals.at(ii)) = cz_lon * dfields_dlon.at(ii) + cz_lat * dfields_dlat.at(ii);
         }
 
     }
