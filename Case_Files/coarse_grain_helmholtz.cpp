@@ -34,7 +34,9 @@ int main(int argc, char *argv[]) {
             "Please update constants.hpp accordingly.");
 
     // Enable all floating point exceptions but FE_INEXACT
-    feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
+    //feenableexcept( FE_ALL_EXCEPT & ~FE_INEXACT & ~FE_UNDERFLOW );
+    //fprintf( stdout, " %d : %d \n", FE_ALL_EXCEPT, FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW | FE_INEXACT | FE_UNDERFLOW );
+    feenableexcept( FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW );
 
     // Specify the number of OpenMP threads
     //   and initialize the MPI world
@@ -135,7 +137,10 @@ int main(int argc, char *argv[]) {
 
     // If we're using FILTER_OVER_LAND, then the mask has been wiped out. Load in a mask that still includes land references
     //      so that we have both. Will be used to get 'water-only' region areas.
-    if (constants::FILTER_OVER_LAND) { read_mask_from_file( source_data.reference_mask, vel_field_var_name, vel_input_fname ); }
+    if (constants::FILTER_OVER_LAND) { 
+        read_mask_from_file( source_data.reference_mask, vel_field_var_name, vel_input_fname,
+               source_data.Nprocs_in_time, source_data.Nprocs_in_depth );
+    }
 
     // Read in the region definitions and compute region areas
     if ( check_file_existence( region_defs_fname ) ) {

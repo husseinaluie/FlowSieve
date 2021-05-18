@@ -166,7 +166,10 @@ int main(int argc, char *argv[]) {
 
     // If we're using FILTER_OVER_LAND, then the mask has been wiped out. Load in a mask that still includes land references
     //      so that we have both. Will be used to get 'water-only' region areas.
-    if (constants::FILTER_OVER_LAND) { read_mask_from_file( source_data.reference_mask, zonal_vel_name, input_fname ); }
+    if (constants::FILTER_OVER_LAND) { 
+        read_mask_from_file( source_data.reference_mask, zonal_vel_name, input_fname,
+               source_data.Nprocs_in_time, source_data.Nprocs_in_depth );
+    }
 
     // Read in the region definitions and compute region areas
     if ( check_file_existence( region_defs_fname ) ) {
