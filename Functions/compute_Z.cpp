@@ -176,7 +176,7 @@ void compute_Z(
 
                     // u_i * tau_ij,j - (u_i * tau_ij)_,j
                     Z_tmp = omega->at(index) * tau_ij_j  -  u_i_tau_ij_j;
-                    enstrophy_transfer.at(index) += Z_tmp;
+                    enstrophy_transfer.at(index) += constants::rho0 * Z_tmp;
                         
                 }
             }
