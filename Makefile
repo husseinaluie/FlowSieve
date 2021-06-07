@@ -189,11 +189,13 @@ ALGLIB: ${ALGLIB_OBJS}
 CORE_TARGET_EXES := Case_Files/coarse_grain.x \
 					Case_Files/particles.x \
 					Case_Files/compare_particles.x \
-					Case_Files/project_onto_particles.x
+					Case_Files/project_onto_particles.x \
+					Case_Files/vonStorch.x
 CORE_TARGET_OBJS := Case_Files/coarse_grain.o \
 					Case_Files/particles.o \
 					Case_Files/compare_particles.o \
-					Case_Files/project_onto_particles.o
+					Case_Files/project_onto_particles.o \
+					Case_Files/vonStorch.o
 
 $(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
@@ -225,12 +227,16 @@ $(SW_TARGET_EXES): %.x : ${SW_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS} %.o
 # Building toroidal projection
 TOROID_TARGET_EXES := 	Case_Files/toroidal_projection.x \
 						Case_Files/potential_projection.x \
+						Case_Files/Helmholtz_projection.x \
+						Case_Files/Helmholtz_projection_SymTensor.x \
 						Case_Files/interpolator.x \
 						Case_Files/geostrophic_vel.x \
 						Case_Files/coarsen_grid.x \
 						Case_Files/refine_Helmholtz_seed.x
 TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
 						Case_Files/potential_projection.o \
+						Case_Files/Helmholtz_projection.o \
+						Case_Files/Helmholtz_projection_SymTensor.o \
 						Case_Files/interpolator.o \
 						Case_Files/geostrophic_vel.o \
 						Case_Files/coarsen_grid.o \
@@ -243,10 +249,13 @@ $(TOROID_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} $
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -I ./ALGLIB -o $@ $^ $(LINKS) 
 
 # Building test scripts
-Tests/%.o: Tests/%.cpp constants.hpp
+TEST_TARGET_CPPS := $(wildcard  Tests/*.cpp)
+TEST_TARGET_OBJS := $(addprefix Tests/,$(notdir $(TEST_TARGET_CPPS:.cpp=.o)))
+TEST_TARGET_EXES := $(addprefix Tests/,$(notdir $(TEST_TARGET_CPPS:.cpp=.x)))
+$(TEST_TARGET_OBJS): %.o: %.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-Tests/%.x: Tests/%.o ${DIFF_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS}
+$(TEST_TARGET_EXES): %.x : %.o ${DIFF_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS}
 	$(MPICXX) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building fftw-based coarse_grain executable
