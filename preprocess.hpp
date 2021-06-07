@@ -117,6 +117,33 @@ void Apply_Potential_Projection(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
+void Apply_Helmholtz_Projection(
+        const std::string output_fname,
+        dataset & source_data,
+        const std::vector<double> & seed_tor,
+        const std::vector<double> & seed_pot,
+        const bool single_seed,
+        const double rel_tol,
+        const int max_iters,
+        const bool weight_err,
+        const bool use_mask,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void Apply_Helmholtz_Projection_SymTensor(
+        const std::string output_fname,
+        dataset & source_data,
+        const std::vector<double> & seed_v_r,
+        const std::vector<double> & seed_v_lon,
+        const std::vector<double> & seed_v_lat,
+        const bool single_seed,
+        const double rel_tol,
+        const int max_iters,
+        const bool weight_err,
+        const bool use_mask,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 /*!
  * \brief Computes the (toroidal) velocity corresponding to field F.
  * @ingroup ToroidalProjection
@@ -197,36 +224,24 @@ void toroidal_curl_u_dot_er(
         );
 
 
-/*!
- * \brief Builds the (sparse!) Laplacian differentiation operator.
- * @ingroup ToroidalProjection
- *
- * Uses the differentation order specified in contants.hpp
- *
- * Currently only handles spherical coordinates.
- *
- * @param[in,out]   Lap                     Where to store the (sparse) differentiation matrix
- * @param[in]       longitude,latitude      Grid vectors (1D)
- * @param[in]       Itime,Idepth            Current time-depth iteration
- * @param[in]       Ntime,Ndepth,Nlat,Nlon  Dimension sizes
- * @param[in]       mask                    Array to distinguish land/water
- * @param[in]       areas                   Array giving the size of each cell
- * @param[in]       area_weight             Bool indicating if the Laplacian should be weighted by cell-size (i.e. weight error by cell size). Default is false.
- *
- */
 void toroidal_sparse_Lap(
         alglib::sparsematrix & Lap,
-        const std::vector<double> & latitude,
-        const std::vector<double> & longitude,
+        const dataset & source_data,
         const int Itime,
         const int Idepth,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
         const std::vector<bool> & mask,
-        const std::vector<double> & areas,
-        const bool area_weight = false
+        const bool area_weight = false,
+        const size_t row_skip = 0,
+        const size_t column_skip = 0
+        );
+
+void sparse_vel_from_PsiPhi(
+        alglib::sparsematrix & LHS_matr,
+        const dataset & source_data,
+        const int Itime,
+        const int Idepth,
+        const std::vector<bool> & mask,
+        const bool area_weight
         );
 
 

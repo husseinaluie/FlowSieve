@@ -140,8 +140,7 @@ void Apply_Potential_Projection(
     alglib::sparsematrix Lap;
     alglib::sparsecreate(Npts, Npts, Lap);
 
-    toroidal_sparse_Lap(Lap, latitude, longitude, Itime, Idepth,
-            Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask, dAreas, weight_err);
+    toroidal_sparse_Lap(Lap, source_data, Itime, Idepth, use_mask ? mask : unmask, weight_err);
     alglib::sparseconverttocrs(Lap);
 
     if (wRank == 0) {
