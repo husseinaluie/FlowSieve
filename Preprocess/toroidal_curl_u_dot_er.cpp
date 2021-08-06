@@ -26,7 +26,8 @@ void toroidal_curl_u_dot_er(
     // ret = ddlon(vel_lat) / cos_lat - ddlat( u_lon * cos_lat ) / cos_lat 
     //     = ddlon(vel_lat) / cos_lat - ddlat( u_lon ) + u_lon * tan_lat
 
-    int Ilat, Ilon, index, index_sub;
+    size_t index, index_sub;
+    int Ilat, Ilon;
     double dulat_dlon, dulon_dlat, tmp;
     std::vector<double*> lon_deriv_vals, lat_deriv_vals;
     std::vector<const std::vector<double>*> deriv_fields;
@@ -53,27 +54,20 @@ void toroidal_curl_u_dot_er(
         for (Ilat = 0; Ilat < Nlat; ++Ilat) {
             for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 
-                index = Index(Itime, Idepth, Ilat, Ilon,
-                              Ntime, Ndepth, Nlat, Nlon);
-                index_sub = Index(0, 0, Ilat, Ilon,
-                                  1, 1, Nlat, Nlon);
-                //tmp = constants::fill_value;
+                index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
                 tmp = 0.;
 
                 if (mask.at(index)) { // Skip land areas
 
                     spher_derivative_at_point(
-                            lon_deriv_vals, deriv_fields,
-                            longitude, "lon",
-                            Itime, Idepth, Ilat, Ilon,
-                            Ntime, Ndepth, Nlat, Nlon,
+                            lon_deriv_vals, deriv_fields, longitude, "lon",
+                            Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
                             mask);
 
                     spher_derivative_at_point(
-                            lat_deriv_vals, deriv_fields,
-                            latitude, "lat",
-                            Itime, Idepth, Ilat, Ilon,
-                            Ntime, Ndepth, Nlat, Nlon,
+                            lat_deriv_vals, deriv_fields, latitude, "lat",
+                            Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
                             mask);
 
                     // If we're too close to the pole (less than 0.01 degrees), bad things happen
@@ -90,9 +84,7 @@ void toroidal_curl_u_dot_er(
                     }
 
                     // If we have a seed, then subtract it off now
-                    if ( not(seed == NULL) ) {
-                        tmp = tmp - seed->at(index_sub);
-                    }
+                    if ( not(seed == NULL) ) { tmp = tmp - seed->at(index_sub); }
 
                 }
 

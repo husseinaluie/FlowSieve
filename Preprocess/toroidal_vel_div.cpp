@@ -19,7 +19,8 @@ void toroidal_vel_div(
         const std::vector<bool> & mask
     ) {
 
-    int Itime, Idepth, Ilat, Ilon, index;
+    size_t index;
+    int Itime, Idepth, Ilat, Ilon;
     double dulon_dlon, dulat_dlat, ulat, cos_lat, sin_lat, tmp_val;
     std::vector<double*> lon_deriv_vals, lat_deriv_vals;
     std::vector<const std::vector<double>*> lon_deriv_fields, lat_deriv_fields;
@@ -27,6 +28,8 @@ void toroidal_vel_div(
 
     lon_deriv_fields.push_back(&vel_lon);
     lat_deriv_fields.push_back(&vel_lat);
+
+    const size_t Npts = Ntime * Ndepth * Nlat * Nlon;
 
     #pragma omp parallel \
     default(none) \
@@ -40,7 +43,7 @@ void toroidal_vel_div(
         lat_deriv_vals.push_back(&dulat_dlat);
 
         #pragma omp for collapse(1) schedule(guided)
-        for (index = 0; index < (int)div.size(); ++index) {
+        for (index = 0; index < Npts; ++index) {
 
             tmp_val = constants::fill_value;
 
