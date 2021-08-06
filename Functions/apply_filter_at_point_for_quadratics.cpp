@@ -120,6 +120,7 @@ void apply_filter_at_point_for_quadratics(
             local_weight = kern * area;
 
             // If cell is water, or if we're not deforming around land, then include the cell area in the denominator
+            //      i.e. treat land cells as zero velocity, unless we're deforming around land
             if ( not(constants::DEFORM_AROUND_LAND) or is_water ) { kA_sum += local_weight; }
 
             // If the cell is water, add to the numerator
