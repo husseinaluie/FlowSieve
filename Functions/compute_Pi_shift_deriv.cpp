@@ -18,7 +18,7 @@
  * @param[in]       comm                            MPI communicator object
  *
  */
-void compute_Pi(
+void compute_Pi_shift_deriv(
         std::vector<double> & energy_transfer,
         const dataset & source_data,
         const std::vector<double> & ux,
@@ -58,8 +58,11 @@ void compute_Pi(
     size_t index;
     const size_t Npts = energy_transfer.size();
 
-    double ui_j, uj_i;
-    std::vector<double> tau_ij( ux.size() );
+    double tau_ij_j, u_i_tau_ij_j;
+    std::vector<double> tau_ij;
+    std::vector<double> u_i_tau_ij;
+    tau_ij.resize(ux.size());
+    u_i_tau_ij.resize(ux.size());
 
     // Some convenience handles
     //   note: the pointers aren't constant, but the things
@@ -69,7 +72,10 @@ void compute_Pi(
 
     // Set up the derivatives to pass through the differentiation functions
     std::vector<double*> x_deriv_vals, y_deriv_vals, z_deriv_vals;
-    std::vector<const std::vector<double>*> deriv_fields(2);
+    std::vector<const std::vector<double>*> deriv_fields;
+
+    deriv_fields.push_back(&tau_ij);
+    deriv_fields.push_back(&u_i_tau_ij);
 
     // Zero out energy transfer before we start
     std::fill( energy_transfer.begin(), energy_transfer.end(), 0.);
@@ -97,9 +103,6 @@ void compute_Pi(
                 case 2 : uj = &uz; break;
             }
 
-            deriv_fields[0] = ui;
-            deriv_fields[1] = uj;
-
             // uiuj (note that they're symmetric i.e. uiuj = ujui)
             switch (ii) {
                 case 0 :
@@ -125,8 +128,12 @@ void compute_Pi(
                     break;
             }
 
-            // Compute tau_ij 
-            #pragma omp parallel default(none) shared(tau_ij, mask, ui, uj, uiuj) private(index, uiuj_loc, ui_loc, uj_loc)
+            // First, compute the appropriate
+            //   tau_ij and u_i * tau_ij
+            #pragma omp parallel \
+            default(none) \
+            shared(tau_ij, u_i_tau_ij, mask, ui, uj, uiuj)\
+            private(index, uiuj_loc, ui_loc, uj_loc)
             {
                 #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
                 for (index = 0; index < Npts; index++) {
@@ -138,13 +145,19 @@ void compute_Pi(
                         uiuj_loc = uiuj->at(index);
 
                         tau_ij.at(index) = uiuj_loc - ui_loc * uj_loc;
+                        u_i_tau_ij.at(index) = ui_loc * tau_ij.at(index);
+
                     }
                 }
             }
 
-            #pragma omp parallel default(none) \
-            shared(energy_transfer, latitude, longitude, mask, ii, jj, ui, uj, tau_ij, deriv_fields)\
-            private(Itime, Idepth, Ilat, Ilon, index, pi_tmp, ui_j, uj_i, x_deriv_vals, y_deriv_vals, z_deriv_vals)
+            #pragma omp parallel \
+            default(none) \
+            shared(energy_transfer, latitude, longitude, mask,\
+                    jj, ui, tau_ij, u_i_tau_ij, deriv_fields)\
+            private(Itime, Idepth, Ilat, Ilon, index,\
+                    pi_tmp, tau_ij_j, u_i_tau_ij_j,\
+                    x_deriv_vals, y_deriv_vals, z_deriv_vals)
             {
 
                 x_deriv_vals.resize(2);
@@ -153,18 +166,20 @@ void compute_Pi(
 
                 // Now set the appropriate derivative pointers
                 //   in order to compute
-                //   ui,j and uj,i
-                x_deriv_vals.at(0) = (jj == 0) ? &ui_j : NULL;
-                x_deriv_vals.at(1) = (ii == 0) ? &uj_i : NULL;
+                //     tau_ij,j
+                //     (u_i * tau_ij)_,j
+                x_deriv_vals.at(0) = (jj == 0) ? &tau_ij_j     : NULL;
+                x_deriv_vals.at(1) = (jj == 0) ? &u_i_tau_ij_j : NULL;
 
-                y_deriv_vals.at(0) = (jj == 1) ? &ui_j : NULL;
-                y_deriv_vals.at(1) = (ii == 1) ? &uj_i : NULL;
+                y_deriv_vals.at(0) = (jj == 1) ? &tau_ij_j     : NULL;
+                y_deriv_vals.at(1) = (jj == 1) ? &u_i_tau_ij_j : NULL;
 
-                z_deriv_vals.at(0) = (jj == 2) ? &ui_j : NULL;
-                z_deriv_vals.at(1) = (ii == 2) ? &uj_i : NULL;
+                z_deriv_vals.at(0) = (jj == 2) ? &tau_ij_j     : NULL;
+                z_deriv_vals.at(1) = (jj == 2) ? &u_i_tau_ij_j : NULL;
 
                 // Now actually compute Pi
-                //   in particular, compute S_ij * tau_ij
+                //   in particular, compute
+                //           u_i * tau_ij,j - (u_i * tau_ij)_,j
                 #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
                 for (index = 0; index < Npts; index++) {
 
@@ -178,9 +193,9 @@ void compute_Pi(
                                 latitude, longitude, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
                                 mask);
 
-                        double Sij = 0.5 * ( ui_j + uj_i );
-                        pi_tmp = - constants::rho0 * Sij * tau_ij.at(index);
-                        energy_transfer.at(index) += pi_tmp;
+                        // u_i * tau_ij,j - (u_i * tau_ij)_,j
+                        pi_tmp = ui->at(index) * tau_ij_j  -  u_i_tau_ij_j;
+                        energy_transfer.at(index) += constants::rho0 * pi_tmp;
                     }
                 }
             }
