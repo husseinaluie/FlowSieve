@@ -79,7 +79,11 @@ void Apply_Postprocess_Routines(
 
     // Filename + file
     char filename[50];
-    snprintf(filename, 50, (filename_base + "_%.6gkm.nc").c_str(), filter_scale/1e3);
+    if (filter_scale >= 0) {
+        snprintf(filename, 50, (filename_base + "_%.6gkm.nc").c_str(), filter_scale/1e3);
+    } else {
+        snprintf(filename, 50, (filename_base + ".nc").c_str());
+    }
     initialize_postprocess_file(
             source_data, OkuboWeiss_dim_vals, vars_to_process,
             filename, filter_scale, do_OkuboWeiss
