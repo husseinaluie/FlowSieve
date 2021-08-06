@@ -16,11 +16,11 @@ void differentiation_vector(
     assert( (order_of_deriv == 1) or (order_of_deriv == 2) );
     if (order_of_deriv == 1) {
         // First order derivatives can have 2nd, 4th, or 6th order convergence
-        assert( (diff_ord == 2) or (diff_ord == 4) or (diff_ord == 6) );
+        assert( (diff_ord == 2) or (diff_ord == 3) or (diff_ord == 4) or (diff_ord == 6) );
     }
     if (order_of_deriv == 2) {
         // Second order derivatives can have 2nd, 4th, or 6th order convergence
-        assert( (diff_ord == 2) or (diff_ord == 4) or (diff_ord == 6) );
+        assert( (diff_ord == 2) or (diff_ord == 3) or (diff_ord == 4) or (diff_ord == 6) );
     }
 
     std::vector<double>::iterator i0;
@@ -59,6 +59,44 @@ void differentiation_vector(
                     case 3 :                // [-1.,  4., -5.,  2. ]
                         diff_array.insert(i0, { -1.,  4., -5.,  2. });
                         break;
+                } break;
+        }
+    } else if (diff_ord == 3) {
+        // Use second order
+        switch (order_of_deriv) {
+            case 1 :
+                scale_factor = 3.;
+                switch (index) {
+                    case 0 :                // [ -5.5,  9.,   -4.5,  1.  ] / 3
+                        diff_array.insert(i0, {  -5.5,  9.,   -4.5,  1.  });
+                        break;
+                    case 1 :                // [ -1.,  -1.5,   3.,  -0.5 ] / 3
+                        diff_array.insert(i0, {  -1.,  -1.5,   3.,  -0.5 });
+                        break;
+                    case 2 :                // [  0.5, -3.,    1.5,  1.  ] / 3
+                        diff_array.insert(i0, {   0.5, -3.,    1.5,  1.  });
+                        break;
+                    case 3 :                // [ -1.,   4.5,  -9.,   5.5 ] / 3
+                        diff_array.insert(i0, {  -1.,   4.5,  -9.,   5.5 });
+                        break;
+                } break;
+            case 2 :
+                scale_factor = 3.;
+                switch (index) {
+                    case 0 :                // [  8.75, -26.  ,  28.5 , -14.  ,   2.75] / 3
+                        diff_array.insert(i0, {   8.75, -26.  ,  28.5 , -14.  ,   2.75  });
+                        break;
+                    case 1 :                // [  2.75,  -5.  ,   1.5 ,   1.  ,  -0.25] / 3
+                        diff_array.insert(i0, {   2.75,  -5.  ,   1.5 ,   1.  ,  -0.25  });
+                        break;
+                    case 2 :                // [ -0.25,   4.  ,  -7.5 ,   4.  ,  -0.25] / 3
+                        diff_array.insert(i0, {  -0.25,   4.  ,  -7.5 ,   4.  ,  -0.25  });
+                        break;
+                    case 3 :                // [ -0.25,   1.  ,   1.5 ,  -5.  ,   2.75] / 3
+                        diff_array.insert(i0, {  -0.25,   1.  ,   1.5 ,  -5.  ,   2.75  });
+                        break;
+                    case 4 :                // [  2.75, -14.  ,  28.5 , -26.  ,   8.75] / 3
+                        diff_array.insert(i0, {   2.75, -14.  ,  28.5 , -26.  ,   8.75  });
                 } break;
         }
     } else if (diff_ord == 4) {
