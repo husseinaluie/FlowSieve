@@ -244,6 +244,31 @@ void compute_Pi(
         const std::vector<double> & uzuz,
         const MPI_Comm comm = MPI_COMM_WORLD);
 
+void compute_Pi_shift_deriv(
+        std::vector<double> & energy_transfer,
+        const dataset & source_data,
+        const std::vector<double> & ux,   
+        const std::vector<double> & uy,   
+        const std::vector<double> & uz,
+        const std::vector<double> & uxux, 
+        const std::vector<double> & uxuy, 
+        const std::vector<double> & uxuz,
+        const std::vector<double> & uyuy, 
+        const std::vector<double> & uyuz, 
+        const std::vector<double> & uzuz,
+        const MPI_Comm comm = MPI_COMM_WORLD);
+
+void compute_Pi_Helmholtz(
+        std::vector<double> & energy_transfer,
+        const dataset & source_data,
+        const std::vector<double> & ulon,
+        const std::vector<double> & ulat,
+        const std::vector<double> & ulon_ulon,
+        const std::vector<double> & ulon_ulat,
+        const std::vector<double> & ulat_ulat,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 void compute_Z(
         std::vector<double> & enstrophy_transfer,
         const dataset & source_data,
@@ -446,6 +471,8 @@ class InputParser {
         bool cmdOptionExists(const std::string &option) const;
 
         void getFilterScales( std::vector<double> &filter_scales, const std::string &argname ) const;
+
+        void getListofStrings( std::vector<std::string> &list_of_strings, const std::string &argname ) const;
 
     private:
         std::vector <std::string> tokens;

@@ -31,14 +31,14 @@ const std::string InputParser::getCmdOption(
     std::vector<std::string>::const_iterator itr;
     itr = std::find(this->tokens.begin(), this->tokens.end(), option);
     if (itr != this->tokens.end() && ++itr != this->tokens.end()){
-        #if DEBUG >= 1
+        #if DEBUG >= 0
         if (wRank == 0) {
             fprintf(stdout, " Commandline flag \"%s\" got value \"%s\"\n", option.c_str(), itr->c_str());
         }
         #endif
         return *itr;
     }
-    #if DEBUG >= 1
+    #if DEBUG >= 0
     if (wRank == 0) {
         fprintf(stdout, " Commandline flag \"%s\" received no value - will use default \"%s\"\n", 
                 option.c_str(), default_value.c_str());
@@ -69,7 +69,7 @@ void InputParser::getFilterScales( std::vector<double> &filter_scales, const std
           std::back_inserter( scales_as_strings ));
 
     // Convert the strings into doubles
-    #if DEBUG >= 1
+    #if DEBUG >= 0
     if (wRank == 0) { fprintf(stdout, "Filter scales (%zu) are: ", scales_as_strings.size()); }
     #endif
     filter_scales.resize( scales_as_strings.size() );
@@ -81,7 +81,7 @@ void InputParser::getFilterScales( std::vector<double> &filter_scales, const std
                     scales_as_strings.at(ii).c_str());
             assert(false);
         }
-        #if DEBUG >= 1
+        #if DEBUG >= 0
         if (wRank == 0) { 
             double curr_scale = filter_scales.at(ii);
             if ( curr_scale >= 1000. ) {
@@ -92,7 +92,33 @@ void InputParser::getFilterScales( std::vector<double> &filter_scales, const std
         }
         #endif
     }
+    #if DEBUG >= 0
+    if (wRank == 0) { fprintf(stdout, "\n\n"); }
+    #endif
+
+}
+
+void InputParser::getListofStrings( std::vector<std::string> &list_of_strings, const std::string &argname ) const{
+
+    int wRank=-1;
+    MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
+
+    //using namespace std;
+    const std::string raw_input_string = getCmdOption( argname, "" );
+    assert( raw_input_string.size() > 0 );
+
+    std::istringstream iss( raw_input_string );
+
+    // Split up the list of inputs based on white space into separate strings
+    copy( std::istream_iterator< std::string >(iss), 
+          std::istream_iterator< std::string >(), 
+          std::back_inserter( list_of_strings ));
+
     #if DEBUG >= 1
+    if (wRank == 0) { fprintf(stdout, "String arguments for %s are: ", argname.c_str()); }
+    for ( size_t II = 0; II < list_of_strings.size(); II++ ) {
+        if (wRank == 0) { fprintf(stdout, "  %s", list_of_strings.at(II).c_str()); }
+    }
     if (wRank == 0) { fprintf(stdout, "\n\n"); }
     #endif
 
