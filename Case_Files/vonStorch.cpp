@@ -13,10 +13,13 @@
 #include "../functions.hpp"
 #include "../differentiation_tools.hpp"
 #include "../constants.hpp"
+#include "../postprocess.hpp"
 
 int main(int argc, char *argv[]) {
     
     static_assert ( not(constants::FILTER_OVER_LAND), "Cannot have FILTER_OVER_LAND on when computing vonStorch" );
+
+    static_assert( not( constants::DO_OKUBOWEISS_ANALYSIS ), "No OkuboWeiss available to pass to post-processing." );
 
     // Enable all floating point exceptions but FE_INEXACT
     //feenableexcept( FE_ALL_EXCEPT & ~FE_INEXACT & ~FE_UNDERFLOW );
@@ -46,7 +49,8 @@ int main(int argc, char *argv[]) {
 
     // first argument is the flag, second argument is default value (for when flag is not present)
     const std::string   &input_fname        = input.getCmdOption("--input_file",    "input.nc"),
-                        &output_fname       = input.getCmdOption("--output_file",   "vonStorch.nc");
+                        &output_fname       = input.getCmdOption("--output_file",   "vonStorch.nc"),
+                        &postproc_fname     = input.getCmdOption("--postproc_file", "postprocess");
 
     const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
                         &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
@@ -62,9 +66,13 @@ int main(int argc, char *argv[]) {
 
     const std::string   &zonal_vel_name = input.getCmdOption("--zonal_vel", "uo"),
                         &merid_vel_name = input.getCmdOption("--merid_vel", "vo"),
-                        &tau_uu_name    = input.getCmdOption("--tau_uu",    "tau_uu"),
-                        &tau_uv_name    = input.getCmdOption("--tau_uv",    "tau_uv"),
-                        &tau_vv_name    = input.getCmdOption("--tau_vv",    "tau_vv");
+                        &uu_name    = input.getCmdOption("--uu",    "uu"),
+                        &uv_name    = input.getCmdOption("--uv",    "uv"),
+                        &vv_name    = input.getCmdOption("--vv",    "vv");
+
+    const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    "region_definitions.nc"),
+                        &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     "region"),
+                        &region_defs_var_name = input.getCmdOption("--region_definitions_var",     "region_definition");
 
     // Print processor assignments
     const int max_threads = omp_get_max_threads();
@@ -101,19 +109,19 @@ int main(int argc, char *argv[]) {
     source_data.load_variable( "zonal_vel", zonal_vel_name, input_fname, true, true );
     source_data.load_variable( "merid_vel", merid_vel_name, input_fname, true, true );
 
-    source_data.load_variable( "tau_uu", tau_uu_name, input_fname, false, true );
-    source_data.load_variable( "tau_uv", tau_uv_name, input_fname, false, true );
-    source_data.load_variable( "tau_vv", tau_vv_name, input_fname, false, true );
+    source_data.load_variable( "uu", uu_name, input_fname, true, true );
+    source_data.load_variable( "uv", uv_name, input_fname, true, true );
+    source_data.load_variable( "vv", vv_name, input_fname, true, true );
 
     const std::vector<double>   &latitude  = source_data.latitude,
                                 &longitude = source_data.longitude;
 
     const std::vector<double>   &u_lon  = source_data.variables.at("zonal_vel"),
                                 &u_lat  = source_data.variables.at("merid_vel"),
-                                &tau_uu = source_data.variables.at("tau_uu"),
-                                &tau_uv = source_data.variables.at("tau_uv"),
-                                &tau_vu = source_data.variables.at("tau_uv"),
-                                &tau_vv = source_data.variables.at("tau_vv");
+                                &uu = source_data.variables.at("uu"),
+                                &uv = source_data.variables.at("uv"),
+                                &vu = source_data.variables.at("uv"),
+                                &vv = source_data.variables.at("vv");
 
     // Get the MPI-local dimension sizes
     source_data.Ntime  = source_data.myCounts[0];
@@ -129,30 +137,59 @@ int main(int argc, char *argv[]) {
     mask_out_pole( source_data.latitude, source_data.mask, Ntime, Ndepth, Nlat, Nlon );
 
     // Compute vonStorch point-wise
-    std::vector<double> vonStorch( source_data.variables.at("zonal_vel").size() );
+    std::vector<double> vonStorch( source_data.variables.at("zonal_vel").size(), 0. );
     std::vector<const std::vector<double>*> deriv_fields { &u_lon, &u_lat };
 
     double ulon_lon, ulon_lat, ulat_lon, ulat_lat;
-    std::vector<double*>    lon_deriv_vals { &ulon_lon, &ulat_lon },
-                            lat_deriv_vals { &ulon_lat, &ulat_lat };
+    std::vector<double*> lon_deriv_vals, lat_deriv_vals;
 
-    for (int Idepth = 0; Idepth < source_data.Ndepth; Idepth++) {
-        for (int Ilat = 0; Ilat < source_data.Nlat; Ilat++) {
-            for (int Ilon = 0; Ilon < source_data.Nlon; Ilon++) {
+    const size_t Npts = Ntime * Ndepth * Nlat * Nlon;
+    size_t index;
+    int Itime, Idepth, Ilat, Ilon;
 
-                size_t index = Index( 0, Idepth, Ilat, Ilon, 1, Ndepth, Nlat, Nlon);
+    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
-                spher_derivative_at_point( lat_deriv_vals, deriv_fields, latitude,  "lat", 0, Idepth, Ilat, Ilon, 1, Ndepth, Nlat, Nlon, source_data.mask );
-                spher_derivative_at_point( lon_deriv_vals, deriv_fields, longitude, "lon", 0, Idepth, Ilat, Ilon, 1, Ndepth, Nlat, Nlon, source_data.mask );
+    double u_loc, v_loc, tau_uu, tau_uv, tau_vu, tau_vv;
+    #pragma omp parallel \
+    default(none) \
+    shared( source_data, latitude, longitude, deriv_fields, u_lon, u_lat, uu, uv, vu, vv, vonStorch )\
+    private( Itime, Idepth, Ilat, Ilon, index, ulon_lon, ulon_lat, ulat_lon, ulat_lat, lon_deriv_vals, lat_deriv_vals,\
+             u_loc, v_loc, tau_uu, tau_uv, tau_vu, tau_vv )
+    {
+
+        lon_deriv_vals.push_back( &ulon_lon );
+        lon_deriv_vals.push_back( &ulat_lon );
+
+        lat_deriv_vals.push_back( &ulon_lat );
+        lat_deriv_vals.push_back( &ulat_lat );
+
+        #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+        for ( index = 0; index < Npts; index++ ) {
+
+            if (source_data.mask.at(index)) {
+                Index1to4( index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+
+                spher_derivative_at_point( lat_deriv_vals, deriv_fields, latitude,  "lat", Itime, Idepth, Ilat, Ilon, 
+                                                                                           Ntime, Ndepth, Nlat, Nlon, source_data.mask );
+                spher_derivative_at_point( lon_deriv_vals, deriv_fields, longitude, "lon", Itime, Idepth, Ilat, Ilon, 
+                                                                                           Ntime, Ndepth, Nlat, Nlon, source_data.mask );
 
                 // rho0 * [ tau( u, vec(u) ) dot grad( u )  +  tau( v, vec(u) ) dot grad ( v ) ]
                 //      where tau( a, b ) = bar(ab) - bar(a) bar(b)
                 //      and bar(.) is a time mean
+                
+                u_loc = u_lon.at(index);
+                v_loc = u_lat.at(index);
+                tau_uu = uu.at(index) - u_loc * u_loc;
+                tau_uv = uv.at(index) - u_loc * v_loc;
+                tau_vu = vu.at(index) - v_loc * u_loc;
+                tau_vv = vv.at(index) - v_loc * v_loc;
+                      
                 vonStorch.at(index) = ( constants::rho0 / constants::R_earth ) * (
-                              tau_uu.at(index) * ulon_lon / cos(latitude.at(Ilat))
-                            + tau_uv.at(index) * ulon_lat 
-                            + tau_vu.at(index) * ulat_lon / cos(latitude.at(Ilat))
-                            + tau_vv.at(index) * ulat_lat
+                              tau_uu * ulon_lon / cos(latitude.at(Ilat))
+                            + tau_uv * ulon_lat 
+                            + tau_vu * ulat_lon / cos(latitude.at(Ilat))
+                            + tau_vv * ulat_lat
                         );
             }
         }
@@ -162,14 +199,42 @@ int main(int argc, char *argv[]) {
     //// Write the output
     //
     const int ndims = 4;
-    size_t starts[ndims] = { 0, 0,              0,            0            };
-    size_t counts[ndims] = { 1, size_t(Ndepth), size_t(Nlat), size_t(Nlon) };
+    size_t starts[ndims] = { 0,     0,      0,    0    };
+    size_t counts[ndims] = { Ntime, Ndepth, Nlat, Nlon };
 
     std::vector<std::string> vars_to_write;
     vars_to_write.push_back("C_Km_Ke");
 
-    initialize_output_file( source_data, vars_to_write, output_fname.c_str(), -1);
-    write_field_to_output( vonStorch, "C_Km_Ke", starts, counts, output_fname.c_str(), &(source_data.mask) );
+    if ( not( constants::NO_FULL_OUTPUTS ) ) {
+        initialize_output_file( source_data, vars_to_write, output_fname.c_str(), -1);
+        write_field_to_output( vonStorch, "C_Km_Ke", starts, counts, output_fname.c_str(), &(source_data.mask) );
+    }
+
+    //
+    //// Also do postprocess for region summing
+    //
+
+    // Read in the region definitions and compute region areas
+    if ( check_file_existence( region_defs_fname ) ) {
+        // If the file exists, then read in from that
+        source_data.load_region_definitions( region_defs_fname, region_defs_dim_name, region_defs_var_name );
+    } else {
+        // Otherwise, just make a single region which is the entire domain
+        source_data.region_names.push_back("full_domain");
+        source_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
+                                    "full_domain", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
+                );
+        source_data.compute_region_areas();
+    }
+
+    std::vector<const std::vector<double>*> postprocess_fields;
+    std::vector<std::string> postprocess_names;
+
+    postprocess_names.push_back( "C_Km_Ke" );
+    postprocess_fields.push_back( &vonStorch );
+
+    std::vector<double> OkuboWeiss;
+    Apply_Postprocess_Routines( source_data, postprocess_fields, postprocess_names, OkuboWeiss, -1, postproc_fname );
 
     // Done!
     MPI_Finalize();
