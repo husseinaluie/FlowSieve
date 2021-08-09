@@ -19,7 +19,7 @@ proj = Proj( proj = 'wag7', lon_0 = 0., lat_0 = 0. )
 Xp_coarse, Yp_coarse = proj(LON, LAT, inverse=False)
 
 
-with Dataset('velocity_sample.nc', 'r') as dset:
+with Dataset('../velocity_sample.nc', 'r') as dset:
     lat = dset['latitude' ][:]
     lon = dset['longitude'][:]
     
@@ -31,17 +31,15 @@ Xp_fine, Yp_fine = proj(LON, LAT, inverse=False)
 
 def get_results( res, kind ):
 
-    tor_fname = 'toroidal_projection.nc'  if (res == 'fine') else 'coarse_toroidal_projection.nc'
-    pot_fname = 'potential_projection.nc' if (res == 'fine') else 'coarse_potential_projection.nc'
-    src_fname = 'velocity_sample.nc'      if (res == 'fine') else 'coarsened_sample.nc'
+    ui_proj_fname   = 'projection_ui.nc'      if (res == 'fine') else 'coarse_projection_ui.nc'
+    src_fname       = '../velocity_sample.nc' if (res == 'fine') else 'coarsened_sample.nc'
 
-    with Dataset(tor_fname, 'r') as tor_set:
-        u_lon_tor = tor_set['u_lon'][0,0,:,:]
-        u_lat_tor = tor_set['u_lat'][0,0,:,:]
+    with Dataset(ui_proj_fname, 'r') as dset:
+        u_lon_tor = dset['u_lon_tor'][0,0,:,:]
+        u_lat_tor = dset['u_lat_tor'][0,0,:,:]
 
-    with Dataset(pot_fname, 'r') as pot_set:
-        u_lon_pot = pot_set['u_lon'][0,0,:,:]
-        u_lat_pot = pot_set['u_lat'][0,0,:,:]
+        u_lon_pot = dset['u_lon_pot'][0,0,:,:]
+        u_lat_pot = dset['u_lat_pot'][0,0,:,:]
 
     u_lon_proj = u_lon_tor + u_lon_pot
     u_lat_proj = u_lat_tor + u_lat_pot
@@ -65,6 +63,22 @@ def get_results( res, kind ):
         return u_lat_tor, u_lat_pot, u_lat_src, u_lat_proj, u_lat_diff
     elif kind == 'KE':
         return KE_tor, KE_pot, KE_src, KE_proj, KE_diff
+
+def get_results_uiuj( res = 'fine' ):
+
+    uiuj_proj_fname = 'projection_uiuj.nc'    if (res == 'fine') else 'coarse_projection_uiuj.nc'
+    src_fname       = '../velocity_sample.nc' if (res == 'fine') else 'coarsened_sample.nc'
+
+    with Dataset(uiuj_proj_fname, 'r') as dset:
+        uu = dset['uu'][0,0,:,:]
+        uv = dset['uv'][0,0,:,:]
+        vv = dset['vv'][0,0,:,:]
+
+    with Dataset(src_fname, 'r') as src:
+        u = src['uo'][0,0,:,:]
+        v = src['vo'][0,0,:,:]
+
+    return u, v, uu, uv, vv
 
 
 for kind in ['u_lon', 'u_lat', 'KE']:
@@ -119,50 +133,48 @@ for kind in ['u_lon', 'u_lat', 'KE']:
 
 
 
+###
+##
+###
 
-fig, axes = plt.subplots( 3, 2, sharex = True, sharey = True, figsize = (6,5), gridspec_kw = dict( left = 0.05, bottom = 0.05, top = 0.95, right = 0.95 ) )
+u, v, uu, uv, vv = get_results_uiuj()
 
-with Dataset('toroidal_projection.nc', 'r') as tor_set:
-    F_tor       = tor_set['F'     ][0,0,:,:]
-    F_tor_seed  = tor_set['F_seed'][0,0,:,:]
+cv = max( np.max( np.abs(u*u) ), np.max(np.abs( u*v ) ), np.max(np.abs( v*v ) ) )
+cmap = 'bwr'
+norm = colors.SymLogNorm( vmin = -cv, vmax = cv, linthresh = cv / 1e5 )
 
-with Dataset('potential_projection.nc', 'r') as pot_set:
-    F_pot       = pot_set['F'     ][0,0,:,:]
-    F_pot_seed  = pot_set['F_seed'][0,0,:,:]
+gridspec_props = dict(wspace = 0.075, hspace = 0.05, left = 0.05, right = 0.95, bottom = 0.05, top = 0.9)
 
-with Dataset('coarse_toroidal_projection.nc', 'r') as tor_set:
-    F_tor_coarse = tor_set['F'][0,0,:,:]
-
-with Dataset('coarse_potential_projection.nc', 'r') as pot_set:
-    F_pot_coarse = pot_set['F'][0,0,:,:]
-
-norm_tor = colors.Normalize( vmin = F_tor.min(), vmax = F_tor.max() )
-norm_pot = colors.Normalize( vmin = F_pot.min(), vmax = F_pot.max() )
-cmap = 'viridis'
+fig, axes = plt.subplots(3, 3, sharex=True, sharey=True, figsize=(9, 6), gridspec_kw = gridspec_props)
 
 qms = np.zeros(axes.shape, dtype='object')
-qms[0,0] = axes[0,0].pcolormesh( Xp_coarse, Yp_coarse, F_tor_coarse,  cmap = cmap, norm = norm_tor )
-qms[0,1] = axes[0,1].pcolormesh( Xp_coarse, Yp_coarse, F_pot_coarse,  cmap = cmap, norm = norm_pot )
 
-qms[1,0] = axes[1,0].pcolormesh( Xp_fine, Yp_fine, F_tor_seed,  cmap = cmap, norm = norm_tor )
-qms[1,1] = axes[1,1].pcolormesh( Xp_fine, Yp_fine, F_pot_seed,  cmap = cmap, norm = norm_pot )
+qms[0,0] = axes[0,0].pcolormesh( Xp_fine, Yp_fine, u*u,       cmap = cmap, norm = norm )
+qms[0,1] = axes[0,1].pcolormesh( Xp_fine, Yp_fine, uu,        cmap = cmap, norm = norm )
+qms[0,2] = axes[0,2].pcolormesh( Xp_fine, Yp_fine, u*u - uu,  cmap = cmap, norm = norm )
 
-qms[2,0] = axes[2,0].pcolormesh( Xp_fine, Yp_fine, F_tor,  cmap = cmap, norm = norm_tor )
-qms[2,1] = axes[2,1].pcolormesh( Xp_fine, Yp_fine, F_pot,  cmap = cmap, norm = norm_pot )
+qms[1,0] = axes[1,0].pcolormesh( Xp_fine, Yp_fine, u*v,       cmap = cmap, norm = norm )
+qms[1,1] = axes[1,1].pcolormesh( Xp_fine, Yp_fine, uv,        cmap = cmap, norm = norm )
+qms[1,2] = axes[1,2].pcolormesh( Xp_fine, Yp_fine, u*v - uv,  cmap = cmap, norm = norm )
 
-axes[0,0].set_ylabel('Coarse Result')
-axes[1,0].set_ylabel('Fine Seed')
-axes[2,0].set_ylabel('Fine Result')
+qms[2,0] = axes[2,0].pcolormesh( Xp_fine, Yp_fine, v*v,       cmap = cmap, norm = norm )
+qms[2,1] = axes[2,1].pcolormesh( Xp_fine, Yp_fine, vv,        cmap = cmap, norm = norm )
+qms[2,2] = axes[2,2].pcolormesh( Xp_fine, Yp_fine, v*v - vv,  cmap = cmap, norm = norm )
 
-axes[0,0].set_title('Toroidal')
-axes[0,1].set_title('Potential')
 
-cb0 = plt.colorbar( qms[0,0], ax = axes[:,0] )
-cb1 = plt.colorbar( qms[0,1], ax = axes[:,1] )
-
+cb = plt.colorbar( qms[0,0], ax = axes )
+            
 for ax in axes.ravel():
     ax.set_xticklabels([])
     ax.set_yticklabels([])
+            
+axes[0,0].set_title('Original')
+axes[0,1].set_title('Helmholtz')
+axes[0,2].set_title('Difference')
 
-plt.savefig('Psi_Phi.png', dpi = 350)
+axes[0,0].set_ylabel('u*u')
+axes[1,0].set_ylabel('u*v')
+axes[2,0].set_ylabel('v*v')
+
+plt.savefig( 'uiuj_projection_results.png', dpi = 250)
 plt.close()

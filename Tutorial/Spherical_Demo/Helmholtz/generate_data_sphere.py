@@ -33,7 +33,7 @@ eddy_scales = [ 250e3, 750e3, 3500e3 ]
 eddy_counts = [ 1e3,   3e2,   5e1 ]
 eddy_velocs = [ 0.2,   0.4,   0.1 ]
 
-u_lon_mean_value = 0.01
+u_lon_mean_value = 0.0
 
 
 # Function to compute distances on sphere
@@ -72,10 +72,7 @@ for scale, count, veloc in zip( eddy_scales, eddy_counts, eddy_velocs ):
 
 # Add in continent info
 D2R = np.pi / 180.
-coast_lat = - 70 * D2R
-coast_wid =    4 * D2R
-coast_cut =  -80 * D2R
-for coast_lat, coast_wid, coast_cut in zip( [-60*D2R, 60*D2R], [4*D2R, 4*D2R], [-70*D2R, 70*D2R] ):
+for coast_lat, coast_wid in zip( [-65*D2R, 65*D2R], [4*D2R, 4*D2R] ):
     ENV = 0.5 * ( 1 + np.tanh( -1 * np.sign(coast_lat) * (LAT - coast_lat) / coast_wid ) )
     Psi *= ENV
 
