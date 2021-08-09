@@ -190,12 +190,14 @@ CORE_TARGET_EXES := Case_Files/coarse_grain.x \
 					Case_Files/particles.x \
 					Case_Files/compare_particles.x \
 					Case_Files/project_onto_particles.x \
-					Case_Files/vonStorch.x
+					Case_Files/vonStorch.x \
+					Case_Files/vonStorch_year_sets.x
 CORE_TARGET_OBJS := Case_Files/coarse_grain.o \
 					Case_Files/particles.o \
 					Case_Files/compare_particles.o \
 					Case_Files/project_onto_particles.o \
-					Case_Files/vonStorch.o
+					Case_Files/vonStorch.o \
+					Case_Files/vonStorch_year_sets.o
 
 $(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
@@ -229,18 +231,24 @@ TOROID_TARGET_EXES := 	Case_Files/toroidal_projection.x \
 						Case_Files/potential_projection.x \
 						Case_Files/Helmholtz_projection.x \
 						Case_Files/Helmholtz_projection_SymTensor.x \
+						Case_Files/Helmholtz_projection_uiuj.x \
 						Case_Files/interpolator.x \
 						Case_Files/geostrophic_vel.x \
 						Case_Files/coarsen_grid.x \
-						Case_Files/refine_Helmholtz_seed.x
+						Case_Files/coarsen_grid_linear.x \
+						Case_Files/refine_Helmholtz_seed.x \
+						Case_Files/Pi_helm_breakdown.x
 TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
 						Case_Files/potential_projection.o \
 						Case_Files/Helmholtz_projection.o \
 						Case_Files/Helmholtz_projection_SymTensor.o \
+						Case_Files/Helmholtz_projection_uiuj.o \
 						Case_Files/interpolator.o \
 						Case_Files/geostrophic_vel.o \
 						Case_Files/coarsen_grid.o \
-						Case_Files/refine_Helmholtz_seed.o
+						Case_Files/coarsen_grid_linear.o \
+						Case_Files/refine_Helmholtz_seed.o \
+						Case_Files/Pi_helm_breakdown.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
