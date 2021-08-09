@@ -49,12 +49,27 @@ double true_deriv_lon(const double lat, const double lon) {
     return ret_val;
 }
 
+double true_deriv2_lon(const double lat, const double lon) {
+    double ret_val = - 64 * cos(8 * lon + 10 * lat) * exp( - pow( lat / (M_PI / 6), 2));
+    return ret_val;
+}
+
 double true_deriv_lat(const double lat, const double lon) {
     double ret_val =        cos(8 * lon + 10 * lat) 
                                 * exp( - pow( lat / (M_PI / 6), 2)) 
                                 * (- 2 * lat / pow(M_PI/6, 2))
                      - 10 * sin(8 * lon + 10 * lat) 
                                 * exp( - pow( lat / (M_PI / 6), 2));
+    return ret_val;
+
+double true_deriv2_lat(const double lat, const double lon) {
+    const double    L = M_PI / 6,
+                    trig_arg = 8 * lon + 10 * lat,
+                    exp_arg  = - pow( lat / L, 2);
+
+    double ret_val = ( -100 - 2/pow(L,2) + 4*pow(lat/L,2) ) * cos( trig_arg ) * exp( exp_arg )
+                     + 40 * lat / pow(L,2) * sin( trig_arg ) * exp( exp_arg );
+
     return ret_val;
 }
 

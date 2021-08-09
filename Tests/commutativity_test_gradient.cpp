@@ -42,13 +42,9 @@ double full_field(const double lat, const double lon) {
     return ret_val;
 }
 
-double mask_func(const double lat, const double lon) {
-    // 1 indicates water, 0 indicates land
-    double ret_val = 1.;
-
+bool mask_func(const double lat, const double lon) {
     // For now, no land, just water
-    
-    return ret_val;
+    return true;
 }
 
 int main(int argc, char *argv[]) {
@@ -61,44 +57,49 @@ int main(int argc, char *argv[]) {
     static_assert( constants::PERIODIC_X);
     static_assert(!constants::PERIODIC_Y);
 
-    const int Ntime  = 1;
-    const int Ndepth = 1;
-    const int Nlat   = 256;
-    const int Nlon   = 512;
-    const int Npts   = Ntime * Ndepth * Nlat * Nlon;
+    const int       Ntime  = 1,
+                    Ndepth = 1,
+                    Nlat   = 256,
+                    Nlon   = 512;
+    const size_t    Npts   = Ntime * Ndepth * Nlat * Nlon;
 
-    const int Itime  = 0;
-    const int Idepth = 0;
+    const int   Itime  = 0,
+                Idepth = 0;
 
-    const double lon_min = -M_PI;
-    const double lon_max =  M_PI;
+    const double    lon_min = -M_PI,
+                    lon_max =  M_PI,
+                    lat_min = -M_PI / 2,
+                    lat_max =  M_PI / 2;
 
-    const double lat_min = -M_PI / 2;
-    const double lat_max =  M_PI / 2;
-
-    double scale;
-    if (constants::CARTESIAN) {
-        scale = M_PI / 10.;
-    } else {
-        scale = 2500e3;
-    }
-    const double dlat = (lat_max - lat_min) / Nlat;
-    const double dlon = (lon_max - lon_min) / Nlon;
+    const double    scale = (constants::CARTESIAN) ? M_PI / 10. : 2500e3,
+                    dlat = (lat_max - lat_min) / Nlat,
+                    dlon = (lon_max - lon_min) / Nlon;
 
     // Create the grid
-    std::vector<double> times = { 0. };
-    std::vector<double> depth = { 0. };
-    std::vector<double> longitude(Nlon);
-    std::vector<double> latitude( Nlat);
-    std::vector<double> dArea( Npts);
-    std::vector<double> mask(  Npts);
+    std::vector<double> times = { 0. },
+                        depth = { 0. },
+                        longitude( Nlon ),
+                        latitude( Nlat ),
+                        field( Npts );
 
-    std::vector<double>  field(     Npts);
+    std::vector<bool> mask( Npts );
 
     for (int II = 0; II < Nlat; II++) { latitude.at( II) = lat_min + (II+0.5) * dlat; }
     for (int II = 0; II < Nlon; II++) { longitude.at(II) = lon_min + (II+0.5) * dlon; }
 
-    compute_areas(dArea, longitude, latitude);
+    dataset output_data;
+    output_data.time      = times;
+    output_data.depth     = depth;
+    output_data.latitude  = latitude;
+    output_data.longitude = longitude;
+
+    output_data.Ntime   = times.size();
+    output_data.Ndepth  = depth.size();
+    output_data.Nlat    = latitude.size();
+    output_data.Nlon    = longitude.size();
+
+    output_data.compute_cell_areas();
+
     int Ilat, Ilon, index, perc_base, perc, perc_count;
 
     // Initialize field
@@ -113,23 +114,16 @@ int main(int argc, char *argv[]) {
 
     // Differentiate the field
     fprintf(stdout, "   differentiation the field\n");
-    double ddlon_field, ddlat_field;
-    std::vector<double> gradf_lon(Npts);
-    std::vector<double> gradf_lat(Npts);
-
-    double ddx_field, ddy_field, ddz_field;
-    std::vector<double> gradf_x(Npts);
-    std::vector<double> gradf_y(Npts);
-    std::vector<double> gradf_z(Npts);
+    double ddlon_field, ddlat_field, ddx_field, ddy_field, ddz_field;
+    std::vector<double> gradf_lon(Npts), gradf_lat(Npts), gradf_x(Npts), gradf_y(Npts), gradf_z(Npts);
 
     std::vector<const std::vector<double>*> deriv_fields {&field};
 
-    std::vector<double*> lon_deriv_vals {&ddlon_field};
-    std::vector<double*> lat_deriv_vals {&ddlat_field};
-
-    std::vector<double*> x_deriv_vals {&ddx_field};
-    std::vector<double*> y_deriv_vals {&ddy_field};
-    std::vector<double*> z_deriv_vals {&ddz_field};
+    std::vector<double*>    lon_deriv_vals {&ddlon_field},
+                            lat_deriv_vals {&ddlat_field},
+                            x_deriv_vals {&ddx_field};
+                            y_deriv_vals {&ddy_field};
+                            z_deriv_vals {&ddz_field};
 
     perc_base = 5;
     perc = 0; 
@@ -176,15 +170,13 @@ int main(int argc, char *argv[]) {
     }
     fprintf(stdout, "\n");
 
-    std::vector<double> local_kernel(Npts);
-
-    std::vector<double> coarse(      Npts);
-    std::vector<double> coarse_ddlon(Npts);
-    std::vector<double> coarse_ddlat(Npts);
-
-    std::vector<double> coarse_ddx(Npts);
-    std::vector<double> coarse_ddy(Npts);
-    std::vector<double> coarse_ddz(Npts);
+    std::vector<double> local_kernel( Npts ),
+                        coarse(       Npts ),
+                        coarse_ddlon( Npts ),
+                        coarse_ddlat( Npts ),
+                        coarse_ddx(   Npts ),
+                        coarse_ddy(   Npts ),
+                        coarse_ddz(   Npts );
 
     int LAT_lb, LAT_ub;
 
@@ -228,7 +220,7 @@ int main(int argc, char *argv[]) {
                 gradf_x, gradf_y, gradf_z,\
                 coarse, coarse_ddlon, coarse_ddlat,\
                 coarse_ddx, coarse_ddy, coarse_ddz,\
-                LAT_lb, LAT_ub, dArea, mask, scale,\
+                LAT_lb, LAT_ub, mask, scale,\
                 latitude, longitude, filter_fields) \
         private(index, Ilon, filtered_vals,\
                 filt_field, filt_dfdlon, filt_dfdlat,\
@@ -260,7 +252,7 @@ int main(int argc, char *argv[]) {
                         Itime, Idepth, Ilat, Ilon,
                         longitude, latitude,
                         LAT_lb, LAT_ub,
-                        dArea, scale, mask, true,
+                        output_data.areas, scale, mask, true,
                         &local_kernel);
 
                 coarse.at(index) = filt_field;
@@ -280,12 +272,11 @@ int main(int argc, char *argv[]) {
     deriv_fields.resize(1);
     deriv_fields.at(0) = &coarse;
 
-    std::vector<double> ddlon_coarse(Npts);
-    std::vector<double> ddlat_coarse(Npts);
-
-    std::vector<double> ddx_coarse(Npts);
-    std::vector<double> ddy_coarse(Npts);
-    std::vector<double> ddz_coarse(Npts);
+    std::vector<double> ddlon_coarse( Npts ),
+                        ddlat_coarse( Npts ),
+                        ddx_coarse(   Npts ),
+                        ddy_coarse(   Npts ),
+                        ddz_coarse(   Npts );
 
     fprintf(stdout, "   differentiating filtered field\n");
 
@@ -360,8 +351,7 @@ int main(int argc, char *argv[]) {
     vars_to_write.push_back("ddz_coarse"  );
 
     fprintf(stdout, "  Initializing the file\n");
-    initialize_output_file(times, depth, longitude, latitude, mask,
-            vars_to_write, fname, scale);
+    initialize_output_file( output_data, vars_to_write, fname, scale );
 
     fprintf(stdout, "  Writing reference fields\n");
     write_field_to_output(field,  "field",  starts, counts, fname);
