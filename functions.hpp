@@ -69,7 +69,8 @@ class dataset {
                             const std::string var_name_in_file, 
                             const std::string filename,
                             const bool read_mask = true,
-                            const bool load_counts = true );
+                            const bool load_counts = true,
+                            const bool do_splits = true );
 
         // Load in region definitions
         void load_region_definitions(   const std::string filename, 
