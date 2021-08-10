@@ -187,12 +187,14 @@ ALGLIB: ${ALGLIB_OBJS}
 
 # Group together executables with similar compilations
 CORE_TARGET_EXES := Case_Files/coarse_grain.x \
+					Case_Files/coarse_grain_scalars.x \
 					Case_Files/particles.x \
 					Case_Files/compare_particles.x \
 					Case_Files/project_onto_particles.x \
 					Case_Files/vonStorch.x \
 					Case_Files/vonStorch_year_sets.x
 CORE_TARGET_OBJS := Case_Files/coarse_grain.o \
+					Case_Files/coarse_grain_scalars.o \
 					Case_Files/particles.o \
 					Case_Files/compare_particles.o \
 					Case_Files/project_onto_particles.o \
