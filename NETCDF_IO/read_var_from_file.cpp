@@ -162,7 +162,7 @@ void read_var_from_file(
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }
     fflush(stdout);
-    if (num_dims == 4) { fprintf( stdout, " MPI rank %d has sizes:a %'zu %'zu %'zu %'zu\n", wRank, count[0], count[1], count[2], count[3] ); }
+    //if (num_dims == 4) { fprintf( stdout, " MPI rank %d has sizes:a %'zu %'zu %'zu %'zu\n", wRank, count[0], count[1], count[2], count[3] ); }
     #endif
 
     // Now resize the vector to the appropriate size

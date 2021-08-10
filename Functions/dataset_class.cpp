@@ -11,12 +11,32 @@ dataset::dataset() {
 };
 
 void dataset::load_time( const std::string dim_name, const std::string filename ) {
-    read_var_from_file(time, dim_name, filename);
+    if ( ( dim_name == "DNE" ) or ( dim_name == "DOES_NOT_EXIST" ) ) {
+        time.resize(1);
+        time[0] = 0.;
+        #if DEBUG >= 1
+        int wRank=-1;
+        MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
+        if (wRank == 0) { fprintf(stdout, "Time dimension DNE, so setting as singleton.\n"); }
+        #endif
+    } else {
+        read_var_from_file(time, dim_name, filename);
+    }
     full_Ntime = time.size();
 };
 
 void dataset::load_depth( const std::string dim_name, const std::string filename ) {
-    read_var_from_file(depth, dim_name, filename);
+    if ( ( dim_name == "DNE" ) or ( dim_name == "DOES_NOT_EXIST" ) ) {
+        depth.resize(1);
+        depth[0] = 0.;
+        #if DEBUG >= 1
+        int wRank=-1;
+        MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
+        if (wRank == 0) { fprintf(stdout, "Depth dimension DNE, so setting as singleton.\n"); }
+        #endif
+    } else {
+        read_var_from_file(depth, dim_name, filename);
+    }
     full_Ndepth = depth.size();
 };
 
@@ -43,7 +63,8 @@ void dataset::load_variable(
         const std::string var_name_in_file, 
         const std::string filename,
         const bool read_mask,
-        const bool load_counts
+        const bool load_counts,
+        const bool do_splits
         ) {
 
     // Add a new entry to the variables dictionary with an empty array
@@ -54,7 +75,8 @@ void dataset::load_variable(
                         read_mask ? &mask : NULL, 
                         load_counts ? &myCounts : NULL, 
                         load_counts ? &myStarts : NULL, 
-                        Nprocs_in_time, Nprocs_in_depth );
+                        Nprocs_in_time, Nprocs_in_depth,
+                        do_splits );
 };
 
 void dataset::check_processor_divisions( const int Nprocs_in_time_input, const int Nprocs_in_depth_input, const MPI_Comm ) {
