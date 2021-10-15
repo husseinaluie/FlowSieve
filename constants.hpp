@@ -180,6 +180,7 @@ namespace constants
      * @ingroup constants
      */
     const bool COMP_TRANSFERS = true;
+    const bool COMP_PI_HELMHOLTZ = false;
 
     /*!
      * \param COMP_BC_TRANSFERS
