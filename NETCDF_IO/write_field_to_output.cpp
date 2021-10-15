@@ -25,7 +25,7 @@ void write_field_to_output(
     MPI_Comm_size( comm, &wSize );
 
     #if DEBUG >= 2
-    if (wRank == 0) { fprintf(stdout, "  Preparing to write %s to %s.\n", field_name.c_str(), filename.c_str()); }
+    if (wRank == 0) { fprintf(stdout, "  Preparing to write %s to %s (%'zu points).\n", field_name.c_str(), filename.c_str(), field.size()); }
     fflush(stdout);
     #endif
 
