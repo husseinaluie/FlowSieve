@@ -57,15 +57,22 @@ int main(int argc, char *argv[]) {
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string &input_fname       = input.getCmdOption("--input_file",  "input.nc");
-    const std::string &output_fname      = input.getCmdOption("--output_file", "output.nc");
+    const std::string   &input_fname       = input.getCmdOption("--input_file",  "input.nc"),
+                        &output_fname      = input.getCmdOption("--output_file", "output.nc");
 
-    const std::string &time_dim_name      = input.getCmdOption("--time",        "time");
-    const std::string &depth_dim_name     = input.getCmdOption("--depth",       "depth");
-    const std::string &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude");
-    const std::string &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
+                        &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude"),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
 
-    const std::string &ssh_vel_name = input.getCmdOption("--ssh_vel",   "zos");
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true");
+
+    const std::string &ssh_var_name = input.getCmdOption("--ssh_var",   "zos");
+
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1"),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
+                Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
     // Set OpenMP thread number
     const int max_threads = omp_get_max_threads();
@@ -84,24 +91,23 @@ int main(int argc, char *argv[]) {
     if (wRank == 0) { fprintf(stdout, "Reading in source data.\n\n"); }
     #endif
 
-    // Read in the grid coordinates
-    read_var_from_file(time,      time_dim_name,      input_fname);
-    read_var_from_file(depth,     depth_dim_name,     input_fname);
-    read_var_from_file(latitude,  latitude_dim_name,  input_fname);
-    read_var_from_file(longitude, longitude_dim_name, input_fname);
-     
-    convert_coordinates(longitude, latitude);
+    dataset source_data;
 
-    const int Ntime  = time.size();
-    const int Ndepth = depth.size();
-    const int Nlon   = longitude.size();
-    const int Nlat   = latitude.size();
-
-    std::vector<double> areas(Nlon * Nlat);
-    compute_areas(areas, longitude, latitude);
+    source_data.load_time(      time_dim_name,      input_fname );
+    source_data.load_depth(     depth_dim_name,     input_fname );
+    source_data.load_latitude(  latitude_dim_name,  input_fname );
+    source_data.load_longitude( longitude_dim_name, input_fname );
+    
+    // Apply some cleaning to the processor allotments if necessary.
+    source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
+    // Convert to radians, if appropriate
+    if ( (latlon_in_degrees == "true") and (not(constants::CARTESIAN)) ) {
+        convert_coordinates( source_data.longitude, source_data.latitude );
+    }
+    source_data.compute_cell_areas();
 
     // Read in the velocity fields
-    read_var_from_file(ssh, ssh_vel_name, input_fname, &mask, &myCounts, &myStarts);
+    read_var_from_file(ssh, ssh_var_name, input_fname, &mask, &myCounts, &myStarts, source_data.Nprocs_in_time, source_data.Nprocs_in_depth);
     u_lon.resize( ssh.size() );
     u_lat.resize( ssh.size() );
 
@@ -111,20 +117,20 @@ int main(int argc, char *argv[]) {
         counts.at(index) = myCounts.at(index);
     }
 
+    const int   Ntime  = myCounts[0],
+                Ndepth = myCounts[1],
+                Nlat   = source_data.Nlat,
+                Nlon   = source_data.Nlon;
+
     // Initialize output file
     std::vector<std::string> vars_to_write;
     vars_to_write.push_back("u_geos");
     vars_to_write.push_back("v_geos");
 
-    initialize_output_file(
-        time, depth, longitude, latitude, areas,
-        vars_to_write, output_fname.c_str(), 0.
-        );
+    initialize_output_file( source_data, vars_to_write, output_fname.c_str() );
 
     // Compute geostrophic velocity
-    toroidal_vel_from_F( u_lon, u_lat, ssh, 
-            longitude, latitude,
-            Ntime, Ndepth, Nlat, Nlon, mask);
+    toroidal_vel_from_F( u_lon, u_lat, ssh, source_data.longitude, source_data.latitude, Ntime, Ndepth, Nlat, Nlon, mask );
 
     // Now mask out the equator before writing the geostrophic velocities
     int Itime, Idepth, Ilat, Ilon;
@@ -137,7 +143,7 @@ int main(int argc, char *argv[]) {
         Index1to4(index, Itime, Idepth, Ilat, Ilon,
                          Ntime, Ndepth, Nlat, Nlon);
 
-        curr_lat = latitude.at(Ilat);
+        curr_lat = source_data.latitude.at(Ilat);
 
         if ( fabs( curr_lat * 180. / M_PI ) < eqr_cut ) {
             signum = (curr_lat >= 0) - (curr_lat < 0);
@@ -150,9 +156,8 @@ int main(int argc, char *argv[]) {
         u_lon.at(index) = u_lon.at(index) * constants::g / f_Coriolis; 
         u_lat.at(index) = u_lat.at(index) * constants::g / f_Coriolis; 
 
-        // Also mask out garbage
-        if ( ( fabs( u_lon.at(index) ) >= 1000. ) or ( fabs( u_lat.at(index) ) >= 1000. ) ) {
-            //mask.at(index) = false;
+        // If bad things happen outside of the equator, throw a warning
+        if ( ( ( fabs( u_lon.at(index) ) >= 1000. ) or ( fabs( u_lat.at(index) ) >= 1000. ) ) and ( signum == 0 ) ) {
             fprintf(stdout, "Bad point found!\n");
         }
     }
