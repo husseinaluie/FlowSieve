@@ -64,9 +64,21 @@ void get_lon_bounds(
             //   lines of latitude
             const double delta_lat = constants::R_earth * fabs( centre_lat - curr_lat ); 
             if ( delta_lat < padded_scale ) { 
-                const double cosrat =   cos( padded_scale     / constants::R_earth ) 
-                                      / cos( delta_lat        / constants::R_earth );
-                local_scale = acos( cosrat ) * constants::R_earth;
+                // Ratios subtended by the padded filter scale, and the current latitudinal extent
+                const double    padded_angle = padded_scale / constants::R_earth,
+                                lat_angle    = delta_lat / constants::R_earth;
+
+                if ( (padded_angle >= M_PI / 2) or (lat_angle >= M_PI / 2) ) {
+                    // If the padded angle exceeds pi / 2, then the arccos breaks.
+                    // For now, just make the whole sphere the integration range in this case.
+                    // This is more expensive than it needs to be! But need to sort out the
+                    // trig / spherical law of cosines for other quadrants.
+                    local_scale = 2 * M_PI * constants::R_earth;
+                } else {
+                    const double cosrat = cos( padded_angle ) / cos( lat_angle );
+                    local_scale = acos(cosrat) * constants::R_earth;
+                }
+
             } else {
                 local_scale = 0.;
             }
@@ -75,7 +87,8 @@ void get_lon_bounds(
 
         // Now find the appropriate integration region
         //   The factor of 2 is diameter->radius 
-        int dlon_N = std::min( Nlon, (int) ceil( ( local_scale / dlon_m ) / 2.) );
+        int dlon_N = int( std::min( (double) Nlon, ceil( ( local_scale / dlon_m ) / 2.) ) ); 
+        //int dlon_N = std::min( Nlon, (int) ceil( ( local_scale / dlon_m ) / 2.) );
 
         if (constants::PERIODIC_X) {
             LON_lb = Ilon - dlon_N;
