@@ -61,7 +61,8 @@ int main(int argc, char *argv[]) {
     // first argument is the flag, second argument is default value (for when flag is not present)
     const std::string   &tor_input_fname   = input.getCmdOption("--toroidal_input_file",        "toroidal_projection.nc"),
                         &pot_input_fname   = input.getCmdOption("--potential_input_file",       "potential_projection.nc"),
-                        &vel_input_fname   = input.getCmdOption("--velocity_input_file",        "toroidal_projection.nc");
+                        &vel_input_fname   = input.getCmdOption("--velocity_input_file",        "toroidal_projection.nc"),
+                        &quad_input_fname  = input.getCmdOption("--uiuj_Helmholtz_input_file",  "helmholtz_projection_uiuj.nc");
 
     const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
                         &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
@@ -75,9 +76,12 @@ int main(int argc, char *argv[]) {
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
-    const std::string   &tor_field_var_name = input.getCmdOption("--tor_field",   "F"),
-                        &pot_field_var_name = input.getCmdOption("--pot_field",   "F"),
-                        &vel_field_var_name = input.getCmdOption("--vel_field",   "u_lat");
+    const std::string   &tor_field_var_name     = input.getCmdOption("--tor_field",     "Psi"),
+                        &pot_field_var_name     = input.getCmdOption("--pot_field",     "Phi"),
+                        &vel_field_var_name     = input.getCmdOption("--vel_field",     "u_lat"),
+                        &uiuj_F_r_var_name      = input.getCmdOption("--uiuj_F_r",      "uiuj_F_r"),
+                        &uiuj_F_Phi_var_name    = input.getCmdOption("--uiuj_F_Phi",    "uiuj_F_Phi"),
+                        &uiuj_F_Psi_var_name    = input.getCmdOption("--uiuj_F_Psi",    "uiuj_F_Psi");
 
     const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    "region_definitions.nc"),
                         &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     "region"),
@@ -124,6 +128,13 @@ int main(int argc, char *argv[]) {
     // Read in the toroidal and potential fields
     source_data.load_variable( "F_potential", pot_field_var_name, pot_input_fname, false, true );
     source_data.load_variable( "F_toroidal",  tor_field_var_name, tor_input_fname, false, true );
+
+    // Read in the Helmholtz fields for uiuj
+    if ( constants::COMP_PI_HELMHOLTZ ) {
+        source_data.load_variable( "uiuj_F_r",      uiuj_F_r_var_name,      quad_input_fname, false, true );
+        source_data.load_variable( "uiuj_F_Phi",    uiuj_F_Phi_var_name,    quad_input_fname, false, true );
+        source_data.load_variable( "uiuj_F_Psi",    uiuj_F_Psi_var_name,    quad_input_fname, false, true );
+    }
 
     // Get the MPI-local dimension sizes
     source_data.Ntime  = source_data.myCounts[0];
