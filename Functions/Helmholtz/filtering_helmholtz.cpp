@@ -27,6 +27,16 @@ void filtering_helmholtz(
         const MPI_Comm comm
         ) {
 
+    // Get dimension sizes
+    const int   Nscales = scales.size(),
+                Ntime   = source_data.Ntime,    // this is the MPI-local Ntime, not the full Ntime
+                Ndepth  = source_data.Ndepth,   // this is the MPI-local Ndepth, not the full Ndepth
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
+    const unsigned int num_pts = Ntime * Ndepth * Nlat * Nlon;
+
+    const std::vector<double> zero_vector( num_pts, 0. );
+
     // Create some tidy names for variables
     const std::vector<double>   &time       = source_data.time,
                                 &depth      = source_data.depth,
@@ -36,6 +46,10 @@ void filtering_helmholtz(
 
     const std::vector<double>   &F_potential    = source_data.variables.at("F_potential"),
                                 &F_toroidal     = source_data.variables.at("F_toroidal");
+
+    const std::vector<double>   &uiuj_F_r   = ( constants::COMP_PI_HELMHOLTZ ) ? source_data.variables.at("uiuj_F_r")   : zero_vector,
+                                &uiuj_F_Phi = ( constants::COMP_PI_HELMHOLTZ ) ? source_data.variables.at("uiuj_F_Phi") : zero_vector,
+                                &uiuj_F_Psi = ( constants::COMP_PI_HELMHOLTZ ) ? source_data.variables.at("uiuj_F_Psi") : zero_vector;
 
     const std::vector<bool> &mask = source_data.mask;
 
@@ -55,20 +69,12 @@ void filtering_helmholtz(
     Timing_Records timing_records;
     double clock_on;
 
-    // Get dimension sizes
-    const int   Nscales = scales.size(),
-                Ntime   = source_data.Ntime,    // this is the MPI-local Ntime, not the full Ntime
-                Ndepth  = source_data.Ndepth,   // this is the MPI-local Ndepth, not the full Ndepth
-                Nlat    = source_data.Nlat,
-                Nlon    = source_data.Nlon;
-
     #if DEBUG >= 1
     if (wRank == 0) { fprintf( stdout, "\nPreparing to apply %d filters to data with (MPI-local) sizes (%'d - %'d - %'d - %'d) \n", Nscales, Ntime, Ndepth, Nlat, Nlon ); }
     #endif
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
-    const unsigned int num_pts = Ntime * Ndepth * Nlat * Nlon;
     char fname [50];
     
     const int ndims = 4;
@@ -90,6 +96,10 @@ void filtering_helmholtz(
         // Arrays to store filtered Phi and Psi fields (potential, pseudo-potential)
         coarse_F_tor(   num_pts, 0. ),
         coarse_F_pot(   num_pts, 0. ),
+
+        coarse_uiuj_F_r(   num_pts, 0. ),
+        coarse_uiuj_F_Phi( num_pts, 0. ),
+        coarse_uiuj_F_Psi( num_pts, 0. ),
 
         // Original KE
         KE_tor_orig(    num_pts, 0. ),
@@ -117,9 +127,9 @@ void filtering_helmholtz(
         KE_tot_filt(    num_pts, 0. ),
 
         // Enstrophy
-        Enst_tor(       num_pts, 0. ),
-        Enst_pot(       num_pts, 0. ),
-        Enst_tot(       num_pts, 0. ),
+        Enst_tor( num_pts, 0. ),
+        Enst_pot( num_pts, 0. ),
+        Enst_tot( num_pts, 0. ),
 
         // Velocity divergences
         div_tor(        num_pts, 0. ),
@@ -200,6 +210,11 @@ void filtering_helmholtz(
         u_lat_pot( num_pts, 0. ),
         u_lat_tot( num_pts, 0. ),
 
+        // Spherical - dyadix products
+        ulon_ulon( num_pts, 0. ),
+        ulon_ulat( num_pts, 0. ),
+        ulat_ulat( num_pts, 0. ),
+
         // Vorticity (only r component)
         vort_tor_r( num_pts, 0. ),
         vort_pot_r( num_pts, 0. ),
@@ -216,9 +231,15 @@ void filtering_helmholtz(
         OkuboWeiss_tot( num_pts, 0. ),
 
         // Pi
-        Pi_tor( num_pts, 0. ),
-        Pi_pot( num_pts, 0. ),
-        Pi_tot( num_pts, 0. ),
+        Pi_tor(  num_pts, 0. ),
+        Pi_pot(  num_pts, 0. ),
+        Pi_tot(  num_pts, 0. ),
+        Pi_Helm( num_pts, 0. ),
+
+        // Pi - shifted derivatives
+        Pi2_tor(  num_pts, 0. ),
+        Pi2_pot(  num_pts, 0. ),
+        Pi2_tot(  num_pts, 0. ),
 
         // Z ( enstrophy cascade )
         Z_tor( num_pts, 0. ),
@@ -288,6 +309,12 @@ void filtering_helmholtz(
         vars_to_write.push_back("coarse_F_tor");
         vars_to_write.push_back("coarse_F_pot");
 
+        if ( constants::COMP_PI_HELMHOLTZ ) {
+            vars_to_write.push_back("coarse_uiuj_F_r");
+            vars_to_write.push_back("coarse_uiuj_F_Phi");
+            vars_to_write.push_back("coarse_uiuj_F_Psi");
+        }
+
         vars_to_write.push_back("u_lon_tor");
         vars_to_write.push_back("u_lat_tor");
 
@@ -301,6 +328,13 @@ void filtering_helmholtz(
         vars_to_write.push_back("Pi_tor");
         vars_to_write.push_back("Pi_pot");
         vars_to_write.push_back("Pi_tot");
+        if ( constants::COMP_PI_HELMHOLTZ ) {
+            vars_to_write.push_back("Pi_Helm");
+        }
+
+        vars_to_write.push_back("Pi2_tor");
+        vars_to_write.push_back("Pi2_pot");
+        vars_to_write.push_back("Pi2_tot");
 
         vars_to_write.push_back("Z_tor");
         vars_to_write.push_back("Z_pot");
@@ -309,7 +343,7 @@ void filtering_helmholtz(
 
     if (not(constants::MINIMAL_OUTPUT)) {
         //
-        // There's outputs are only included if not set to minimal outputs
+        // These outputs are only included if not set to minimal outputs
         //
 
         vars_to_write.push_back("KE_tor_fine_mod");
@@ -337,6 +371,12 @@ void filtering_helmholtz(
         vars_to_write.push_back("vort_r_tor");
         vars_to_write.push_back("vort_r_pot");
         vars_to_write.push_back("vort_r_tot");
+
+        if ( constants::COMP_PI_HELMHOLTZ ) {
+            vars_to_write.push_back("coarse_uu");
+            vars_to_write.push_back("coarse_uv");
+            vars_to_write.push_back("coarse_vv");
+        }
     }
 
     // Compute the kernal alpha value (for baroclinic transfers)
@@ -363,6 +403,19 @@ void filtering_helmholtz(
     double F_tor_tmp;
     filter_fields.push_back(&F_toroidal);
     filt_use_mask.push_back(false);
+
+    double uiuj_F_r_tmp, uiuj_F_Phi_tmp, uiuj_F_Psi_tmp;
+    if ( constants::COMP_PI_HELMHOLTZ ) {
+        filter_fields.push_back(&uiuj_F_r);
+        filt_use_mask.push_back(false);
+
+        filter_fields.push_back(&uiuj_F_Psi);
+        filt_use_mask.push_back(false);
+
+        filter_fields.push_back(&uiuj_F_Phi);
+        filt_use_mask.push_back(false);
+    }
+
 
     double uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, vort_ux_tmp, vort_uy_tmp, vort_uz_tmp;
 
@@ -421,6 +474,18 @@ void filtering_helmholtz(
     postprocess_fields_tor.push_back( &Pi_tor );
     postprocess_fields_pot.push_back( &Pi_pot );
     postprocess_fields_tot.push_back( &Pi_tot );
+
+    postprocess_names.push_back( "Pi2" );
+    postprocess_fields_tor.push_back( &Pi2_tor );
+    postprocess_fields_pot.push_back( &Pi2_pot );
+    postprocess_fields_tot.push_back( &Pi2_tot );
+
+    if ( constants::COMP_PI_HELMHOLTZ ) {
+        postprocess_names.push_back( "Pi_Helm" );
+        postprocess_fields_tor.push_back( &Pi_Helm );
+        postprocess_fields_pot.push_back( &Pi_Helm );
+        postprocess_fields_tot.push_back( &Pi_Helm );
+    }
 
     postprocess_names.push_back( "Z" );
     postprocess_fields_tor.push_back( &Z_tor );
@@ -482,11 +547,13 @@ void filtering_helmholtz(
                 vort_ux_tor, vort_uy_tor, vort_uz_tor, \
                 vort_ux_pot, vort_uy_pot, vort_uz_pot, \
                 vort_ux_tot, vort_uy_tot, vort_uz_tot, \
-                KE_tor_filt, KE_pot_filt, KE_tot_filt \
+                KE_tor_filt, KE_pot_filt, KE_tot_filt, \
+                uiuj_F_r, uiuj_F_Phi, uiuj_F_Psi, coarse_uiuj_F_r, coarse_uiuj_F_Phi, coarse_uiuj_F_Psi\
                 ) \
         private(Itime, Idepth, Ilat, Ilon, index, \
                 F_tor_tmp, F_pot_tmp, uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, \
-                vort_ux_tmp, vort_uy_tmp, vort_uz_tmp, LAT_lb, LAT_ub, tid, filtered_vals) \
+                vort_ux_tmp, vort_uy_tmp, vort_uz_tmp, LAT_lb, LAT_ub, tid, filtered_vals, \
+                uiuj_F_r_tmp, uiuj_F_Phi_tmp, uiuj_F_Psi_tmp ) \
         firstprivate(perc, wRank, local_kernel, perc_count)
         {
 
@@ -494,6 +561,12 @@ void filtering_helmholtz(
 
             filtered_vals.push_back(&F_pot_tmp);
             filtered_vals.push_back(&F_tor_tmp);
+
+            if ( constants::COMP_PI_HELMHOLTZ ) {
+                filtered_vals.push_back(&uiuj_F_r_tmp);
+                filtered_vals.push_back(&uiuj_F_Psi_tmp);
+                filtered_vals.push_back(&uiuj_F_Phi_tmp);
+            }
 
             tid = omp_get_thread_num();
 
@@ -556,6 +629,15 @@ void filtering_helmholtz(
                             // Store the filtered values in the appropriate arrays
                             coarse_F_pot.at(index) = F_pot_tmp;
                             coarse_F_tor.at(index) = F_tor_tmp;
+
+                            if ( constants::COMP_PI_HELMHOLTZ ) {
+                                coarse_uiuj_F_r.at(  index) = uiuj_F_r_tmp;
+                                coarse_uiuj_F_Phi.at(index) = uiuj_F_Phi_tmp;
+                                if ( ( uiuj_F_Phi_tmp == 0 ) and ( wRank == 0 ) ) {
+                                    fprintf( stdout, " bar(F_phi[%'d,%'d]) = 0 (loc val is %'.4g)\n", Ilat, Ilon, uiuj_F_Phi.at(index) );
+                                }
+                                coarse_uiuj_F_Psi.at(index) = uiuj_F_Psi_tmp;
+                            }
 
                             if ( mask.at(index) ) {
                                 if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
@@ -645,6 +727,12 @@ void filtering_helmholtz(
             // Don't mask these fields, since they are filled over land from the projection
             write_field_to_output(coarse_F_tor, "coarse_F_tor", starts, counts, fname, NULL);
             write_field_to_output(coarse_F_pot, "coarse_F_pot", starts, counts, fname, NULL);
+
+            if ( constants::COMP_PI_HELMHOLTZ ) {
+                write_field_to_output(coarse_uiuj_F_r,   "coarse_uiuj_F_r",   starts, counts, fname, NULL);
+                write_field_to_output(coarse_uiuj_F_Phi, "coarse_uiuj_F_Phi", starts, counts, fname, NULL);
+                write_field_to_output(coarse_uiuj_F_Psi, "coarse_uiuj_F_Psi", starts, counts, fname, NULL);
+            }
         }
 
         // Get pot and tor velocities
@@ -673,6 +761,18 @@ void filtering_helmholtz(
 
             write_field_to_output(u_lon_pot, "u_lon_pot", starts, counts, fname, &mask);
             write_field_to_output(u_lat_pot, "u_lat_pot", starts, counts, fname, &mask);
+        }
+
+        // Get uiuj from corresponding Helmholtz
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+        if ( constants::COMP_PI_HELMHOLTZ ) {
+            uiuj_from_Helmholtz( ulon_ulon, ulon_ulat, ulat_ulat, coarse_uiuj_F_r, coarse_uiuj_F_Phi, coarse_uiuj_F_Psi, source_data );
+
+            if (not(constants::MINIMAL_OUTPUT)) {
+                write_field_to_output( ulon_ulon, "coarse_uu", starts, counts, fname, &mask );
+                write_field_to_output( ulon_ulat, "coarse_uv", starts, counts, fname, &mask );
+                write_field_to_output( ulat_ulat, "coarse_vv", starts, counts, fname, &mask );
+            }
         }
 
         // compute_vorticity gives vorticity, divergence, and OkuboWeiss
@@ -710,20 +810,35 @@ void filtering_helmholtz(
         vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_tor, u_lat_tor, source_data );
         compute_Pi( Pi_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor );
         compute_Z(  Z_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_tor_r, vort_ux_tor, vort_uy_tor, vort_uz_tor );
+        compute_Pi_shift_deriv( Pi2_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor );
 
         vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_pot, u_lat_pot, source_data );
         compute_Pi( Pi_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot );
         compute_Z(  Z_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_pot_r, vort_ux_pot, vort_uy_pot, vort_uz_pot );
+        compute_Pi_shift_deriv( Pi2_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot );
 
         vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_tot, u_lat_tot, source_data );
         compute_Pi( Pi_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot );
         compute_Z(  Z_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_tot_r, vort_ux_tot, vort_uy_tot, vort_uz_tot );
+        compute_Pi_shift_deriv( Pi2_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot );
+
+        if ( constants::COMP_PI_HELMHOLTZ ) {
+            compute_Pi_Helmholtz( Pi_Helm, source_data, u_lon_tot, u_lat_tot, ulon_ulon, ulon_ulat, ulat_ulat );
+        }
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_Pi_and_Z"); }
 
         if (not(constants::NO_FULL_OUTPUTS)) {
             write_field_to_output( Pi_tor, "Pi_tor", starts, counts, fname, &mask);
             write_field_to_output( Pi_pot, "Pi_pot", starts, counts, fname, &mask);
             write_field_to_output( Pi_tot, "Pi_tot", starts, counts, fname, &mask);
+
+            write_field_to_output( Pi2_tor, "Pi2_tor", starts, counts, fname, &mask);
+            write_field_to_output( Pi2_pot, "Pi2_pot", starts, counts, fname, &mask);
+            write_field_to_output( Pi2_tot, "Pi2_tot", starts, counts, fname, &mask);
+
+            if ( constants::COMP_PI_HELMHOLTZ ) {
+                write_field_to_output( Pi_Helm, "Pi_Helm", starts, counts, fname, &mask);
+            }
 
             write_field_to_output( Z_tor, "Z_tor", starts, counts, fname, &mask);
             write_field_to_output( Z_pot, "Z_pot", starts, counts, fname, &mask);
