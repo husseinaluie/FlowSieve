@@ -60,6 +60,9 @@ double distance(
                             cos_lat1        = cos( lat1 ),
                             sin_lat1        = sin( lat1 ),
                             cos_Delta_lon   = cos( Delta_lon );
+        if ( isinf( lon1 ) ) {
+            fprintf( stdout, " %'g, %'g, %'g, %'g \n", lon1, lon2, lat1, lat2 );
+        }
         // Since cos is even and cos(2pi - x) = cos(x), we don't need to worry about periodicity in computing Delta_lon for cos(Delta_lon)
         //      for sin(Delta_lon), sin is odd and sin(2pi - x) = -sin(x), but since the result is being squared, it's not a concern either
 
@@ -67,7 +70,14 @@ double distance(
 
         if (not(constants::USE_HIGH_PRECISION_DISTANCE)) {
             // This is cheaper, and so long as our distances are at least a couple metres, the floating-point issues shouldn't arise.
-            Delta_sigma = acos( sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * cos_Delta_lon );
+            const double acos_argument = sin_lat1 * sin_lat2 + cos_lat1 * cos_lat2 * cos_Delta_lon;
+            
+            // Handle some rounding cases when distance is nearly maximal
+            if ( ( acos_argument < -1 ) and ( fabs(acos_argument + 1) < 1e-10 ) ) { 
+                Delta_sigma = M_PI;
+            } else {
+                Delta_sigma = acos( acos_argument );
+            }
         } else {
             // If desired, use the more expensive distance calculator
             long double numer, denom;
