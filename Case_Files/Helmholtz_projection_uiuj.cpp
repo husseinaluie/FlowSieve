@@ -49,9 +49,9 @@ int main(int argc, char *argv[]) {
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string   &input_fname      = input.getCmdOption("--input_file",      "input.nc"),
-                        &output_fname     = input.getCmdOption("--output_file",     "projection_Helmholtz.nc"),
-                        &seed_fname       = input.getCmdOption("--seed_file",       "seed.nc");
+    const std::string   &input_fname        = input.getCmdOption("--input_file",    "input.nc"),
+                        &output_fname       = input.getCmdOption("--output_file",   "projection_Helmholtz_uiuj.nc"),
+                        &seed_fname         = input.getCmdOption("--seed_file",     "seed.nc");
 
     const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
                         &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
@@ -67,17 +67,21 @@ int main(int argc, char *argv[]) {
 
     const std::string   &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo"),
                         &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo"),
-                        &tor_seed_name     = input.getCmdOption("--tor_seed",    "Psi_seed"),
-                        &pot_seed_name     = input.getCmdOption("--pot_seed",    "Phi_seed");
+                        &v_r_seed_name     = input.getCmdOption("--v_r_seed",    "v_r_seed"),
+                        &Phi_v_seed_name   = input.getCmdOption("--Phi_v_seed",  "Phi_v_seed"),
+                        &Psi_v_seed_name   = input.getCmdOption("--Psi_v_seed",  "Psi_v_seed");
+
+    const std::string &Tikhov_Lap_string = input.getCmdOption("--Tikhov_Laplace", "1.");
+    const double Tikhov_Laplace = stod(Tikhov_Lap_string);  
+
+    const std::string &Tikhov_string = input.getCmdOption("--Tikhov_Lambda", "0");
+    const double Tikhov_Lambda = stod(Tikhov_string);  
 
     const std::string &tolerance_string = input.getCmdOption("--tolerance", "5e-3");
     const double tolerance = stod(tolerance_string);  
 
     const std::string &iteration_string = input.getCmdOption("--max_iterations", "100000");
     const int max_iterations = stod(iteration_string);  
-
-    const std::string &Tikhov_Lap_string = input.getCmdOption("--Tikhov_Laplace", "1.");
-    const double Tikhov_Laplace = stod(Tikhov_Lap_string);  
 
     const std::string &use_mask_string = input.getCmdOption("--use_mask", "false");
     const bool use_mask = string_to_bool(use_mask_string);
@@ -127,22 +131,26 @@ int main(int argc, char *argv[]) {
     // Read in the seed
     double seed_count;
     bool single_seed;
-    std::vector<double> Psi_seed, Phi_seed;
+    std::vector<double> seed_v_r, seed_Phi_v, seed_Psi_v;
     if (seed_fname == "zero") {
         seed_count = 1.;
-        Psi_seed.resize( source_data.Nlat * source_data.Nlon, 0.);
-        Phi_seed.resize( source_data.Nlat * source_data.Nlon, 0.);
+        seed_v_r.resize(   source_data.Nlat * source_data.Nlon, 0. );
+        seed_Phi_v.resize( source_data.Nlat * source_data.Nlon, 0. );
+        seed_Psi_v.resize( source_data.Nlat * source_data.Nlon, 0. );
     } else {
         read_attr_from_file(seed_count, "seed_count", seed_fname);
         const int Nprocs_in_time  = source_data.Nprocs_in_time,
                   Nprocs_in_depth = source_data.Nprocs_in_depth;
-        read_var_from_file( Psi_seed, tor_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed));
-        read_var_from_file( Phi_seed, pot_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed));
+        read_var_from_file( seed_v_r,   v_r_seed_name,   seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed) );
+        read_var_from_file( seed_Phi_v, Phi_v_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed) );
+        read_var_from_file( seed_Psi_v, Psi_v_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed) );
     }
     single_seed = (seed_count == 1);
 
     // Apply to projection routine
-    Apply_Helmholtz_Projection( output_fname, source_data, Psi_seed, Phi_seed, single_seed, tolerance, max_iterations, use_area_weight, use_mask, Tikhov_Laplace );
+    Apply_Helmholtz_Projection_uiuj( output_fname, source_data, seed_v_r, seed_Phi_v, seed_Psi_v, 
+            single_seed, 3 * source_data.Nlat * source_data.Nlon * Tikhov_Lambda, Tikhov_Laplace, 
+            tolerance, max_iterations, use_area_weight, use_mask );
 
     // Done!
     #if DEBUG >= 0

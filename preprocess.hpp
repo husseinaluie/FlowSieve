@@ -127,6 +127,23 @@ void Apply_Helmholtz_Projection(
         const int max_iters,
         const bool weight_err,
         const bool use_mask,
+        const double Tikhov_Laplace,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void Apply_Helmholtz_Projection_uiuj(
+        const std::string output_fname,
+        dataset & source_data,
+        const std::vector<double> & seed_v_r,
+        const std::vector<double> & seed_v_lon,
+        const std::vector<double> & seed_v_lat,
+        const bool single_seed,
+        const double Tikhov_Lambda,
+        const double Tikhov_Laplace,
+        const double rel_tol,
+        const int max_iters,
+        const bool weight_err,
+        const bool use_mask,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -181,6 +198,16 @@ void potential_vel_from_F(
         const int Nlat,
         const int Nlon,
         const std::vector<bool> & mask
+    );
+
+void uiuj_from_Helmholtz(  
+        std::vector<double> & ulon_ulon,
+        std::vector<double> & ulon_ulat,
+        std::vector<double> & ulat_ulat,
+        const std::vector<double> & v_r,
+        const std::vector<double> & Phi_v,
+        const std::vector<double> & Psi_v,
+        const dataset & source_data
     );
 
 

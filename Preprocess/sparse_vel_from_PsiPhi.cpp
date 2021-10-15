@@ -64,17 +64,14 @@ void sparse_vel_from_PsiPhi(
 
             cos_lat_inv = 1. / cos(latitude.at(Ilat));
 
-            //if ( not(is_pole) ) { // Skip land areas and poles
+            if ( not(is_pole) ) { // Skip land areas and poles
 
                 //
                 //// LON first derivative part
                 //
 
                 LB = - 2 * Nlon;
-                get_diff_vector(diff_vec, LB, longitude, "lon",
-                                Itime, Idepth, Ilat, Ilon,
-                                Ntime, Ndepth, Nlat, Nlon,
-                                mask, 1, constants::DiffOrd);
+                get_diff_vector(diff_vec, LB, longitude, "lon", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask, 1, constants::DiffOrd);
 
                 Ndiff = diff_vec.size();
 
@@ -142,7 +139,7 @@ void sparse_vel_from_PsiPhi(
                         alglib::sparseset(  LHS_matr, row_skip + index_sub, column_skip + diff_index, old_val + tmp);
                     }
                 }
-            //}
+            }
         }
     }
 }
