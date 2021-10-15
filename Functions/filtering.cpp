@@ -410,6 +410,8 @@ void filtering(
         firstprivate(perc, wRank, local_kernel, perc_count)
         {
 
+            tid = omp_get_thread_num();
+
             filtered_vals.clear();
 
             filtered_vals.push_back(&u_x_tmp);
@@ -447,13 +449,23 @@ void filtering(
                 // If our longitude grid is uniform, and spans the full periodic domain,
                 // then we can just compute it once and translate it at each lon index
                 if ( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) {
+                    //#if DEBUG >= 3
+                    //if (wRank == 0) { fprintf(stdout, "  computing local kernel ... "); }
+                    //#endif
                     if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
                     std::fill(local_kernel.begin(), local_kernel.end(), 0);
                     compute_local_kernel( local_kernel, scale, source_data, Ilat, 0, LAT_lb, LAT_ub );
                     if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_outer"); }
+                    //#if DEBUG >= 3
+                    //if (wRank == 0) { fprintf(stdout, "  done\n"); }
+                    //#endif
                 }
 
                 for (Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                    //#if DEBUG >= 3
+                    //if (wRank == 0) { fprintf(stdout, "    Ilon (%d)\n", Ilon); }
+                    //#endif
 
                     #if DEBUG >= 0
                     tid = omp_get_thread_num();
@@ -475,7 +487,7 @@ void filtering(
                         // If we couldn't precompute the kernel earlier, then do it now
                         std::fill(local_kernel.begin(), local_kernel.end(), 0);
                         compute_local_kernel( local_kernel, scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
-                        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_inner"); }
+                        if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_inner"); }
                     }
 
                     for (Itime = 0; Itime < Ntime; Itime++) {
@@ -513,7 +525,7 @@ void filtering(
 
                                 // Also filter KE
                                 filtered_KE.at(index) = KE_tmp;
-                                if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_main"); }
+                                if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_main"); }
 
                                 // If we want energy transfers (Pi), 
                                 // then do those calculations now
@@ -554,12 +566,12 @@ void filtering(
                                             +   uzuz_tmp - u_z_tmp * u_z_tmp
                                         );
                                 }
-                                if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_for_Pi"); }
+                                if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_for_Pi"); }
 
                                 // If we want baroclinic transfers (Lees and Aluie, 2019), 
                                 //    then do those calculations now
-                                if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                                 if (constants::COMP_BC_TRANSFERS) {
+                                    if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
                                     coarse_rho.at(index) = rho_tmp;
                                     coarse_p.at(  index) = p_tmp;
 
@@ -589,8 +601,8 @@ void filtering(
                                     tilde_u_r.at(  index) = u_r_tmp   / rho_tmp;
                                     tilde_u_lon.at(index) = u_lon_tmp / rho_tmp;
                                     tilde_u_lat.at(index) = u_lat_tmp / rho_tmp;
+                                    if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_for_Lambda"); }
                                 }
-                                if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_for_Lambda"); }
 
                             }  // end if(masked) block
                         }  // end for(depth) block
