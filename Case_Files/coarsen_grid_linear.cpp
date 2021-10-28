@@ -93,6 +93,8 @@ int main(int argc, char *argv[]) {
 
     // Apply some cleaning to the processor allotments if necessary. 
     coarse_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
+    fine_data.Nprocs_in_time = coarse_data.Nprocs_in_time;
+    fine_data.Nprocs_in_depth = coarse_data.Nprocs_in_depth;
      
     // Convert to radians, if appropriate
     if ( latlon_in_degrees == "true" ) {
@@ -133,9 +135,10 @@ int main(int argc, char *argv[]) {
     const size_t    Npts_coarse = Ntime * Ndepth * Nlat_coarse * Nlon_coarse,
                     Npts_fine = fine_data.variables.at("fine_field").size();
     std::vector<double> var_coarse(Npts_coarse);
+    std::vector<bool> mask_coarse(Npts_coarse, true);
 
     // Next, the coarse velocities
-    int cnt, Itime, Idepth, lat_lb, lon_lb, LEFT, RIGHT, BOT, TOP, Ilat_fine, Ilon_fine, Ilat_coarse, Ilon_coarse;
+    int cnt, land_cnt, Itime, Idepth, lat_lb, lon_lb, LEFT, RIGHT, BOT, TOP, Ilat_fine, Ilon_fine, Ilat_coarse, Ilon_coarse;
     double target_lat, target_lon, interp_val;
     size_t II_fine, II_coarse;
 
@@ -147,9 +150,9 @@ int main(int argc, char *argv[]) {
 
         #pragma omp parallel \
         default(none) \
-        shared( coarse_data, fine_data, var_coarse, vars_to_refine, stdout ) \
+        shared( coarse_data, fine_data, var_coarse, mask_coarse, vars_to_refine, stdout ) \
         private( lat_lb, lon_lb, target_lat, target_lon, Itime, Idepth, II_coarse, Ilat_coarse, Ilon_coarse, \
-                 RIGHT, LEFT, BOT, TOP, II_fine, Ilat_fine, Ilon_fine, cnt, interp_val )
+                 RIGHT, LEFT, BOT, TOP, II_fine, Ilat_fine, Ilon_fine, cnt, interp_val, land_cnt )
         {
             #pragma omp for collapse(1) schedule(static)
             for (II_coarse = 0; II_coarse < Npts_coarse; ++II_coarse) {
@@ -199,24 +202,32 @@ int main(int argc, char *argv[]) {
 
                 // Loop through the fine grid and build up the coarsened value.
                 interp_val = 0.;
+                land_cnt = 0.;
                 cnt = 0;
                 for (Ilat_fine = BOT; Ilat_fine <= TOP; Ilat_fine++) {
                     for (Ilon_fine = LEFT; Ilon_fine <= RIGHT; Ilon_fine++) {
                         II_fine = Index( Itime, Idepth, Ilat_fine, Ilon_fine, Ntime, Ndepth, Nlat_fine, Nlon_fine );
                         if ( fine_data.mask.at( II_fine ) ) {
                             interp_val += fine_data.variables.at( "fine_field" ).at( II_fine );
+                        } else {
+                            land_cnt++;
                         }
                         cnt++;
                     }
                 }
 
-                //fprintf( stdout, " %'zu : [ %d, %d, %d, %d ] : %g, %d \n", II_coarse, LEFT, BOT, TOP, RIGHT, interp_val, cnt );
-
                 // And drop into the coarse grid
                 var_coarse.at(II_coarse) = ( cnt == 0 ) ? 0 : ( interp_val / cnt );
+
+                // If half or more of the points were land, then the new cell is also land
+                mask_coarse.at(II_coarse) = double(land_cnt) / double(cnt) < 0.5;
+
+                #if DEBUG >= 3
+                fprintf( stdout, " %'zu : [ %d, %d, %d, %d ] : %g, %d : %g \n", II_coarse, LEFT, BOT, TOP, RIGHT, interp_val, cnt, var_coarse.at(II_coarse) );
+                #endif
             }
         }
-        write_field_to_output( var_coarse, vars_in_output.at(Ivar), starts, counts, output_fname, NULL );
+        write_field_to_output( var_coarse, vars_in_output.at(Ivar), starts, counts, output_fname, &mask_coarse );
     }
 
     if (wRank == 0) {fprintf( stdout, "Storing seed count to file\n" ); }
