@@ -222,6 +222,22 @@ void read_var_from_file(
     if (wRank == 0) { fprintf(stdout, "  fill value = %'g\n", fill_val); }
     #endif
 
+    // Apply scale factor if appropriate
+    double scale = 1.;
+    retval = nc_get_att_double(ncid, var_id, "scale_factor", &scale);
+    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "  scale factor = %'g\n", scale); }
+    #endif
+
+    // Apply offset if appropriate
+    double offset = 0.;
+    retval = nc_get_att_double(ncid, var_id, "add_offset", &offset);
+    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "  additive offset = %'g\n", offset); }
+    #endif
+
     // Masked if equal to fill value
     for (size_t II = 0; II < var.size(); II++) {
         if ( var.at(II) == fill_val ) {
@@ -239,68 +255,15 @@ void read_var_from_file(
             var_min = std::min( var_min, var.at(II) );
             if (mask != NULL) { mask->at(II) = true; }
             num_water++;
+
+            // Apply scale factor and offset to non-masked values
+            if (scale  != 1.) { var.at(II) = var.at(II) * scale; }
+            if (offset != 0.) { var.at(II) = var.at(II) + offset; }
         }
     }
-
-    // Apply scale factor if appropriate
-    double scale = 1.;
-    retval = nc_get_att_double(ncid, var_id, "scale_factor", &scale);
-    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
-    #if DEBUG >= 2
-    if (wRank == 0) { fprintf(stdout, "  scale factor = %'g\n", scale); }
-    #endif
-    if (scale != 1.) { for (size_t II = 0; II < num_pts; II++) { var.at(II) = var.at(II) * scale; } }
-
-    // Apply offset if appropriate
-    double offset = 0.;
-    retval = nc_get_att_double(ncid, var_id, "add_offset", &offset);
-    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
-    #if DEBUG >= 2
-    if (wRank == 0) { fprintf(stdout, "  additive offset = %'g\n", offset); }
-    #endif
-    if (offset != 0.) { for (size_t II = 0; II < num_pts; II++) { var.at(II) = var.at(II) + offset; } }
 
     var_max = var_max * scale + offset;
     var_min = var_min * scale + offset;
-
-
-    /*
-    // Determine masking, if desired
-    double fill_val = 1e100;  // backup value
-    double var_max = -1e10, var_min = 1e10;
-    size_t num_land = 0, num_water = 0, num_unmasked = 0;
-
-    if (mask != NULL) { mask->resize(var.size()); }
-
-    // Get the relevant fill value
-    nc_get_att_double(ncid, var_id, "_FillValue", &fill_val);
-    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
-
-    #if DEBUG >= 2
-    if (wRank == 0) { fprintf(stdout, "  fill value = %'g\n", fill_val); }
-    #endif
-
-    // If we're at 99% of the fill_val, call it land
-    for (size_t II = 0; II < var.size(); II++) {
-        //if (fabs(var.at(II)) > 0.999999 * (fabs(fill_val*scale + offset))) {
-        if (fabs(var.at(II)) >= (fabs(fill_val*scale + offset))) {
-            if (constants::FILTER_OVER_LAND) {
-                // If requested to filter over land, then fill in the mask now
-                if (mask != NULL) { mask->at(II) = true; }
-                num_unmasked++;
-                var.at(II) = land_fill_value;
-            } else {
-                if (mask != NULL) { mask->at(II) = false; }
-                num_land++;
-            }
-        } else {
-            var_max = std::max( var_max, var.at(II) );
-            var_min = std::min( var_min, var.at(II) );
-            if (mask != NULL) { mask->at(II) = true; }
-            num_water++;
-        }
-    }
-    */
 
     #if DEBUG >= 1
     if (wRank == 0) {

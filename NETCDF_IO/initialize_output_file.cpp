@@ -21,7 +21,7 @@ void initialize_output_file(
                                 &depth      = source_data.depth,
                                 &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude,
-                                &areas     = source_data.areas;
+                                &areas      = source_data.areas;
 
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_CLOBBER | NC_MPIIO;
