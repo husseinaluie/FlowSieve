@@ -70,15 +70,15 @@ void spher_derivative_at_point(
     while (LB > LLB) {
 
         // If we have enough points, stop
-        if ( (Iref - LB) > diff_ord ) { break; }
+        if ( (Iref - LB) >= num_deriv_pts ) { break; }
        
         // Check if the next point would be land
         lb = ( ( LB - 1 ) % Nref + Nref ) % Nref;
         if (do_lon) { index = Index(Itime, Idepth, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
         else        { index = Index(Itime, Idepth, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
         
-        if ( mask.at(index) )   { LB--;  }
-        else                    { break; }
+        if ( mask.at(index) )   { LB--;  }  // If next point is still water, extend stencil over it
+        else                    { break; }  // Otherwise, halt [ without extending stencil ]
     }
 
     // ub (lower case) will be the periodicity-adjusted value of UB 
@@ -86,15 +86,15 @@ void spher_derivative_at_point(
     while (UB < UUB) {
 
         // If we have enough points, stop
-        if ( (UB - Iref) > diff_ord ) { break; }
+        if ( (UB - Iref) >= num_deriv_pts ) { break; }
        
         // Check if the next point would be land
         ub = ( ( UB + 1 ) % Nref + Nref ) % Nref;
         if (do_lon) { index = Index(Itime, Idepth, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
         else        { index = Index(Itime, Idepth, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
-        if ( mask.at(index) )   { UB++;  }
-        else                    { break; }
+        if ( mask.at(index) )   { UB++;  }  // If next point is still water, extend stencil over it
+        else                    { break; }  // Otherwise, halt [ without extending stencil ]
     }
 
     // NOTE

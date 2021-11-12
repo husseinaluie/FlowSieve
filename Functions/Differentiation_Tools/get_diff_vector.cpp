@@ -54,13 +54,14 @@ void get_diff_vector(
 
         if ( (Iref - LB) >= num_deriv_pts ) { break; }
        
-        lb = ( LB < 0 ) ? LB + Nref : LB ;
+        // Check if the next point would be land
+        lb = ( ( LB - 1 ) % Nref + Nref ) % Nref;
         if (do_lon) { index = Index(Itime, Idepth, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
         else        { index = Index(Itime, Idepth, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
         
-        if ( not(mask.at(index)) ) { LB++; break; }
+        if ( mask.at(index) )   { LB--;  }  // If next point is still water, extend stencil over it
+        else                    { break; }  // Otherwise, halt [ without extending stencil ]
 
-        LB--;
     }
 
     // ub (lower case) will be the periodicity-adjusted value of UB 
@@ -68,13 +69,13 @@ void get_diff_vector(
     while (UB < UUB) {
         if ( (UB - Iref) >= num_deriv_pts ) { break; }
        
-        ub = ( UB > Nref - 1 ) ? UB - Nref : UB ;
+        // Check if the next point would be land
+        ub = ( ( UB + 1 ) % Nref + Nref ) % Nref;
         if (do_lon) { index = Index(Itime, Idepth, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
         else        { index = Index(Itime, Idepth, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
 
-        if ( not(mask.at(index)) ) { UB--; break; }
-
-        UB++;
+        if ( mask.at(index) )   { UB++;  }  // If next point is still water, extend stencil over it
+        else                    { break; }  // Otherwise, halt [ without extending stencil ]
     }
 
     // NOTE
