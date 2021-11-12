@@ -81,12 +81,16 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Read in the grid coordinates
-    coarse_data.load_time(      time_dim_name,      coarse_fname );
+    //coarse_data.load_time(      time_dim_name,      coarse_fname );
     coarse_data.load_depth(     depth_dim_name,     coarse_fname );
     coarse_data.load_latitude(  latitude_dim_name,  coarse_fname );
     coarse_data.load_longitude( longitude_dim_name, coarse_fname );
 
     fine_data.load_time(      time_dim_name,      fine_fname );
+    coarse_data.time.resize( fine_data.time.size() );
+    coarse_data.time = fine_data.time;
+    coarse_data.full_Ntime = fine_data.full_Ntime;
+
     fine_data.load_depth(     depth_dim_name,     fine_fname );
     fine_data.load_latitude(  latitude_dim_name,  fine_fname );
     fine_data.load_longitude( longitude_dim_name, fine_fname );
@@ -126,8 +130,8 @@ int main(int argc, char *argv[]) {
 
     #if DEBUG >= 1
     if (wRank == 0) {
-        fprintf( stdout, " c(%d,%d,%d,%d) -> f(%d,%d,%d,%d)\n", Ntime, Ndepth, Nlat_fine,   Nlon_fine,
-                                                                Ntime, Ndepth, Nlat_coarse, Nlon_coarse );
+        fprintf( stdout, " c(%d,%d,%d,%d) -> f(%d,%d,%d,%d)\n", full_Ntime, Ndepth, Nlat_fine,   Nlon_fine,
+                                                                full_Ntime, Ndepth, Nlat_coarse, Nlon_coarse );
     }
     #endif
 
@@ -138,7 +142,7 @@ int main(int argc, char *argv[]) {
     std::vector<bool> mask_coarse(Npts_coarse, true);
 
     // Next, the coarse velocities
-    int cnt, land_cnt, Itime, Idepth, lat_lb, lon_lb, LEFT, RIGHT, BOT, TOP, Ilat_fine, Ilon_fine, Ilat_coarse, Ilon_coarse;
+    int cnt, land_cnt, Itime, Idepth, LEFT, RIGHT, BOT, TOP, Ilat_fine, Ilon_fine, Ilat_coarse, Ilon_coarse;
     double target_lat, target_lon, interp_val;
     size_t II_fine, II_coarse;
 
@@ -151,7 +155,7 @@ int main(int argc, char *argv[]) {
         #pragma omp parallel \
         default(none) \
         shared( coarse_data, fine_data, var_coarse, mask_coarse, vars_to_refine, stdout ) \
-        private( lat_lb, lon_lb, target_lat, target_lon, Itime, Idepth, II_coarse, Ilat_coarse, Ilon_coarse, \
+        private( target_lat, target_lon, Itime, Idepth, II_coarse, Ilat_coarse, Ilon_coarse, \
                  RIGHT, LEFT, BOT, TOP, II_fine, Ilat_fine, Ilon_fine, cnt, interp_val, land_cnt )
         {
             #pragma omp for collapse(1) schedule(static)
@@ -220,7 +224,7 @@ int main(int argc, char *argv[]) {
                 var_coarse.at(II_coarse) = ( cnt == 0 ) ? 0 : ( interp_val / cnt );
 
                 // If half or more of the points were land, then the new cell is also land
-                mask_coarse.at(II_coarse) = double(land_cnt) / double(cnt) < 0.5;
+                mask_coarse.at(II_coarse) = ( double(land_cnt) / double(cnt) < 0.5 );
 
                 #if DEBUG >= 3
                 fprintf( stdout, " %'zu : [ %d, %d, %d, %d ] : %g, %d : %g \n", II_coarse, LEFT, BOT, TOP, RIGHT, interp_val, cnt, var_coarse.at(II_coarse) );
