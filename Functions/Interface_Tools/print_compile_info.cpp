@@ -62,6 +62,8 @@ void print_compile_info(
     fprintf(stdout, "  KERNEL_OPT                   = %d\n", constants::KERNEL_OPT);
     fprintf(stdout, "  DEFORM_AROUND_LAND           = %s\n", constants::DEFORM_AROUND_LAND          ? "true" : "false");
     fprintf(stdout, "  FILTER_OVER_LAND             = %s\n", constants::FILTER_OVER_LAND            ? "true" : "false");
+    fprintf(stdout, "  ZONAL_KERNEL_ONLY            = %s\n", constants::ZONAL_KERNEL_ONLY           ? "true" : "false");
+    fprintf(stdout, "  EXTEND_DOMAIN_TO_POLES       = %s\n", constants::EXTEND_DOMAIN_TO_POLES      ? "true" : "false");
     fprintf(stdout, "  CARTESIAN                    = %s\n", constants::CARTESIAN                   ? "true" : "false");
     fprintf(stdout, "\n");
     fprintf(stdout, "  PERIODIC_X                   = %s\n", constants::PERIODIC_X                  ? "true" : "false");
