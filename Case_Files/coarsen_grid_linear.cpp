@@ -170,39 +170,39 @@ int main(int argc, char *argv[]) {
 
                 // bottom
                 if ( Ilat_coarse == 0 ) {
-                    BOT = 0;
+                    target_lat = coarse_data.latitude.at(Ilat_coarse);
                 } else {
                     target_lat = 0.5 * ( coarse_data.latitude.at(Ilat_coarse) + coarse_data.latitude.at(Ilat_coarse - 1) );
-                    BOT =  std::lower_bound( fine_data.latitude.begin(), fine_data.latitude.end(), target_lat ) - fine_data.latitude.begin();
-                    BOT = (BOT < 0) ? 0 : (BOT >= Nlat_fine) ? Nlat_fine - 1 : BOT;
                 }
+                BOT =  std::lower_bound( fine_data.latitude.begin(), fine_data.latitude.end(), target_lat ) - fine_data.latitude.begin();
+                BOT = (BOT < 0) ? 0 : (BOT >= Nlat_fine) ? Nlat_fine - 1 : BOT;
 
                 // top
                 if ( Ilat_coarse < Nlat_coarse - 1 ) {
                     target_lat = 0.5 * ( coarse_data.latitude.at(Ilat_coarse) + coarse_data.latitude.at(Ilat_coarse + 1) );
-                    TOP =  std::lower_bound( fine_data.latitude.begin(), fine_data.latitude.end(), target_lat ) - fine_data.latitude.begin();
-                    TOP = (TOP < 0) ? 0 : (TOP >= Nlat_fine) ? Nlat_fine - 1 : TOP;
                 } else {
-                    TOP = Nlat_coarse - 1;
+                    target_lat = coarse_data.latitude.at(Ilat_coarse);
                 }
+                TOP =  std::lower_bound( fine_data.latitude.begin(), fine_data.latitude.end(), target_lat ) - fine_data.latitude.begin();
+                TOP = (TOP < 0) ? 0 : (TOP >= Nlat_fine) ? Nlat_fine - 1 : TOP;
 
                 // left
                 if ( Ilon_coarse == 0 ) {
-                    LEFT = 0;
+                    target_lon = coarse_data.longitude.at(Ilon_coarse);
                 } else {
                     target_lon = 0.5 * ( coarse_data.longitude.at(Ilon_coarse) + coarse_data.longitude.at(Ilon_coarse - 1) );
-                    LEFT =  std::lower_bound( fine_data.longitude.begin(), fine_data.longitude.end(), target_lon ) - fine_data.longitude.begin();
-                    LEFT = (LEFT < 0) ? 0 : (LEFT >= Nlon_fine) ? Nlon_fine - 1 : LEFT;
                 }
+                LEFT =  std::lower_bound( fine_data.longitude.begin(), fine_data.longitude.end(), target_lon ) - fine_data.longitude.begin();
+                LEFT = (LEFT < 0) ? 0 : (LEFT >= Nlon_fine) ? Nlon_fine - 1 : LEFT;
 
                 // right
                 if ( Ilon_coarse < Nlon_coarse - 1 ) {
                     target_lon = 0.5 * ( coarse_data.longitude.at(Ilon_coarse) + coarse_data.longitude.at(Ilon_coarse + 1) );
-                    RIGHT =  std::lower_bound( fine_data.longitude.begin(), fine_data.longitude.end(), target_lon ) - fine_data.longitude.begin();
-                    RIGHT = (RIGHT < 0) ? 0 : (RIGHT >= Nlon_fine) ? Nlon_fine - 1 : RIGHT;
                 } else {
-                    RIGHT = Nlon_coarse - 1;
+                    target_lon = coarse_data.longitude.at(Ilon_coarse);
                 }
+                RIGHT =  std::lower_bound( fine_data.longitude.begin(), fine_data.longitude.end(), target_lon ) - fine_data.longitude.begin();
+                RIGHT = (RIGHT < 0) ? 0 : (RIGHT >= Nlon_fine) ? Nlon_fine - 1 : RIGHT;
 
                 // Loop through the fine grid and build up the coarsened value.
                 interp_val = 0.;
