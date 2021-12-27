@@ -120,6 +120,33 @@ void Apply_Postprocess_Routines(
             Stime, Sdepth, Ntime, Ndepth, num_regions, num_fields
             );
 
+    //
+    //// Zonal averages and standard deviations
+    //
+
+    if (constants::POSTPROCESS_DO_ZONAL_MEANS) {
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "  .. computing the zonal average and std. dev.\n"); }
+        fflush(stdout);
+        #endif
+
+        std::vector< std::vector< double > >
+            zonal_averages(num_fields, std::vector<double>(Ntime * Ndepth * Nlat, 0.)), 
+            zonal_std_devs(num_fields, std::vector<double>(Ntime * Ndepth * Nlat, 0.));
+
+        compute_zonal_avg_and_std( zonal_averages, zonal_std_devs, source_data, postprocess_fields );
+
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "  .. writing region averages and deviations\n"); }
+        fflush(stdout);
+        #endif
+
+        write_zonal_avg_and_std(
+            zonal_averages, zonal_std_devs, vars_to_process, filename,
+            Stime, Sdepth, Ntime, Ndepth, Nlat, num_fields
+            );
+    }
+
 
     //
     //// If we have OkuboWeiss data, then also do processing along OW contours

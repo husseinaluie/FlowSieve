@@ -49,6 +49,14 @@ void compute_region_avg_and_std(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
+void compute_zonal_avg_and_std(
+        std::vector< std::vector< double > > & zonal_averages,
+        std::vector< std::vector< double > > & zonal_std_devs,
+        const dataset & source_data,
+        const std::vector<const std::vector<double>*> & postprocess_fields,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 void compute_region_avg_and_std_OkuboWeiss(
         std::vector< std::vector< double > > & field_averages,
         std::vector< std::vector< double > > & field_std_devs,
@@ -81,6 +89,19 @@ void write_region_avg_and_std(
         const int Ntime,
         const int Ndepth,
         const int num_regions,
+        const int num_fields
+        );
+
+void write_zonal_avg_and_std(
+        const std::vector< std::vector< double > > & zonal_averages,
+        const std::vector< std::vector< double > > & zonal_std_devs,
+        const std::vector<std::string> & vars_to_process,
+        const char * filename,
+        const int Stime,
+        const int Sdepth,
+        const int Ntime,
+        const int Ndepth,
+        const int Nlat,
         const int num_fields
         );
 

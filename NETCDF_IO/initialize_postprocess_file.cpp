@@ -163,6 +163,16 @@ void initialize_postprocess_file(
             }
         }
 
+        // zonal averages
+        if (constants::POSTPROCESS_DO_ZONAL_MEANS) {
+            const char* dim_names_time_ave[] = {"time", "depth", "latitude"};
+            const int ndims_time_ave = 3;
+            for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
+                add_var_to_file( int_vars.at(varInd)+"_zonal_average", dim_names_time_ave, ndims_time_ave, buffer);
+                //add_var_to_file(int_vars.at(varInd)+"_time_std_dev", dim_names_time_ave, ndims_time_ave, buffer);
+            }
+        }
+
         // region averages : averaged over OkuboWeiss contours
         if (include_OkuboWeiss) {
             const char* dim_names[] = {"time", "depth", "OkuboWeiss", "region"};

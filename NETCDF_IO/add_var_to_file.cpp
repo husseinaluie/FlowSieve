@@ -70,7 +70,8 @@ void add_var_to_file(
 
     const size_t    time_avg_index  = var_name.find("_time_average"),
                     Okubo_avg_index = var_name.find("_OkuboWeiss_average"),
-                    area_avg_index  = var_name.find("_area_average");
+                    area_avg_index  = var_name.find("_area_average"),
+                    zonal_avg_index = var_name.find("_zonal_average");
     if ( time_avg_index != std::string::npos ) {
         nc_put_att_text( ncid, var_id, "variable_type", 
                          constants::time_average_description.size(), 
@@ -88,6 +89,12 @@ void add_var_to_file(
                          constants::spatial_average_description.size(),    
                          constants::spatial_average_description.c_str() );
         substring = var_name.substr( 0, area_avg_index );
+
+    } else if ( zonal_avg_index != std::string::npos ) {
+        nc_put_att_text( ncid, var_id, "variable_type", 
+                         constants::zonal_average_description.size(),    
+                         constants::zonal_average_description.c_str() );
+        substring = var_name.substr( 0, zonal_avg_index );
 
     }
 
