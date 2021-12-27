@@ -59,8 +59,9 @@ int main(int argc, char *argv[]) {
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string   &tor_input_fname   = input.getCmdOption("--toroidal_input_file",        "toroidal_projection.nc"),
-                        &pot_input_fname   = input.getCmdOption("--potential_input_file",       "potential_projection.nc"),
+    //const std::string   &tor_input_fname   = input.getCmdOption("--toroidal_input_file",        "toroidal_projection.nc"),
+    //                    &pot_input_fname   = input.getCmdOption("--potential_input_file",       "potential_projection.nc"),
+    const std::string   &Helm_input_fname  = input.getCmdOption("--Helmholtz_input_file",       "Helmholtz_projection.nc"),
                         &vel_input_fname   = input.getCmdOption("--velocity_input_file",        "toroidal_projection.nc"),
                         &quad_input_fname  = input.getCmdOption("--uiuj_Helmholtz_input_file",  "helmholtz_projection_uiuj.nc");
 
@@ -109,10 +110,10 @@ int main(int argc, char *argv[]) {
 
     // Read in the grid coordinates
     //   implicitely assume coordinates are the same between input files
-    source_data.load_time(      time_dim_name,      tor_input_fname );
-    source_data.load_depth(     depth_dim_name,     tor_input_fname );
-    source_data.load_latitude(  latitude_dim_name,  tor_input_fname );
-    source_data.load_longitude( longitude_dim_name, tor_input_fname );
+    source_data.load_time(      time_dim_name,      Helm_input_fname );
+    source_data.load_depth(     depth_dim_name,     Helm_input_fname );
+    source_data.load_latitude(  latitude_dim_name,  Helm_input_fname );
+    source_data.load_longitude( longitude_dim_name, Helm_input_fname );
 
     // Apply some cleaning to the processor allotments if necessary. 
     source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
@@ -126,8 +127,8 @@ int main(int argc, char *argv[]) {
     source_data.compute_cell_areas();
 
     // Read in the toroidal and potential fields
-    source_data.load_variable( "F_potential", pot_field_var_name, pot_input_fname, false, true );
-    source_data.load_variable( "F_toroidal",  tor_field_var_name, tor_input_fname, false, true );
+    source_data.load_variable( "F_potential", pot_field_var_name, Helm_input_fname, false, true );
+    source_data.load_variable( "F_toroidal",  tor_field_var_name, Helm_input_fname, false, true );
 
     // Read in the Helmholtz fields for uiuj
     if ( constants::COMP_PI_HELMHOLTZ ) {
