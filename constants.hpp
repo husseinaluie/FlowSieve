@@ -115,7 +115,25 @@ namespace constants
      * Note that this does NOT affect the shape of filtering kernels.
      * @ingroup constants
      */
-    const bool FILTER_OVER_LAND = true;
+    const bool FILTER_OVER_LAND = false;
+
+    /*!
+     * \param ZONAL_KERNEL_ONLY
+     *
+     * @ingroup constants
+     */
+    const bool ZONAL_KERNEL_ONLY = false;
+
+    /*!
+     * \param EXTEND_DOMAIN_TO_POLES
+     * \brief Boolean to indicate whether or not the input domain should have the latitude extended to reach the poles.
+     *
+     * If true, 'land' is added with a uniform grid spacing to make the domain reach both north and south poles
+     * If false, nothing happens.
+     *
+     * @ingroup constants
+     */
+    const bool EXTEND_DOMAIN_TO_POLES = true;
 
     /*!
      * \param CARTESIAN
@@ -204,7 +222,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool MINIMAL_OUTPUT = true;
+    const bool MINIMAL_OUTPUT = false;
 
     /*! 
      * \param NO_FULL_OUTPUTS
@@ -217,7 +235,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool NO_FULL_OUTPUTS = true;
+    const bool NO_FULL_OUTPUTS = false;
 
     /*!
      * \param CAST_TO_SINGLE
@@ -242,14 +260,21 @@ namespace constants
      * \brief Boolean indicating if we want to output internal timings
      * @ingroup constants
      */
-    const bool DO_TIMING = true;
+    const bool DO_TIMING = false;
 
     /*!
      * \param APPLY_POSTPROCESS
      * \brief Boolean indicating whether or not the postprocess routines should be applied
      * @ingroup constants
      */
-    const bool APPLY_POSTPROCESS = true;
+    const bool APPLY_POSTPROCESS = false;
+
+    /*!
+     * \param POSTPROCESS_DO_ZONAL_MEANS
+     * \brief Boolean indicating whether or not the postprocess routines should include zonal means
+     * @ingroup constants
+     */
+    const bool POSTPROCESS_DO_ZONAL_MEANS = true;
 
     /*!
      * \param POSTPROCESS_DO_TIME_MEANS
@@ -334,6 +359,7 @@ namespace constants
     };
 
     const std::string spatial_average_description       = "The lat/lon average computed over each defined region (see region dimension).";
+    const std::string zonal_average_description         = "The zonal (longitudinal) average computed at each latitude.";
     const std::string time_average_description          = "Time average over the entire provided dataset.";
     const std::string OkuboWeiss_average_description    = "Variable binned by Okubo-Weiss parameter (i.e. histogram). "
                                                           "Values in OkuboWeiss dimension indicate the lower bound of each bin.";
