@@ -27,7 +27,10 @@ void get_lat_bounds(
     const double ref_lat = latitude.at(Ilat);
     const int    Nlat    = (int) latitude.size();
     
-    if (KernPad < 0) {
+    if (constants::ZONAL_KERNEL_ONLY) {
+        LAT_lb = Ilat;
+        LAT_ub = Ilat+1;
+    } else if (KernPad < 0) {
         // KernPad < 0 means we use the entire domain, so don't bother
         //   calculating an integration region.
         LAT_lb = 0;
