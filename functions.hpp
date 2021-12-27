@@ -415,6 +415,32 @@ void roll_field(
         const int Nlon
         );
 
+
+// Extending to the poles
+
+void extend_latitude_to_poles(
+        const std::vector<double> & original_latitude,
+        std::vector<double> & extended_latitude,
+        int & orig_Ilat_start,
+        const bool IS_DEGREES = false,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void extend_field_to_poles(
+        std::vector<double> & array_to_extend,
+        const dataset & source_data,
+        const std::vector<double> & extended_latitude,
+        const int Ilat_start
+        );
+
+void extend_mask_to_poles(
+        std::vector<bool> & mask_to_extend,
+        const dataset & source_data,
+        const std::vector<double> & extended_latitude,
+        const int Ilat_start,
+        const bool extend_val = constants::FILTER_OVER_LAND
+        );
+
 /*!
  * \brief Class for storing internal timings.
  *

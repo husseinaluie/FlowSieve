@@ -102,6 +102,25 @@ int main(int argc, char *argv[]) {
         convert_coordinates( coarse_data.longitude, coarse_data.latitude );
         convert_coordinates( fine_data.longitude,   fine_data.latitude );
     }
+    
+    //
+    //// If necessary, extend the domain to reach the poles
+    //      this will assume that the coarse grid has been similarly extended
+    //      if it is the result of running the Helmholtz solver on a down-sampled
+    //      grid, then this should be the case
+    //
+    if ( constants::EXTEND_DOMAIN_TO_POLES ) {
+        std::vector<double> extended_latitude;
+        int orig_lat_start_in_extend;
+        #if DEBUG >= 2
+        if (wRank == 0) { fprintf( stdout, "    Extending latitude to poles\n" ); }
+        #endif
+        extend_latitude_to_poles( fine_data.latitude, extended_latitude, orig_lat_start_in_extend );
+
+        // Update source_data to use the extended latitude
+        fine_data.latitude = extended_latitude;
+        fine_data.Nlat = fine_data.latitude.size();
+    }
 
     // Read in velocity fields
     coarse_data.load_variable( "coarse_field", vars_to_refine.at(0), coarse_fname, true, true );

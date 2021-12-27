@@ -81,6 +81,10 @@ void filtering(
     std::vector<double> u_x(num_pts), u_y(num_pts), u_z(num_pts);
     std::vector<double> coarse_u_r(num_pts), coarse_u_lon(num_pts), coarse_u_lat(num_pts);
 
+    if ( (constants::EXTEND_DOMAIN_TO_POLES) or (constants::FILTER_OVER_LAND) ) {
+            vars_to_write.push_back("mask");
+    }
+
     if (not(constants::MINIMAL_OUTPUT)) {
         vars_to_write.push_back("coarse_u_r");
     }
@@ -618,6 +622,13 @@ void filtering(
         fprintf(stdout, "  = Rank %d finished filtering loop =\n", wRank);
         fflush(stdout);
         #endif
+
+        if ( (constants::EXTEND_DOMAIN_TO_POLES) or (constants::FILTER_OVER_LAND) ) {
+                std::vector<double> mask_double( source_data.reference_mask.begin(), 
+                                                 source_data.reference_mask.end() );
+                write_field_to_output( mask_double, "mask", starts, counts, fname, NULL );
+                mask_double.clear();
+        }
 
         // Get KE from coarse velocities
         KE_from_vels(KE_from_coarse_vel, &coarse_u_r, &coarse_u_lon, &coarse_u_lat, mask);

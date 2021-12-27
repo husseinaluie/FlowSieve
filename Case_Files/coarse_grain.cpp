@@ -161,8 +161,12 @@ int main(int argc, char *argv[]) {
         source_data.load_variable( "p",   pressure_var_name, input_fname, false, false );
     }
 
-    // Mask out the pole, if necessary (i.e. set lat = 90 to land)
-    mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
+
+
+    if ( not(constants::EXTEND_DOMAIN_TO_POLES) ) {
+        // Mask out the pole, if necessary (i.e. set lat = 90 to land)
+        mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
+    }
 
     // If we're using FILTER_OVER_LAND, then the mask has been wiped out. Load in a mask that still includes land references
     //      so that we have both. Will be used to get 'water-only' region areas.
@@ -184,7 +188,66 @@ int main(int argc, char *argv[]) {
         source_data.compute_region_areas();
     }
 
-    // Now pass the arrays along to the filtering routines
+
+    //
+    //// If necessary, extend the domain to reach the poles
+    //
+    
+    if ( constants::EXTEND_DOMAIN_TO_POLES ) {
+        #if DEBUG >= 0
+        if (wRank == 0) { fprintf( stdout, "Extending the domain to the poles\n" ); }
+        #endif
+
+        // Extend the latitude grid to reach the poles and update source_data with the new info.
+        std::vector<double> extended_latitude;
+        int orig_lat_start_in_extend;
+        #if DEBUG >= 2
+        if (wRank == 0) { fprintf( stdout, "    Extending latitude to poles\n" ); }
+        #endif
+        extend_latitude_to_poles( source_data.latitude, extended_latitude, orig_lat_start_in_extend );
+
+        // Extend out the mask
+        #if DEBUG >= 2
+        if (wRank == 0) { fprintf( stdout, "    Extending mask to poles\n" ); }
+        #endif
+        extend_mask_to_poles( source_data.mask,           source_data, extended_latitude, orig_lat_start_in_extend );
+        if (constants::FILTER_OVER_LAND) { 
+            extend_mask_to_poles( source_data.reference_mask, source_data, extended_latitude, orig_lat_start_in_extend, false );
+        }
+
+        // Extend out all of the variable fields
+        for(const auto& var_data : source_data.variables) {
+            #if DEBUG >= 2
+            if (wRank == 0) { fprintf( stdout, "    Extending variable %s to poles\n", var_data.first.c_str() ); }
+            #endif
+            extend_field_to_poles( source_data.variables[var_data.first], source_data, extended_latitude, orig_lat_start_in_extend );
+        }
+
+        // Extend out all of the region definitions
+        for(const auto& reg_data : source_data.regions) {
+            #if DEBUG >= 2
+            if (wRank == 0) { fprintf( stdout, "    Extending region %s to poles\n", reg_data.first.c_str() ); }
+            #endif
+            extend_mask_to_poles( source_data.regions[reg_data.first], source_data, extended_latitude, orig_lat_start_in_extend, false );
+        }
+
+        // Update source_data to use the extended latitude
+        source_data.latitude = extended_latitude;
+        source_data.Nlat = source_data.latitude.size();
+        source_data.myCounts[2] = source_data.Nlat;
+
+        // Mask out the pole, if necessary (i.e. set lat = 90 to land)
+        mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
+
+        // Re-compute cell areas and region areas
+        source_data.compute_cell_areas();
+        source_data.compute_region_areas();
+    }
+
+
+    //
+    //// Now pass the arrays along to the filtering routines
+    //
     const double pre_filter_time = MPI_Wtime();
     filtering( source_data, filter_scales );
     const double post_filter_time = MPI_Wtime();
