@@ -13,6 +13,7 @@
 #include "../functions.hpp"
 #include "../constants.hpp"
 #include "../preprocess.hpp"
+#include "../differentiation_tools.hpp"
 
 int main(int argc, char *argv[]) {
     
@@ -108,13 +109,19 @@ int main(int argc, char *argv[]) {
 
     // Read in the velocity fields
     read_var_from_file(ssh, ssh_var_name, input_fname, &mask, &myCounts, &myStarts, source_data.Nprocs_in_time, source_data.Nprocs_in_depth);
+    source_data.mask = mask;
     u_lon.resize( ssh.size() );
     u_lat.resize( ssh.size() );
 
     std::vector<size_t> starts(myStarts.size()), counts(myCounts.size());
+    source_data.myCounts.resize(myCounts.size());
+    source_data.myStarts.resize(myStarts.size());
     for (size_t index = 0; index < starts.size(); ++index) {
         starts.at(index) = myStarts.at(index);
         counts.at(index) = myCounts.at(index);
+
+        source_data.myCounts.at(index) = myCounts.at(index);
+        source_data.myStarts.at(index) = myStarts.at(index);
     }
 
     const int   Ntime  = myCounts[0],
@@ -129,39 +136,69 @@ int main(int argc, char *argv[]) {
 
     initialize_output_file( source_data, vars_to_write, output_fname.c_str() );
 
-    // Compute geostrophic velocity
-    toroidal_vel_from_F( u_lon, u_lat, ssh, source_data.longitude, source_data.latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+    // Compute geostrophic f-plane velocity (need to add scale factors)
+    if (wRank == 0) { fprintf( stdout, "Getting f-plane velocity\n" ); fflush( stdout ); }
+    std::vector<double> u_f( ssh.size() ), v_f( ssh.size() );
+    toroidal_vel_from_F( u_f, v_f, ssh, source_data.longitude, source_data.latitude, Ntime, Ndepth, Nlat, Nlon, mask );
 
-    // Now mask out the equator before writing the geostrophic velocities
-    int Itime, Idepth, Ilat, Ilon;
-    const double Omega = 2. * M_PI / (24. * 60. * 60.);
-    const double eqr_cut = 3;
-    const double arg_eps = 1e-5;
-    double signum, curr_lat, f_Coriolis;
+    // Compute geostrophic beta-plane velocity
+    if (wRank == 0) { fprintf( stdout, "Getting beta-plane velocity\n" ); fflush( stdout ); }
+    std::vector<double> u_beta( ssh.size() ), v_beta( ssh.size() );
+    toroidal_vel_from_F( u_beta, v_beta, u_f, source_data.longitude, source_data.latitude, Ntime, Ndepth, Nlat, Nlon, mask );
     for (size_t index = 0; index < ssh.size(); ++index) {
+        u_beta.at(index) *= -1.;
+        v_beta.at(index) *= -1.;
+    }
+    //Extract_Beta_Geos_Vel( u_beta, v_beta, ssh, mask, source_data, 1e-100, 10000);
 
-        Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                         Ntime, Ndepth, Nlat, Nlon);
+    int Itime, Idepth, Ilat, Ilon;
+    const double    Omega = 2. * M_PI / (24. * 60. * 60.),
+                    arg_eps = 1e-5;
+    double curr_lat, second_deriv;
 
-        curr_lat = source_data.latitude.at(Ilat);
+    // Loop through space, computing the geostrophic velocity
+    if (wRank == 0) { fprintf( stdout, "Combining velocity terms\n" ); fflush( stdout ); }
+    size_t bad_points = 0, index;
+    double f_Coriolis, beta_Coriolis, g_over_f, g_over_beta, W_beta;
+    #pragma omp parallel \
+    default(none) \
+    shared( u_lon, u_lat, u_f, v_f, u_beta, v_beta, mask, ssh, source_data ) \
+    private( index, Itime, Idepth, Ilat, Ilon, curr_lat, f_Coriolis, beta_Coriolis, g_over_f, g_over_beta, W_beta ) \
+    reduction(+ : bad_points )
+    {
+        for (index = 0; index < ssh.size(); ++index) {
 
-        if ( fabs( curr_lat * 180. / M_PI ) < eqr_cut ) {
-            signum = (curr_lat >= 0) - (curr_lat < 0);
-            mask.at(index) = false;
-        } else {
-            signum = 0.;
-        }
+            Index1to4(index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
-        f_Coriolis = 2 * Omega * sin( curr_lat + signum * arg_eps );
-        u_lon.at(index) = u_lon.at(index) * constants::g / f_Coriolis; 
-        u_lat.at(index) = u_lat.at(index) * constants::g / f_Coriolis; 
+            curr_lat = source_data.latitude.at(Ilat);
+            f_Coriolis = 2 * Omega * sin( curr_lat );
+            beta_Coriolis = 2 * Omega * cos( curr_lat ) / constants::R_earth;
+            g_over_f = constants::g / f_Coriolis;
+            g_over_beta = constants::g / beta_Coriolis;
+            W_beta = exp( - pow( curr_lat * 180. / M_PI / 2.2, 2) );
 
-        // If bad things happen outside of the equator, throw a warning
-        if ( ( ( fabs( u_lon.at(index) ) >= 1000. ) or ( fabs( u_lat.at(index) ) >= 1000. ) ) and ( signum == 0 ) ) {
-            fprintf(stdout, "Bad point found!\n");
+            // If close to the equator, use a beta correction
+            if ( fabs( curr_lat * 180. / M_PI ) < 0.5 ) {
+                u_lon.at(index) = W_beta * g_over_beta * u_beta.at(index);
+                u_lat.at(index) = W_beta * g_over_beta * v_beta.at(index);
+            } else if ( fabs( curr_lat * 180. / M_PI ) < 5 ) {
+                u_lon.at(index) = W_beta * g_over_beta * u_beta.at(index) + ( 1 - W_beta ) * g_over_f * u_f.at(index);
+                u_lat.at(index) = W_beta * g_over_beta * v_beta.at(index) + ( 1 - W_beta ) * g_over_f * v_f.at(index);
+            } else {
+                // Otherwise, just use traditional geostrophy
+                u_lon.at(index) = g_over_f * u_f.at(index);
+                u_lat.at(index) = g_over_f * v_f.at(index);
+            }
+
+            // If bad things happen, throw a warning and mask it out
+            if ( ( ( fabs( u_lon.at(index) ) >= 1.e2 ) or ( fabs( u_lat.at(index) ) >= 1.e2 ) ) ) {
+                bad_points++;
+                mask.at(index) = false;
+            }
         }
     }
 
+    if (wRank == 0) { fprintf( stdout, "%'zu bad points found!\n", bad_points ); }
 
     // Write geostrophic velocity
     write_field_to_output( u_lon, "u_geos", &starts[0], &counts[0], output_fname.c_str(), &mask );
