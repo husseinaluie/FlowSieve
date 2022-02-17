@@ -15,7 +15,9 @@ void build_main_projection_matrix(
         alglib::sparsematrix & matr,
         const dataset & source_data,
         const int Itime,
-        const int Idepth
+        const int Idepth,
+        const bool weight_err,
+        const double v_r_noise_damp
         ) {
 
     // Create some tidy names for variables
@@ -44,12 +46,38 @@ void build_main_projection_matrix(
 
         double tan_lat = tan(latitude.at(Ilat));
         double cos_lat = cos(latitude.at(Ilat));
-
+        
         for ( int Ilon = 0; Ilon < Nlon; Ilon++ ) {
             index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
 
-            //weight_val = weight_err ? dAreas.at(index_sub) : 1.;
-            weight_val = 1.;  // don't weight this matrix
+            weight_val = weight_err ? dAreas.at(index_sub) : 1.;
+
+
+            // Unfortunately, 1 is quite a bit smaller than the magnitude of the second derivative terms.
+            //      so terms that are 1 (the v_r terms) get swamped out. So, let's just scale them by a comparable factor
+            //      We'll take the mean absolute value of the second latitudinal derivative at the equator, for kicks
+            // This same scale factor is then removed from the resulting solution afterwards
+            LB = - 2 * Nlat;
+            get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Nlat/2, 0, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
+            Ndiff = diff_vec.size();
+            double Lap_comp_factor = 0;
+            for ( IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
+
+            // These are for the v_r term.
+
+            // (0,0)
+            row_skip    = 0 * Npts;
+            column_skip = 0 * Npts;
+            tmp_val     = 1.;
+            tmp_val    *= weight_val * Lap_comp_factor;
+            alglib::sparseadd(  matr, row_skip + index_sub, column_skip + index_sub, tmp_val);
+            
+            // (2,0)
+            row_skip    = 2 * Npts;
+            column_skip = 0 * Npts;
+            tmp_val     = 1.;
+            tmp_val    *= weight_val * Lap_comp_factor;
+            alglib::sparseadd(  matr, row_skip + index_sub, column_skip + index_sub, tmp_val);
 
             // First longitude derivatives
             LB = - 2 * Nlon;
@@ -82,6 +110,30 @@ void build_main_projection_matrix(
                     tmp_val     = tan_lat * diff_vec.at( IDIFF - LB ) / cos_lat;
                     tmp_val    *= weight_val;
                     alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+
+                    //
+                    //// Along southern pole-most latitude, force constant value. This is to eliminate spurious modes from the kernel
+                    //
+                    if ( (Ilat == 0) or (Ilat == Nlat - 1) ) {
+                        row_skip    = 3 * Npts;
+                        column_skip = 0 * Npts;
+                        tmp_val     = tan_lat * diff_vec.at( IDIFF - LB ) / cos_lat;
+                        tmp_val    *= weight_val;
+                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+
+                        row_skip    = 4 * Npts;
+                        column_skip = 1 * Npts;
+                        tmp_val     = tan_lat * diff_vec.at( IDIFF - LB ) / cos_lat;
+                        tmp_val    *= weight_val;
+                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+
+                        row_skip    = 5 * Npts;
+                        column_skip = 2 * Npts;
+                        tmp_val     = tan_lat * diff_vec.at( IDIFF - LB ) / cos_lat;
+                        tmp_val    *= weight_val;
+                        //alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+                        alglib::sparseset(  matr, row_skip + index_sub, column_skip + index_sub, Lap_comp_factor);
+                    }
                 }
             }
 
@@ -109,6 +161,15 @@ void build_main_projection_matrix(
                     tmp_val     = 0.5 * diff_vec.at( IDIFF - LB ) / pow(cos_lat, 2.);
                     tmp_val    *= weight_val;
                     alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+
+                    // Try to remove jagged noise from v_r
+                    if ( not( (Ilat == 0) or (Ilat == Nlat - 1) ) ) {
+                        row_skip    = 5 * Npts;
+                        column_skip = 2 * Npts;
+                        tmp_val     = v_r_noise_damp * diff_vec.at( IDIFF - LB ) / pow(cos_lat, 2.);
+                        tmp_val    *= weight_val;
+                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+                    }
                 }
             }
 
@@ -136,6 +197,15 @@ void build_main_projection_matrix(
                     tmp_val     = - 0.5 * tan_lat * diff_vec.at( IDIFF - LB );
                     tmp_val    *= weight_val;
                     alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+
+                    // Try to remove jagged noise from v_r
+                    if ( not( (Ilat == 0) or (Ilat == Nlat - 1) ) ) {
+                        row_skip    = 5 * Npts;
+                        column_skip = 2 * Npts;
+                        tmp_val     = - v_r_noise_damp * diff_vec.at( IDIFF - LB ) * tan_lat;
+                        tmp_val    *= weight_val;
+                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+                    }
                 }
             }
 
@@ -163,6 +233,15 @@ void build_main_projection_matrix(
                     tmp_val     = diff_vec.at( IDIFF - LB );
                     tmp_val    *= weight_val;
                     alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+
+                    // Try to remove jagged noise from v_r
+                    if ( not( (Ilat == 0) or (Ilat == Nlat - 1) ) ) {
+                        row_skip    = 5 * Npts;
+                        column_skip = 2 * Npts;
+                        tmp_val     = v_r_noise_damp * diff_vec.at( IDIFF - LB );
+                        tmp_val    *= weight_val;
+                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+                    }
                 }
             }
 
@@ -213,21 +292,6 @@ void build_main_projection_matrix(
                 }
             }
 
-
-            // (0,0)
-            row_skip    = 0 * Npts;
-            column_skip = 0 * Npts;
-            tmp_val     = 1.;
-            tmp_val    *= weight_val;
-            alglib::sparseadd(  matr, row_skip + index_sub, column_skip + index_sub, tmp_val);
-            
-            // (2,0)
-            row_skip    = 2 * Npts;
-            column_skip = 0 * Npts;
-            tmp_val     = 1.;
-            tmp_val    *= weight_val;
-            alglib::sparseadd(  matr, row_skip + index_sub, column_skip + index_sub, tmp_val);
-
         }
     }
 
@@ -237,400 +301,6 @@ void build_main_projection_matrix(
     alglib::sparseconverttocrs( matr );
 
 }
-
-void build_reduced_projection_matrix(
-        alglib::sparsematrix & matr,
-        const dataset & source_data,
-        const int Itime,
-        const int Idepth,
-        const bool weight_err,
-        const double Tikhov
-        ) {
-
-    // Create some tidy names for variables
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
-                                &dAreas     = source_data.areas;
-    const std::vector<bool> &mask = source_data.mask;
-    const std::vector<bool> unmask(mask.size(), true);
-
-    const std::vector<int>  &myCounts = source_data.myCounts;
-
-    const int   Ntime   = myCounts.at(0),
-                Ndepth  = myCounts.at(1),
-                Nlat    = myCounts.at(2),
-                Nlon    = myCounts.at(3);
-
-    const size_t Npts = Nlat * Nlon;
-    const double R2inv = pow( 1. / constants::R_earth, 2 );
-
-    double tmp_val, weight_val;
-    size_t column_skip, row_skip, index_sub;
-    int IDIFF, Idiff, Idiff_lat, Idiff_lon, 
-               LB,    LB_lon,    LB_lat, 
-               Ndiff, Ndiff_lon, Ndiff_lat;
-    std::vector<double> diff_vec, diff_vec_lon, diff_vec_lat;
-    for ( int Ilat = 0; Ilat < Nlat; Ilat++ ) {
-
-        double tan_lat = tan(latitude.at(Ilat));
-        double cos_lat = cos(latitude.at(Ilat));
-
-        for ( int Ilon = 0; Ilon < Nlon; Ilon++ ) {
-            index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
-
-            weight_val = weight_err ? dAreas.at(index_sub) : 1.;
-
-            // First longitude derivatives
-            LB = - 2 * Nlon;
-            get_diff_vector(diff_vec, LB, longitude, "lon", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
-            Ndiff = diff_vec.size();
-
-            if ( LB != - 2 * Nlon) {
-                for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
-                    if (constants::PERIODIC_X) { Idiff = ( IDIFF % Nlon + Nlon ) % Nlon; }
-                    else                       { Idiff = IDIFF;                          }
-                    size_t diff_index = Index(0, 0, Ilat, Idiff, 1, 1, Nlat, Nlon);
-
-                    // (0,1) entry
-                    row_skip    = 0 * Npts;
-                    column_skip = 1 * Npts;
-                    tmp_val     = - 2 * tan_lat * diff_vec.at( IDIFF - LB ) / cos_lat;
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                    // (1,0) entry
-                    row_skip    = 1 * Npts;
-                    column_skip = 0 * Npts;
-                    tmp_val     = tan_lat * diff_vec.at( IDIFF - LB ) / cos_lat;
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-                }
-            }
-
-            // Second longitude derivatives
-            LB = - 2 * Nlon;
-            get_diff_vector(diff_vec, LB, longitude, "lon", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
-            Ndiff = diff_vec.size();
-
-            if ( LB != - 2 * Nlon) {
-                for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
-                    if (constants::PERIODIC_X) { Idiff = ( IDIFF % Nlon + Nlon ) % Nlon; }
-                    else                       { Idiff = IDIFF;                          }
-                    size_t diff_index = Index(0, 0, Ilat, Idiff, 1, 1, Nlat, Nlon);
-
-                    // (0,0) entry
-                    row_skip    = 0 * Npts;
-                    column_skip = 0 * Npts;
-                    tmp_val     = diff_vec.at( IDIFF - LB ) / pow(cos_lat, 2.);
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                    // (1,1) entry
-                    row_skip    = 1 * Npts;
-                    column_skip = 1 * Npts;
-                    tmp_val     = 0.5 * diff_vec.at( IDIFF - LB ) / pow(cos_lat, 2.);
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                    //
-                    //// Laplacian term to (hopefully) reduce noise
-                    //
-
-                    // (2,0) entry
-                    row_skip    = 2 * Npts;
-                    column_skip = 0 * Npts;
-                    tmp_val     = diff_vec.at( IDIFF - LB ) / pow(cos_lat, 2.);
-                    tmp_val    *= Tikhov * weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                    // (3,1) entry
-                    row_skip    = 3 * Npts;
-                    column_skip = 1 * Npts;
-                    tmp_val     = diff_vec.at( IDIFF - LB ) / pow(cos_lat, 2.);
-                    tmp_val    *= Tikhov * weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-                }
-            }
-
-            // First latitude derivatives
-            LB = - 2 * Nlat;
-            get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
-            Ndiff = diff_vec.size();
-
-            if ( LB != - 2 * Nlat) {
-                for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
-                    if (constants::PERIODIC_Y) { Idiff = ( IDIFF % Nlat + Nlat ) % Nlat; }
-                    else                       { Idiff = IDIFF;                          }
-                    size_t diff_index = Index(0, 0, Idiff, Ilon, 1, 1, Nlat, Nlon);
-
-                    // (0,0) entry  
-                    row_skip    = 0 * Npts;
-                    column_skip = 0 * Npts;
-                    tmp_val     = - tan_lat * diff_vec.at( IDIFF - LB );
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                    // (1,1) entry
-                    row_skip    = 1 * Npts;
-                    column_skip = 1 * Npts;
-                    tmp_val     = - 0.5 * tan_lat * diff_vec.at( IDIFF - LB );
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                    //
-                    //// Laplacian term to (hopefully) reduce noise
-                    //
-
-                    // (2,0) entry
-                    row_skip    = 2 * Npts;
-                    column_skip = 0 * Npts;
-                    tmp_val     = - tan_lat * diff_vec.at( IDIFF - LB );
-                    tmp_val    *= Tikhov * weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                    // (3,1) entry
-                    row_skip    = 3 * Npts;
-                    column_skip = 1 * Npts;
-                    tmp_val     = - tan_lat * diff_vec.at( IDIFF - LB );
-                    tmp_val    *= Tikhov * weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-                }
-            }
-
-            // Second latitude derivatives
-            LB = - 2 * Nlat;
-            get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
-            Ndiff = diff_vec.size();
-
-            if ( LB != - 2 * Nlat) {
-                for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
-                    if (constants::PERIODIC_Y) { Idiff = ( IDIFF % Nlat + Nlat ) % Nlat; }
-                    else                       { Idiff = IDIFF;                          }
-                    size_t diff_index = Index(0, 0, Idiff, Ilon, 1, 1, Nlat, Nlon);
-
-                    // (0,0) entry  
-                    row_skip    = 0 * Npts;
-                    column_skip = 0 * Npts;
-                    tmp_val     = - diff_vec.at( IDIFF - LB );
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                    // (1,1) entry  
-                    row_skip    = 1 * Npts;
-                    column_skip = 1 * Npts;
-                    tmp_val     = - 0.5 * diff_vec.at( IDIFF - LB );
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                    //
-                    //// Laplacian term to (hopefully) reduce noise
-                    //
-
-                    // (2,0) entry
-                    row_skip    = 2 * Npts;
-                    column_skip = 0 * Npts;
-                    tmp_val     = diff_vec.at( IDIFF - LB );
-                    tmp_val    *= Tikhov * weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                    // (3,1) entry
-                    row_skip    = 3 * Npts;
-                    column_skip = 1 * Npts;
-                    tmp_val     = diff_vec.at( IDIFF - LB );
-                    tmp_val    *= Tikhov * weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-                }
-            }
-
-            // Mixed partial (first lon and first lat)
-            LB_lon = - 2 * Nlon;
-            get_diff_vector(diff_vec_lon, LB_lon, longitude, "lon", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
-            Ndiff_lon = diff_vec_lon.size();
-
-            LB_lat = - 2 * Nlat;
-            get_diff_vector(diff_vec_lat, LB_lat, latitude, "lat", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
-            Ndiff_lat = diff_vec_lat.size();
-
-            if ( ( LB_lat != - 2 * Nlat) and ( LB_lon != - 2 * Nlon) ) {
-                for ( int IDIFF_lat = LB_lat; IDIFF_lat < LB_lat + Ndiff_lat; IDIFF_lat++ ) {
-
-                    if (constants::PERIODIC_Y) { Idiff_lat = ( IDIFF_lat % Nlat + Nlat ) % Nlat; }
-                    else                       { Idiff_lat = IDIFF_lat;                          }
-
-                    for ( int IDIFF_lon = LB_lon; IDIFF_lon < LB_lon + Ndiff_lon; IDIFF_lon++ ) {
-
-                        if (constants::PERIODIC_X) { Idiff_lon = ( IDIFF_lon % Nlon + Nlon ) % Nlon; }
-                        else                       { Idiff_lon = IDIFF_lon;                          }
-
-                        size_t diff_index = Index(0, 0, Idiff_lat, Idiff_lon, 1, 1, Nlat, Nlon);
-
-                        // (0,1) entry  
-                        row_skip    = 0 * Npts;
-                        column_skip = 1 * Npts;
-                        tmp_val     = - 2 * diff_vec_lon.at( IDIFF_lon - LB_lon ) * diff_vec_lat.at( IDIFF_lat - LB_lat ) / cos_lat;
-                        tmp_val    *= weight_val;
-                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-
-                        // (1,0) entry  
-                        row_skip    = 1 * Npts;
-                        column_skip = 0 * Npts;
-                        tmp_val     = diff_vec_lon.at( IDIFF_lon - LB_lon ) * diff_vec_lat.at( IDIFF_lat - LB_lat ) / cos_lat;
-                        tmp_val    *= weight_val;
-                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-                    }
-                }
-            }
-        }
-    }
-
-    size_t lower_count = alglib::sparsegetlowercount( matr );
-    size_t upper_count = alglib::sparsegetuppercount( matr );
-
-    alglib::sparseconverttocrs( matr );
-
-}
-
-void build_v_r_matrix(
-        alglib::sparsematrix & matr,
-        const dataset & source_data,
-        const int Itime,
-        const int Idepth
-        ) {
-
-    // Create some tidy names for variables
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
-                                &dAreas     = source_data.areas;
-    const std::vector<bool> &mask = source_data.mask;
-    const std::vector<bool> unmask(mask.size(), true);
-
-    const std::vector<int>  &myCounts = source_data.myCounts;
-
-    const int   Ntime   = myCounts.at(0),
-                Ndepth  = myCounts.at(1),
-                Nlat    = myCounts.at(2),
-                Nlon    = myCounts.at(3);
-
-    const size_t Npts = Nlat * Nlon;
-
-    double tmp_val, weight_val;
-    size_t column_skip, row_skip, index_sub;
-    int IDIFF, Idiff, Idiff_lat, Idiff_lon, 
-               LB,    LB_lon,    LB_lat, 
-               Ndiff, Ndiff_lon, Ndiff_lat;
-    std::vector<double> diff_vec, diff_vec_lon, diff_vec_lat;
-    for ( int Ilat = 0; Ilat < Nlat; Ilat++ ) {
-
-        double tan_lat = tan(latitude.at(Ilat));
-        double cos_lat = cos(latitude.at(Ilat));
-
-        for ( int Ilon = 0; Ilon < Nlon; Ilon++ ) {
-            index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
-
-            //weight_val = weight_err ? dAreas.at(index_sub) : 1.;
-            weight_val = 1.; // don't weight this matrix
-
-            // First longitude derivatives
-            LB = - 2 * Nlon;
-            get_diff_vector(diff_vec, LB, longitude, "lon", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
-            Ndiff = diff_vec.size();
-
-            if ( LB != - 2 * Nlon) {
-                for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
-                    if (constants::PERIODIC_X) { Idiff = ( IDIFF % Nlon + Nlon ) % Nlon; }
-                    else                       { Idiff = IDIFF;                          }
-                    size_t diff_index = Index(0, 0, Ilat, Idiff, 1, 1, Nlat, Nlon);
-
-                    // (0,1) entry
-                    row_skip    = 0 * Npts;
-                    column_skip = 1 * Npts;
-                    tmp_val     = - tan_lat * diff_vec.at( IDIFF - LB ) / cos_lat;
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-                }
-            }
-
-            // Second longitude derivatives
-            LB = - 2 * Nlon;
-            get_diff_vector(diff_vec, LB, longitude, "lon", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
-            Ndiff = diff_vec.size();
-
-            if ( LB != - 2 * Nlon) {
-                for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
-                    if (constants::PERIODIC_X) { Idiff = ( IDIFF % Nlon + Nlon ) % Nlon; }
-                    else                       { Idiff = IDIFF;                          }
-                    size_t diff_index = Index(0, 0, Ilat, Idiff, 1, 1, Nlat, Nlon);
-
-                    // (0,0) entry
-                    row_skip    = 0 * Npts;
-                    column_skip = 0 * Npts;
-                    tmp_val     = diff_vec.at( IDIFF - LB ) / pow(cos_lat, 2.);
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-                }
-            }
-
-            // First latitude derivatives
-            LB = - 2 * Nlat;
-            get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
-            Ndiff = diff_vec.size();
-
-            if ( LB != - 2 * Nlat) {
-                for ( IDIFF = LB; IDIFF < LB + Ndiff; IDIFF++ ) {
-                    if (constants::PERIODIC_Y) { Idiff = ( IDIFF % Nlat + Nlat ) % Nlat; }
-                    else                       { Idiff = IDIFF;                          }
-                    size_t diff_index = Index(0, 0, Idiff, Ilon, 1, 1, Nlat, Nlon);
-
-                    // (0,0) entry  
-                    row_skip    = 0 * Npts;
-                    column_skip = 0 * Npts;
-                    tmp_val     = - tan_lat * diff_vec.at( IDIFF - LB );
-                    tmp_val    *= weight_val;
-                    alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-                }
-            }
-
-            // Mixed partial (first lon and first lat)
-            LB_lon = - 2 * Nlon;
-            get_diff_vector(diff_vec_lon, LB_lon, longitude, "lon", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
-            Ndiff_lon = diff_vec_lon.size();
-
-            LB_lat = - 2 * Nlat;
-            get_diff_vector(diff_vec_lat, LB_lat, latitude, "lat", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
-            Ndiff_lat = diff_vec_lat.size();
-
-            if ( ( LB_lat != - 2 * Nlat) and ( LB_lon != - 2 * Nlon) ) {
-                for ( int IDIFF_lat = LB_lat; IDIFF_lat < LB_lat + Ndiff_lat; IDIFF_lat++ ) {
-
-                    if (constants::PERIODIC_Y) { Idiff_lat = ( IDIFF_lat % Nlat + Nlat ) % Nlat; }
-                    else                       { Idiff_lat = IDIFF_lat;                          }
-
-                    for ( int IDIFF_lon = LB_lon; IDIFF_lon < LB_lon + Ndiff_lon; IDIFF_lon++ ) {
-
-                        if (constants::PERIODIC_X) { Idiff_lon = ( IDIFF_lon % Nlon + Nlon ) % Nlon; }
-                        else                       { Idiff_lon = IDIFF_lon;                          }
-
-                        size_t diff_index = Index(0, 0, Idiff_lat, Idiff_lon, 1, 1, Nlat, Nlon);
-
-                        // (0,1) entry  
-                        row_skip    = 0 * Npts;
-                        column_skip = 1 * Npts;
-                        tmp_val     = - diff_vec_lon.at( IDIFF_lon - LB_lon ) * diff_vec_lat.at( IDIFF_lat - LB_lat ) / cos_lat;
-                        tmp_val    *= weight_val;
-                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
-                    }
-                }
-            }
-        }
-    }
-
-    size_t lower_count = alglib::sparsegetlowercount( matr );
-    size_t upper_count = alglib::sparsegetuppercount( matr );
-
-    alglib::sparseconverttocrs( matr );
-
-}
-
 
 void Apply_Helmholtz_Projection_uiuj(
         const std::string output_fname,
@@ -705,22 +375,17 @@ void Apply_Helmholtz_Projection_uiuj(
         full_vv(    u_lon.size(), 0. );
 
     // alglib variables
-    alglib::real_1d_array rhs, rhs_seed, rhs_result, lhs_seed, v_r_result, full_Helm_vector;
+    alglib::real_1d_array rhs, rhs_seed, rhs_result, lhs_seed;
     std::vector<double> 
-        V_R_result( 1 * Npts, 0.),
-        RHS_vector( 4 * Npts, 0.),
-        RHS_seed(   4 * Npts, 0.),
-        LHS_seed(   2 * Npts, 0.),
-        RHS_result( 3 * Npts, 0.),
-        FULL_HELM(  3 * Npts, 0. );
+        RHS_vector( 6 * Npts, 0.),
+        RHS_seed(   6 * Npts, 0.),
+        LHS_seed(   3 * Npts, 0.),
+        RHS_result( 3 * Npts, 0.);
 
-    v_r_result.attach_to_ptr(       1 * Npts, &V_R_result[0] );
-    rhs.attach_to_ptr(              4 * Npts, &RHS_vector[0] );
-    //rhs.attach_to_ptr(              2 * Npts, &RHS_vector[0] );
-    rhs_seed.attach_to_ptr(         4 * Npts, &RHS_seed[0] );
-    lhs_seed.attach_to_ptr(         2 * Npts, &LHS_seed[0] );
+    rhs.attach_to_ptr(              6 * Npts, &RHS_vector[0] );
+    rhs_seed.attach_to_ptr(         6 * Npts, &RHS_seed[0] );
+    lhs_seed.attach_to_ptr(         3 * Npts, &LHS_seed[0] );
     rhs_result.attach_to_ptr(       3 * Npts, &RHS_result[0] );
-    full_Helm_vector.attach_to_ptr( 3 * Npts, &FULL_HELM[0] );
     
 
     // Copy the starting seed.
@@ -732,8 +397,9 @@ void Apply_Helmholtz_Projection_uiuj(
             for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                 for (Ilon = 0; Ilon < Nlon; ++Ilon) {
                     index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
-                    LHS_seed.at( index + 0 * Npts ) = seed_Phi_v.at( index );
-                    LHS_seed.at( index + 1 * Npts ) = seed_Psi_v.at( index );
+                    LHS_seed.at( index + 0 * Npts ) = seed_v_r.at( index );
+                    LHS_seed.at( index + 1 * Npts ) = seed_Phi_v.at( index );
+                    LHS_seed.at( index + 2 * Npts ) = seed_Psi_v.at( index );
                 }
             }
         }
@@ -760,15 +426,11 @@ void Apply_Helmholtz_Projection_uiuj(
     }
     #endif
 
-    alglib::sparsematrix LHS_matr, get_vr_matr, proj_matr;
-    alglib::sparsecreate(3*Npts, 3*Npts, proj_matr);
-    //alglib::sparsecreate(2*Npts, 2*Npts, LHS_matr);
-    alglib::sparsecreate(4*Npts, 2*Npts, LHS_matr);
-    alglib::sparsecreate(1*Npts, 2*Npts, get_vr_matr);
+    alglib::sparsematrix proj_matr;
+    alglib::sparsecreate(6*Npts, 3*Npts, proj_matr);
 
-    build_main_projection_matrix(    proj_matr,   source_data, Itime, Idepth );
-    build_reduced_projection_matrix( LHS_matr,    source_data, Itime, Idepth, weight_err, Tikhov_Laplace );
-    build_v_r_matrix(                get_vr_matr, source_data, Itime, Idepth );
+    const double v_r_noise_damp = Tikhov_Laplace; // 0.05
+    build_main_projection_matrix(    proj_matr,   source_data, Itime, Idepth, weight_err, v_r_noise_damp );
 
     #if DEBUG >= 1
     if (wRank == 0) {
@@ -776,9 +438,25 @@ void Apply_Helmholtz_Projection_uiuj(
         fflush(stdout);
     }
     #endif
-    alglib::linlsqrcreate(4*Npts, 2*Npts, state);
+    alglib::linlsqrcreate(6*Npts, 3*Npts, state);
     alglib::linlsqrsetcond(state, rel_tol, rel_tol, max_iters);
     alglib::linlsqrsetlambdai( state, Tikhov_Lambda );
+
+    // Counters to track termination types
+    int terminate_count_abs_tol = 0,
+        terminate_count_rel_tol = 0,
+        terminate_count_max_iter = 0,
+        terminate_count_rounding = 0,
+        terminate_count_other = 0;
+
+    // Laplace comparison scale factor, for v_r
+    int LB = - 2 * Nlat;
+    std::vector<double> diff_vec;
+    get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Nlat/2, 0, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
+    int Ndiff = diff_vec.size();
+    double Lap_comp_factor = 0;
+    for ( int IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
+    if (wRank == 0) { fprintf( stdout, "Lap_comp_factor = %g\n", Lap_comp_factor ); }
 
     // Now do the solve!
     for (int Itime = 0; Itime < Ntime; ++Itime) {
@@ -796,8 +474,9 @@ void Apply_Helmholtz_Projection_uiuj(
                         for (Ilon = 0; Ilon < Nlon; ++Ilon) {
                             index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
                             index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
-                            LHS_seed.at( index_sub + 0 * Npts ) = seed_Phi_v.at( index );
-                            LHS_seed.at( index_sub + 1 * Npts ) = seed_Psi_v.at( index );
+                            LHS_seed.at( index_sub + 0 * Npts ) = seed_v_r.at( index );
+                            LHS_seed.at( index_sub + 1 * Npts ) = seed_Phi_v.at( index );
+                            LHS_seed.at( index_sub + 2 * Npts ) = seed_Psi_v.at( index );
                         }
                     }
                 }
@@ -811,7 +490,7 @@ void Apply_Helmholtz_Projection_uiuj(
             #endif
 
             // Get velocity from seed
-            alglib::sparsemv( LHS_matr, lhs_seed, rhs_seed );
+            alglib::sparsemv( proj_matr, lhs_seed, rhs_seed );
 
             #if DEBUG >= 2
             if ( (wRank == 0) and (Itime == 0) ) {
@@ -839,16 +518,19 @@ void Apply_Helmholtz_Projection_uiuj(
 
                         u_lon_loc = u_lon.at(index);
                         u_lat_loc = u_lat.at(index);
-                        RHS_vector.at(0 * Npts + index_sub) = pow( u_lon_loc, 2. ) - pow( u_lat_loc, 2. );
+                        RHS_vector.at(0 * Npts + index_sub) = pow( u_lon_loc, 2. );
                         RHS_vector.at(1 * Npts + index_sub) = u_lon_loc * u_lat_loc;
+                        RHS_vector.at(2 * Npts + index_sub) = pow( u_lat_loc, 2. );
 
                         weight_val = weight_err ? dAreas.at(index_sub) : 1.;
                         RHS_vector.at(0 * Npts + index_sub) *= weight_val; 
                         RHS_vector.at(1 * Npts + index_sub) *= weight_val; 
+                        RHS_vector.at(2 * Npts + index_sub) *= weight_val; 
 
                         // Seed already scaled by weight from multiplying with LHS_matr
                         RHS_vector.at(0 * Npts + index_sub) += -RHS_seed.at( 0 * Npts + index_sub );
                         RHS_vector.at(1 * Npts + index_sub) += -RHS_seed.at( 1 * Npts + index_sub );
+                        RHS_vector.at(2 * Npts + index_sub) += -RHS_seed.at( 2 * Npts + index_sub );
                     }
                 }
             }
@@ -862,17 +544,8 @@ void Apply_Helmholtz_Projection_uiuj(
                 fflush(stdout);
             }
             #endif
-            alglib::linlsqrsolvesparse(state, LHS_matr, rhs);
+            alglib::linlsqrsolvesparse(state, proj_matr, rhs);
             alglib::linlsqrresults(state, F_alglib, report);
-
-            #if DEBUG >= 1
-            if      (report.terminationtype == 1) { fprintf(stdout, "Termination type: absolulte tolerance reached.\n"); }
-            else if (report.terminationtype == 4) { fprintf(stdout, "Termination type: relative tolerance reached.\n"); }
-            else if (report.terminationtype == 5) { fprintf(stdout, "Termination type: maximum number of iterations reached.\n"); }
-            else if (report.terminationtype == 7) { fprintf(stdout, "Termination type: round-off errors prevent further progress.\n"); }
-            else if (report.terminationtype == 8) { fprintf(stdout, "Termination type: user requested (?)\n"); }
-            else                                  { fprintf(stdout, "Termination type: unknown\n"); }
-            #endif
 
             /*    Rep     -   optimization report:
                 * Rep.TerminationType completetion code:
@@ -888,6 +561,21 @@ void Apply_Helmholtz_Projection_uiuj(
                 * NMV countains number of matrix-vector calculations
             */
 
+            #if DEBUG >= 1
+            if      (report.terminationtype == 1) { fprintf(stdout, "Termination type: absolulte tolerance reached.\n"); }
+            else if (report.terminationtype == 4) { fprintf(stdout, "Termination type: relative tolerance reached.\n"); }
+            else if (report.terminationtype == 5) { fprintf(stdout, "Termination type: maximum number of iterations reached.\n"); }
+            else if (report.terminationtype == 7) { fprintf(stdout, "Termination type: round-off errors prevent further progress.\n"); }
+            else if (report.terminationtype == 8) { fprintf(stdout, "Termination type: user requested (?)\n"); }
+            else                                  { fprintf(stdout, "Termination type: unknown\n"); }
+            #endif
+            if      (report.terminationtype == 1) { terminate_count_abs_tol++; }
+            else if (report.terminationtype == 4) { terminate_count_rel_tol++; }
+            else if (report.terminationtype == 5) { terminate_count_max_iter++; }
+            else if (report.terminationtype == 7) { terminate_count_rounding++; }
+            else if (report.terminationtype == 8) { terminate_count_other++; }
+            else                                  { terminate_count_other++; }
+
             #if DEBUG >= 2
             if ( (wRank == 0) and (Itime == 0) ) {
                 fprintf(stdout, " Done solving the least squares problem.\n");
@@ -897,23 +585,7 @@ void Apply_Helmholtz_Projection_uiuj(
 
             // Add the seed back in to the solution
             double *LHS_ptr = F_alglib.getcontent();
-            for (size_t ii = 0; ii < 2 * Npts; ++ii) { LHS_ptr[ii] += LHS_seed.at(ii); }
-
-            // Get v_r from the Phi_v and Psi_v results
-            alglib::sparsemv( get_vr_matr, F_alglib, v_r_result );
-
-            // Prepend v_r on top of the Phi_v and Psi_v
-            // We will use FULL_HELM to get the uu, uv, vv projection results.
-            for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                    index     = Index( Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
-                    weight_val = weight_err ? dAreas.at(index) : 1.;
-
-                    FULL_HELM.at( index + 0 * Npts ) = pow(u_lon.at(index),2) - V_R_result.at( index );
-                    FULL_HELM.at( index + 1 * Npts ) = LHS_ptr[ index + 0 * Npts ];
-                    FULL_HELM.at( index + 2 * Npts ) = LHS_ptr[ index + 1 * Npts ];
-                }
-            }
+            for (size_t ii = 0; ii < 3 * Npts; ++ii) { LHS_ptr[ii] += LHS_seed.at(ii); }
 
             // Get velocity associated to computed F field
             #if DEBUG >= 2
@@ -922,7 +594,10 @@ void Apply_Helmholtz_Projection_uiuj(
                 fflush(stdout);
             }
             #endif
-            alglib::sparsemv( proj_matr, full_Helm_vector, rhs_result );
+            alglib::real_1d_array lhs_result;
+            lhs_result.attach_to_ptr( 3 * Npts, &LHS_ptr[0] );
+            alglib::sparsemv( proj_matr, lhs_result, rhs_result );
+            double *RHS_result_ptr = rhs_result.getcontent();
 
             //
             //// Store into the full arrays
@@ -936,8 +611,8 @@ void Apply_Helmholtz_Projection_uiuj(
             #pragma omp parallel \
             default(none) \
             shared( full_v_r, full_Phi_v, full_Psi_v, full_uu, full_uv, full_vv, \
-                    dAreas, FULL_HELM, RHS_result, Itime, Idepth ) \
-            private( Ilat, Ilon, index, index_sub )
+                    dAreas, LHS_ptr, RHS_result, RHS_result_ptr, Itime, Idepth, Lap_comp_factor ) \
+            private( Ilat, Ilon, index, index_sub, weight_val )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -946,19 +621,23 @@ void Apply_Helmholtz_Projection_uiuj(
 
                         index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
 
-                        full_v_r.at(  index) = FULL_HELM.at( index_sub + 0 * Npts );
-                        full_Phi_v.at(index) = FULL_HELM.at( index_sub + 1 * Npts );
-                        full_Psi_v.at(index) = FULL_HELM.at( index_sub + 2 * Npts );
+                        full_v_r.at(  index) = LHS_ptr[ index_sub + 0 * Npts ] * Lap_comp_factor;
+                        full_Phi_v.at(index) = LHS_ptr[ index_sub + 1 * Npts ];
+                        full_Psi_v.at(index) = LHS_ptr[ index_sub + 2 * Npts ];
 
-                        full_uu.at( index ) = RHS_result.at( index_sub + 0 * Npts );
-                        full_uv.at( index ) = RHS_result.at( index_sub + 1 * Npts );
-                        full_vv.at( index ) = RHS_result.at( index_sub + 2 * Npts );
+                        weight_val = weight_err ? dAreas.at(index_sub) : 1.;
+                        //full_uu.at( index ) = RHS_result.at( index_sub + 0 * Npts );
+                        //full_uv.at( index ) = RHS_result.at( index_sub + 1 * Npts );
+                        //full_vv.at( index ) = RHS_result.at( index_sub + 2 * Npts );
+                        full_uu.at( index ) = RHS_result_ptr[ index_sub + 0 * Npts ] / weight_val;
+                        full_uv.at( index ) = RHS_result_ptr[ index_sub + 1 * Npts ] / weight_val;
+                        full_vv.at( index ) = RHS_result_ptr[ index_sub + 2 * Npts ] / weight_val;
                     }
                 }
             }
 
             // If we don't have a seed for the next iteration, use this solution as the seed
-            if (single_seed) { for (size_t ii = 0; ii < 2 * Npts; ++ii) { LHS_seed.at(ii) = LHS_ptr[ii]; } }
+            if (single_seed) { for (size_t ii = 0; ii < 3 * Npts; ++ii) { LHS_seed.at(ii) = LHS_ptr[ii]; } }
 
             #if DEBUG >= 0
             if ( source_data.full_Ndepth > 1 ) {
@@ -976,6 +655,37 @@ void Apply_Helmholtz_Projection_uiuj(
         }
         #endif
     }
+
+    //
+    //// Print termination counts
+    //
+
+    int total_count_abs_tol, total_count_rel_tol, total_count_max_iter, total_count_rounding, total_count_other;
+
+    MPI_Reduce( &terminate_count_abs_tol,  &total_count_abs_tol,  1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD );
+    MPI_Reduce( &terminate_count_rel_tol,  &total_count_rel_tol,  1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD );
+    MPI_Reduce( &terminate_count_max_iter, &total_count_max_iter, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD );
+    MPI_Reduce( &terminate_count_rounding, &total_count_rounding, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD );
+    MPI_Reduce( &terminate_count_other,    &total_count_other,    1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD );
+
+    #if DEBUG >= 0
+    if (wRank == 0) {
+        fprintf( stdout, "\n" );
+        fprintf( stdout, "Termination counts: %'d from absolute tolerance\n", total_count_abs_tol );
+        fprintf( stdout, "                    %'d from relative tolerance\n", total_count_rel_tol );
+        fprintf( stdout, "                    %'d from iteration maximum\n", total_count_max_iter );
+        fprintf( stdout, "                    %'d from rounding errors \n", total_count_rounding );
+        fprintf( stdout, "                    %'d from other causes \n", total_count_other );
+        fprintf( stdout, "\n" );
+    }
+    #endif
+    if      (report.terminationtype == 1) { terminate_count_abs_tol++; }
+    else if (report.terminationtype == 4) { terminate_count_rel_tol++; }
+    else if (report.terminationtype == 5) { terminate_count_max_iter++; }
+    else if (report.terminationtype == 7) { terminate_count_rounding++; }
+    else if (report.terminationtype == 8) { terminate_count_other++; }
+    else                                  { terminate_count_other++; }
+
 
     //
     //// Write the output

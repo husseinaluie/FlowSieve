@@ -18,7 +18,9 @@ void sparse_vel_from_PsiPhi_vortdiv(
         const int Idepth,
         const std::vector<bool> & mask,
         const bool weight_err,
-        const double Tikhov_Laplace
+        const double Tikhov_Laplace,
+        const double deriv_scale_factor,
+        const int wRank
         ) {
 
     const std::vector<double>   &latitude   = source_data.latitude,
@@ -42,6 +44,16 @@ void sparse_vel_from_PsiPhi_vortdiv(
     const double R_inv  = 1. / constants::R_earth,
                  R2_inv = pow( R_inv, 2 );
 
+
+    //
+    ////
+    ////// Add terms for velocity matching
+    ////
+    //
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf( stdout, "  Adding terms to force velocity matching.\n" ); }
+    #endif
+
     for ( Ilat = 0; Ilat < Nlat; Ilat++ ) {
         for ( Ilon = 0; Ilon < Nlon; Ilon++ ) {
             
@@ -56,7 +68,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
             double cos_lat_inv = 1. / cos(latitude.at(Ilat)),
                    cos2_lat_inv = pow( cos_lat_inv, 2. );
 
-            if ( not(is_pole) ) { // Skip land areas and poles
+            if ( not(is_pole) ) { // Skip poles
 
                 //
                 //// LON first derivative part
@@ -125,35 +137,38 @@ void sparse_vel_from_PsiPhi_vortdiv(
                     }
                 }
             }
+        }
+    }
 
 
 
+    //
+    ////
+    ////// Add in Laplace terms to force Phi / Psi to match vorticity and divergence of flow
+    ////
+    //
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf( stdout, "  Adding Laplace terms to force velocity / divergence matching.\n" ); }
+    #endif
 
-            //
-            ////
-            ////// Add in Laplace terms to force Phi / Psi to match vorticity and divergence of flow
-            ////
-            //
-            if ( ( Ilat == 0 ) ) {
+
+    for ( Ilat = 0; Ilat < Nlat; Ilat++ ) {
+        for ( Ilon = 0; Ilon < Nlon; Ilon++ ) {
+            
+            // If we're too close to the pole (less than 0.01 degrees), bad things happen
+            is_pole = std::fabs( std::fabs( latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 0.01;
+
+            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+            index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
+            
+            double weight_val = weight_err ? dAreas.at(index_sub) : 1.;
+
+            double cos_lat_inv = 1. / cos(latitude.at(Ilat)),
+                   cos2_lat_inv = pow( cos_lat_inv, 2. );
+
+            if ( ( Ilat == 0 ) and (Tikhov_Laplace == 0) ) {
                 // At the pole-most point, force to be zonally constant. This is to try and remove the null(Laplacian) component
                 //      i.e. force neighbouring points to sum to zero
-
-                /*
-                double scale_factor = 10. / std::fmin( longitude.at(1) - longitude.at(0), latitude.at(1) - latitude.at(0) );
-                size_t index_neighbour = Index(0, 0, Ilat, Ilon + 1 % Nlon, 1, 1, Nlat, Nlon);
-
-                // Psi part
-                size_t  column_skip = 1 * Npts,
-                        row_skip    = 2 * Npts;
-                alglib::sparseadd(  LHS_matr, row_skip + index_sub, column_skip + index_sub,        1. * scale_factor );
-                alglib::sparseadd(  LHS_matr, row_skip + index_sub, column_skip + index_neighbour, -1. * scale_factor );
-
-                // Phi part
-                column_skip = 0 * Npts;
-                row_skip    = 3 * Npts;
-                alglib::sparseadd(  LHS_matr, row_skip + index_sub, column_skip + index_sub,        1. * scale_factor );
-                alglib::sparseadd(  LHS_matr, row_skip + index_sub, column_skip + index_neighbour, -1. * scale_factor );
-                */
 
                 // i.e. force zero zonal derivative
                 LB = - 2 * Nlon;
@@ -208,7 +223,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
                         diff_index = Index(0, 0, Ilat, Idiff, 1, 1, Nlat, Nlon);
 
                         tmp_val     = diff_vec.at(IDIFF-LB) * cos2_lat_inv * R2_inv;
-                        tmp_val    *= weight_val * Tikhov_Laplace;
+                        tmp_val    *= weight_val * Tikhov_Laplace / deriv_scale_factor;
 
                         // (2,0) entry
                         size_t  row_skip    = 2 * Npts,
@@ -242,7 +257,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
                         diff_index = Index(0, 0, Idiff, Ilon, 1, 1, Nlat,  Nlon);
 
                         tmp_val     = diff_vec.at(IDIFF-LB) * R2_inv;
-                        tmp_val    *= weight_val * Tikhov_Laplace;
+                        tmp_val    *= weight_val * Tikhov_Laplace / deriv_scale_factor;
 
                         // (2,0) entry
                         size_t  row_skip    = 2 * Npts,
@@ -276,7 +291,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
                         diff_index = Index(0, 0, Idiff, Ilon, 1, 1, Nlat,  Nlon);
 
                         tmp_val     = - diff_vec.at(IDIFF-LB) * tan_lat * R2_inv;
-                        tmp_val    *= weight_val * Tikhov_Laplace;
+                        tmp_val    *= weight_val * Tikhov_Laplace / deriv_scale_factor;
 
                         // (2,0) entry
                         size_t  row_skip    = 2 * Npts,
@@ -289,10 +304,10 @@ void sparse_vel_from_PsiPhi_vortdiv(
                         alglib::sparseadd(  LHS_matr, row_skip + index_sub, column_skip + diff_index, tmp_val );
                     }
                 }
-
             }
         }
     }
+        
 }
 
 
@@ -343,14 +358,20 @@ void Apply_Helmholtz_Projection(
     const size_t Npts = Nlat * Nlon;
 
     int Itime, Idepth, Ilat, Ilon;
-    size_t index, index_sub;
+    size_t index, index_sub, iters_used;
 
     // Fill in the land areas with zero velocity
-    #pragma omp parallel default(none) shared( u_lon, u_lat, mask ) private( index )
+    #pragma omp parallel default(none) shared( u_lon, u_lat, mask, stderr, wRank ) private( index )
     {
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < u_lon.size(); index++) {
             if (not(mask.at(index))) {
+                u_lon.at(index) = 0.;
+                u_lat.at(index) = 0.;
+            } else if (    ( std::fabs( u_lon.at(index) ) > 30000.) 
+                        or ( std::fabs( u_lat.at(index) ) > 30000.) 
+                      ) {
+                fprintf( stderr, "  Rank %d found a bad vel point at index %'zu! Setting to zero.\n", wRank, index );
                 u_lon.at(index) = 0.;
                 u_lat.at(index) = 0.;
             }
@@ -427,8 +448,19 @@ void Apply_Helmholtz_Projection(
     alglib::sparsematrix LHS_matr;
     alglib::sparsecreate(4*Npts, 2*Npts, LHS_matr);
 
+    // Get a magnitude for the derivatives, to help normalize the rows of the 
+    //  Laplace entries to have similar magnitude to the others.
+    int LB = - 2 * Nlat;
+    std::vector<double> diff_vec;
+    get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Nlat/2, 0, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
+    int Ndiff = diff_vec.size();
+    double deriv_scale_factor = 0;
+    for ( int IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { deriv_scale_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
+    if (wRank == 0) { fprintf( stdout, "deriv_scale_factor = %g\n", deriv_scale_factor ); }
+
     // Put in {u,v}_from_{psi,phi} bits
-    sparse_vel_from_PsiPhi_vortdiv( LHS_matr, source_data, Itime, Idepth, use_mask ? mask : unmask, weight_err, Tikhov_Laplace );
+    //      this assumes that we can use the same operator for all times / depths
+    sparse_vel_from_PsiPhi_vortdiv( LHS_matr, source_data, 0, 0, use_mask ? mask : unmask, weight_err, Tikhov_Laplace, deriv_scale_factor, wRank );
 
     alglib::sparseconverttocrs(LHS_matr);
 
@@ -521,12 +553,11 @@ void Apply_Helmholtz_Projection(
             //
             //// Set up the RHS_vector
             //
-            //  Subtract off the velocity from the seed
-            //
             
+            double is_pole;
             #pragma omp parallel default(none) \
-            shared( dAreas, Itime, Idepth, RHS_vector, div_term, vort_term, u_lon_rem, u_lat_rem ) \
-            private( Ilat, Ilon, index, index_sub )
+            shared( dAreas, latitude, Itime, Idepth, RHS_vector, div_term, vort_term, u_lon_rem, u_lat_rem, deriv_scale_factor ) \
+            private( Ilat, Ilon, index, index_sub, is_pole )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -534,10 +565,18 @@ void Apply_Helmholtz_Projection(
                         index_sub = Index( 0,     0,      Ilat, Ilon, 1,     1,      Nlat, Nlon);
                         index     = Index( Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
+                        is_pole = std::fabs( std::fabs( latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 0.01;
+
                         RHS_vector.at( 0*Npts + index_sub) = u_lon_rem.at(index_sub);
                         RHS_vector.at( 1*Npts + index_sub) = u_lat_rem.at(index_sub);
-                        RHS_vector.at( 2*Npts + index_sub) = ( Ilat == 0 ) ? 0. : vort_term.at(index_sub) * Tikhov_Laplace;
-                        RHS_vector.at( 3*Npts + index_sub) = ( Ilat == 0 ) ? 0. :  div_term.at(index_sub) * Tikhov_Laplace;
+
+                        if ( ( Ilat == 0 ) or ( is_pole ) ) {
+                            RHS_vector.at( 2*Npts + index_sub) = 0.;
+                            RHS_vector.at( 3*Npts + index_sub) = 0.;
+                        } else {
+                            RHS_vector.at( 2*Npts + index_sub) = vort_term.at(index_sub) * Tikhov_Laplace / deriv_scale_factor;
+                            RHS_vector.at( 3*Npts + index_sub) = div_term.at( index_sub) * Tikhov_Laplace / deriv_scale_factor;
+                        }
 
                         if ( weight_err ) {
                             RHS_vector.at( 0*Npts + index_sub) *= dAreas.at(index_sub);
@@ -589,6 +628,8 @@ void Apply_Helmholtz_Projection(
             else if (report.terminationtype == 7) { terminate_count_rounding++; }
             else if (report.terminationtype == 8) { terminate_count_other++; }
             else                                  { terminate_count_other++; }
+
+            iters_used = linlsqrpeekiterationscount( state );
 
             #if DEBUG >= 2
             if ( wRank == 0 ) {
@@ -663,7 +704,7 @@ void Apply_Helmholtz_Projection(
 
             #if DEBUG >= 0
             if ( source_data.full_Ndepth > 1 ) {
-                fprintf(stdout, "  --  --  Rank %d done depth %d\n", wRank, Idepth + myStarts.at(1) );
+                fprintf(stdout, "  --  --  Rank %d done depth %d after %'zu iterations\n", wRank, Idepth + myStarts.at(1), iters_used );
                 fflush(stdout);
             }
             #endif
@@ -672,7 +713,7 @@ void Apply_Helmholtz_Projection(
 
         #if DEBUG >= 0
         if ( source_data.full_Ntime > 1 ) {
-            fprintf(stdout, " -- Rank %d done time %d\n", wRank, Itime + myStarts.at(0) );
+            fprintf(stdout, " -- Rank %d done time %d after %'zu iterations\n", wRank, Itime + myStarts.at(0), iters_used );
             fflush(stdout);
         }
         #endif
@@ -748,7 +789,7 @@ void Apply_Helmholtz_Projection(
 
 
     //
-    //// At the very end, compute the L2 error for each time/depth
+    //// At the very end, compute the L2 and LInf error for each time/depth
     //
 
     #if DEBUG >= 1
