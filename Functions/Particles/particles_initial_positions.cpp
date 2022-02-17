@@ -24,45 +24,51 @@ void particles_initial_positions(
 
     std::vector<double> lon_rng, lat_rng, lon_mid, lat_mid;
 
-    /*
     lon_rng.push_back(         longitude.back() - longitude.front()  );
     lat_rng.push_back( 0.9 * ( latitude.back()  - latitude.front() ) );
     lon_mid.push_back( 0.5 * ( longitude.back() + longitude.front()) );
     lat_mid.push_back( 0.5 * ( latitude.back()  + latitude.front() ) );
-    */
     
     const double D2R = M_PI / 180.;
     // Agulhas
     // plt.xlim( 10,  60)
     // plt.ylim(-40,  20)
+    /*
     lon_rng.push_back(  50 * D2R );
     lat_rng.push_back(  60 * D2R );
     lon_mid.push_back(  35 * D2R );
     lat_mid.push_back( -10 * D2R );
+    */
     
     // Gulf
     // plt.xlim(-100, -30 )
     // plt.ylim(  10,  60 )
+    /*
     lon_rng.push_back(  70 * D2R );
     lat_rng.push_back(  50 * D2R );
     lon_mid.push_back( -65 * D2R );
     lat_mid.push_back(  35 * D2R );
+    */
     
     // ACC
     // plt.xlim(-90, -20)
     // plt.ylim(-75, -15)
+    /*
     lon_rng.push_back(  70 * D2R );
     lat_rng.push_back(  60 * D2R );
     lon_mid.push_back( -55 * D2R );
     lat_mid.push_back( -45 * D2R );
+    */
     
     // Kuroshio
     // plt.xlim(110, 150)
     // plt.ylim(  0,  60)
+    /*
     lon_rng.push_back(   40 * D2R );
     lat_rng.push_back(   60 * D2R );
     lon_mid.push_back(  130 * D2R );
     lat_mid.push_back(   30 * D2R );
+    */
     
     // Kuroshio (spot)
     // plt.xlim(132, 136)
@@ -83,8 +89,7 @@ void particles_initial_positions(
 
     double part_lon, part_lat;
 
-    //srand( wRank + time(NULL) );
-    srand( wRank );
+    srand( time(NULL) + (time_t)(1+wRank));
 
     for ( int II = 0; II < Npts; ++II ) {
 
