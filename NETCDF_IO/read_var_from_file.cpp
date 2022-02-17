@@ -273,7 +273,7 @@ void read_var_from_file(
     }
     #endif
 
-    #if DEBUG >= 2
+    #if DEBUG >= 1
     if (wRank == 0) { 
         fprintf(stdout, "  var_max = %g\n", var_max);
         fprintf(stdout, "  var_min = %g\n", var_min);
