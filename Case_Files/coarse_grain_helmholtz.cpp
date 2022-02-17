@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     print_header_info();
 
     // Initialize dataset class instance
-    dataset source_data;
+    dataset source_data, mask_data;
 
     // Read in source data / get size information
     #if DEBUG >= 1
@@ -141,11 +141,8 @@ int main(int argc, char *argv[]) {
     source_data.Ntime  = source_data.myCounts[0];
     source_data.Ndepth = source_data.myCounts[1];
 
-    // read in velocity to get the mask
+    // Get mask : read in velocity to get the mask, and extend to the poles if needed
     source_data.load_variable( "sample_velocity", vel_field_var_name, vel_input_fname, true, true);
-
-    // Mask out the pole, if necessary (i.e. set lat = 90 to land)
-    mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
 
     // If we're using FILTER_OVER_LAND, then the mask has been wiped out. Load in a mask that still includes land references
     //      so that we have both. Will be used to get 'water-only' region areas.
@@ -154,18 +151,77 @@ int main(int argc, char *argv[]) {
                source_data.Nprocs_in_time, source_data.Nprocs_in_depth );
     }
 
-    // Read in the region definitions and compute region areas
-    if ( check_file_existence( region_defs_fname ) ) {
-        // If the file exists, then read in from that
-        source_data.load_region_definitions( region_defs_fname, region_defs_dim_name, region_defs_var_name );
-    } else {
-        // Otherwise, just make a single region which is the entire domain
-        source_data.region_names.push_back("full_domain");
+    if ( constants::EXTEND_DOMAIN_TO_POLES ) {
+
+        // Need to get the latitude grid for the mask
+        mask_data.load_latitude(  latitude_dim_name,  vel_input_fname );
+        mask_data.load_longitude( longitude_dim_name, vel_input_fname );
+        mask_data.Ntime  = source_data.Ntime;
+        mask_data.Ndepth = source_data.Ndepth;
+
+        mask_data.mask = source_data.mask;
+        mask_data.reference_mask = source_data.reference_mask;
+     
+        // Convert to radians, if appropriate
+        if ( latlon_in_degrees == "true" ) {
+            convert_coordinates( mask_data.longitude, mask_data.latitude );
+        }
+
+        // Extend the latitude grid to reach the poles and update source_data with the new info.
+        std::vector<double> extended_latitude;
+        int orig_lat_start_in_extend;
+        #if DEBUG >= 2
+        if (wRank == 0) { fprintf( stdout, "    Extending latitude to poles\n" ); }
+        #endif
+        extend_latitude_to_poles( mask_data.latitude, extended_latitude, orig_lat_start_in_extend );
+
+        // Extend out the mask
+        #if DEBUG >= 2
+        if (wRank == 0) { fprintf( stdout, "    Extending mask to poles\n" ); }
+        #endif
+        extend_mask_to_poles( source_data.mask, mask_data, extended_latitude, orig_lat_start_in_extend );
+        if (constants::FILTER_OVER_LAND) { 
+            extend_mask_to_poles( source_data.reference_mask, mask_data, extended_latitude, orig_lat_start_in_extend, false );
+        }
+
+        // Extend out all of the region definitions
+        mask_data.compute_cell_areas();
+        mask_data.compute_region_areas();
+
+        // Read in the region definitions and compute region areas
+        if ( check_file_existence( region_defs_fname ) ) {
+            // If the file exists, then read in from that
+            mask_data.load_region_definitions( region_defs_fname, region_defs_dim_name, region_defs_var_name );
+        } else {
+            // Otherwise, just make a single region which is the entire domain
+            mask_data.region_names.push_back("full_domain");
+            mask_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
+                        "full_domain", std::vector<bool>( mask_data.Nlat * mask_data.Nlon, true) ) 
+                    );
+        }
+
+        for(const auto& reg_data : mask_data.regions) {
+            #if DEBUG >= 2
+            if (wRank == 0) { fprintf( stdout, "    Extending region %s to poles\n", reg_data.first.c_str() ); }
+            #endif
+            extend_mask_to_poles( mask_data.regions[reg_data.first], mask_data, extended_latitude, orig_lat_start_in_extend, false );
+
+            // After it's extended, copy it over into source data
+            source_data.region_names.push_back(reg_data.first);
+            source_data.regions.insert( std::pair< std::string, std::vector<bool> >( reg_data.first, reg_data.second ) );
+        }
+
+        source_data.region_names.push_back("AUTO_ALL");
         source_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
-                                    "full_domain", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
+                    "AUTO_ALL", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
                 );
-        source_data.compute_region_areas();
+
     }
+    source_data.compute_cell_areas();
+    source_data.compute_region_areas();
+
+    // Mask out the pole, if necessary (i.e. set lat = 90 to land)
+    mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
 
     // Now pass the data along to the filtering routines
     const double pre_filter_time = MPI_Wtime();
