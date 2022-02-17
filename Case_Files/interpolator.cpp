@@ -1,26 +1,34 @@
-#include <stdlib.h>
+#include <fenv.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <algorithm>
 #include <math.h>
 #include <vector>
 #include <mpi.h>
+#include <omp.h>
+#include <cassert>
 
 #include "../netcdf_io.hpp"
-#include "../preprocess.hpp"
-#include "../constants.hpp"
 #include "../functions.hpp"
+#include "../constants.hpp"
+#include "../preprocess.hpp"
 
-int main(int argc, char **argv)
-{
+int main(int argc, char *argv[]) {
     
     // PERIODIC_Y implies UNIFORM_LAT_GRID
     static_assert( (constants::UNIFORM_LAT_GRID) or (not(constants::PERIODIC_Y)),
             "PERIODIC_Y requires UNIFORM_LAT_GRID.\n"
             "Please update constants.hpp accordingly.\n");
+    static_assert( not(constants::CARTESIAN),
+            "Toroidal projection now set to handle Cartesian coordinates.\n"
+            );
 
     // Specify the number of OpenMP threads
     //   and initialize the MPI world
     int thread_safety_provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_safety_provided);
+    //MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI::ERRORS_THROW_EXCEPTIONS);
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
@@ -36,119 +44,97 @@ int main(int argc, char **argv)
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string   &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo"),
-                        &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo"),
-                        &salinity_name     = input.getCmdOption("--salinity",    "so"),
-                        &temperature_name  = input.getCmdOption("--temperature", "thetao"),
-                        &sla_name          = input.getCmdOption("--sla",         "zos"),
-                        &input_fname       = input.getCmdOption("--input_file",  "input.nc"),
-                        &output_fname      = input.getCmdOption("--output_file", "interp.nc");
+    const std::string   &input_fname    = input.getCmdOption("--input_file",   "input.nc"),
+                        &output_fname   = input.getCmdOption("--output_file",  "output.nc");
+
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
+                        &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude"),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true");
+
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1"),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1"),
+                        &Nlayers_string         = input.getCmdOption("--Nlayers", "7");
+    const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
+                Nprocs_in_depth_input = stoi(Nprocs_in_depth_string),
+                num_interp_layers     = stoi(Nlayers_string);
+
+    std::vector< std::string > vars_to_refine, vars_in_output;
+    input.getListofStrings( vars_to_refine, "--input_variables" );
+    input.getListofStrings( vars_in_output, "--output_variables" );
+    const int Nvars = vars_to_refine.size();
+
+    // Print processor assignments
+    const int max_threads = omp_get_max_threads();
+    omp_set_num_threads( max_threads );
 
     // Print some header info, depending on debug level
     print_header_info();
 
-    std::vector<double> longitude, latitude, time, depth,
-                        u_lat, thetao, sal, ssh, 
-                        mask_thetao, mask_sal, mask_ssh, mask;
-    std::vector<int> myCounts, myStarts;
+    // Initialize dataset class instance
+    dataset orig_data;
 
-    read_var_from_file(longitude, "longitude", input_fname, NULL);
-    read_var_from_file(latitude,  "latitude",  input_fname, NULL);
-    read_var_from_file(time,      "time",      input_fname, NULL);
-    read_var_from_file(depth,     "depth",     input_fname, NULL);
+    // Read in source data / get size information
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf(stdout, "Reading in source data.\n\n"); }
+    #endif
 
-    convert_coordinates(longitude, latitude);
+    // Read in the grid coordinates
+    orig_data.load_time(      time_dim_name,      input_fname );
+    orig_data.load_depth(     depth_dim_name,     input_fname );
+    orig_data.load_latitude(  latitude_dim_name,  input_fname );
+    orig_data.load_longitude( longitude_dim_name, input_fname );
 
-    read_var_from_file(thetao, temperature_name,    input_fname, &mask_thetao, &myCounts, &myStarts );
-    read_var_from_file(sal ,   salinity_name,       input_fname, &mask_sal );
-    read_var_from_file(ssh,    sla_name,            input_fname, &mask_ssh );
-
-    // Combine masks (only keep points where none are masked)
-    mask.resize( mask_thetao.size() );
-    for (size_t II = 0; II < mask_thetao.size(); ++II) {
-        mask.at(II) = mask_thetao.at(II) * mask_sal.at(II) * mask_ssh.at(II);
+    // Apply some cleaning to the processor allotments if necessary. 
+    orig_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
+    orig_data.Nprocs_in_time  = orig_data.Nprocs_in_time;
+    orig_data.Nprocs_in_depth = orig_data.Nprocs_in_depth;
+     
+    // Convert to radians, if appropriate
+    if ( latlon_in_degrees == "true" ) {
+        convert_coordinates( orig_data.longitude,   orig_data.latitude );
     }
 
-    // Free up memory from the old masks
-    mask_thetao.clear();  mask_thetao.shrink_to_fit();
-    mask_sal.clear();     mask_sal.shrink_to_fit();
-    mask_ssh.clear();     mask_ssh.shrink_to_fit();
+    // Read in field to get size info
+    orig_data.load_variable( "to_interp", vars_to_refine.at(0), input_fname, true, true );
 
-    // Compute the density and pressure at each water point
-    //    by converting first, it means that we only need
-    //    to interpolate two fields instead of three, which
-    //    saves us a bit.
-    std::vector<double> pressure(        sal.size() ),
-                        pressure_interp( sal.size() ),
-                        density(         sal.size() ),
-                        density_interp(  sal.size() );
+    const int   full_Ntime  = orig_data.full_Ntime,
+                Ntime       = orig_data.myCounts[0],
+                Ndepth      = orig_data.myCounts[1],
+                Nlat        = orig_data.Nlat,
+                Nlon        = orig_data.Nlon;
 
-    double temp;
-    for (size_t index = 0; index < pressure.size(); ++index) {
-        if (mask.at(index) == 1) {
-            // Compute pressure (geostrophic)
-            pressure.at(index) = constants::rho0 * constants::g * ssh.at(index);
+    size_t starts[4] = { orig_data.myStarts.at(0), orig_data.myStarts.at(1), 0,    0    };
+    size_t counts[4] = { orig_data.myCounts.at(0), orig_data.myCounts.at(1), Nlat, Nlon };
 
-            // Convert potential temp to actual temp
-            temp = depotential_temperature(pressure.at(index), thetao.at(index));
+    // Compute the area of each 'cell' which will be necessary for creating the output file
+    if (wRank == 0) { fprintf( stdout, "Computing cell areas.\n" ); }
+    orig_data.compute_cell_areas();
 
-            // Compute density from UNESCO equation of state
-            density.at(index) = equation_of_state(
-                    temp, 
-                    sal.at(index), 
-                    pressure.at(index) / 1e5); // takes pressure in bar = 100 kPa = 1e5 Pa
+    // Initialize file and write out coarsened fields
+    if (wRank == 0) { fprintf( stdout, "Preparing output file\n" ); }
+    initialize_output_file( orig_data, vars_in_output, output_fname.c_str() );
 
-            if ( (std::isnan(pressure.at(index))) or (std::isnan(density.at(index))) ) {
-                if (std::isnan(pressure.at(index))) { fprintf( stdout, "  NaN pressure  :" ); }
-                if (std::isnan(density.at( index))) { fprintf( stdout, "  NaN density  :" ); }
-                fprintf(stdout, "  ssh, theta (temp), sal = %g, %g (%g), %g \n",
-                        ssh.at(index), thetao.at(index), temp, sal.at(index) );
-            }
-        }
+    // Now coarsen the velocity fields
+    const size_t Npts = Ntime * Ndepth * Nlat * Nlon;
+    std::vector<double> interped_field(Npts);
+
+    // Next, the coarse velocities
+    for ( int Ivar = 0; Ivar < Nvars; Ivar++ ) {
+
+        orig_data.load_variable( "to_interp", vars_to_refine.at(Ivar), input_fname, true, true );
+
+        interpolate_over_land_from_coast( interped_field, orig_data.variables["to_interp"], num_interp_layers,
+                orig_data.time, orig_data.depth, orig_data.latitude, orig_data.longitude, orig_data.mask, orig_data.myCounts);
+
+        write_field_to_output( interped_field, vars_in_output.at(Ivar), starts, counts, output_fname );
     }
 
-    // Now output to interp.nc
-    #if DEBUG >= 0
-    fprintf(stdout, "Creating output\n");
+    #if DEBUG >= 1
+    fprintf(stdout, "Processor %d / %d waiting to finalize.\n", wRank + 1, wSize);
     #endif
-    std::vector<std::string> vars_to_write;
-    vars_to_write.push_back("pressure");
-    vars_to_write.push_back("density");
-
-    const int ndims = 4;
-    size_t starts[ndims] = {
-        size_t(myStarts.at(0)), size_t(myStarts.at(1)), 
-        size_t(myStarts.at(2)), size_t(myStarts.at(3))};
-    size_t counts[ndims] = {
-        size_t(myCounts.at(0)), size_t(myCounts.at(1)), 
-        size_t(myCounts.at(2)), size_t(myCounts.at(3))};
-
-    // Outputting pre-interpolated fields
-    initialize_output_file(time, depth, longitude, latitude, mask, 
-            vars_to_write, "pre_interp.nc", 0.);
-
-    write_field_to_output(pressure, "pressure", starts, counts, "pre_interp.nc", &mask);
-    write_field_to_output(density,  "density",  starts, counts, "pre_interp.nc", &mask);
-
-    // Apply interpolation
-    #if DEBUG >= 0
-    fprintf(stdout, "Interpolating density\n");
-    #endif
-    interpolate_over_land_from_coast(density_interp, density, 
-            time, depth, latitude, longitude, mask, myCounts);
-
-    #if DEBUG >= 0
-    fprintf(stdout, "Interpolating pressure\n");
-    #endif
-    interpolate_over_land_from_coast(pressure_interp, pressure, 
-            time, depth, latitude, longitude, mask, myCounts);
-
-    // Outputting interpolated fields
-    initialize_output_file(time, depth, longitude, latitude, mask, vars_to_write, output_fname.c_str(), 0.);
-
-    write_field_to_output(pressure_interp, "pressure", starts, counts, output_fname);
-    write_field_to_output(density_interp,  "density",  starts, counts, output_fname);
-
+    MPI_Finalize();
     return 0;
 }
-
