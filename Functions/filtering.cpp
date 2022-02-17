@@ -134,9 +134,11 @@ void filtering(
 
     if (not(constants::MINIMAL_OUTPUT)) {
         fine_u_r.resize(  num_pts);
-        fine_u_lon.resize(num_pts);
-        fine_u_lat.resize(num_pts);
         vars_to_write.push_back("fine_u_r");
+    }
+    fine_u_lon.resize(num_pts);
+    fine_u_lat.resize(num_pts);
+    if (not(constants::NO_FULL_OUTPUTS)) {
         vars_to_write.push_back("fine_u_lon");
         vars_to_write.push_back("fine_u_lat");
     }
@@ -519,13 +521,10 @@ void filtering(
                                 coarse_u_lat.at(index) = u_lat_tmp;
 
                                 if (not(constants::MINIMAL_OUTPUT)) {
-                                    fine_u_r.at(  index) = 
-                                        full_u_r.at(  index) - coarse_u_r.at(  index);
-                                    fine_u_lon.at(index) = 
-                                        full_u_lon.at(index) - coarse_u_lon.at(index);
-                                    fine_u_lat.at(index) = 
-                                        full_u_lat.at(index) - coarse_u_lat.at(index);
+                                    fine_u_r.at(  index) = full_u_r.at(  index) - coarse_u_r.at(  index);
                                 }
+                                fine_u_lon.at(index) = full_u_lon.at(index) - coarse_u_lon.at(index);
+                                fine_u_lat.at(index) = full_u_lat.at(index) - coarse_u_lat.at(index);
 
                                 // Also filter KE
                                 filtered_KE.at(index) = KE_tmp;
@@ -636,18 +635,17 @@ void filtering(
         // Write to file
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         if (not(constants::MINIMAL_OUTPUT)) {
-            write_field_to_output(coarse_u_r,         "coarse_u_r",   starts, counts, fname, &mask);
-
-            write_field_to_output(fine_u_r,           "fine_u_r",     starts, counts, fname, &mask);
-            write_field_to_output(fine_u_lon,         "fine_u_lon",   starts, counts, fname, &mask);
-            write_field_to_output(fine_u_lat,         "fine_u_lat",   starts, counts, fname, &mask);
-
-            write_field_to_output(filtered_KE,        "filtered_KE",  starts, counts, fname, &mask);
+            write_field_to_output(coarse_u_r,   "coarse_u_r",   starts, counts, fname, &mask);
+            write_field_to_output(fine_u_r,     "fine_u_r",     starts, counts, fname, &mask);
+            write_field_to_output(filtered_KE,  "filtered_KE",  starts, counts, fname, &mask);
         }
         if (not(constants::NO_FULL_OUTPUTS)) {
             write_field_to_output(coarse_u_lon,       "coarse_u_lon", starts, counts, fname, &mask);
             write_field_to_output(coarse_u_lat,       "coarse_u_lat", starts, counts, fname, &mask);
             write_field_to_output(KE_from_coarse_vel, "coarse_KE",    starts, counts, fname, &mask);
+
+            write_field_to_output(fine_u_lon,   "fine_u_lon",   starts, counts, fname, &mask);
+            write_field_to_output(fine_u_lat,   "fine_u_lat",   starts, counts, fname, &mask);
         }
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing"); }
 
