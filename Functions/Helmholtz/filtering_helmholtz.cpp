@@ -126,6 +126,11 @@ void filtering_helmholtz(
         KE_pot_filt(    num_pts, 0. ),
         KE_tot_filt(    num_pts, 0. ),
 
+        // Energy transport
+        div_J_tor( num_pts, 0. ),
+        div_J_pot( num_pts, 0. ),
+        div_J_tot( num_pts, 0. ),
+
         // Enstrophy
         Enst_tor( num_pts, 0. ),
         Enst_pot( num_pts, 0. ),
@@ -447,6 +452,11 @@ void filtering_helmholtz(
     postprocess_fields_tor.push_back( &KE_tor_fine_mod );
     postprocess_fields_pot.push_back( &KE_pot_fine_mod );
     postprocess_fields_tot.push_back( &KE_tot_fine_mod );
+
+    postprocess_names.push_back( "div_J_transport" );
+    postprocess_fields_tor.push_back( &div_J_tor );
+    postprocess_fields_pot.push_back( &div_J_pot );
+    postprocess_fields_tot.push_back( &div_J_tot );
 
     postprocess_names.push_back( "enstrophy" );
     postprocess_fields_tor.push_back( &Enst_tor );
@@ -805,23 +815,59 @@ void filtering_helmholtz(
             }
         }
 
-        // Compute Pi and Z ( energy and enstrophy cascades )
+        //
+        //// Toroidal diagnostics
+        //
+
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_tor, u_lat_tor, source_data );
+
+        // Energy cascade (Pi)
         compute_Pi( Pi_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor );
-        compute_Z(  Z_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_tor_r, vort_ux_tor, vort_uy_tor, vort_uz_tor );
         compute_Pi_shift_deriv( Pi2_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor );
 
+        // Enstrophy cascade (Z)
+        compute_Z(  Z_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_tor_r, vort_ux_tor, vort_uy_tor, vort_uz_tor );
+
+        // Energy transport
+        compute_div_transport( div_J_tor, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor, u_r_zero,
+               longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+
+        //
+        //// Potential diagnostics
+        //
+
         vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_pot, u_lat_pot, source_data );
+
+        // Energy cascade (Pi)
         compute_Pi( Pi_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot );
-        compute_Z(  Z_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_pot_r, vort_ux_pot, vort_uy_pot, vort_uz_pot );
         compute_Pi_shift_deriv( Pi2_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot );
 
+        // Enstrophy cascade (Z)
+        compute_Z(  Z_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_pot_r, vort_ux_pot, vort_uy_pot, vort_uz_pot );
+
+        // Energy transport
+        compute_div_transport( div_J_pot, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot, u_r_zero,
+               longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+
+        //
+        //// Total velocity diagnostics
+        //
+
         vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, u_r_zero, u_lon_tot, u_lat_tot, source_data );
+
+        // Energy cascade (Pi)
         compute_Pi( Pi_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot );
-        compute_Z(  Z_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_tot_r, vort_ux_tot, vort_uy_tot, vort_uz_tot );
         compute_Pi_shift_deriv( Pi2_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot );
 
+        // Enstrophy cascade (Z)
+        compute_Z(  Z_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_tot_r, vort_ux_tot, vort_uy_tot, vort_uz_tot );
+
+        // Energy transport
+        compute_div_transport( div_J_tot, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot, u_r_zero,
+               longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+
+        //
         if ( constants::COMP_PI_HELMHOLTZ ) {
             compute_Pi_Helmholtz( Pi_Helm, source_data, u_lon_tot, u_lat_tot, ulon_ulon, ulon_ulat, ulat_ulat );
         }
