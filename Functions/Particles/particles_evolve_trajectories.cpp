@@ -17,6 +17,7 @@ void particles_evolve_trajectories(
         const std::vector<double> & starting_lat,
         const std::vector<double> & starting_lon,
         const std::vector<double> & target_times,
+        const double particle_lifespan,
         const std::vector<double> & vel_lon,
         const std::vector<double> & vel_lat,
         const std::vector<const std::vector<double>*> & fields_to_track,
@@ -35,6 +36,7 @@ void particles_evolve_trajectories(
     double t_part, lon0, lat0,
            dx_loc, dy_loc, dt,
            vel_lon_part, vel_lat_part, field_val,
+           test_val, lon_rng, lat_rng, lon_mid, lat_mid,
            time_p;
 
     const double dlon = lon.at(1) - lon.at(0),
@@ -50,7 +52,8 @@ void particles_evolve_trajectories(
                         Nparts = starting_lat.size(),
                         Nouts  = target_times.size();
 
-    int left, right, bottom, top;
+    int left, right, bottom, top,
+        num_times_recycled;
 
     std::vector<double> vel_lon_sub( Nlat * Nlon ), 
                         vel_lat_sub( Nlat * Nlon );
@@ -58,6 +61,8 @@ void particles_evolve_trajectories(
 
     unsigned int out_ind, step_iter, ref_ind, Ip;
     size_t index;
+
+    srand( wRank );
 
     #pragma omp parallel \
     default(none) \
@@ -70,16 +75,22 @@ void particles_evolve_trajectories(
     private(Ip, index, \
             t_part, out_ind, step_iter, ref_ind, lon0, lat0, \
             dx_loc, dy_loc, dt, time_p, vel_lon_part, vel_lat_part, field_val,\
+            test_val, lon_rng, lat_rng, lon_mid, lat_mid, \
+            num_times_recycled, \
             left, right, bottom, top)
     {
         #pragma omp for collapse(1) schedule(dynamic)
         for (Ip = 0; Ip < Nparts; ++Ip) {
+
+            srand( Ip + wRank * Nparts );
     
             // Particle time
             t_part    = time.at(0);     //
             out_ind   = 0;              //
             step_iter = 0;              //
             ref_ind   = 0;              // time index in source velocity 
+
+            num_times_recycled = 0;
 
             // Particle position
             lon0 = starting_lon.at(Ip);
@@ -106,12 +117,6 @@ void particles_evolve_trajectories(
             // Seed values for velocities (only used for dt)
             vel_lon_part = U0;
             vel_lat_part = U0;
-
-            #if DEBUG >= 2
-            fprintf(stdout, "Particle %03d of %03d (rank %d of %d)\n", 
-                    Ip+1 + Nparts * wRank, Nparts * wSize, wRank + 1, wSize);
-            fflush(stdout);
-            #endif
 
             while (t_part < target_times.back()) {
 
@@ -186,14 +191,38 @@ void particles_evolve_trajectories(
                     out_ind++;
                 }
 
+                // Finally, check if this particle is going to recycle
+                //      i.e. if it gets reset to a new random location
+                //      On average (ish) all of the particles will have recycled
+                //      within a period of particle_lifespan
+                // A non-positive lifespan means no recycling
+                if ( particle_lifespan > 0 ) {
+                    test_val = ((double) rand() / (RAND_MAX));
+                    if ( test_val * particle_lifespan < dt ) {
+
+                        num_times_recycled++;
+
+                        // Get domain extent
+                        lon_rng =       ( lon.back() - lon.front() );
+                        lat_rng = 0.9 * ( lat.back() - lat.front() );
+                        lon_mid = 0.5 * ( lon.back() + lon.front() );
+                        lat_mid = 0.5 * ( lat.back() + lat.front() );
+                        
+                        // Set new position
+                        lon0 = ( ((double) rand() / (RAND_MAX)) - 0.5) * lon_rng + lon_mid;
+                        lat0 = ( ((double) rand() / (RAND_MAX)) - 0.5) * lat_rng + lat_mid;
+                    }
+                }
+
                 if ( (t_part >= target_times.back()) or (out_ind >= Nouts) ) { break; }
 
                 if (t_part > time.at(ref_ind+1)) { ref_ind++; }
                 step_iter++;
             }
-            #if DEBUG >= 2
-            fprintf(stdout, "  time %g / %g (%g %% - %d)\n", 
-                    t_part, target_times.back(), 100 * t_part / target_times.back(), step_iter);
+
+            #if DEBUG >= 1
+            fprintf(stdout, "Particle %03d of %03d (rank %d of %d) finished - recycled %d times\n", 
+                    Ip+1 + Nparts * wRank, Nparts * wSize, wRank + 1, wSize, num_times_recycled);
             fflush(stdout);
             #endif
 

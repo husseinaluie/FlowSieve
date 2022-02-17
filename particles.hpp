@@ -19,6 +19,7 @@ void particles_evolve_trajectories(
         const std::vector<double> & starting_lat,
         const std::vector<double> & starting_lon,
         const std::vector<double> & target_times,
+        const double particle_lifespan,
         const std::vector<double> & vel_lon,
         const std::vector<double> & vel_lat,
         const std::vector<const std::vector<double>*> & fields_to_track,
