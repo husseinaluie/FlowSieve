@@ -133,20 +133,20 @@ int main(int argc, char *argv[]) {
         // Extend the latitude grid to reach the poles and update source_data with the new info.
         std::vector<double> extended_latitude;
         int orig_lat_start_in_extend;
-        #if DEBUG >= 2
+        #if DEBUG >= 1
         if (wRank == 0) { fprintf( stdout, "    Extending latitude to poles\n" ); }
         #endif
         extend_latitude_to_poles( source_data.latitude, extended_latitude, orig_lat_start_in_extend );
 
         // Extend out the mask
-        #if DEBUG >= 2
+        #if DEBUG >= 1
         if (wRank == 0) { fprintf( stdout, "    Extending mask to poles\n" ); }
         #endif
         extend_mask_to_poles( source_data.mask, source_data, extended_latitude, orig_lat_start_in_extend );
 
         // Extend out all of the variable fields
         for(const auto& var_data : source_data.variables) {
-            #if DEBUG >= 2
+            #if DEBUG >= 1
             if (wRank == 0) { fprintf( stdout, "    Extending variable %s to poles\n", var_data.first.c_str() ); }
             #endif
             extend_field_to_poles( source_data.variables[var_data.first], source_data, extended_latitude, orig_lat_start_in_extend );
@@ -186,7 +186,8 @@ int main(int argc, char *argv[]) {
     single_seed = (seed_count == 1);
 
     // Apply to projection routine
-    Apply_Helmholtz_Projection( output_fname, source_data, Psi_seed, Phi_seed, single_seed, tolerance, max_iterations, use_area_weight, use_mask, Tikhov_Laplace );
+    Apply_Helmholtz_Projection( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
+            tolerance, max_iterations, use_area_weight, use_mask, Tikhov_Laplace );
 
     // Done!
     #if DEBUG >= 0
