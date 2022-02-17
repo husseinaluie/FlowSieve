@@ -53,20 +53,22 @@ void read_attr_from_file(
     nc_type att_type;
     nc_inq_atttype(ncid, var_id, attrname, &att_type);
     #if DEBUG >= 1
-    switch (att_type) {
-        case NC_SHORT   : fprintf( stdout, "Attribute type is NC_SHORT" ); break;
-        case NC_USHORT  : fprintf( stdout, "Attribute type is NC_USHORT" ); break;
-        case NC_INT     : fprintf( stdout, "Attribute type is NC_INT" ); break;
-        case NC_UINT    : fprintf( stdout, "Attribute type is NC_UINT" ); break;
-        case NC_INT64   : fprintf( stdout, "Attribute type is NC_INT64" ); break;
-        case NC_UINT64  : fprintf( stdout, "Attribute type is NC_UINT64" ); break;
-        case NC_FLOAT   : fprintf( stdout, "Attribute type is NC_FLOAT" ); break;
-        case NC_DOUBLE  : fprintf( stdout, "Attribute type is NC_DOUBLE" ); break;
-        case NC_STRING  : fprintf( stdout, "Attribute type is NC_STRING" ); break;
-        case NC_CHAR    : fprintf( stdout, "Attribute type is NC_CHAR" ); break;
-        case NC_BYTE    : fprintf( stdout, "Attribute type is NC_BYTE" ); break;
-        case NC_UBYTE   : fprintf( stdout, "Attribute type is NC_UBYTE" ); break;
-        default         : fprintf( stdout, "Attribute type not recognized." ); break;
+    if (wRank == 0) {
+        switch (att_type) {
+            case NC_SHORT   : fprintf( stdout, "Attribute type is NC_SHORT\n"     ); break;
+            case NC_USHORT  : fprintf( stdout, "Attribute type is NC_USHORT\n"    ); break;
+            case NC_INT     : fprintf( stdout, "Attribute type is NC_INT\n"       ); break;
+            case NC_UINT    : fprintf( stdout, "Attribute type is NC_UINT\n"      ); break;
+            case NC_INT64   : fprintf( stdout, "Attribute type is NC_INT64\n"     ); break;
+            case NC_UINT64  : fprintf( stdout, "Attribute type is NC_UINT64\n"    ); break;
+            case NC_FLOAT   : fprintf( stdout, "Attribute type is NC_FLOAT\n"     ); break;
+            case NC_DOUBLE  : fprintf( stdout, "Attribute type is NC_DOUBLE\n"    ); break;
+            case NC_STRING  : fprintf( stdout, "Attribute type is NC_STRING\n"    ); break;
+            case NC_CHAR    : fprintf( stdout, "Attribute type is NC_CHAR\n"      ); break;
+            case NC_BYTE    : fprintf( stdout, "Attribute type is NC_BYTE\n"      ); break;
+            case NC_UBYTE   : fprintf( stdout, "Attribute type is NC_UBYTE\n"     ); break;
+            default         : fprintf( stdout, "Attribute type not recognized.\n" ); break;
+        }
     }
     #endif
     short att_val_short;
