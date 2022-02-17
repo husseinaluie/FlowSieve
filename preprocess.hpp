@@ -39,12 +39,14 @@ void interpolate_over_land(
 void interpolate_over_land_from_coast(
         std::vector<double> &interp_field,
         const std::vector<double> &field,
+        const int                 nlayers,
         const std::vector<double> &time,
         const std::vector<double> &depth,
         const std::vector<double> &latitude,
         const std::vector<double> &longitude,
         const std::vector<bool> &mask,
-        const std::vector<int>    &myCounts
+        const std::vector<int>    &myCounts,
+        const MPI_Comm comm = MPI_COMM_WORLD
         );
 
 /*!
@@ -319,5 +321,16 @@ void toroidal_vel_div(
         const int Nlon,
         const std::vector<bool> & mask
     );
+
+void Extract_Beta_Geos_Vel(
+        std::vector<double> & u_beta,
+        std::vector<double> & v_beta,
+        const std::vector<double> & ssh,
+        const std::vector<bool> & mask,
+        dataset & source_data,
+        const double rel_tol,
+        const int max_iters,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
 
 #endif
