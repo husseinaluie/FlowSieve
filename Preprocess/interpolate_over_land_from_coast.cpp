@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <omp.h>
+#include <mpi.h>
 #include "../ALGLIB/stdafx.h"
 #include "../ALGLIB/interpolation.h"
 #include <vector>
@@ -11,17 +13,24 @@
 void interpolate_over_land_from_coast(
         std::vector<double> & interp_field,
         const std::vector<double> & field,
+        const int nlayers,
         const std::vector<double> & time,
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
         const std::vector<bool>   & mask,
-        const std::vector<int>    & myCounts)
-{
-    const int Ntime   = myCounts.at(0);
-    const int Ndepth  = myCounts.at(1);
-    const int Nlat    = myCounts.at(2);
-    const int Nlon    = myCounts.at(3);
+        const std::vector<int>    & myCounts,
+        const MPI_Comm comm
+        ){
+
+    int wRank, wSize;
+    MPI_Comm_rank( comm, &wRank );
+    MPI_Comm_size( comm, &wSize );
+
+    const int   Ntime   = myCounts.at(0),
+                Ndepth  = myCounts.at(1),
+                Nlat    = myCounts.at(2),
+                Nlon    = myCounts.at(3);
 
     const bool cast_to_sphere = false;
 
@@ -45,10 +54,12 @@ void interpolate_over_land_from_coast(
 
     int cntr, num_coast=0;
     double R, val;
-    int index = 0, num_interp_points = 0;
-    #if DEBUG >= 1
-    double perc_base = 10;
+    int Ilat, Ilon;
+    size_t index = 0, num_interp_points = 0;
+    #if DEBUG >= 0
+    const double perc_base = 5;
     double perc;
+    int tid, perc_count = 0;
     #endif
 
     double x, y, z, lat, lon;
@@ -57,7 +68,6 @@ void interpolate_over_land_from_coast(
     // largest interpolation scale is scale * dx
     //   smallest is largest / 2^nlayers
     // Current setting sweeps dx -> 2^nlayers * dx
-    const int nlayers = 7;
     const double scale = pow(2., (double)nlayers);
 
     std::vector<double> lon_coast;
@@ -183,13 +193,13 @@ void interpolate_over_land_from_coast(
             perc = perc_base;
             #endif
 
-            for (int Ilat = 0; Ilat < Nlat; Ilat++) {
-                lat = latitude.at(Ilat);
-                for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+            for ( Ilat = 0; Ilat < Nlat; Ilat++) {
+                for ( Ilon = 0; Ilon < Nlon; Ilon++) {
+                    lat = latitude.at(Ilat);
                     lon = longitude.at(Ilon);
 
                     index = Index(Itime, Idepth, Ilat, Ilon,
-                                  Ntime, Ndepth, Nlat, Nlon);
+                            Ntime, Ndepth, Nlat, Nlon);
 
                     if (not(mask.at(index))) {
                         // If we're on a land cell, then use the interpolator
@@ -208,26 +218,30 @@ void interpolate_over_land_from_coast(
                         interp_field.at(index) = field.at(index);
                     }
 
-                    #if DEBUG >= 1
-                    // Every 5 percent, print a dot
-                    if ( ((double)(Ilat*Nlon + Ilon) / (Nlat*Nlon)) * 100 >= perc ) {
-                        if (perc == perc_base) { fprintf(stdout, "          "); }
-                        fprintf(stdout, ".");
-                        fflush(stdout);
-                        perc += perc_base;
+                    #if DEBUG >= 0
+                    tid = omp_get_thread_num();
+                    if ( (tid == 0) and (wRank == 0) ) {
+                        // Every 5 percent, print a dot
+                        if ( ((double)(Ilat*Nlon + Ilon) / (Nlat*Nlon)) * 100 >= perc ) {
+                            if (perc == perc_base) { fprintf(stdout, "          "); }
+                            perc_count++;
+                            if (perc_count % 5 == 0) { fprintf(stdout, "|"); }
+                            else                     { fprintf(stdout, "."); }
+                            fflush(stdout);
+                            perc += perc_base;
+                        }
                     }
                     #endif
-
                 }
             }
         }
-        #if DEBUG >= 1
+        #if DEBUG >= 0
         fprintf(stdout, "\n");
         #endif
     }
 
     #if DEBUG >= 1
-    fprintf(stdout, "  %d seed points used to determine %d interpolated points.\n", num_coast, num_interp_points);
+    fprintf(stdout, "  %'d seed points used to determine %'zu interpolated points.\n", num_coast, num_interp_points);
     #endif
 
 }
