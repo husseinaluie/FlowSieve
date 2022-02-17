@@ -38,10 +38,10 @@ void extend_latitude_to_poles(
     MPI_Comm_rank( comm, &wRank );
     if (wRank == 0) {
         if ( (pad_south > 0) or (pad_north > 0) ) {
-        fprintf( stdout, "NOTE :: Extending latitude grid to the poles. "); 
-        if (pad_south > 0) { fprintf( stdout, "%'d points added to south ", pad_south ); }
-        if (pad_north > 0) { fprintf( stdout, "%'d points added to north ", pad_north ); }
-        fprintf( stdout, "\n");
+            fprintf( stdout, "NOTE :: Extending latitude grid to the poles. "); 
+            if (pad_south > 0) { fprintf( stdout, "%'d points added to south ", pad_south ); }
+            if (pad_north > 0) { fprintf( stdout, "%'d points added to north ", pad_north ); }
+            fprintf( stdout, "\n");
         }
     }
     #endif
