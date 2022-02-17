@@ -191,7 +191,8 @@ void Apply_Postprocess_Routines(
 
         // Extract a common mask that determines what points are always masked.
         //    Also keep a tally of how often a cell is masked
-        std::vector<bool>   always_masked(   Ndepth * Nlat * Nlon, true );
+        std::vector<bool>   always_masked(   Ndepth * Nlat * Nlon, true ),
+                            output_mask(     Ndepth * Nlat * Nlon, false );
         std::vector<int>    mask_count(      Ndepth * Nlat * Nlon, 0 ),
                             mask_count_loc(  Ndepth * Nlat * Nlon, 0 );
 
@@ -214,11 +215,12 @@ void Apply_Postprocess_Routines(
         MPI_Allreduce( &(mask_count_loc[0]), &(mask_count[0]), Ndepth * Nlat * Nlon, MPI_INT, MPI_SUM, comm);
 
         #pragma omp parallel default(none) \
-        private( index ) shared( mask_count, always_masked )
+        private( index ) shared( mask_count, always_masked, output_mask )
         { 
             #pragma omp for collapse(1) schedule(static)
             for (index = 0; index < mask_count.size(); ++index) {
                 always_masked.at(index) = mask_count.at(index) == 0 ? true : false;
+                output_mask.at(index) = not( always_masked.at(index) );
             }
         }
 
@@ -259,9 +261,9 @@ void Apply_Postprocess_Routines(
         count[2] = Nlon;
 
         for (int Ifield = 0; Ifield < num_fields; ++Ifield) {
-            write_field_to_output( time_average.at(Ifield), vars_to_process.at(Ifield) + "_time_average", start, count, filename, &mask );
+            write_field_to_output( time_average.at(Ifield), vars_to_process.at(Ifield) + "_time_average", start, count, filename, &output_mask );
             // To turn these outputs back on, also need to turn back on the calculations in compute_time_avg_std
-            //write_field_to_output( time_std_dev.at(Ifield), vars_to_process.at(Ifield) + "_time_std_dev", start, count, filename, &mask );
+            //write_field_to_output( time_std_dev.at(Ifield), vars_to_process.at(Ifield) + "_time_std_dev", start, count, filename, &output_mask );
         }
     }
 }
