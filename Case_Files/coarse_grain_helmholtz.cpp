@@ -216,6 +216,19 @@ int main(int argc, char *argv[]) {
                     "AUTO_ALL", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
                 );
 
+    } else {
+
+        // Read in the region definitions and compute region areas
+        if ( check_file_existence( region_defs_fname ) ) {
+            // If the file exists, then read in from that
+            source_data.load_region_definitions( region_defs_fname, region_defs_dim_name, region_defs_var_name );
+        } else {
+            // Otherwise, just make a single region which is the entire domain
+            source_data.region_names.push_back("full_domain");
+            source_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
+                        "full_domain", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
+                    );
+        }
     }
     source_data.compute_cell_areas();
     source_data.compute_region_areas();
