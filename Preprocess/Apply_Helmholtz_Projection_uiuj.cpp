@@ -164,11 +164,13 @@ void build_main_projection_matrix(
 
                     // Try to remove jagged noise from v_r
                     if ( not( (Ilat == 0) or (Ilat == Nlat - 1) ) ) {
-                        row_skip    = 5 * Npts;
-                        column_skip = 2 * Npts;
-                        tmp_val     = v_r_noise_damp * diff_vec.at( IDIFF - LB ) / pow(cos_lat, 2.);
-                        tmp_val    *= weight_val;
-                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+                        for ( int II = 0; II < 3; II++ ) {
+                            row_skip    = (3+II) * Npts;
+                            column_skip = II * Npts;
+                            tmp_val     = v_r_noise_damp * diff_vec.at( IDIFF - LB ) / pow(cos_lat, 2.);
+                            tmp_val    *= weight_val;
+                            alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+                        }
                     }
                 }
             }
@@ -200,11 +202,13 @@ void build_main_projection_matrix(
 
                     // Try to remove jagged noise from v_r
                     if ( not( (Ilat == 0) or (Ilat == Nlat - 1) ) ) {
-                        row_skip    = 5 * Npts;
-                        column_skip = 2 * Npts;
-                        tmp_val     = - v_r_noise_damp * diff_vec.at( IDIFF - LB ) * tan_lat;
-                        tmp_val    *= weight_val;
-                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+                        for ( int II = 0; II < 3; II++ ) {
+                            row_skip    = (3+II) * Npts;
+                            column_skip = II * Npts;
+                            tmp_val     = - v_r_noise_damp * diff_vec.at( IDIFF - LB ) * tan_lat;
+                            tmp_val    *= weight_val;
+                            alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+                        }
                     }
                 }
             }
@@ -236,11 +240,13 @@ void build_main_projection_matrix(
 
                     // Try to remove jagged noise from v_r
                     if ( not( (Ilat == 0) or (Ilat == Nlat - 1) ) ) {
-                        row_skip    = 5 * Npts;
-                        column_skip = 2 * Npts;
-                        tmp_val     = v_r_noise_damp * diff_vec.at( IDIFF - LB );
-                        tmp_val    *= weight_val;
-                        alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+                        for ( int II = 0; II < 3; II++ ) {
+                            row_skip    = (3+II) * Npts;
+                            column_skip = II * Npts;
+                            tmp_val     = v_r_noise_damp * diff_vec.at( IDIFF - LB );
+                            tmp_val    *= weight_val;
+                            alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
+                        }
                     }
                 }
             }
@@ -387,17 +393,26 @@ void Apply_Helmholtz_Projection_uiuj(
     lhs_seed.attach_to_ptr(         3 * Npts, &LHS_seed[0] );
     rhs_result.attach_to_ptr(       3 * Npts, &RHS_result[0] );
     
+    // Laplace comparison scale factor, for v_r
+    int LB = - 2 * Nlat;
+    std::vector<double> diff_vec;
+    get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Nlat/2, 0, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
+    int Ndiff = diff_vec.size();
+    double Lap_comp_factor = 0;
+    for ( int IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
+    if (wRank == 0) { fprintf( stdout, "Lap_comp_factor = %g\n", Lap_comp_factor ); }
 
     // Copy the starting seed.
     if (single_seed) {
-        #pragma omp parallel default(none) shared( LHS_seed, seed_v_r, seed_Phi_v, seed_Psi_v ) \
+        #pragma omp parallel default(none) \
+        shared( LHS_seed, seed_v_r, seed_Phi_v, seed_Psi_v, Lap_comp_factor ) \
         private( Ilat, Ilon, index )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                 for (Ilon = 0; Ilon < Nlon; ++Ilon) {
                     index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
-                    LHS_seed.at( index + 0 * Npts ) = seed_v_r.at( index );
+                    LHS_seed.at( index + 0 * Npts ) = seed_v_r.at( index ) / Lap_comp_factor;
                     LHS_seed.at( index + 1 * Npts ) = seed_Phi_v.at( index );
                     LHS_seed.at( index + 2 * Npts ) = seed_Psi_v.at( index );
                 }
@@ -449,15 +464,6 @@ void Apply_Helmholtz_Projection_uiuj(
         terminate_count_rounding = 0,
         terminate_count_other = 0;
 
-    // Laplace comparison scale factor, for v_r
-    int LB = - 2 * Nlat;
-    std::vector<double> diff_vec;
-    get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Nlat/2, 0, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
-    int Ndiff = diff_vec.size();
-    double Lap_comp_factor = 0;
-    for ( int IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
-    if (wRank == 0) { fprintf( stdout, "Lap_comp_factor = %g\n", Lap_comp_factor ); }
-
     // Now do the solve!
     for (int Itime = 0; Itime < Ntime; ++Itime) {
         for (int Idepth = 0; Idepth < Ndepth; ++Idepth) {
@@ -466,7 +472,7 @@ void Apply_Helmholtz_Projection_uiuj(
                 // If single_seed == false, then we were provided seed values, pull out the appropriate values here
                 #pragma omp parallel \
                 default(none) \
-                shared( LHS_seed, seed_v_r, seed_Phi_v, seed_Psi_v, Itime, Idepth ) \
+                shared( LHS_seed, seed_v_r, seed_Phi_v, seed_Psi_v, Itime, Idepth, Lap_comp_factor ) \
                 private( Ilat, Ilon, index, index_sub )
                 {
                     #pragma omp for collapse(2) schedule(static)
@@ -474,7 +480,7 @@ void Apply_Helmholtz_Projection_uiuj(
                         for (Ilon = 0; Ilon < Nlon; ++Ilon) {
                             index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
                             index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
-                            LHS_seed.at( index_sub + 0 * Npts ) = seed_v_r.at( index );
+                            LHS_seed.at( index_sub + 0 * Npts ) = seed_v_r.at( index ) / Lap_comp_factor;
                             LHS_seed.at( index_sub + 1 * Npts ) = seed_Phi_v.at( index );
                             LHS_seed.at( index_sub + 2 * Npts ) = seed_Psi_v.at( index );
                         }
