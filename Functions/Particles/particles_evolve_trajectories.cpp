@@ -141,6 +141,10 @@ void particles_evolve_trajectories(
                           / ( time.at(ref_ind+1) - time.at(ref_ind) );
 
                 //
+                //// Time-stepping is a simple first-order symplectic scheme
+                //
+
+                //
                 //// Get u_lon at position at advance lon position
                 //
                 particles_get_edges(left, right, bottom, top, lat0, lon0, lat, lon);
