@@ -1,19 +1,3 @@
-#float coarse_u_r(time, depth, latitude, longitude) ;
-#float coarse_u_lon(time, depth, latitude, longitude) ;
-#float coarse_u_lat(time, depth, latitude, longitude) ;
-#float KE_from_coarse_vels(time, depth, latitude, longitude) ;
-#float div_Jtransport(time, depth, latitude, longitude) ;
-#float fine_u_r(time, depth, latitude, longitude) ;
-#float fine_u_lon(time, depth, latitude, longitude) ;
-#float fine_u_lat(time, depth, latitude, longitude) ;
-#float filtered_KE(time, depth, latitude, longitude) ;
-#float coarse_vort_r(time, depth, latitude, longitude) ;
-#float fine_vort_r(time, depth, latitude, longitude) ;
-#float coarse_vel_div(time, depth, latitude, longitude) ;
-#float OkuboWeiss(time, depth, latitude, longitude) ;
-#float fine_KE(time, depth, latitude, longitude) ;
-#float energy_transfer(time, depth, latitude, longitude) ;
-
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -40,6 +24,37 @@ filter_scales = filter_scales[inds]
 
 
 ##
+#   Also load in the original data
+##
+
+with Dataset( 'velocity_sample.nc', 'r' ) as dset:
+
+    x = dset['longitude'][:] / 1e3
+    y = dset['latitude' ][:] / 1e3
+
+    uo = dset['uo'][0,0,:,:]
+    vo = dset['vo'][0,0,:,:]
+
+fig, axes = plt.subplots( 3, 1, sharex = True, sharey = True, figsize = (7,5), 
+                                gridspec_kw = dict( left = 0.075, right = 0.95, bottom = 0.05, top = 0.95 ) )
+
+plot_params = dict( vmin = -1.5, vmax = 1.5, cmap = 'bwr' )
+
+qm = axes[0].pcolormesh( x, y, uo,                       **plot_params )
+axes[1].pcolormesh( x, y, vo,                       **plot_params )
+axes[2].pcolormesh( x, y, np.sqrt( uo**2 + vo**2 ), **plot_params )
+
+plt.colorbar( qm, ax = axes )
+
+axes[0].set_ylabel( 'x-velocity' )
+axes[1].set_ylabel( 'y-velocity' )
+axes[2].set_ylabel( 'velocity magnitude' )
+
+plt.savefig('unfiltered_fields.png', dpi = 350)
+plt.close()
+
+
+##
 #
 ##
 
@@ -47,9 +62,9 @@ if len(filter_files) > 4:
     print('More than 4 filter scales used. Will only plot the smallest four.')
 
 # A list of the variables that we'll plot
-variables = [   ('KE_from_coarse_vels', 'log'), 
+variables = [   ('coarse_KE', 'log'), 
                 ('fine_KE', 'log'), 
-                ('energy_transfer', 'lin'), 
+                ('Pi', 'lin'), 
                 ('fine_u_lon', 'lin'),
                 ('fine_u_lat', 'lin'),
                 ('coarse_u_lon', 'lin'),

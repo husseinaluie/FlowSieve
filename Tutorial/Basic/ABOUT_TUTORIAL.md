@@ -33,7 +33,7 @@ Make sure that the variables in `constants.hpp` are set appropraitely. These inc
 - `PERIODIC_Y = true`
 - `COMP_BC_TRANSFERS = false`, this requires pressure and density, which are not included in this tutorial
 - Since there are no 'land' areas in this tutorial, the choice of land treatment (set by `DEFORM_AROUND_LAND` and `FILTER_OVER_LAND`) has no effect.
-- The grid is uniform, and so `UNIFORM_LON_GRID` and `UNIFORM_LAT_GRID` should be set accordingly. However, these are strictly optimization flags, and d not impact the output.
+- The grid is uniform, and so `UNIFORM_LON_GRID` and `UNIFORM_LAT_GRID` should be set accordingly. However, these are strictly optimization flags, and do not impact the output.
 - `FULL_LON_SPAN = true`
 - `MINIMAL_OUTPUT` and `NO_FULL_OUTPUTS` both to `false`. We want the full output files (file size is not a concern, since the sample is small)
 - `CAST_TO_SINGLE` and `CAST_TO_INT` simply modify the data type (i.e. precision) used to store the outputs, and can be set however you wish
