@@ -114,3 +114,18 @@ These routines account for the vast majority of runtime outside of very small fi
 
 See the function map for [filtering] to get an overview of the function dependencies.
 [filtering]: @ref filtering() "the main filtering function"
+
+
+## Licence
+
+This is a brief human-readable summary of the ODC-BY 1.0 license, and is not the actual licence. 
+See `licence.md` for the full licence details.
+
+You are free:
+* To share: To copy, distribute and use the database.
+* To create: To produce works from the database.
+* To adapt: To modify, transform and build upon the database.
+
+As long as you:
+* Attribute: You must attribute any public use of the database, or works produced from the database, in the manner specified in the license. For any use or redistribution of the database, or works produced from it, you must make clear to others the license of the database and keep intact any notices on the original database.
+
