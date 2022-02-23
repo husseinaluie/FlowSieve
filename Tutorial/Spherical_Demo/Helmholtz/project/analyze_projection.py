@@ -4,6 +4,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
+import sys
+sys.path.append('../../../../PythonTools')
+import PlotTools.ScientificCbar as ScientificCbar
+
 from netCDF4 import Dataset
 
 from pyproj import Proj
@@ -112,8 +116,11 @@ for kind in ['u_lon', 'u_lat', 'KE']:
     qms[4,1] = axes[4,1].pcolormesh( Xp_fine, Yp_fine, fine_diff, cmap = cmap, norm = norm_diff )
 
 
-    cb = plt.colorbar( qms[0,0], ax = axes[:-1,:] )
-    cb = plt.colorbar( qms[-1,0], ax = axes[-1,:] )
+    cb0 = plt.colorbar( qms[ 0,0], ax = axes[:-1,:] )
+    cb1 = plt.colorbar( qms[-1,0], ax = axes[ -1,:] )
+    if kind != 'KE':
+        ScientificCbar(cb0)
+        ScientificCbar(cb1)
             
     for ax in axes.ravel():
         ax.set_xticklabels([])
@@ -132,49 +139,55 @@ for kind in ['u_lon', 'u_lat', 'KE']:
     plt.close()
 
 
-
 ###
 ##
 ###
 
-u, v, uu, uv, vv = get_results_uiuj()
+for res in ['coarse', 'fine']:
 
-cv = max( np.max( np.abs(u*u) ), np.max(np.abs( u*v ) ), np.max(np.abs( v*v ) ) )
-cmap = 'bwr'
-norm = colors.SymLogNorm( vmin = -cv, vmax = cv, linthresh = cv / 1e5 )
+    u, v, uu, uv, vv = get_results_uiuj( res = res )
 
-gridspec_props = dict(wspace = 0.075, hspace = 0.05, left = 0.05, right = 0.95, bottom = 0.05, top = 0.9)
+    Xp = Xp_fine if (res == 'fine') else Xp_coarse
+    Yp = Yp_fine if (res == 'fine') else Yp_coarse
 
-fig, axes = plt.subplots(3, 3, sharex=True, sharey=True, figsize=(9, 6), gridspec_kw = gridspec_props)
+    cv = max( np.max( np.abs(u*u) ), np.max(np.abs( u*v ) ), np.max(np.abs( v*v ) ) )
+    cmap = 'bwr'
+    norm = colors.SymLogNorm( vmin = -cv, vmax = cv, linthresh = cv / 1e2, linscale = 0.2 )
+    #norm = colors.Normalize( vmin = -cv, vmax = cv )
 
-qms = np.zeros(axes.shape, dtype='object')
+    gridspec_props = dict(wspace = 0.075, hspace = 0.05, left = 0.05, right = 0.95, bottom = 0.05, top = 0.9)
 
-qms[0,0] = axes[0,0].pcolormesh( Xp_fine, Yp_fine, u*u,       cmap = cmap, norm = norm )
-qms[0,1] = axes[0,1].pcolormesh( Xp_fine, Yp_fine, uu,        cmap = cmap, norm = norm )
-qms[0,2] = axes[0,2].pcolormesh( Xp_fine, Yp_fine, u*u - uu,  cmap = cmap, norm = norm )
+    fig, axes = plt.subplots(3, 3, sharex=True, sharey=True, figsize=(9, 6), gridspec_kw = gridspec_props)
 
-qms[1,0] = axes[1,0].pcolormesh( Xp_fine, Yp_fine, u*v,       cmap = cmap, norm = norm )
-qms[1,1] = axes[1,1].pcolormesh( Xp_fine, Yp_fine, uv,        cmap = cmap, norm = norm )
-qms[1,2] = axes[1,2].pcolormesh( Xp_fine, Yp_fine, u*v - uv,  cmap = cmap, norm = norm )
+    qms = np.zeros(axes.shape, dtype='object')
 
-qms[2,0] = axes[2,0].pcolormesh( Xp_fine, Yp_fine, v*v,       cmap = cmap, norm = norm )
-qms[2,1] = axes[2,1].pcolormesh( Xp_fine, Yp_fine, vv,        cmap = cmap, norm = norm )
-qms[2,2] = axes[2,2].pcolormesh( Xp_fine, Yp_fine, v*v - vv,  cmap = cmap, norm = norm )
+    qms[0,0] = axes[0,0].pcolormesh( Xp, Yp, u*u,       cmap = cmap, norm = norm )
+    qms[0,1] = axes[0,1].pcolormesh( Xp, Yp, uu,        cmap = cmap, norm = norm )
+    qms[0,2] = axes[0,2].pcolormesh( Xp, Yp, u*u - uu,  cmap = cmap, norm = norm )
+
+    qms[1,0] = axes[1,0].pcolormesh( Xp, Yp, u*v,       cmap = cmap, norm = norm )
+    qms[1,1] = axes[1,1].pcolormesh( Xp, Yp, uv,        cmap = cmap, norm = norm )
+    qms[1,2] = axes[1,2].pcolormesh( Xp, Yp, u*v - uv,  cmap = cmap, norm = norm )
+
+    qms[2,0] = axes[2,0].pcolormesh( Xp, Yp, v*v,       cmap = cmap, norm = norm )
+    qms[2,1] = axes[2,1].pcolormesh( Xp, Yp, vv,        cmap = cmap, norm = norm )
+    qms[2,2] = axes[2,2].pcolormesh( Xp, Yp, v*v - vv,  cmap = cmap, norm = norm )
 
 
-cb = plt.colorbar( qms[0,0], ax = axes )
+    cb = plt.colorbar( qms[0,0], ax = axes )
+    #ScientificCbar( cb )
             
-for ax in axes.ravel():
-    ax.set_xticklabels([])
-    ax.set_yticklabels([])
+    for ax in axes.ravel():
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
             
-axes[0,0].set_title('Original')
-axes[0,1].set_title('Helmholtz')
-axes[0,2].set_title('Difference')
+    axes[0,0].set_title('Original')
+    axes[0,1].set_title('Helmholtz')
+    axes[0,2].set_title('Difference')
 
-axes[0,0].set_ylabel('u*u')
-axes[1,0].set_ylabel('u*v')
-axes[2,0].set_ylabel('v*v')
+    axes[0,0].set_ylabel('u*u')
+    axes[1,0].set_ylabel('u*v')
+    axes[2,0].set_ylabel('v*v')
 
-plt.savefig( 'uiuj_projection_results.png', dpi = 250)
-plt.close()
+    plt.savefig( 'uiuj_{0}_projection_results.png'.format(res), dpi = 250)
+    plt.close()
