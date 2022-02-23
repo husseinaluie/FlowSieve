@@ -13,17 +13,27 @@ export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 export KMP_AFFINITY="compact"
 export I_MPI_PIN_DOMAIN="auto"
 
-FILTER_SCALES="10e3 20e3 30e3 4.03e+04 5.33e+04 7.04e+04 9.31e+04 1.23e+05 1.63e+05 2.15e+05 2.84e+05 3.75e+05 4.96e+05 6.56e+05 8.66e+05 1.15e+06 1.51e+06 2.00e+06"
+# Recall that eddy scales are [ 250e3, 750e3, 3500e3 ]
+
+FILTER_SCALES="100e3 500e3 2000e3 5000e3"
 
 mpirun -n ${SLURM_NTASKS} ./coarse_grain_helmholtz.x \
-        --toroidal_input_file ../project/projection_ui.nc \
-        --potential_input_file ../project/projection_ui.nc \
+        --Helmholtz_input_file ../project/projection_ui.nc \
+        --velocity_input_file ../velocity_sample.nc \
         --tor_field Psi \
         --pot_field Phi \
-        --velocity_input_file ../velocity_sample.nc \
-        --uiuj_Helmholtz_input_file ../project/projection_uiuj.nc \
-        --uiuj_F_r v_r \
-        --uiuj_F_lon v_lon \
-        --uiuj_F_lat v_lat \
         --vel_field uo \
         --filter_scales "${FILTER_SCALES}"
+
+#mpirun -n ${SLURM_NTASKS} ./coarse_grain_helmholtz.x \
+#        --toroidal_input_file ../project/projection_ui.nc \
+#        --potential_input_file ../project/projection_ui.nc \
+#        --tor_field Psi \
+#        --pot_field Phi \
+#        --velocity_input_file ../velocity_sample.nc \
+#        --uiuj_Helmholtz_input_file ../project/projection_uiuj.nc \
+#        --uiuj_F_r v_r \
+#        --uiuj_F_lon v_lon \
+#        --uiuj_F_lat v_lat \
+#        --vel_field uo \
+#        --filter_scales "${FILTER_SCALES}"
