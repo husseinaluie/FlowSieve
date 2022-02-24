@@ -205,6 +205,10 @@ namespace constants
     /*!
      * \param COMP_BC_TRANSFERS
      * \brief Boolean indicating if baroclinic transfers (Lambda^m) should be computed.
+     *
+     * Lambda transfers are currently in development and removed from main branch.
+     * This flag only activates PEtoKE conversion term using p and rho.
+     *
      * @ingroup constants
      */
     const bool COMP_BC_TRANSFERS = false;
