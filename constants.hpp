@@ -131,6 +131,8 @@ namespace constants
      * If true, 'land' is added with a uniform grid spacing to make the domain reach both north and south poles
      * If false, nothing happens.
      *
+     * Set to false if not on a sphere
+     *
      * @ingroup constants
      */
     const bool EXTEND_DOMAIN_TO_POLES = true;
