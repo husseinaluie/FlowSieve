@@ -1,5 +1,7 @@
 import subprocess, os
 
+master_doc = 'index'
+
 read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 
 # Extract version number from version file
