@@ -1,6 +1,6 @@
 import subprocess, os
 
-master_doc = 'index'
+master_doc = 'contents'
 
 read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 
