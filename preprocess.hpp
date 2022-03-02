@@ -224,7 +224,7 @@ void uiuj_from_Helmholtz(
  *
  * *seed*: I couldn't figure out how to provide a seed directly to the solver. Instead,
  * seeds are done in the following way. Call the seed \f$ x_0 \f$ and write \f$ x = x' + x_0 \f$.
- * Then \f$ Ax=b \implies Ax' = b - Ax_0 \f$.
+ * If \f$ Ax=b\f$ then \f$Ax' = b - Ax_0 \f$.
  * The seed is applied in exactly this way to modify the RHS of the problem. 
  * The seed is then added back in afterwards.
  *
