@@ -1,6 +1,7 @@
 import subprocess, os
 
-master_doc = 'contents'
+master_doc = 'index'
+html_extra_path = ['./docs/build/html']
 
 read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 
