@@ -1,15 +1,17 @@
-\page issues1
-# Solutions to Common Problems
+# Solutions to Common Problems {#issues1}
+[TOC]
+
+\brief A description of some know issues / bugs, with solutions where available.
 
 ## I/O
 
 ### Fails to read in array / zero-dimensional variables (when should have more dimensions)
 
 This appears to be a result of the netcdf format.
-The coarse-graining codebase requires netcdf-4 format.
+The FlowSieve codebase requires netcdf-4 format.
 
 You can check the format of your input file by calling `ncdump -k <filename>`.
-If the returned value is not "netCDF-4", then you can convert it by calling `nccopy -k netCDF-4 sample_data.nc raw_velocity.nc`
+If the returned value is not "netCDF-4", then you can convert it by calling `nccopy -k netCDF-4 original.nc nc4_version.nc`
 
 
 

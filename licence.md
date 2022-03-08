@@ -1,4 +1,7 @@
-# ODC Attribution License (ODC-By)
+# ODC Attribution License (ODC-By) {#license1}
+[TOC]
+
+\brief The ODC Attribution License (ODC-By)
 
 ### Preamble
 

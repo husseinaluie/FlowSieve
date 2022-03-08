@@ -1,7 +1,7 @@
+# Installing {#install1}
 [TOC]
-\page install1
 
-# Installing
+\brief A guide to installing and compiling FlowSieve.
 
 ## Initial (one-time) set-up
 
@@ -25,7 +25,7 @@ The `Systems` directory contains a few sample system files. To prepare a system 
 
 A makefile is included to simplify compiling. 
 As a first test of your install, try `make clean; make Case_Files/coarse_grain.x`.
-If the executable compiles successfully, then a good next step is to check out the [tutorials that are provided](../Tutorial/TUTORIAL.md) (\ref tutorials1) to familiarize yourself with the code usage.
+If the executable compiles successfully, then a good next step is to check out the [tutorials that are provided](\ref tutorials1) to familiarize yourself with the code usage.
 
 ## make arguments
 * `make clean`

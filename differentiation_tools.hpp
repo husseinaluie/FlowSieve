@@ -119,6 +119,8 @@ void spher_derivative_at_point(
  * @param[in]       Itime,Idepth,Ilat,Ilon  Indices for the target point in space
  * @param[in]       Ntime,Ndepth,Nlat,Nlon  Sizes of the dimensions
  * @param[in]       mask                    array to distinguish land/water cells 
+ * @param[in]       order_of_deriv          order of the derivative (1st deriv, 2nd deriv, etc)
+ * @param[in]       diff_ord                convergence order (default is specified in constants.hpp)
  */
 void Cart_derivatives_at_point(
         const std::vector<double*> & x_deriv_vals,

@@ -1,5 +1,5 @@
-\page helmholtz1
-# Helmholtz Decomposition
+# Helmholtz Decomposition {#helmholtz1}
+[TOC]
 
 ---
 

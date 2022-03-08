@@ -1,8 +1,7 @@
+# Methods {#methods1}
 [TOC]
-\page methods1
-# Methods
 
-This file will outline some of the computational methodologies.
+\brief A review of the computational methodologies (warning: math content)
 
 ## Coarse-Grain Filtering
 

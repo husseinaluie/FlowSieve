@@ -1,7 +1,12 @@
 [TOC]
 # FlowSieve
 
-**FlowSieve** is developed as an open resource by the Complex Flow Group at the University of Rochester, under the sponsorship of the National Science Foundation and the National Aeronautics and Space Administration. Continued support for **FlowSieve** depends on demonstrable evidence of the code’s value to the scientific community. We kindly request that you cite the code in your publications and presentations. **FlowSieve** is made available under the Open Data Commons Attribution License (ODC-By) (http://opendatacommons.org/licenses/by/, see `licence.md` or the human-readable summary at the end of the README), which means it is open to use, but requires attribution. The following citations are suggested:
+**FlowSieve** is developed as an open resource by the Complex Flow Group at the University of Rochester, under the sponsorship of the National Science Foundation and the National Aeronautics and Space Administration. 
+Continued support for **FlowSieve** depends on demonstrable evidence of the code’s value to the scientific community. 
+We kindly request that you cite the code in your publications and presentations. 
+**FlowSieve** is made available under the Open Data Commons Attribution License (ODC-By) (http://opendatacommons.org/licenses/by/, see [the license file](\ref license1) or the human-readable summary at the end of the README), which means it is open to use, but requires attribution. 
+
+The following citations are suggested:
 
 For journal articles, proceedings, etc.., we suggest:
 * Aluie, Hussein, Matthew Hecht, and Geoffrey K. Vallis. "Mapping the energy cascade in the North Atlantic Ocean: The coarse-graining approach." Journal of Physical Oceanography 48.2 (2018): 225-244: (https://doi.org/10.1175/JPO-D-17-0100.1)
@@ -15,24 +20,24 @@ For presentations, posters, etc.., we suggest acknowledging:
 
 ## Tutorial
 
-A series of [basic tutorials](./Tutorial/TUTORIAL.md) (\ref tutorials1) are provided to outline both various usage cases as well as how to use / process the outputs.
+A series of [basic tutorials](\ref tutorials1) are provided to outline both various usage cases as well as how to use / process the outputs.
 
 
 ---
 
 ## Methods
 
-Some details regarding underlying methods are discussed [on this page](./Documentation/METHODS.md) (\ref methods1) (warning, math content).
+Some details regarding underlying methods are discussed [on this page](\ref methods1) (warning, math content).
 
 ### Helmholtz Decomposition
 
-For notes about the Helmholtz decomposition, [go to this page](./Documentation/HELMHOLTZ.md) (\ref helmholtz1).
+For notes about the Helmholtz decomposition, [go to this page](\ref helmholtz1).
 
 ---
 
 ## Compilation / Installation
 
-For notes on installation, please see [this page](./Documentation/INSTALL.md) (\ref install1).
+For notes on installation, please see [this page](\ref install1).
 
 ---
 
@@ -73,29 +78,32 @@ Python can be helpful for this. For example, `numpy.logspace( np.log10(50e3), np
 filter scales between 50km and 2000km.
 
 Hint: to print filter scales to only three significant digits, the `numpy.format_float_scientific` function can help.
-> import numpy
->
-> number_of_scales = 10
-> 
-> smallest_scale = 50e3
-> 
-> largest_scale  = 2000e3
-> 
-> scales = numpy.logspace( numpy.log10(smallest_scale), numpy.log10(largest_scale), number_of_scales )
-> 
-> [print( numpy.format_float_scientific( scale, precision = 2 ), end = ' ' ) for scale in scales]
+~~~~~~~~~~~~~~{.py}
+import numpy as np
+
+number_of_scales = 10
+
+smallest_scale = 50e3
+largest_scale  = 2000e3
+ 
+scales = np.logspace( np.log10(smallest_scale), np.log10(largest_scale), number_of_scales )
+ 
+[print( np.format_float_scientific( scale, precision = 2 ), end = ' ' ) for scale in scales]
+~~~~~~~~~~~~~~
 
 If you are using a bash script (e.g. a job-submission script), an easy way to pass the filter scales on to the coarse-graining executable is to define 
 a variable that has the list of scales, and then just pass that to the executable using the **--filter_scales** flag.
-> FILTER_SCALES="1e4 5e4 10e4"
->
-> --filter_scales "${FILTER_SCALES}"
+~~~~~~~~~~~~{.sh}
+FILTER_SCALES="1e4 5e4 10e4"
+
+--filter_scales "${FILTER_SCALES}"
+~~~~~~~~~~~~
 
 ---
 
 ## Known Issues
 
-Some known issues (with solutions where available) are [given on this page](./Documentation/ISSUES.md) (\ref issues1).
+Some known issues (with solutions where available) are [given on this page](\ref issues1).
 
 ---
 
