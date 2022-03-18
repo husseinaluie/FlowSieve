@@ -36,7 +36,7 @@ scale-by-scale analysis.
 
 # Statement of need
 
-`@Aluie2018` demonstrated how, when applied appropriately, coarse-graining can
+@Aluie2018 demonstrated how, when applied appropriately, coarse-graining can
 not only be applied in a data-processing sense, but also to the governing equations.
 This provides a physically meaningful and mathematically coherent way to quantify not
 only how much energy is contained in different length scales, but also how much energy
@@ -46,7 +46,7 @@ is being transferred to different scales.
 tools for spatially filtering both scalar fields and vector fields in Cartesian
 and spherical geometries. Specifically, filtering velocity vector fields on a sphere
 provides a high-powered tool for scale-decomposing oceanic and atmospheric flows 
-following the mathematical results in `@Aluie2019`.
+following the mathematical results in @Aluie2019.
 
 `FlowSieve` is designed to work in high-performance computing (HPC) environments in order to
 efficiently analyse large oceanic and atmospheric datasets, and extract scientifically meaningful
