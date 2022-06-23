@@ -1,9 +1,8 @@
 # Installing {#install1}
-[TOC]
-
----
 
 A guide to installing and compiling FlowSieve.
+
+---
 
 ## Initial (one-time) set-up
 
