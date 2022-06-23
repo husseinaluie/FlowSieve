@@ -26,11 +26,8 @@ This is implemented in **Functions/get_lat_bounds.cpp**
 Suppose that we have uniform (spherical) grid spacing \f$\Delta\phi\f$. 
 
 The spacing between latitude bands, in *metres*, is then \f$\Delta\phi_m=\Delta\phi R_E\f$.
-The number of points that we'll include in either latitude side is then \f$\Delta\phi_N=\mathrm{ceil}\left( L^{pad} (\ell/2) / \Delta\phi_m\right)\f$.
-The scale factor \f$L^{pad}\f$ is a user-specified scaling to indicate how large of an integration region should be used. 
-This is specified as *KernPad* in constants.hpp.
-That is, the numerical integration to compute the local coarse-grained value only includes points within a distance of \f$ L^{pad}\ell \f$ (in metres) from the target spatial point, so that \f$ L^{pad}=1 \f$ indicates that the integration area has a diameter of exactly \f$ \ell \f$. 
-This is implemented in the functions get_lon_bounds and get_lat_bounds, which determine the physical and logical integration bounds for a given point and filter scale.
+The number of points that we'll include in either latitude side is then 
+\f[\Delta\phi_N=\mathrm{ceil}\left( L^{pad} (\ell/2) / \Delta\phi_m\right).\f]
 
 The outer loop in the integral is then from \f$I_{\phi_0} - \Delta\phi_N\f$ to \f$I_{\phi_0}+\Delta\phi_N\f$.
 
@@ -52,7 +49,14 @@ Suppose that we have uniform (spherical) grid spacing \f$\Delta\lambda\f$.
 Next, at each latitude \f$\phi\f$ within that loop, the same process is applied to compute the bounds for the longitude loop, with
 the spacing between longitude band, in *metres*, given by \f$\Delta\lambda_m=\Delta\lambda R_E \cos(\phi)\f$.
 
-An identical equation is then used to compute \f$ \Delta\lambda_N \f$, which then gives the width of the integration region (in logical indexing) at that specific latitude.
+An equation identical to the one for \f$ \Delta\phi_N \f$ is then used to compute \f$ \Delta\lambda_N \f$, which then gives the width of the integration region (in logical indexing) at that specific latitude.
+
+#### Kernel Padding Factor (\f$L^{pad}\f$)
+
+The scale factor \f$L^{pad}\f$ is a user-specified scaling to indicate how large of an integration region should be used. 
+This is specified as *KernPad* in constants.hpp.
+That is, the numerical integration to compute the local coarse-grained value only includes points within a distance of \f$ L^{pad}\ell \f$ (in metres) from the target spatial point, so that \f$ L^{pad}=1 \f$ indicates that the integration area has a diameter of exactly \f$ \ell \f$. 
+This is implemented in the functions get_lon_bounds and get_lat_bounds, which determine the physical and logical integration bounds for a given point and filter scale.
 
 ---
 
