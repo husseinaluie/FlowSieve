@@ -11,7 +11,7 @@
 
 ### Region Selection for Filtering
 
-Suppose that we are computing the filter at longitude \f$\lambda_0\f$ and latitude \f$\varphi_0\f$ (at indices \f$I_{\lambda_0}\f$ and \f$I_{\varphi_0}\f$ respectively) over length scale \f$L\f$. 
+Suppose that we are computing the filter at longitude \f$\lambda_0\f$ and latitude \f$\varphi_0\f$ (at indices \f$I_{\lambda_0}\f$ and \f$I_{\varphi_0}\f$ respectively) over length scale \f$\ell\f$. 
 Let \f$R_E\f$ be the mean radius of the earth (in metres). 
 
 The integral is performed as a double for-loop, with the outer loop going through latitude and the inner loop going through longitude.
@@ -26,7 +26,7 @@ This is implemented in **Functions/get_lat_bounds.cpp**
 Suppose that we have uniform (spherical) grid spacing \f$\Delta\phi\f$. 
 
 The spacing between latitude bands, in *metres*, is then \f$\Delta\phi_m=\Delta\phi R_E\f$.
-The number of points that we'll include in either latitude side is then \f$\Delta\phi_N=\mathrm{ceil}\left( L^{pad} (L/2) / \Delta\phi_m\right)\f$.
+The number of points that we'll include in either latitude side is then \f$\Delta\phi_N=\mathrm{ceil}\left( L^{pad} (\ell/2) / \Delta\phi_m\right)\f$.
 The scale factor \f$L^{pad}\f$ is a user-specified scaling to indicate how large of an integration region should be used. 
 This is specified as *KernPad* in constants.hpp.
 That is, the numerical integration to compute the local coarse-grained value only includes points within a distance of \f$ L^{pad}\ell \f$ (in metres) from the target spatial point, so that \f$ L^{pad}=1 \f$ indicates that the integration area has a diameter of exactly \f$ \ell \f$. 
@@ -37,7 +37,9 @@ The outer loop in the integral is then from \f$I_{\phi_0} - \Delta\phi_N\f$ to \
 ##### Non-uniform grid spacing
 
 In this event, we simply use a binary search routine to search the (logical) interval 
-\f$ [0, I_{\phi_0}-1 ] \f$ for the point whose distance from the reference point is nearest to, but not less than, \f$ L^{pad} L/2  \f$
+\f$ [0, I_{\phi_0}-1 ] \f$ for the point whose distance from the reference point is nearest to, but not less than, \f$ L^{pad} \ell/2  \f$, and similarly for the (logical) interval \f$ [I_{\phi_0}+1, N_{\phi}-1 ] \f$ 
+
+Note that implicitly assumes a mesh grid (i.e. that the latitude grid is independent of longitude).
 
 #### Restricting the longitudinal (inner) loop
 
