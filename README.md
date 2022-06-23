@@ -18,6 +18,19 @@ For journal articles, proceedings, etc.., we suggest:
 For presentations, posters, etc.., we suggest acknowledging:
 * **FlowSieve** code from the Complex Flow Group at University of Rochester
 
+
+---
+
+## Community Guidelines
+
+* **Contributing**
+ * At the current stage of development, anyone seeking to contribute to the FlowSieve codebase is asked to contact the main developers (see *Seeking Support*) to discuss the best way to integrate their contributions. The codebase is maintained on GitHub, and contributions will ultimately result in merging commits into the main branch. 
+ * It is recommended to use a forked repository for active development, since it allows testing in a separate environment before merging.
+* **Reporting Issues** 
+ * Please report issues using the GitHub issue tracking tools. Issues can also be submitted by email (see *Seeking Support*), but the issue tracker is preferred.
+* **Seeking Support**
+ * The best way to obtain support is to contact *Hussein Aluie* or *Benjamin Storer* by email. Contact information is available at the Complex Flow Group webpage (http://www.complexflowgroup.com/people/).
+
 ---
 
 [**FlowSieve** documentation is available here.](https://flowsieve.readthedocs.io/en/latest/) 
