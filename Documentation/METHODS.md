@@ -2,11 +2,13 @@
 
 A review of the computational methodologies (warning: math content).
 
+# FlowSieve Methods {#methods1-0}
+
 Test text to confirm that RTD is using latest version.
 
 ---
 
-## Coarse-Grain Filtering
+## Coarse-Grain Filtering {#method1-1}
 
 ### Region Selection for Filtering
 
