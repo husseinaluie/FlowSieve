@@ -1,11 +1,9 @@
 # Methods {#methods1}
-[TOC]
 
-A review of the computational methodologies (warning: math content).
+\brief A review of the computational methodologies (warning: math content).
 
 # FlowSieve Methods {#methods1-0}
-
-Test text to confirm that RTD is using latest version.
+[TOC]
 
 ---
 

@@ -1,9 +1,9 @@
 # Solutions to Common Problems {#issues1}
-[TOC]
+
+\brief A description of some know issues / bugs, with solutions where available.
 
 # Known Issues
-
-A description of some know issues / bugs, with solutions where available.
+[TOC]
 
 ---
 

@@ -1,7 +1,7 @@
 # Helmholtz Decomposition {#helmholtz1}
-[TOC]
 
 # Helmholtz Routines {#helmholtz1-0}
+[TOC]
 
 ---
 

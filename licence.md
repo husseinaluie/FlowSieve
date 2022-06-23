@@ -1,11 +1,9 @@
 # ODC Attribution License (ODC-By) {#license1}
+
+\brief The ODC Attribution License (ODC-By)
+
+# License {#license1-0}
 [TOC]
-
-# Header-Test {#license1-0}
-
-## License {#license1-1}
-
-The ODC Attribution License (ODC-By)
 
 
 ---
