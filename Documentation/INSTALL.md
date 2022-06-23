@@ -2,6 +2,8 @@
 
 A guide to installing and compiling FlowSieve.
 
+# Installation
+
 ---
 
 ## Initial (one-time) set-up
