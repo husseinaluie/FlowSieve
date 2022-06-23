@@ -44,7 +44,7 @@ PROJECT_NUMBER         = $(DOXY_VERSION)
 # for a project that appears at the top of each page and should give viewer a
 # quick idea about the purpose of the project. Keep the description short.
 
-PROJECT_BRIEF          = "Coarse Graining Routines"
+PROJECT_BRIEF          = "FlowSieve Coarse-Graining Documentation"
 
 # With the PROJECT_LOGO tag one can specify a logo or an icon that is included
 # in the documentation. The maximum height of the logo should not exceed 55
@@ -339,7 +339,7 @@ MARKDOWN_SUPPORT       = YES
 # Minimum value: 0, maximum value: 99, default value: 5.
 # This tag requires that the tag MARKDOWN_SUPPORT is set to YES.
 
-TOC_INCLUDE_HEADINGS   = 3
+TOC_INCLUDE_HEADINGS   = 4
 
 # When enabled doxygen tries to link words that correspond to documented
 # classes, or namespaces to their corresponding documentation. Such a link can
@@ -876,10 +876,6 @@ WARN_LOGFILE           =
 
 INPUT                  = .. \
                          ../Documentation \
-                         ../Tutorial \
-                         ../Tutorial/Basic \
-                         ../Tutorial/Spherical_Demo \
-                         ../Tutorial/Spherical_Demo/Helmholtz \
                          ../NETCDF_IO \
                          ../Functions \
                          ../Functions/Differentiation_Tools \
@@ -888,6 +884,11 @@ INPUT                  = .. \
                          ../Functions/Interface_Tools \
                          ../Postprocess \
                          ../Preprocess
+
+#                         ../Tutorial \
+#                         ../Tutorial/Basic \
+#                         ../Tutorial/Spherical_Demo \
+#                         ../Tutorial/Spherical_Demo/Helmholtz \
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
@@ -974,7 +975,8 @@ RECURSIVE              = NO
 # Note that relative paths are relative to the directory from which doxygen is
 # run.
 
-EXCLUDE                =
+EXCLUDE                = ../README.md \
+                         ../paper.md
 
 # The EXCLUDE_SYMLINKS tag can be used to select whether or not files or
 # directories that are symbolic links (a Unix file system feature) are excluded
