@@ -4,7 +4,7 @@
 **FlowSieve** is developed as an open resource by the Complex Flow Group at the University of Rochester, under the sponsorship of the National Science Foundation and the National Aeronautics and Space Administration. 
 Continued support for **FlowSieve** depends on demonstrable evidence of the code’s value to the scientific community. 
 We kindly request that you cite the code in your publications and presentations. 
-**FlowSieve** is made available under the Open Data Commons Attribution License (ODC-By) (http://opendatacommons.org/licenses/by/, see [the license file](\ref license1) or the human-readable summary at the end of the README), which means it is open to use, but requires attribution. 
+**FlowSieve** is made available under The Open Software License 3.0 (OSL-3.0) (see [the license file](\ref license1) or the human-readable summary at the end of the README), which means it is open to use, but requires attribution. 
 
 The following citations are suggested:
 
