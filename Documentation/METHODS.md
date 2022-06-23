@@ -1,11 +1,9 @@
 [TOC]
 # Methods {#methods1}
 
-\brief A review of the computational methodologies (warning: math content)
+## Coarse-Grain Filtering
 
-# Coarse-Grain Filtering
-
-## Region Selection for Filtering
+### Region Selection for Filtering
 
 Suppose that we are computing the filter at longitude \f$\lambda_0\f$ and latitude \f$\varphi_0\f$ (at indices \f$I_{\lambda_0}\f$ and \f$I_{\varphi_0}\f$ respectively) over length scale \f$L\f$. 
 Let \f$R_E\f$ be the mean radius of the earth (in metres). 
@@ -51,6 +49,9 @@ An identical equation is then used to compute \f$ \Delta\lambda_N \f$, which the
 ---
 
 ## Evolution of Kinetic Energy of Filter Velocities
+
+For details regarding the derivation of these quantities, please see the following publications.
+* Aluie, Hussein, Matthew Hecht, and Geoffrey K. Vallis. "Mapping the energy cascade in the North Atlantic Ocean: The coarse-graining approach." Journal of Physical Oceanography 48.2 (2018): 225-244: (https://doi.org/10.1175/JPO-D-17-0100.1)
 
 \f[
 \frac{\partial}{\partial t}\left( \frac{\rho_0}{2}\left| \overline{\vec{u}} \right|^2 \right)
