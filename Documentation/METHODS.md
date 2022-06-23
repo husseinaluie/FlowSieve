@@ -2,6 +2,8 @@
 
 A review of the computational methodologies (warning: math content).
 
+Test text to confirm that RTD is using latest version.
+
 ---
 
 ## Coarse-Grain Filtering

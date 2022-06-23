@@ -1,7 +1,9 @@
 # Tutorial for Working on a Sphere {#tutorials3}
 [TOC]
 
-\brief This tutorial walks through analysing a velocity field using Helmholtz decomposition with coarse-graining.
+This tutorial walks through analysing a velocity field using Helmholtz decomposition with coarse-graining.
+
+---
 
 There are three stages in this tutorial, each with a corresponding sub-directory. See the ABOUT documentation file in each directory for the step-by-step guide to each part.
 1. The 'project' directory works through the steps needed to perform the Helmholtz decompiosition

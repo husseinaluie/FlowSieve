@@ -1,5 +1,8 @@
 # Tutorials {#tutorials1}
+
 [TOC]
+
+---
 
 ## Basic
 
