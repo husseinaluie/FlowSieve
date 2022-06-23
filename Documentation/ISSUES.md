@@ -1,5 +1,5 @@
 # Solutions to Common Problems {#issues1}
-[ TOC]
+[TOC]
 
 # Known Issues
 

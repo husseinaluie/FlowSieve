@@ -1,4 +1,5 @@
 # Methods {#methods1}
+[TOC]
 
 A review of the computational methodologies (warning: math content).
 
