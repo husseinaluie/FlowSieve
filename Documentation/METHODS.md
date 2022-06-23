@@ -51,7 +51,7 @@ the spacing between longitude band, in *metres*, given by \f$\Delta\lambda_m=\De
 
 An equation identical to the one for \f$ \Delta\phi_N \f$ is then used to compute \f$ \Delta\lambda_N \f$, which then gives the width of the integration region (in logical indexing) at that specific latitude.
 
-#### Kernel Padding Factor (\f$L^{pad}\f$)
+#### Kernel Padding Factor (Lpad)
 
 The scale factor \f$L^{pad}\f$ is a user-specified scaling to indicate how large of an integration region should be used. 
 This is specified as *KernPad* in constants.hpp.
