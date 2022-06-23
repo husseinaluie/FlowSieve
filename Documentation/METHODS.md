@@ -4,9 +4,9 @@ Methods {#methods1}
 
 \brief A review of the computational methodologies (warning: math content)
 
-# Coarse-Grain Filtering
+## Coarse-Grain Filtering {#methods-main}
 
-### Region Selection for Filtering
+### Region Selection for Filtering {#methods-region-select}
 
 Suppose that we are computing the filter at longitude \f$\lambda_0\f$ and latitude \f$\varphi_0\f$ (at indices \f$I_{\lambda_0}\f$ and \f$I_{\varphi_0}\f$ respectively) over length scale \f$L\f$. 
 Let \f$R_E\f$ be the mean radius of the earth (in metres). 
@@ -14,7 +14,7 @@ Let \f$R_E\f$ be the mean radius of the earth (in metres).
 The integral is performed as a double for-loop, with the outer loop going through latitude and the inner loop going through longitude.
 In order to optimize the computation time, we would like to restrict the bounds on each of the for loops as much as possible.
 
-#### Restricting the latitudinal (outer) loop
+#### Restricting the latitudinal (outer) loop {#methods-latitude-range}
 
 This is implemented in **Functions/get_lat_bounds.cpp**
 
