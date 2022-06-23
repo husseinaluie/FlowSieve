@@ -3,7 +3,7 @@
 
 \brief A review of the computational methodologies (warning: math content)
 
-## Coarse-Grain Filtering
+# Coarse-Grain Filtering
 
 ### Region Selection for Filtering
 
