@@ -1,4 +1,5 @@
-# Methods {#methods1}
+Methods {#methods1}
+===================
 [TOC]
 
 \brief A review of the computational methodologies (warning: math content)
