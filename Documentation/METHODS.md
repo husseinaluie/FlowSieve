@@ -1,11 +1,11 @@
-# Methods {#methods1}
 [TOC]
+# Methods {#methods1}
 
 \brief A review of the computational methodologies (warning: math content)
 
-## Coarse-Grain Filtering {#methods-main}
+# Coarse-Grain Filtering
 
-### Region Selection for Filtering {#methods-region-select}
+## Region Selection for Filtering
 
 Suppose that we are computing the filter at longitude \f$\lambda_0\f$ and latitude \f$\varphi_0\f$ (at indices \f$I_{\lambda_0}\f$ and \f$I_{\varphi_0}\f$ respectively) over length scale \f$L\f$. 
 Let \f$R_E\f$ be the mean radius of the earth (in metres). 
@@ -13,7 +13,7 @@ Let \f$R_E\f$ be the mean radius of the earth (in metres).
 The integral is performed as a double for-loop, with the outer loop going through latitude and the inner loop going through longitude.
 In order to optimize the computation time, we would like to restrict the bounds on each of the for loops as much as possible.
 
-#### Restricting the latitudinal (outer) loop {#methods-latitude-range}
+#### Restricting the latitudinal (outer) loop
 
 This is implemented in **Functions/get_lat_bounds.cpp**
 
@@ -47,6 +47,8 @@ Next, at each latitude \f$\phi\f$ within that loop, the same process is applied 
 the spacing between longitude band, in *metres*, given by \f$\Delta\lambda_m=\Delta\lambda R_E \cos(\phi)\f$.
 
 An identical equation is then used to compute \f$ \Delta\lambda_N \f$, which then gives the width of the integration region (in logical indexing) at that specific latitude.
+
+---
 
 ## Evolution of Kinetic Energy of Filter Velocities
 
@@ -115,6 +117,7 @@ Not implemented.
 \right)
 \f}
 
+---
 
 ## Differentiation
 
@@ -183,6 +186,8 @@ then \f$ \partial/\partial r\equiv0  \f$, so this reduced down to
 
 [spher-deriv]: @ref spher_derivative_at_point "spherical derivatives"
 [cart-deriv]: @ref Cart_derivative_at_point "Cartesian derivatives"
+
+---
 
 ## Parallelization
 
