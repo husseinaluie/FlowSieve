@@ -2,6 +2,8 @@
 
 [![Documentation Status](https://readthedocs.org/projects/flowsieve/badge/?version=latest)](https://flowsieve.readthedocs.io/en/latest/?badge=latest)
 
+# About FlowSieve
+
 **FlowSieve** is developed as an open resource by the [Complex Flow Group at the University of Rochester](http://www.complexflowgroup.com), under the sponsorship of the National Science Foundation and the National Aeronautics and Space Administration. 
 Continued support for **FlowSieve** depends on demonstrable evidence of the code’s value to the scientific community. 
 We kindly request that you cite the code in your publications and presentations. 

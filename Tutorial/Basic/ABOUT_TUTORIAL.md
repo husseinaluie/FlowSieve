@@ -1,7 +1,9 @@
 # Basic Tutorial {#tutorials2}
-[TOC]
 
-This tutorial shows the basic functionality of the coarse-graining codebase.
+\brief This tutorial shows the basic functionality of the coarse-graining codebase.
+
+# Tutorial
+[TOC]
 
 ---
 
