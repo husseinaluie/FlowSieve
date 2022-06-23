@@ -7,9 +7,9 @@ version: 2
 sphinx:
   configuration: docs/sphinx/conf.py
 
-python:
-  install:
-  - requirements: docs/sphinx/requirements.txt
+#python:
+#  install:
+#  - requirements: docs/sphinx/requirements.txt
 
 conda:
   environment: docs/sphinx/environment.yml
