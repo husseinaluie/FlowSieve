@@ -1,7 +1,9 @@
 # Solutions to Common Problems {#issues1}
-[TOC]
+[ TOC]
 
-\brief A description of some know issues / bugs, with solutions where available.
+---
+
+A description of some know issues / bugs, with solutions where available.
 
 ## I/O
 
