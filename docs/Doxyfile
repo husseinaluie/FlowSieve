@@ -882,10 +882,10 @@ INPUT                  = .. \
                          ../Functions/FFTW_versions \
                          ../Functions/Helmholtz \
                          ../Functions/Interface_Tools \
+                         ../Tutorial \
                          ../Postprocess \
                          ../Preprocess
 
-#                         ../Tutorial \
 #                         ../Tutorial/Basic \
 #                         ../Tutorial/Spherical_Demo \
 #                         ../Tutorial/Spherical_Demo/Helmholtz \
