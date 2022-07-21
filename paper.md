@@ -37,10 +37,10 @@ scale-by-scale analysis.
 # Summary of Software
 
 The core features of `FlowSieve` are:
-* computes coarse-grained scalar and vector fields for arbitary filter scales, in both Cartesian and spherical coordinates
-* built-in diagnostics for oceanographic settings, including kinetic energy (KE), KE cascades, vorticity, divergence
-* built-in post-processing tools compute temporal and region averages, for an arbitrary number of custom user-specified regions [ avoiding storage concerns when handling large datasets ]
-* includes Helmholtz-decomposition scripts to allow careful coarse-graining on the sphere [ i.e. to maintain commutativity with derivatives ]
+- computes coarse-grained scalar and vector fields for arbitary filter scales, in both Cartesian and spherical coordinates
+- built-in diagnostics for oceanographic settings, including kinetic energy (KE), KE cascades, vorticity, divergence
+- built-in post-processing tools compute temporal and region averages, for an arbitrary number of custom user-specified regions [ avoiding storage concerns when handling large datasets ]
+- includes Helmholtz-decomposition scripts to allow careful coarse-graining on the sphere [ i.e. to maintain commutativity with derivatives ]
 
 `FlowSieve` is written in C++, with some python user-friendliness scripts included. 
 Input and output files are netCDF.
