@@ -21,7 +21,7 @@ bibliography: paper.bib
 
 ---
 
-# Summary
+# Summary of Subject Area
 
 Ocean and atmosphere dynamics span an incredibly wide range of spatial and temporal
 scales, with spatial scales ranging from the sub-millimetre viscous scales all the way
@@ -33,6 +33,32 @@ flow systems is being able to disentangle the complex interactions across this w
 Coarse-graining is a physically-motivated and mathematically-rigorous technique for partitioning
 spatial flows as a function of a specified partitioning scale, allowing for a consistent and comprehensive
 scale-by-scale analysis.
+
+# Summary of Software
+
+The core features of `FlowSieve` are:
+* computes coarse-grained scalar and vector fields for arbitary filter scales, in both Cartesian and spherical coordinates
+* built-in diagnostics for oceanographic settings, including kinetic energy (KE), KE cascades, vorticity, divergence
+* built-in post-processing tools compute temporal and region averages, for an arbitrary number of custom user-specified regions [ avoiding storage concerns when handling large datasets ]
+* includes Helmholtz-decomposition scripts to allow careful coarse-graining on the sphere [ i.e. to maintain commutativity with derivatives ]
+
+`FlowSieve` is written in C++, with some python user-friendliness scripts included. 
+Input and output files are netCDF.
+`FlowSieve` is designed with heavy parallelization in mind, as well as several context-based optimizations, in order to facilitate processing high-resolution datasets. 
+In particular, MPI is used to divide time and depth [ with minimal communication costs, since coarse-graining is applied at each time and depth independently ], while OpenMP is used to parallelize latitude and longitude loops, taking advantage of shared memory to reduce communication overhead.
+
+
+`FlowSieve` can currently only work on mesh grids ( i.e. latitude grid is independent of longitude, and vice-versa ), but those grids need not be uniform.
+This is not a restriction of the coarse-graining methodology, however, and future developments may extend this functionality if there is sufficient interest / need.
+
+
+# State of the Field
+
+Coarse-graining is being increasingly used as an analytical method in oceanographic communities. While the coarse-graining is similar to blurring / convolutions in image-processing, those tools do not readily apply to these contexts; they often rely on uniform, rectangular, Cartesian grids, which typically do not apply in Global Climate Model (GCM) data.
+An established package in the fied, GCM-Filters, was designed to work on GCM data and grids.  It uses a diffusion-type coarse-graining method that is made available to users through python utilities.
+
+The unique contributions of `FlowSieve` to the field are: follows the rigorous underlying mathematical framework to preserve physical properties of the data, designed for use on full spherical geometries, and can apply any arbitrary filtering scale spanning from sub-grid to domain-size.
+
 
 # Statement of need
 
