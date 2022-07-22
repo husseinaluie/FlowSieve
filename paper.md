@@ -37,10 +37,10 @@ scale-by-scale analysis.
 # Summary of Software
 
 The core features of `FlowSieve` are:
-1) computes coarse-grained scalar and vector fields for arbitary filter scales, in both Cartesian and spherical coordinates
-2) built-in diagnostics for oceanographic settings, including kinetic energy (KE), KE cascades, vorticity, divergence
-3) built-in post-processing tools compute temporal and region averages, for an arbitrary number of custom user-specified regions [ avoiding storage concerns when handling large datasets ]
-4) includes Helmholtz-decomposition scripts to allow careful coarse-graining on the sphere [ i.e. to maintain commutativity with derivatives ]
+1) computes coarse-grained scalar and vector fields for arbitrary filter scales, in both Cartesian and spherical coordinates,
+2) built-in diagnostics for oceanographic settings, including kinetic energy (KE), KE cascades, vorticity, divergence, etc.,
+3) built-in post-processing tools compute region averages for an arbitrary number of custom user-specified regions [ avoiding storage concerns when handling large datasets ], and
+4) includes Helmholtz-decomposition scripts to allow careful coarse-graining on the sphere [ i.e. to maintain commutativity with derivatives ].
 
 `FlowSieve` is written in C++, with some python user-friendliness scripts included. 
 Input and output files are netCDF.
@@ -54,8 +54,8 @@ This is not a restriction of the coarse-graining methodology, however, and futur
 
 # State of the Field
 
-Coarse-graining is being increasingly used as an analytical method in oceanographic communities. While the coarse-graining is similar to blurring / convolutions in image-processing, those tools do not readily apply to these contexts; they often rely on uniform, rectangular, Cartesian grids, which typically do not apply in Global Climate Model (GCM) data.
-An established package in the fied, GCM-Filters, was designed to work on GCM data and grids.  It uses a diffusion-type coarse-graining method that is made available to users through python utilities.
+Coarse-graining is being increasingly used as an analytical method in oceanographic communities. While coarse-graining is similar to blurring / convolutions in image-processing, for which many software packages exist, those tools do not readily apply to oceanographic contexts: they often rely on uniform, rectangular, Cartesian grids, which typically do not apply in Global Climate Model (GCM) data.
+An established package in the fied, GCM-Filters, is designed to work on GCM data and grids. It uses a diffusion-type coarse-graining method that is made available to users through python utilities.
 
 The unique contributions of `FlowSieve` to the field are: follows the rigorous underlying mathematical framework to preserve physical properties of the data, designed for use on full spherical geometries, and can apply any arbitrary filtering scale spanning from sub-grid to domain-size.
 
