@@ -138,6 +138,8 @@ for kind in ['u_lon', 'u_lat', 'KE']:
     plt.savefig( kind + '_projection_results.png', dpi = 250)
     plt.close()
 
+# we've removed the UiUj decomposition part for now, so don't do it.
+sys.exit()
 
 ###
 ##

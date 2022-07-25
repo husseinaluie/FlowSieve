@@ -27,7 +27,7 @@ cd project/
 
 #python generate_coarse_grid.py
 
-echo "\n\n REFINE GRID \n\n"
+echo "\n\n COARSEN GRID \n\n"
 mpirun -np ${SLURM_NTASKS} ./coarsen_grid_linear.x \
     --fine_file ../velocity_sample.nc \
     --coarse_file coarse_grid.nc \
@@ -49,14 +49,7 @@ mpirun -np ${SLURM_NTASKS} ./Helmholtz_projection.x \
     --tolerance 1e-12 \
     --Tikhov_Laplace 1
 
-echo "\n\n COARSE HELMHOLTZ UiUj\n\n"
-mpirun -np ${SLURM_NTASKS} ./Helmholtz_projection_uiuj.x \
-    --input_file ./coarsened_sample.nc \
-    --seed_file zero \
-    --output_file coarse_projection_uiuj.nc \
-    --max_iterations 5e5 \
-    --tolerance 1e-12 \
-    --Tikhov_Laplace 0.2
+
 
 
 ###
@@ -71,13 +64,7 @@ mpirun -np ${SLURM_NTASKS} ./refine_Helmholtz_seed.x \
     --input_variables "Phi Psi" \
     --output_variables "Phi_seed Psi_seed"
 
-echo "\n\n REFINE SEED FOR UiUj \n\n"
-mpirun -np ${SLURM_NTASKS} ./refine_Helmholtz_seed.x \
-    --coarse_file ./coarse_projection_uiuj.nc \
-    --fine_file ../velocity_sample.nc \
-    --output_file seed_uiuj.nc \
-    --input_variables "v_r v_lon v_lat" \
-    --output_variables "v_r_seed v_lon_seed v_lat_seed"
+
 
 
 ###
@@ -93,14 +80,6 @@ mpirun -np ${SLURM_NTASKS} ./Helmholtz_projection.x \
     --tolerance 1e-18 \
     --Tikhov_Laplace 1
 
-echo "\n\n FINE HELMHOLTZ UiUk \n\n"
-mpirun -np ${SLURM_NTASKS} ./Helmholtz_projection_uiuj.x \
-    --input_file ../velocity_sample.nc \
-    --seed_file ./seed_uiuj.nc \
-    --output_file projection_uiuj.nc \
-    --max_iterations 5e3 \
-    --tolerance 1e-18 \
-    --Tikhov_Laplace 0.2
 
 
 ###

@@ -24,7 +24,7 @@ This tutorial includes:
 
 Note: After step 1, all of the subsequent steps are included in `submit_all_Helmholtz_steps.sh`
 
-1. Compile `Case_Files/Helmholtz_projection.x`, `Case_Files/Helmholtz_projection_uiuj.x`, `Case_Files/coarsen_grid.x`, `Case_Files/refine_Helmholtz_seed.x` (see notes below) and copy into this directory.
+1. Compile `Case_Files/Helmholtz_projection.x`, `Case_Files/coarsen_grid_linear.x`, `Case_Files/refine_Helmholtz_seed.x` (see notes below) and copy into this directory.
 2. Create the sample dataset
 3. Create a coarsened grid version of the sample data
 4. Run the Helmholtz projection on the coarsen data
