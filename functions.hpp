@@ -492,12 +492,17 @@ class InputParser {
 
         const std::string getCmdOption(
                 const std::string &option,
-                const std::string &default_value = ""
+                const std::string &default_value = "",
+                const bool help = false
                 ) const;
 
         bool cmdOptionExists(const std::string &option) const;
 
-        void getFilterScales( std::vector<double> &filter_scales, const std::string &argname ) const;
+        void getFilterScales( 
+                std::vector<double> &filter_scales, 
+                const std::string &argname,
+                const bool help = false
+                ) const;
 
         void getListofStrings( std::vector<std::string> &list_of_strings, const std::string &argname ) const;
 

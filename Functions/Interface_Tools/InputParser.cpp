@@ -21,7 +21,8 @@ InputParser::InputParser (int &argc, char **argv){
 
 const std::string InputParser::getCmdOption(
         const std::string &option,
-        const std::string &default_value
+        const std::string &default_value,
+        const bool help
         ) const{
 
     int wRank=-1, wSize=-1;
@@ -30,34 +31,44 @@ const std::string InputParser::getCmdOption(
 
     std::vector<std::string>::const_iterator itr;
     itr = std::find(this->tokens.begin(), this->tokens.end(), option);
-    if (itr != this->tokens.end() && ++itr != this->tokens.end()){
+    if (help) {
+            fprintf(stdout, "   %s [ %s ]\n", option.c_str(), default_value.c_str());
+            return default_value;
+    } else {
+        if (itr != this->tokens.end() && ++itr != this->tokens.end()){
+            #if DEBUG >= 0
+            if (wRank == 0) {
+                fprintf(stdout, " Commandline flag \"%s\" got value \"%s\"\n", option.c_str(), itr->c_str());
+            }
+            #endif
+            return *itr;
+        }
         #if DEBUG >= 0
         if (wRank == 0) {
-            fprintf(stdout, " Commandline flag \"%s\" got value \"%s\"\n", option.c_str(), itr->c_str());
+            fprintf(stdout, " Commandline flag \"%s\" received no value - will use default \"%s\"\n", 
+                    option.c_str(), default_value.c_str());
         }
         #endif
-        return *itr;
+        return default_value;
     }
-    #if DEBUG >= 0
-    if (wRank == 0) {
-        fprintf(stdout, " Commandline flag \"%s\" received no value - will use default \"%s\"\n", 
-                option.c_str(), default_value.c_str());
-    }
-    #endif
-    return default_value;
 }
 
 bool InputParser::cmdOptionExists(const std::string &option) const{
     return ( std::find(this->tokens.begin(), this->tokens.end(), option)  !=  this->tokens.end() );
 }
 
-void InputParser::getFilterScales( std::vector<double> &filter_scales, const std::string &argname ) const{
+void InputParser::getFilterScales( 
+        std::vector<double> &filter_scales, 
+        const std::string &argname,
+        const bool help
+        ) const{
 
     int wRank=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
 
     //using namespace std;
-    const std::string string_of_scales = getCmdOption( argname, "" );
+    const std::string string_of_scales = getCmdOption( argname, " ", help );
+    if (help) { return; }
     assert( string_of_scales.size() > 0 );
 
     std::istringstream iss( string_of_scales );
