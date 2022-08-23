@@ -18,8 +18,22 @@ If the returned value is not "netCDF-4", then you can convert it by calling `ncc
 ### alglib::ap_error
 When running some of the alglib routines (interpolator, Helmholtz projections, etc), you may encounter the error message 
 "terminate called after throwing an instance of 'alglib::ap_error'".
-So far, this seems to come up as the result of NaN values. There are two main reasons
-that have caused this so far.
+So far, this seems to come up for two reasons
+1. not enough memory (a somewhat confusing form of memory error)
+2. as the result of NaN values. 
+
+#### Memory
+
+Running the Helmholtz interpolator on large grids can be expensize, and there appears to be more
+MPI memory overhead / inefficient splitting than expected [ hunting this down is a to-do ].
+Currents options are: use more memory ( may require more OpenMP threads ), or manually split
+the input files across time / depth and run the Helmholtz solver on the problems seperately.
+
+Aplogies for the inconvenience.
+
+#### NaNs
+
+There are two main reasons that have caused this so far.
 
 For the interpolator, this often means:
 1. The input fields (potential temparture, salinity, sea level anomaly) have different mask,
