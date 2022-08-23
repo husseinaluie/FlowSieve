@@ -63,7 +63,7 @@ void read_mask_from_file(
     int input_nc_format;
     retval = nc_inq_format( ncid, &input_nc_format );
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
-    //assert( input_nc_format == NC_FORMAT_NETCDF4 ); // input file must be netCDF-4 format
+    assert( input_nc_format == NC_FORMAT_NETCDF4 ); // input file must be netCDF-4 format. Use `nccopy -k netCDF-4 input.nc output.nc` to change file version
 
     char varname [str_len];
     snprintf(varname, str_len, var_name.c_str());

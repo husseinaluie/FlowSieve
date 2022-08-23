@@ -69,7 +69,20 @@ void read_var_from_file(
     int input_nc_format;
     retval = nc_inq_format( ncid, &input_nc_format );
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
-    //assert( input_nc_format == NC_FORMAT_NETCDF4 ); // input file must be netCDF-4 format
+    #if DEBUG >= 1
+    // NC_FORMAT_CLASSIC, NC_FORMAT_64BIT_OFFSET, NC_FORMAT_CDF5, NC_FORMAT_NETCDF4, NC_FORMAT_NETCDF4_CLASSIC
+    if (wRank == 0) {
+        fprintf( stdout, "Detected file format (%d) is ", input_nc_format );
+        if ( input_nc_format == NC_FORMAT_CLASSIC )         { fprintf( stdout, "NC_FORMAT_CLASSIC (%d)", NC_FORMAT_CLASSIC ); }
+        if ( input_nc_format == NC_FORMAT_64BIT_OFFSET )    { fprintf( stdout, "NC_FORMAT_64BIT_OFFSET (%d)", NC_FORMAT_64BIT_OFFSET ); }
+        if ( input_nc_format == NC_FORMAT_CDF5 )            { fprintf( stdout, "NC_FORMAT_CDF5 (%d)", NC_FORMAT_CDF5 ); }
+        if ( input_nc_format == NC_FORMAT_NETCDF4 )         { fprintf( stdout, "NC_FORMAT_NETCDF4 (%d)", NC_FORMAT_NETCDF4 ); }
+        if ( input_nc_format == NC_FORMAT_NETCDF4_CLASSIC ) { fprintf( stdout, "NC_FORMAT_NETCDF4_CLASSIC (%d)", NC_FORMAT_NETCDF4_CLASSIC ); }
+        fprintf( stdout, " \n" );
+        fflush(stdout);
+    }
+    #endif
+    assert( input_nc_format == NC_FORMAT_NETCDF4 ); // input file must be netCDF-4 format. Use `nccopy -k netCDF-4 input.nc output.nc` to change file version
 
     char varname [str_len];
     snprintf(varname, str_len, var_name.c_str());
