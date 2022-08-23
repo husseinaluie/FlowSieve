@@ -62,6 +62,9 @@ int main(int argc, char *argv[]) {
     const std::string &output_frequency_string = input.getCmdOption("--output_frequency", "3600");
     const double out_freq = stod(output_frequency_string);  // in seconds
 
+    const std::string &final_time_string = input.getCmdOption("--final_time", "-1");
+    const double final_time_input = stod(final_time_string);  // in seconds
+
     const std::string &particle_lifespan_string = input.getCmdOption("--particle_lifespan", "-1");
     const double particle_lifespan = stod(particle_lifespan_string);  // in seconds
 
@@ -107,9 +110,18 @@ int main(int argc, char *argv[]) {
     read_var_from_file(u_lon, zonal_vel_name, input_fname, &mask, NULL, NULL, 1, 1, false);
     read_var_from_file(u_lat, merid_vel_name, input_fname, &mask, NULL, NULL, 1, 1, false);
 
+    // 
+    const int Ntime = time.size();
+    if ( (final_time_input * time_scale_factor <= time.front()) and (Ntime == 1) ) {
+        assert(false);  // Since only one time point is given, need a final particle time specified
+                        // that is larger than the initial time
+    } else if ( ( final_time_input > 0 ) and (Ntime > 1) and ( final_time_input * time_scale_factor > time.back() ) ) {
+        assert(false); // Final time specified goes beyond provided data time
+    }
+
     // Set the output times
     const double start_time = time.front(),
-                 final_time = time.back();
+                 final_time = ( Ntime == 1 ) ? final_time_input * time_scale_factor : time.back();
     const size_t Nouts = std::max( (int) ( (final_time - start_time) / out_freq ), 2);
 
     #if DEBUG >= 1

@@ -102,8 +102,12 @@ void particles_evolve_trajectories(
             part_lon_hist.at(index) = lon0;
             part_lat_hist.at(index) = lat0;
 
-            time_p =    ( t_part             - time.at(ref_ind) ) 
-                      / ( time.at(ref_ind+1) - time.at(ref_ind) );
+            if (Ntime == 1) {
+                time_p = 0.;
+            } else {
+                time_p =    ( t_part             - time.at(ref_ind) ) 
+                          / ( time.at(ref_ind+1) - time.at(ref_ind) );
+            }
 
             particles_get_edges(left, right, bottom, top, lat0, lon0, lat, lon);
             for (size_t Ifield = 0; Ifield < fields_to_track.size(); ++Ifield) {
@@ -137,8 +141,12 @@ void particles_evolve_trajectories(
                 }
 
                 // Subset velocities by time
-                time_p =    ( t_part             - time.at(ref_ind) ) 
-                          / ( time.at(ref_ind+1) - time.at(ref_ind) );
+                if (Ntime == 1) {
+                    time_p = 0.;
+                } else {
+                    time_p =    ( t_part             - time.at(ref_ind) ) 
+                              / ( time.at(ref_ind+1) - time.at(ref_ind) );
+                }
 
                 //
                 //// Time-stepping is a simple first-order symplectic scheme
@@ -220,7 +228,14 @@ void particles_evolve_trajectories(
 
                 if ( (t_part >= target_times.back()) or (out_ind >= Nouts) ) { break; }
 
-                if (t_part > time.at(ref_ind+1)) { ref_ind++; }
+                if (Ntime > 1) {
+                    // If there's only one Ntime, then we're doing streamlines, not pathlines,
+                    // so don't need to advance time in velocity field
+                    //
+                    // Otherwise, check if we've stepped into the next 'time bin' in the velocity
+                    // field.
+                    if (t_part > time.at(ref_ind+1)) { ref_ind++; }
+                }
                 step_iter++;
             }
 

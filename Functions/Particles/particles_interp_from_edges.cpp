@@ -108,16 +108,26 @@ double particles_interp_from_edges(
         if ( mask.at(TL_pre_ind) ) { top_L_pre_val = field->at(TL_pre_ind); }
         if ( mask.at(TR_pre_ind) ) { top_R_pre_val = field->at(TR_pre_ind); }
 
-        if ( mask.at(TL_fut_ind) ) { top_L_fut_val = field->at(TL_fut_ind); }
-        if ( mask.at(TR_fut_ind) ) { top_R_fut_val = field->at(TR_fut_ind); }
+        if (Ntime > 1) {
+            if ( mask.at(TL_fut_ind) ) { top_L_fut_val = field->at(TL_fut_ind); }
+            if ( mask.at(TR_fut_ind) ) { top_R_fut_val = field->at(TR_fut_ind); }
+        } else {
+            top_L_fut_val = top_L_pre_val;
+            top_R_fut_val = top_R_pre_val;
+        }
     } 
 
     if (bottom >= 0) {
         if ( mask.at(BL_pre_ind) ) { bot_L_pre_val = field->at(BL_pre_ind); }
         if ( mask.at(BR_pre_ind) ) { bot_R_pre_val = field->at(BR_pre_ind); }
 
-        if ( mask.at(BL_fut_ind) ) { bot_L_fut_val = field->at(BL_fut_ind); }
-        if ( mask.at(BR_fut_ind) ) { bot_R_fut_val = field->at(BR_fut_ind); }
+        if (Ntime > 1) {
+            if ( mask.at(BL_fut_ind) ) { bot_L_fut_val = field->at(BL_fut_ind); }
+            if ( mask.at(BR_fut_ind) ) { bot_R_fut_val = field->at(BR_fut_ind); }
+        } else {
+            bot_L_fut_val = bot_L_pre_val;
+            bot_R_fut_val = bot_R_pre_val;
+        }
     }
 
     // Do the interpolation in time
