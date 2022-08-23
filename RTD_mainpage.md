@@ -146,7 +146,7 @@ See the function map for [filtering] to get an overview of the function dependen
 
 ## Licence
 
-This is a brief human-readable summary of the ODC-BY 1.0 license, and is not the actual licence. 
+This is a brief human-readable summary of the OSL-3.0 license, and is not the actual licence. 
 See `licence.md` for the full licence details.
 
 You are free:
