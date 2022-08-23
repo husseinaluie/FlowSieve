@@ -128,14 +128,12 @@ int main(int argc, char *argv[]) {
     #endif
     for (size_t field_ind = 0; field_ind < vars_to_filter.size(); field_ind++) {
         source_data.load_variable( vars_to_filter.at(field_ind), vars_to_filter.at(field_ind), input_fname, true, true, !one_snapshot );
-        fprintf( stdout, "Has size %'zu\n", source_data.variables.at( vars_to_filter.at(field_ind) ).size() );
     }
 
     // Get the MPI-local dimension sizes
     source_data.Ntime  = one_snapshot ? 1 : source_data.myCounts[0];
     source_data.Ndepth = one_snapshot ? 1 : source_data.myCounts[1];
     const size_t Npts = source_data.Ntime * source_data.Ndepth * source_data.Nlat * source_data.Nlon;
-    fprintf( stdout, "Total number of points: %'zu \n", Npts );
 
     const std::vector<int>  &myCounts = source_data.myCounts,
                             &myStarts = source_data.myStarts;
@@ -218,19 +216,13 @@ int main(int argc, char *argv[]) {
 
                     for (Itime = 0; Itime < Ntime; Itime++) {
                         for (Idepth = 0; Idepth < Ndepth; Idepth++) {
-                            //fprintf( stdout, "  I(time, depth, lat, lon) = (%d, %d, %d, %d) / (%d, %d, %d, %d)\n", 
-                            //        Itime, Idepth, Ilat, Ilon, 
-                            //        Ntime, Ndepth, Nlat, Nlon );
 
                             // Convert our four-index to a one-index
                             index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
-                            //fprintf( stdout, "      index = %'zu \n", index );
 
                             // Apply the filter at the point
-                            //fprintf( stdout, "      apply \n" );
                             apply_filter_at_point(  filter_values_ptrs, filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
                                                     LAT_lb, LAT_ub, scale, std::vector<bool>(Nvars,false), local_kernel );
-                            //fprintf( stdout, "      done \n" );
 
                             // Store the filtered values in the appropriate arrays
                             for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
