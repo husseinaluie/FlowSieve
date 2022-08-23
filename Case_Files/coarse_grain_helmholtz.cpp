@@ -57,41 +57,48 @@ int main(int argc, char *argv[]) {
         if (wRank == 0) { print_compile_info(NULL); } 
         return 0;
     }
+    const bool asked_help = input.cmdOptionExists("--help");
+    if (asked_help) {
+        fprintf( stdout, "The command-line input arguments [and default values] are:\n" );
+    }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    //const std::string   &tor_input_fname   = input.getCmdOption("--toroidal_input_file",        "toroidal_projection.nc"),
-    //                    &pot_input_fname   = input.getCmdOption("--potential_input_file",       "potential_projection.nc"),
-    const std::string   &Helm_input_fname  = input.getCmdOption("--Helmholtz_input_file",       "Helmholtz_projection.nc"),
-                        &vel_input_fname   = input.getCmdOption("--velocity_input_file",        "toroidal_projection.nc"),
-                        &quad_input_fname  = input.getCmdOption("--uiuj_Helmholtz_input_file",  "helmholtz_projection_uiuj.nc");
+    const std::string   &Helm_input_fname  = input.getCmdOption("--Helmholtz_input_file",       "Helmholtz_projection.nc",      asked_help),
+                        &vel_input_fname   = input.getCmdOption("--velocity_input_file",        "vels.nc",                      asked_help),
+                        &wind_input_fname  = input.getCmdOption("--wind_tau_input_file",        "wind_tau_projection.nc",       asked_help),
+                        &quad_input_fname  = input.getCmdOption("--uiuj_Helmholtz_input_file",  "helmholtz_projection_uiuj.nc", asked_help);
 
-    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
-                        &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
-                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude"),
-                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time",       asked_help),
+                        &depth_dim_name     = input.getCmdOption("--depth",       "depth",      asked_help),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude",   asked_help),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude",  asked_help);
 
-    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true");
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true", asked_help);
 
-    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1"),
-                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1", asked_help),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1", asked_help);
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
-    const std::string   &tor_field_var_name     = input.getCmdOption("--tor_field",     "Psi"),
-                        &pot_field_var_name     = input.getCmdOption("--pot_field",     "Phi"),
-                        &vel_field_var_name     = input.getCmdOption("--vel_field",     "u_lat"),
-                        &uiuj_F_r_var_name      = input.getCmdOption("--uiuj_F_r",      "uiuj_F_r"),
-                        &uiuj_F_Phi_var_name    = input.getCmdOption("--uiuj_F_Phi",    "uiuj_F_Phi"),
-                        &uiuj_F_Psi_var_name    = input.getCmdOption("--uiuj_F_Psi",    "uiuj_F_Psi");
+    const std::string   &tor_field_var_name     = input.getCmdOption("--tor_field",     "Psi",          asked_help),
+                        &pot_field_var_name     = input.getCmdOption("--pot_field",     "Phi",          asked_help),
+                        &vel_field_var_name     = input.getCmdOption("--vel_field",     "u_lat",        asked_help),
+                        &wind_tau_Psi_var_name  = input.getCmdOption("--wind_tau_Psi",  "wind_tau_Psi", asked_help),
+                        &wind_tau_Phi_var_name  = input.getCmdOption("--wind_tau_Phi",  "wind_tau_Phi", asked_help),
+                        &uiuj_F_r_var_name      = input.getCmdOption("--uiuj_F_r",      "uiuj_F_r",     asked_help),
+                        &uiuj_F_Phi_var_name    = input.getCmdOption("--uiuj_F_Phi",    "uiuj_F_Phi",   asked_help),
+                        &uiuj_F_Psi_var_name    = input.getCmdOption("--uiuj_F_Psi",    "uiuj_F_Psi",   asked_help);
 
-    const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    "region_definitions.nc"),
-                        &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     "region"),
-                        &region_defs_var_name = input.getCmdOption("--region_definitions_var",     "region_definition");
+    const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    "region_definitions.nc", asked_help),
+                        &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     "region",                asked_help),
+                        &region_defs_var_name = input.getCmdOption("--region_definitions_var",     "region_definition",     asked_help);
 
     // Also read in the filter scales from the commandline
     //   e.g. --filter_scales "10.e3 150.76e3 1000e3" (units are in metres)
     std::vector<double> filter_scales;
-    input.getFilterScales( filter_scales, "--filter_scales" );
+    input.getFilterScales( filter_scales, "--filter_scales", asked_help );
+
+    if (asked_help) { return 0; }
 
     // Print processor assignments
     const int max_threads = omp_get_max_threads();
@@ -135,6 +142,11 @@ int main(int argc, char *argv[]) {
         source_data.load_variable( "uiuj_F_r",      uiuj_F_r_var_name,      quad_input_fname, false, true );
         source_data.load_variable( "uiuj_F_Phi",    uiuj_F_Phi_var_name,    quad_input_fname, false, true );
         source_data.load_variable( "uiuj_F_Psi",    uiuj_F_Psi_var_name,    quad_input_fname, false, true );
+    }
+
+    if ( constants::COMP_WIND_FORCE ) {
+        source_data.load_variable( "wind_tau_Psi", wind_tau_Psi_var_name, wind_input_fname, false, true );
+        source_data.load_variable( "wind_tau_Phi", wind_tau_Phi_var_name, wind_input_fname, false, true );
     }
 
     // Get the MPI-local dimension sizes
