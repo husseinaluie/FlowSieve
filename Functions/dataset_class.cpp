@@ -32,7 +32,10 @@ void dataset::load_depth( const std::string dim_name, const std::string filename
         #if DEBUG >= 1
         int wRank=-1;
         MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
-        if (wRank == 0) { fprintf(stdout, "Depth dimension DNE, so setting as singleton.\n"); }
+        if (wRank == 0) { 
+            fprintf(stdout, "Depth dimension DNE, so setting as singleton.\n\n");
+            fflush( stdout );
+        }
         #endif
     } else {
         read_var_from_file(depth, dim_name, filename);
