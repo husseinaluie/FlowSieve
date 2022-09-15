@@ -55,8 +55,8 @@ This is not a restriction of the coarse-graining methodology, however, and futur
 # State of the Field
 
 Coarse-graining is being increasingly used as an analytical method in oceanographic communities. While coarse-graining is similar to blurring / convolutions in image-processing, for which many software packages exist, those tools do not readily apply to oceanographic contexts: they often rely on uniform, rectangular, Cartesian grids, which typically do not apply in Global Climate Model (GCM) data.
-An established package in the fied, GCM-Filters (@Grooms2021), is designed to work on GCM data and grids. It uses a diffusion-type coarse-graining method that is made available to users through python utilities.
-Another approach applies structure functions to Lagrangian trajectories to extract spectral diagnostics, such as power spectra and inter-scale energy transfers (@Balwada2022).
+An established package in the fied, GCM-Filters (@Grooms2021, @Loose2022), is designed to work on GCM data and grids. It uses a diffusion-type coarse-graining method that is made available to users through python utilities.
+Another approach applies structure functions to Lagrangian trajectories to extract spectral diagnostics, such as power spectra and inter-scale energy transfers (@Frisch1995, @Balwada2022).
 
 The unique contributions of `FlowSieve` to the field are: follows the rigorous underlying mathematical framework to preserve physical properties of the data, designed for use on full spherical geometries, and can apply any arbitrary filtering scale spanning from sub-grid to domain-size.
 
