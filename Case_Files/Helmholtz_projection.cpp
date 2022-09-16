@@ -47,43 +47,49 @@ int main(int argc, char *argv[]) {
         if (wRank == 0) { print_compile_info(NULL); } 
         return 0;
     }
+    const bool asked_help = input.cmdOptionExists("--help");
+    if (asked_help) {
+        fprintf( stdout, "The command-line input arguments [and default values] are:\n" );
+    }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string   &input_fname      = input.getCmdOption("--input_file",      "input.nc"),
-                        &output_fname     = input.getCmdOption("--output_file",     "projection_Helmholtz.nc"),
-                        &seed_fname       = input.getCmdOption("--seed_file",       "seed.nc");
+    const std::string   &input_fname      = input.getCmdOption("--input_file",      "input.nc",                 asked_help),
+                        &output_fname     = input.getCmdOption("--output_file",     "projection_Helmholtz.nc",  asked_help),
+                        &seed_fname       = input.getCmdOption("--seed_file",       "seed.nc",                  asked_help);
 
-    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
-                        &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
-                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude"),
-                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time",       asked_help),
+                        &depth_dim_name     = input.getCmdOption("--depth",       "depth",      asked_help),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude",   asked_help),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude",  asked_help);
 
-    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true");
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true", asked_help);
 
-    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1"),
-                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1", asked_help),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1", asked_help);
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
-    const std::string   &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo"),
-                        &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo"),
-                        &tor_seed_name     = input.getCmdOption("--tor_seed",    "Psi_seed"),
-                        &pot_seed_name     = input.getCmdOption("--pot_seed",    "Phi_seed");
+    const std::string   &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo",          asked_help),
+                        &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo",          asked_help),
+                        &tor_seed_name     = input.getCmdOption("--tor_seed",    "Psi_seed",    asked_help),
+                        &pot_seed_name     = input.getCmdOption("--pot_seed",    "Phi_seed",    asked_help);
 
-    const std::string &tolerance_string = input.getCmdOption("--tolerance", "5e-3");
+    const std::string &tolerance_string = input.getCmdOption("--tolerance", "5e-3", asked_help);
     const double tolerance = stod(tolerance_string);  
 
-    const std::string &iteration_string = input.getCmdOption("--max_iterations", "100000");
+    const std::string &iteration_string = input.getCmdOption("--max_iterations", "100000", asked_help);
     const int max_iterations = stod(iteration_string);  
 
-    const std::string &Tikhov_Lap_string = input.getCmdOption("--Tikhov_Laplace", "1.");
+    const std::string &Tikhov_Lap_string = input.getCmdOption("--Tikhov_Laplace", "1.", asked_help);
     const double Tikhov_Laplace = stod(Tikhov_Lap_string);  
 
-    const std::string &use_mask_string = input.getCmdOption("--use_mask", "false");
+    const std::string &use_mask_string = input.getCmdOption("--use_mask", "false", asked_help);
     const bool use_mask = string_to_bool(use_mask_string);
 
-    const std::string &use_area_weight_string = input.getCmdOption("--use_area_weight", "true");
+    const std::string &use_area_weight_string = input.getCmdOption("--use_area_weight", "true", asked_help);
     const bool use_area_weight = string_to_bool(use_area_weight_string);
+
+    if (asked_help) { return 0; }
 
     // Print processor assignments
     const int max_threads = omp_get_max_threads();
@@ -174,16 +180,17 @@ int main(int argc, char *argv[]) {
     std::vector<double> Psi_seed, Phi_seed;
     if (seed_fname == "zero") {
         seed_count = 1.;
+        single_seed = (seed_count == 1);
         Psi_seed.resize( source_data.Nlat * source_data.Nlon, 0.);
         Phi_seed.resize( source_data.Nlat * source_data.Nlon, 0.);
     } else {
         read_attr_from_file(seed_count, "seed_count", seed_fname);
         const int Nprocs_in_time  = source_data.Nprocs_in_time,
                   Nprocs_in_depth = source_data.Nprocs_in_depth;
-        read_var_from_file( Psi_seed, tor_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed));
-        read_var_from_file( Phi_seed, pot_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed));
+        single_seed = (seed_count == 1);
+        read_var_from_file( Psi_seed, tor_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed) );
+        read_var_from_file( Phi_seed, pot_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed) );
     }
-    single_seed = (seed_count == 1);
 
     // Apply to projection routine
     Apply_Helmholtz_Projection( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
