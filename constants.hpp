@@ -3,7 +3,15 @@
 
 #include <map>
 
-// Default debug value
+/*!
+ * \param DEBUG
+ * \brief Compile-time debug setting, specified in Makefile
+ *
+ * This is an integer than generally controls how much is printed
+ * during run-time. Higher values mean more print statements.
+ *
+ * @ingroup constants
+ */
 #ifndef DEBUG
     #define DEBUG 1
 #endif
@@ -364,9 +372,39 @@ namespace constants
         { "coarse_vel_div",     "1 / s" }
     };
 
+
+    /*!
+     * \param spatial_average_description
+     * \brief Human-friendly text that is added to all region-average variables in postprocessing outputs
+     *
+     * @ingroup constants
+     */
     const std::string spatial_average_description       = "The lat/lon average computed over each defined region (see region dimension).";
+
+    /*!
+     * \param zonal_average_description
+     * \brief Human-friendly text that is added to all zonal-average variables in postprocessing outputs
+     *
+     * @ingroup constants
+     */
     const std::string zonal_average_description         = "The zonal (longitudinal) average computed at each latitude.";
+
+    /*!
+     * \param time_average_description
+     * \brief Human-friendly text that is added to all time-average variables in postprocessing outputs
+     *
+     * @ingroup constants
+     */
     const std::string time_average_description          = "Time average over the entire provided dataset.";
+
+    /*!
+     * \param OkuboWeiss_average_description
+     * \brief Human-friendly text that is added to all OkuboWeiss-average variables in postprocessing outputs
+     *
+     * i.e. for variables that are averaged over OkuboWeiss bins / histograms
+     *
+     * @ingroup constants
+     */
     const std::string OkuboWeiss_average_description    = "Variable binned by Okubo-Weiss parameter (i.e. histogram). "
                                                           "Values in OkuboWeiss dimension indicate the lower bound of each bin.";
 

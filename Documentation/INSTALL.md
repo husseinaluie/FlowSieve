@@ -1,18 +1,25 @@
-[TOC]
-\page install1
+# Installing {#install1}
 
-# Installing
+\brief A guide to installing and compiling FlowSieve.
+
+# Installation
+[TOC]
+
+---
 
 ## Initial (one-time) set-up
 
-You will need to create a `system.mk` file in the main code directory that specifies the compilers and provides the compiler flags needed to link to the appropriate libraries.
+First, you will need to copy the FlowSieve source files onto your HPC system.
+The source files are available through git (https://github.com/husseinaluie/FlowSieve), allowing you to directly copy/fork the repository, or download a zipped version.
 
-Some system files are already provided in the `Systems` directory for a few computing environments.
+### System File
+
+Next, you will need to create a `system.mk` file in the main code directory that specifies the compilers and provides the compiler flags needed to link to the appropriate libraries.
+
+Some system files are already provided in the `Systems` directory for a few computing environments, and may be a helpful reference.
 Where appropraite, they specify which modules are needed to compile and run the code (note: these modules need to be loaded both when you compile the code and also when you run the code).
 
 If you create a system file for a computing environment that was not previously included, please consider submitting it to the repository so that others can benefit from it.
-
-### System File
 
 The `Systems` directory contains a few sample system files. To prepare a system file for your machine, there are a few steps.
 1. Copy the most appropraite system file from `Systems` to `system.mk` into the main directory.
@@ -21,11 +28,13 @@ The `Systems` directory contains a few sample system files. To prepare a system 
 4. EXTRA_OPT_FLAGS: this is for other optimizations that you may not want on by default. For example, `-ip -ipo` for intel compilers.
 5. Depending on how your libraries are set up, you may need to add various library and include directories to `LIB_DIRS` and `INC_DIRS`
 
+If you are unsure of how to make an appropriate `system.mk` file, please feel free to contact the FlowSieve developers for support.
+
 # Compiling
 
 A makefile is included to simplify compiling. 
 As a first test of your install, try `make clean; make Case_Files/coarse_grain.x`.
-If the executable compiles successfully, then a good next step is to check out the [tutorials that are provided](../Tutorial/TUTORIAL.md) (\ref tutorials1) to familiarize yourself with the code usage.
+If the executable compiles successfully, then a good next step is to check out the [tutorials that are provided](\ref tutorials1) to familiarize yourself with the code usage.
 
 ## make arguments
 * `make clean`
@@ -41,5 +50,5 @@ If the executable compiles successfully, then a good next step is to check out t
 
 ## ALGLIB
 
-Some of the executables (such as interpolator.x, toroidal_projection.x, and potential_projection.x) require the use of a third-party library, ALGLIB.
-To compile this library, simply call `make ALGLIB` (should only need to be done once, unless you call `make hardclean`).
+Some of the executables (such as interpolator.x and helmholtz_projection.x) require the use of a third-party library, [ALGLIB](https://www.alglib.net).
+To compile this library, simply call `make ALGLIB` (should only need to be done once, unless you call `make hardclean`, change system libraries, etc.).

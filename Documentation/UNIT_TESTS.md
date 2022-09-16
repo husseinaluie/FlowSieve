@@ -1,5 +1,9 @@
+# Unit Tests {#unittests1}
+
+# Unit Testing
 [TOC]
-# Unit Tests
+
+---
 
 ## Spherical Differentiation
 
@@ -95,6 +99,8 @@ Mean convergence rates: (lon, lat) = (-5.75, -5.02)
       ( 011    -32.09  -3.76 )  :      ( 011    -37.81  1.3 )
       ( 012    -35.85  -3.76 )  :      ( 012    -36.5  1.3 )
 ```
+
+---
 
 ## Vorticity
 

@@ -6,7 +6,7 @@ try:
 except:
     from scipy.special import factorial
 
-## FiniteDiff computes FD matrices
+# FiniteDiff computes FD matrices
 ## ------
 ## Dr = FiniteDiff(x, Nx, kwargs)
 ## ------

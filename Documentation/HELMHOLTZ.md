@@ -1,5 +1,7 @@
-\page helmholtz1
-# Helmholtz Decomposition
+# Helmholtz Decomposition {#helmholtz1}
+
+# Helmholtz Routines {#helmholtz1-0}
+[TOC]
 
 ---
 
@@ -10,7 +12,7 @@ This is done using a sparse least-squares solver using the ALGLIB library.
 The main variables controlling the convergence are the maximum number of iterations and the target relative tolerance.
 If the maximum number of iterations are reach, or if the error goes below the tolerance, the solver halts and outputs the computed terms.
 
-## Decomposing High Resolution Velocities
+## Decomposing High Resolution Velocities {#helmholtz1-1}
 
 In the case of high-resolution velocities, two logistical concerns arise.
 1. Memory: the least-squares systems scales like N^2, so if you double the number of points in each horizontal dimension, the problem becomes 16 times larger.

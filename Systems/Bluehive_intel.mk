@@ -7,8 +7,8 @@
 #  intel/2019.5      
 
 # Specify compilers
-CXX     ?= icc
-MPICXX  ?= mpicxx
+CXX     := icc
+MPICXX  := mpicxx
 
 # Linking flags for netcdf
 LINKS:=-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl -qopenmp -lm

@@ -52,6 +52,11 @@ int main(int argc, char *argv[]) {
             "You must either change NO_FULL_OUTPUTS to false, "
             "or MINIMAL_OUTPUT to true.\n" 
             "Please update constants.hpp accordingly.");
+    
+    // Cannot extend to poles AND be Cartesian
+    static_assert( not( (constants::EXTEND_DOMAIN_TO_POLES) and (constants::CARTESIAN) ),
+            "Cartesian implies that there are no poles, so cannot extend to poles."
+            "Please update constants.hpp accordingly.");
 
     // Enable all floating point exceptions but FE_INEXACT and FE_UNDERFLOW
     //      for reasons that I do not understand, FE_ALL_EXCEPT is __NOT__ equal

@@ -7,9 +7,10 @@
 #include "../differentiation_tools.hpp"
 
 /*!
- * \brief Compute the energy transfer through the current filter scale
+ * \brief Compute the enstrophy transfer through the current filter scale
  *
- * In particular, computes \$ \rho_0 * ( u_i \tau_{ij,j} - (u_i \tau_{ij})_{,j}  ) \$
+ * In particular, computes \f$ \rho_0 * ( \omega \tau_{j,j} - (\omega \tau_{j})_{,j}  ) \f$
+ * where \f$ \tau_{j} = \overline{\omega u_j} - \overline{\omega}\, \overline{u_j} \f$
  * 
  * This computation is applied to the Cartesian velocity components
  *

@@ -1,25 +1,20 @@
-[TOC]
-\page tutorials1
+# Tutorials {#tutorials1}
 
-# Tutorials
+# FlowSieve Tutorials
+[TOC]
+
+---
 
 ## Basic
 
 Introduces the basic workings on a sample dataset.
 Nothing fancy, but introduces the basics of running the code and plotting some of the results.
 
-Tutorial [details are here](./Basic/ABOUT_TUTORIAL) (\ref tutorials2).
+Tutorial [details are here](\ref tutorials2).
 
 ## Spherical Demo
 
-### Post-processing
+This tutorial works through the various steps involved in working with spherical data.
+There are three components, that go through Helmholtz decomposition, filtering, and using on-line post-processing tools.
 
-This tutorial shows you how to use post-processing result to generate filtering spectra of different fields.
-
-Tutorial [details are here](./Spherical_Demo/Postprocessing/ABOUT_TUTORIAL) (\ref tutorials2).
-
-### Helmholtz Decomposition
-
-This tutorial shows you how to use the Helmholtz projection rouines and then apply the Helmholtz-specific coarse graining routines.
-
-Tutorial [details are here](./Spherical_Demo/Helmholtz/ABOUT_TUTORIAL) (\ref tutorials3).
+The tutorial [details are here](\ref tutorials3).

@@ -490,20 +490,34 @@ class InputParser {
     public:
         InputParser (int &argc, char **argv);
 
+        /*!
+         *  If command-line option <option> was passed at run-time, return the value, otherwise return the default
+         */
         const std::string getCmdOption(
                 const std::string &option,
                 const std::string &default_value = "",
                 const bool help = false
                 ) const;
 
+        /*!
+         *  Check if command-line option <option> was passed at run-time
+         */
         bool cmdOptionExists(const std::string &option) const;
 
+        /*!
+         *  Extract, parse, and format, the string of filter scales that was provided at run-time.
+         *  Assumes a string of space-delimited numbers (e.g. "1.3e3 2.4e5 8.9e9")
+         */
         void getFilterScales( 
                 std::vector<double> &filter_scales, 
                 const std::string &argname,
                 const bool help = false
                 ) const;
 
+        /*!
+         *  Extract, parse, and format, a list of strings. This is typically a list of variable names.
+         *  Assumes a string of space-delimited strings (e.g. "rho u v")
+         */
         void getListofStrings( std::vector<std::string> &list_of_strings, const std::string &argname ) const;
 
     private:

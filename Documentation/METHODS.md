@@ -1,14 +1,17 @@
+# Methods {#methods1}
+
+\brief A review of the computational methodologies (warning: math content).
+
+# FlowSieve Methods {#methods1-0}
 [TOC]
-\page methods1
-# Methods
 
-This file will outline some of the computational methodologies.
+---
 
-## Coarse-Grain Filtering
+## Coarse-Grain Filtering {#method1-1}
 
 ### Region Selection for Filtering
 
-Suppose that we are computing the filter at longitude \f$\lambda_0\f$ and latitude \f$\varphi_0\f$ (at indices \f$I_{\lambda_0}\f$ and \f$I_{\varphi_0}\f$ respectively) over length scale \f$L\f$. 
+Suppose that we are computing the filter at longitude \f$\lambda_0\f$ and latitude \f$\varphi_0\f$ (at indices \f$I_{\lambda_0}\f$ and \f$I_{\varphi_0}\f$ respectively) over length scale \f$\ell\f$. 
 Let \f$R_E\f$ be the mean radius of the earth (in metres). 
 
 The integral is performed as a double for-loop, with the outer loop going through latitude and the inner loop going through longitude.
@@ -20,33 +23,47 @@ This is implemented in **Functions/get_lat_bounds.cpp**
 
 ##### Uniform grid spacing
 
-Suppose that we have uniform (spherical) grid spacing \f$\Delta\varphi\f$. 
+Suppose that we have uniform (spherical) grid spacing \f$\Delta\phi\f$. 
 
-The spacing between latitude bands, in *metres*, is then \f$\Delta\varphi_m=\Delta\varphi R_E\f$.
-The number of points that we'll include in either latitude side is then \f$\Delta\phi_N=\mathrm{ceil}\left( L^{pad} (L/2) / \Delta\phi_m\right)\f$
-The scale factor \f$L^{pad}\f$ is a user-specified scaling to indicate how large of an integration region should be used. This is specified as *KernPad* in constants.hpp.
+The spacing between latitude bands, in *metres*, is then \f$\Delta\phi_m=\Delta\phi R_E\f$.
+The number of points that we'll include in either latitude side is then 
+\f[\Delta\phi_N=\mathrm{ceil}\left( L^{pad} (\ell/2) / \Delta\phi_m\right).\f]
 
-The outer loop in the integral is then from \f$I_{\varphi_0} - \Delta\varphi_N\f$ to \f$I_{\varphi_0}+\Delta\varphi_N\f$.
+The outer loop in the integral is then from \f$I_{\phi_0} - \Delta\phi_N\f$ to \f$I_{\phi_0}+\Delta\phi_N\f$.
 
 ##### Non-uniform grid spacing
 
 In this event, we simply use a binary search routine to search the (logical) interval 
-\f$ [0, I_{\varphi_0}-1 ] \f$ for the point whose distance from the reference point is nearest to, but not less than, \f$ L^{pad} L/2  \f$
+\f$ [0, I_{\phi_0}-1 ] \f$ for the point whose distance from the reference point is nearest to, but not less than, \f$ L^{pad} \ell/2  \f$, and similarly for the (logical) interval \f$ [I_{\phi_0}+1, N_{\phi}-1 ] \f$ 
+
+Note that implicitly assumes a mesh grid (i.e. that the latitude grid is independent of longitude).
 
 #### Restricting the longitudinal (inner) loop
 
 This is implemented in **Functions/get_lon_bounds.cpp**
 
-*The currently implementation requires the longitudinal grid to be uniform.*
+*The current implementation requires the longitudinal grid to be uniform.*
 
 Suppose that we have uniform (spherical) grid spacing \f$\Delta\lambda\f$. 
 
-Next, at each latitude \f$\varphi\f$ within that loop, the same process is applied to compute the bounds for the longitude loop, with
-the spacing between longitude band, in *metres*, given by \f$\Delta\lambda_m=\Delta\lambda R_E \cos(\varphi)\f$.
+Next, at each latitude \f$\phi\f$ within that loop, the same process is applied to compute the bounds for the longitude loop, with
+the spacing between longitude band, in *metres*, given by \f$\Delta\lambda_m=\Delta\lambda R_E \cos(\phi)\f$.
 
-An identical equation is then used to compute \f$ \Delta\lambda_N \f$, which then gives the width of the integration region (in logical indexing) at that specific latitude.
+An equation identical to the one for \f$ \Delta\phi_N \f$ is then used to compute \f$ \Delta\lambda_N \f$, which then gives the width of the integration region (in logical indexing) at that specific latitude.
+
+#### Kernel Padding Factor (Lpad)
+
+The scale factor \f$L^{pad}\f$ is a user-specified scaling to indicate how large of an integration region should be used. 
+This is specified as *KernPad* in constants.hpp.
+That is, the numerical integration to compute the local coarse-grained value only includes points within a distance of \f$ L^{pad}\ell \f$ (in metres) from the target spatial point, so that \f$ L^{pad}=1 \f$ indicates that the integration area has a diameter of exactly \f$ \ell \f$. 
+This is implemented in the functions get_lon_bounds and get_lat_bounds, which determine the physical and logical integration bounds for a given point and filter scale.
+
+---
 
 ## Evolution of Kinetic Energy of Filter Velocities
+
+For details regarding the derivation of these quantities, please see the following publications.
+* Aluie, Hussein, Matthew Hecht, and Geoffrey K. Vallis. "Mapping the energy cascade in the North Atlantic Ocean: The coarse-graining approach." Journal of Physical Oceanography 48.2 (2018): 225-244: (https://doi.org/10.1175/JPO-D-17-0100.1)
 
 \f[
 \frac{\partial}{\partial t}\left( \frac{\rho_0}{2}\left| \overline{\vec{u}} \right|^2 \right)
@@ -113,29 +130,7 @@ Not implemented.
 \right)
 \f}
 
-
-## Baroclinic Energy Transfer
-
-
-\f[
-\Lambda^m = \frac{\overline{\mathbf{\omega}}\cdot \left( \nabla \overline{\rho} \times \nabla \overline{p} \right)}{\overline{\rho}}
-\f]
-
-Unit-wise, this gives 
-\f[ 
-\left[\omega \right]=\frac{1}{\mathrm{s}}, \qquad
-\left[\nabla \right]= \frac{1}{\mathrm{m}} , \qquad
-\left[ p \right]=\left[g\rho z\right] =  \frac{\mathrm{kg}}{\mathrm{m}\cdot\mathrm{s}^2} , \qquad
-\left[ W \right] = \frac{\mathrm{kg}\cdot\mathrm{m}^2}{\mathrm{s}^3}, \qquad
-\Rightarrow \qquad
-\left[ \Lambda^m \right] = \frac{\mathrm{W}}{\mathrm{m}^5} 
-\f]
-
-In the case that \f$ \vec{\omega}=\left(\omega_r,0,0\right) \f$, then this reduces to
-\f[
-\Lambda^m = \frac{\overline{\omega_r}}{\overline{\rho}r^2\cos(\phi)}\left( \partial_{\lambda}\overline{\rho}\partial_{\phi}\overline{p} - \partial_{\phi}\overline{\rho}\partial_{\lambda}\overline{p} \right)
-\f]
-
+---
 
 ## Differentiation
 
@@ -205,6 +200,8 @@ then \f$ \partial/\partial r\equiv0  \f$, so this reduced down to
 [spher-deriv]: @ref spher_derivative_at_point "spherical derivatives"
 [cart-deriv]: @ref Cart_derivative_at_point "Cartesian derivatives"
 
+---
+
 ## Parallelization
 
 This section outlines some of the parallelizations that are used.
@@ -263,7 +260,7 @@ There is a price to pay with scheduling, particularly since we can't use static 
 
 ### Functions
 
-The following functions occur *within* a time/depth `for` loop, and so do not use OpenMPI reoutines.
+The following functions occur *within* a time/depth `for` loop, and so do not use OpenMPI routines.
 * apply_filter_at_point
 * apply_filter_at_point_for_quadratics
 

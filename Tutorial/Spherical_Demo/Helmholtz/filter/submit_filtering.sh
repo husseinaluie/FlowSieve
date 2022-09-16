@@ -25,15 +25,3 @@ mpirun -n ${SLURM_NTASKS} ./coarse_grain_helmholtz.x \
         --vel_field uo \
         --filter_scales "${FILTER_SCALES}"
 
-#mpirun -n ${SLURM_NTASKS} ./coarse_grain_helmholtz.x \
-#        --toroidal_input_file ../project/projection_ui.nc \
-#        --potential_input_file ../project/projection_ui.nc \
-#        --tor_field Psi \
-#        --pot_field Phi \
-#        --velocity_input_file ../velocity_sample.nc \
-#        --uiuj_Helmholtz_input_file ../project/projection_uiuj.nc \
-#        --uiuj_F_r v_r \
-#        --uiuj_F_lon v_lon \
-#        --uiuj_F_lat v_lat \
-#        --vel_field uo \
-#        --filter_scales "${FILTER_SCALES}"

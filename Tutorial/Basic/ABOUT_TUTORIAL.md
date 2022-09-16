@@ -1,7 +1,11 @@
-[TOC]
-\page tutorials2
+# Basic Tutorial {#tutorials2}
 
-This tutorial shows the basic functionality of the coarse-graining codebase.
+\brief This tutorial shows the basic functionality of the coarse-graining codebase.
+
+# Tutorial
+[TOC]
+
+---
 
 It includes:
 - a python script to generate a sample dataset: `generate_data.py`

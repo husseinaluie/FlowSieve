@@ -7,7 +7,7 @@
 /*!
  * \brief Compute the energy transfer through the current filter scale
  *
- * In particular, computes \$ \rho_0 * ( u_i \tau_{ij,j} - (u_i \tau_{ij})_{,j}  ) \$
+ * In particular, computes \f$ \rho_0 * ( u_i \tau_{ij,j} - (u_i \tau_{ij})_{,j}  ) \f$
  * 
  * This computation is applied to the Cartesian velocity components
  *
