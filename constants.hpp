@@ -123,7 +123,7 @@ namespace constants
      * Note that this does NOT affect the shape of filtering kernels.
      * @ingroup constants
      */
-    const bool FILTER_OVER_LAND = false;
+    const bool FILTER_OVER_LAND = true;
 
     /*!
      * \param ZONAL_KERNEL_ONLY
@@ -222,6 +222,13 @@ namespace constants
     const bool COMP_BC_TRANSFERS = false;
 
     /*!
+     * \param COMP_WIND_FORCE
+     * \brief Boolean to indicate if wind forcing should be computing (requires supplying wind terms)
+     * @ingroup constants
+     */
+    const bool COMP_WIND_FORCE = false;
+
+    /*!
      * \param DO_OKUBOWEISS_ANALYSIS
      * \brief Boolean to indicate if post-processing should also bin by Okubo-Weiss
      * @ingroup constants
@@ -236,7 +243,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool MINIMAL_OUTPUT = false;
+    const bool MINIMAL_OUTPUT = true;
 
     /*! 
      * \param NO_FULL_OUTPUTS
@@ -249,7 +256,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool NO_FULL_OUTPUTS = false;
+    const bool NO_FULL_OUTPUTS = true;
 
     /*!
      * \param CAST_TO_SINGLE
@@ -281,7 +288,7 @@ namespace constants
      * \brief Boolean indicating whether or not the postprocess routines should be applied
      * @ingroup constants
      */
-    const bool APPLY_POSTPROCESS = false;
+    const bool APPLY_POSTPROCESS = true;
 
     /*!
      * \param POSTPROCESS_DO_ZONAL_MEANS
@@ -295,7 +302,7 @@ namespace constants
      * \brief Boolean indicating whether or not the postprocess routines should include time means (i.e. spatial maps)
      * @ingroup constants
      */
-    const bool POSTPROCESS_DO_TIME_MEANS = true;
+    const bool POSTPROCESS_DO_TIME_MEANS = false;
 
     /*!
      * \param KERNEL_OPT
