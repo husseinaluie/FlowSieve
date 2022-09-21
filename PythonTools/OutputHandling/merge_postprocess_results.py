@@ -14,6 +14,17 @@ parser.add_argument('--output_filename', metavar='output', type=str, nargs=1, re
 parser.add_argument('--print_level', metavar='debug', type=int, nargs=1, default = 0,
         help='String to indicate how much printing to do. Options are 0, 1, 2 [higher value means more printed].')
 
+# Pass --exclude_time to exclude time means
+parser.add_argument('--exclude_time', dest='copy_time_means', action='store_false',
+        help="Pass '--exclude_time' to have time means ignored when merging postprocessing files.")
+parser.set_defaults(copy_time_means=True)
+
+# Pass --exclude_OkuboWeiss to exclude OkuboWeiss histograms
+parser.add_argument('--exclude_OkuboWeiss', dest='copy_OkuboWeiss', action='store_false',
+        help="Pass '--exclude_OkuboWeiss' to have OkuboWeiss histograms ignored when merging postprocessing files.")
+parser.set_defaults(copy_OkuboWeiss=True)
+
+# Now actually parse in command-line flags
 args = parser.parse_args()
 
 if type(args.print_level) == type(0):
@@ -22,6 +33,15 @@ elif type(args.print_level) == type([0,]):
     print_level = args.print_level[0]
 
 print("Attempting to merge all files matching pattern {0} into output file {1}.".format( args.file_pattern[0], args.output_filename[0] ))
+
+DO_NOT_COPY_TIME_MEANS = not( args.copy_time_means )
+if DO_NOT_COPY_TIME_MEANS:
+    print("  Will not merge time means maps.")
+
+DO_NOT_COPY_OKUBOWEISS = not( args.copy_OkuboWeiss )
+if DO_NOT_COPY_OKUBOWEISS:
+    print("  Will not merge OkuboWeiss histograms.")
+
 
 
 ## First, find all files matching the requested pattern
@@ -64,11 +84,11 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
     with Dataset( all_fps[0], 'r' ) as dset:
         all_dims = dset.dimensions.copy()
         for dim in all_dims:
+            if ( (DO_NOT_COPY_OKUBOWEISS ) and ('OkuboWeiss' == dim) ):
+                continue
             if print_level >= 0:
                 print("  .. copying dimension " + dim, flush = True)
             dim_dim = out_fp.createDimension( dim, all_dims[dim].size )
-            #dim_var = out_fp.createVariable( dim, dtype_dim, (dim,) )
-            #dim_var[:] = Dataset( sorted_fps[0], 'r' )[dim][:]
 
     # Now loop through all previously-existing variables, and re-create them will an ell-dimension prepended.
     #   The iterate through all files and copy in the data to the new file.
@@ -77,6 +97,14 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
     with Dataset( all_fps[0], 'r' ) as dset:
         all_vars = dset.variables.copy()
         for varname in all_vars:
+
+            # Don't include time averages
+            if ( (DO_NOT_COPY_TIME_MEANS ) and ('time_average' in varname) ):
+                continue
+
+            # Don't include OkuboWeiss histograms
+            if ( (DO_NOT_COPY_OKUBOWEISS ) and ('OkuboWeiss' in varname) ):
+                continue
 
             # Extract the dimensions (in order) for varname
             var_dims = all_vars[varname].dimensions
@@ -109,6 +137,15 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
         print("  Copying variable data", flush = True)
     prog = 5
     for Ivar,varname in enumerate(all_vars):
+
+        # Don't include time averages
+        if ( (DO_NOT_COPY_TIME_MEANS ) and ('time_average' in varname) ):
+            continue
+
+        # Don't include OkuboWeiss histograms
+        if ( (DO_NOT_COPY_OKUBOWEISS ) and ('OkuboWeiss' in varname) ):
+            continue
+
         if print_level >= 2:
             print("  .. .. copying data for " + varname, flush = True)
         else:
