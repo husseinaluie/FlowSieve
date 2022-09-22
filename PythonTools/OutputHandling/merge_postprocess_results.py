@@ -15,14 +15,19 @@ parser.add_argument('--print_level', metavar='debug', type=int, nargs=1, default
         help='String to indicate how much printing to do. Options are 0, 1, 2 [higher value means more printed].')
 
 # Pass --exclude_time to exclude time means
-parser.add_argument('--exclude_time', dest='copy_time_means', action='store_false',
-        help="Pass '--exclude_time' to have time means ignored when merging postprocessing files.")
+parser.add_argument('--exclude_time_means', dest='copy_time_means', action='store_false',
+        help="Pass '--exclude_time_means' to have time means ignored when merging postprocessing files.")
 parser.set_defaults(copy_time_means=True)
 
 # Pass --exclude_OkuboWeiss to exclude OkuboWeiss histograms
 parser.add_argument('--exclude_OkuboWeiss', dest='copy_OkuboWeiss', action='store_false',
         help="Pass '--exclude_OkuboWeiss' to have OkuboWeiss histograms ignored when merging postprocessing files.")
 parser.set_defaults(copy_OkuboWeiss=True)
+
+# Pass --exclude_zonal_mean to exclude zonal means
+parser.add_argument('--exclude_zonal_means', dest='copy_zonal_means', action='store_false',
+        help="Pass '--exclude_zonal_means' to have zonal means ignored when merging postprocessing files.")
+parser.set_defaults(copy_zonal_means=True)
 
 # Now actually parse in command-line flags
 args = parser.parse_args()
@@ -41,6 +46,10 @@ if DO_NOT_COPY_TIME_MEANS:
 DO_NOT_COPY_OKUBOWEISS = not( args.copy_OkuboWeiss )
 if DO_NOT_COPY_OKUBOWEISS:
     print("  Will not merge OkuboWeiss histograms.")
+
+DO_NOT_COPY_ZONAL_MEANS = not( args.copy_zonal_means )
+if DO_NOT_COPY_ZONAL_MEANS:
+    print("  Will not merge zonal means.")
 
 
 
@@ -106,6 +115,10 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
             if ( (DO_NOT_COPY_OKUBOWEISS ) and ('OkuboWeiss' in varname) ):
                 continue
 
+            # Don't include time averages
+            if ( (DO_NOT_COPY_ZONAL_MEANS ) and ('zonal_average' in varname) ):
+                continue
+
             # Extract the dimensions (in order) for varname
             var_dims = all_vars[varname].dimensions
 
@@ -144,6 +157,10 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
 
         # Don't include OkuboWeiss histograms
         if ( (DO_NOT_COPY_OKUBOWEISS ) and ('OkuboWeiss' in varname) ):
+            continue
+
+        # Don't include time averages
+        if ( (DO_NOT_COPY_ZONAL_MEANS ) and ('zonal_average' in varname) ):
             continue
 
         if print_level >= 2:
