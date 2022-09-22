@@ -35,7 +35,7 @@ void mask_out_pole(
     size_t index;
     
     const double D2R = M_PI / 180.;
-    const double pole_cut = (90. - 0.1) * D2R;
+    const double pole_cut = (90. - 0.05) * D2R;
 
     std::vector<int> masked_latitudes;
 
