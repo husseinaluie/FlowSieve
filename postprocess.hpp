@@ -13,6 +13,7 @@ void Apply_Postprocess_Routines(
         const std::vector<std::string> & vars_to_process,
         const std::vector<double> & OkuboWeiss,
         const double filter_scale,
+        Timing_Records & timing_records,
         const std::string filename_base = "postprocess",
         const MPI_Comm comm = MPI_COMM_WORLD
         );

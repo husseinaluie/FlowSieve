@@ -15,6 +15,7 @@ void Apply_Postprocess_Routines(
         const std::vector<std::string> & vars_to_process,
         const std::vector<double> & OkuboWeiss,
         const double filter_scale,
+        Timing_Records & timing_records,
         const std::string filename_base,
         const MPI_Comm comm
         ) {
@@ -35,6 +36,9 @@ void Apply_Postprocess_Routines(
                 Ndepth = source_data.Ndepth,
                 Nlat   = source_data.Nlat,
                 Nlon   = source_data.Nlon;
+
+    // Timer clock variable
+    double clock_on;
 
     // Get full number of time points
     int full_Ntime;
@@ -108,17 +112,21 @@ void Apply_Postprocess_Routines(
         field_averages(num_fields, std::vector<double>(Ntime * Ndepth * num_regions, 0.)), 
         field_std_devs(num_fields, std::vector<double>(Ntime * Ndepth * num_regions, 0.));
 
+    if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
     compute_region_avg_and_std( field_averages, field_std_devs, source_data, postprocess_fields );
+    if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_area_means");  }
 
     #if DEBUG >= 1
     if (wRank == 0) { fprintf(stdout, "  .. writing region averages and deviations\n"); }
     fflush(stdout);
     #endif
 
+    if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
     write_region_avg_and_std(
             field_averages, field_std_devs, vars_to_process, filename,
             Stime, Sdepth, Ntime, Ndepth, num_regions, num_fields
             );
+    if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_writing");  }
 
     //
     //// Zonal averages and standard deviations
@@ -134,17 +142,21 @@ void Apply_Postprocess_Routines(
             zonal_averages(num_fields, std::vector<double>(Ntime * Ndepth * Nlat, 0.)), 
             zonal_std_devs(num_fields, std::vector<double>(Ntime * Ndepth * Nlat, 0.));
 
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         compute_zonal_avg_and_std( zonal_averages, zonal_std_devs, source_data, postprocess_fields );
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_zonal_means");  }
 
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "  .. writing region averages and deviations\n"); }
         fflush(stdout);
         #endif
 
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         write_zonal_avg_and_std(
             zonal_averages, zonal_std_devs, vars_to_process, filename,
             Stime, Sdepth, Ntime, Ndepth, Nlat, num_fields
             );
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_writing");  }
     }
 
 
@@ -166,21 +178,25 @@ void Apply_Postprocess_Routines(
 
         OkuboWeiss_areas.resize(Ntime * Ndepth * N_Okubo * num_regions, 0.);
 
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         compute_region_avg_and_std_OkuboWeiss(
                 field_averages_OW, field_std_devs_OW, OkuboWeiss_areas, 
                 source_data, postprocess_fields, OkuboWeiss, OkuboWeiss_dim_vals, N_Okubo
                 );
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_OkuboWeiss_histogrames");  }
 
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "  .. writing Okubo results\n"); }
         fflush(stdout);
         #endif
 
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         write_region_avg_and_std_OkuboWeiss(
                 field_averages_OW, field_std_devs_OW, OkuboWeiss_areas,
                 vars_to_process, filename,
                 Stime, Sdepth, Ntime, Ndepth, N_Okubo, num_regions, num_fields
                 );
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_writing");  }
     }
 
 
@@ -196,6 +212,7 @@ void Apply_Postprocess_Routines(
         std::vector<int>    mask_count(      Ndepth * Nlat * Nlon, 0 ),
                             mask_count_loc(  Ndepth * Nlat * Nlon, 0 );
 
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         #pragma omp parallel default(none) \
         private( index, area_index, Itime, Idepth, Ilat, Ilon ) \
         shared( mask_count_loc, mask )
@@ -239,6 +256,7 @@ void Apply_Postprocess_Routines(
         }
 
         compute_time_avg_std( time_average, time_std_dev, source_data, postprocess_fields, mask_count, always_masked, full_Ntime );
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_time_means");  }
 
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "  .. writing time-averages of fields\n"); }
@@ -247,6 +265,7 @@ void Apply_Postprocess_Routines(
 
         // Write the time averages
         //   dimension order: depth - lat - lon
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         const int   Slat = myStarts.at(2),
                     Slon = myStarts.at(3);
 
@@ -265,5 +284,6 @@ void Apply_Postprocess_Routines(
             // To turn these outputs back on, also need to turn back on the calculations in compute_time_avg_std
             //write_field_to_output( time_std_dev.at(Ifield), vars_to_process.at(Ifield) + "_time_std_dev", start, count, filename, &output_mask );
         }
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_writing");  }
     }
 }
