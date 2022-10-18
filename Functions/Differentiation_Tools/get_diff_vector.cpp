@@ -26,16 +26,21 @@ void get_diff_vector(
 
     // Check which derivative we're taking
     int index;
+    const bool do_dep = (dim == "depth");
     const bool do_lat = (dim == "lat");
     const bool do_lon = (dim == "lon");
-    assert( do_lat ^ do_lon ); // xor
+    assert( do_dep ^ (do_lat ^ do_lon) ); // ^ = xor
 
-    int Iref = do_lon ? Ilon : Ilat;
+    int Iref = do_dep ? Idepth :
+               do_lat ? Ilat :
+               do_lon ? Ilon : -1;
     const int Nref = grid.size();
 
     // Determine lowest lower bound (LLB) and upperest upper bound (UUB)
     //   for the integration region. This essentially just depends on periodicity.
-    const bool periodic = do_lat ? constants::PERIODIC_Y : constants::PERIODIC_X ;
+    const bool periodic = do_dep ? false : 
+                          do_lat ? constants::PERIODIC_Y : 
+                          do_lon ? constants::PERIODIC_X : false;
     const int LLB = periodic ? Iref - Nref : 0 ;
     const int UUB = periodic ? Iref + Nref : Nref - 1 ;
 
@@ -56,8 +61,8 @@ void get_diff_vector(
        
         // Check if the next point would be land
         lb = ( ( LB - 1 ) % Nref + Nref ) % Nref;
-        if (do_lon) { index = Index(Itime, Idepth, Ilat, lb,   Ntime, Ndepth, Nlat, Nlon); }
-        else        { index = Index(Itime, Idepth, lb,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        index = Index( Itime, do_dep ? lb : Idepth, do_lat ? lb : Ilat, do_lon ? lb : Ilon,
+                       Ntime, Ndepth,               Nlat,               Nlon );
         
         if ( mask.at(index) )   { LB--;  }  // If next point is still water, extend stencil over it
         else                    { break; }  // Otherwise, halt [ without extending stencil ]
@@ -71,8 +76,8 @@ void get_diff_vector(
        
         // Check if the next point would be land
         ub = ( ( UB + 1 ) % Nref + Nref ) % Nref;
-        if (do_lon) { index = Index(Itime, Idepth, Ilat, ub,   Ntime, Ndepth, Nlat, Nlon); }
-        else        { index = Index(Itime, Idepth, ub,   Ilon, Ntime, Ndepth, Nlat, Nlon); }
+        index = Index( Itime, do_dep ? ub : Idepth, do_lat ? ub : Ilat, do_lon ? ub : Ilon,
+                       Ntime, Ndepth,               Nlat,               Nlon );
 
         if ( mask.at(index) )   { UB++;  }  // If next point is still water, extend stencil over it
         else                    { break; }  // Otherwise, halt [ without extending stencil ]
@@ -96,7 +101,7 @@ void get_diff_vector(
     if (UB - LB + 1 == num_deriv_pts) {
 
         // If we have enough cells for differentiation, do it
-        if ( do_lon or (constants::UNIFORM_LAT_GRID)) {
+        if ( do_lon or (do_lat and constants::UNIFORM_LAT_GRID)) {
             // Since we're on a uniform grid, we can use pre-computed
             //   differentiation coefficients
             differentiation_vector(ddl, dl, Iref - LB, order_of_deriv, diff_ord);
@@ -148,7 +153,7 @@ void get_diff_vector(
         //                 (not great, but better than nothing (hopefully))
         if ( (order_of_deriv == 2) and (UB - LB + 1 == 3)) {
             // For now require uniform grid
-            if ( do_lon or (constants::UNIFORM_LAT_GRID)) {
+            if ( do_lon or (do_lat and constants::UNIFORM_LAT_GRID)) {
                 diff_vector.push_back(  1. / pow(dl, 2.) );
                 diff_vector.push_back( -2. / pow(dl, 2.) );
                 diff_vector.push_back(  1. / pow(dl, 2.) );

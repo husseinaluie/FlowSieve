@@ -32,15 +32,22 @@ void Cart_derivatives_at_point(
     assert(z_deriv_vals.size() == fields.size());
     const int num_deriv = x_deriv_vals.size();
 
+    // Create arrays to store the derivatives.
+    //  the "_p" arrays are pointers to the values
+    //  in the other arrays
     std::vector<double*> dfields_dlon_p(num_deriv);
     std::vector<double>  dfields_dlon(  num_deriv);
 
     std::vector<double*> dfields_dlat_p(num_deriv);
     std::vector<double>  dfields_dlat(  num_deriv);
 
+    std::vector<double*> dfields_dr_p(num_deriv);
+    std::vector<double>  dfields_dr(  num_deriv);
+
     for (int ii = 0; ii < num_deriv; ii++) {
         dfields_dlon_p.at(ii) = &(dfields_dlon.at(ii));
         dfields_dlat_p.at(ii) = &(dfields_dlat.at(ii));
+        dfields_dr_p.at(  ii) = &(dfields_dr.at(  ii));
     }
 
     // Compute spherical derivatives
@@ -54,10 +61,15 @@ void Cart_derivatives_at_point(
         Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
         mask, order_of_deriv, diff_ord);
 
+    spher_derivative_at_point(
+        dfields_dr_p, fields, depth, "dep",
+        Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
+        mask, order_of_deriv, diff_ord);
+
     // Define conversion coefficients
-    double cx_lon, cx_lat, 
-           cy_lon, cy_lat, 
-           cz_lon, cz_lat;
+    double cx_lon, cx_lat, cx_r,
+           cy_lon, cy_lat, cy_r,
+           cz_lon, cz_lat, cz_r;
     if (constants::CARTESIAN) {
         cx_lon = 1.;
         cx_lat = 0.;
@@ -82,21 +94,21 @@ void Cart_derivatives_at_point(
         // ddx =   ( cos(lon) * cos(lat)                ) * ddr
         //       - ( sin(lon)            / (r cos(lat)) ) * ddlon   
         //       - ( cos(lon) * sin(lat) /  r           ) * ddlat
-        //cx_r   =     cos_lon  * cos_lat;
+        cx_r   =     cos_lon  * cos_lat;
         cx_lon = -   sin_lon             / (r * cos_lat );
         cx_lat = -   cos_lon  * sin_lat  /  r;
 
         // ddy =   ( sin(lon) * cos(lat)                ) * ddr
         //         ( cos(lon)            / (r cos(lat)) ) * ddlon   
         //       - ( sin(lon) * sin(lat) /  r           ) * ddlat
-        //cy_r   =     sin_lon  * cos_lat;
+        cy_r   =     sin_lon  * cos_lat;
         cy_lon =     cos_lon             / (r * cos_lat );
         cy_lat = -   sin_lon  * sin_lat  /  r;
 
         // ddz =   (            sin(lat)                ) * ddr
         //         (            0.                      ) * ddlon
         //         (            cos(lat) /  r           ) * ddlat
-        //cz_r   =                sin_lat;
+        cz_r   =                sin_lat;
         cz_lon =                0.;
         cz_lat =                cos_lat  /  r;
     }
@@ -106,17 +118,23 @@ void Cart_derivatives_at_point(
 
         // Compute x derivatives
         if (x_deriv_vals.at(ii) != NULL) {
-            *(x_deriv_vals.at(ii)) = cx_lon * dfields_dlon.at(ii) + cx_lat * dfields_dlat.at(ii);
+            *(x_deriv_vals.at(ii)) =      cx_r   * dfields_dr.at(  ii)
+                                        + cx_lon * dfields_dlon.at(ii) 
+                                        + cx_lat * dfields_dlat.at(ii);
         }
 
         // Compute y derivatives
         if (y_deriv_vals.at(ii) != NULL) {
-            *(y_deriv_vals.at(ii)) = cy_lon * dfields_dlon.at(ii) + cy_lat * dfields_dlat.at(ii);
+            *(y_deriv_vals.at(ii)) =      cy_r   * dfields_dr.at(  ii)
+                                        + cy_lon * dfields_dlon.at(ii) 
+                                        + cy_lat * dfields_dlat.at(ii);
         }
 
         // Compute z derivatives
         if (z_deriv_vals.at(ii) != NULL) {
-            *(z_deriv_vals.at(ii)) = cz_lon * dfields_dlon.at(ii) + cz_lat * dfields_dlat.at(ii);
+            *(z_deriv_vals.at(ii)) =      cz_r   * dfields_dr.at(  ii)
+                                        + cz_lon * dfields_dlon.at(ii) 
+                                        + cz_lat * dfields_dlat.at(ii);
         }
 
     }
