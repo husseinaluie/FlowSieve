@@ -239,7 +239,9 @@ TOROID_TARGET_EXES := 	Case_Files/toroidal_projection.x \
 						Case_Files/coarsen_grid.x \
 						Case_Files/coarsen_grid_linear.x \
 						Case_Files/refine_Helmholtz_seed.x \
-						Case_Files/Pi_helm_breakdown.x
+						Case_Files/Pi_helm_breakdown.x \
+						Case_Files/thermal_wind.x \
+						Case_Files/compute_radial_velocity.x
 TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
 						Case_Files/potential_projection.o \
 						Case_Files/Helmholtz_projection.o \
@@ -250,7 +252,9 @@ TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
 						Case_Files/coarsen_grid.o \
 						Case_Files/coarsen_grid_linear.o \
 						Case_Files/refine_Helmholtz_seed.o \
-						Case_Files/Pi_helm_breakdown.o
+						Case_Files/Pi_helm_breakdown.o \
+						Case_Files/thermal_wind.o \
+						Case_Files/compute_radial_velocity.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 

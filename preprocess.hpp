@@ -107,6 +107,13 @@ void Apply_Toroidal_Projection(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
+void depth_integrate(
+        std::vector<double> & depth_integral,
+        const std::vector<double> & field_to_integrate,
+        const dataset & source_data,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 void Apply_Potential_Projection(
         const std::string output_fname,
         dataset & source_data,

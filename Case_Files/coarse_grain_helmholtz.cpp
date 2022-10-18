@@ -70,6 +70,7 @@ int main(int argc, char *argv[]) {
     // first argument is the flag, second argument is default value (for when flag is not present)
     const std::string   &Helm_input_fname  = input.getCmdOption("--Helmholtz_input_file",       "Helmholtz_projection.nc",      asked_help),
                         &vel_input_fname   = input.getCmdOption("--velocity_input_file",        "vels.nc",                      asked_help),
+                        &u_r_input_fname   = input.getCmdOption("--radial_velocity_input_file", "NONE",                         asked_help),
                         &wind_input_fname  = input.getCmdOption("--wind_tau_input_file",        "wind_tau_projection.nc",       asked_help),
                         &quad_input_fname  = input.getCmdOption("--uiuj_Helmholtz_input_file",  "helmholtz_projection_uiuj.nc", asked_help);
 
@@ -88,6 +89,7 @@ int main(int argc, char *argv[]) {
     const std::string   &tor_field_var_name     = input.getCmdOption("--tor_field",     "Psi",          asked_help),
                         &pot_field_var_name     = input.getCmdOption("--pot_field",     "Phi",          asked_help),
                         &vel_field_var_name     = input.getCmdOption("--vel_field",     "u_lat",        asked_help),
+                        &u_r_field_var_name     = input.getCmdOption("--u_r_field",     "u_r",          asked_help),
                         &wind_tau_Psi_var_name  = input.getCmdOption("--wind_tau_Psi",  "wind_tau_Psi", asked_help),
                         &wind_tau_Phi_var_name  = input.getCmdOption("--wind_tau_Phi",  "wind_tau_Phi", asked_help),
                         &uiuj_F_r_var_name      = input.getCmdOption("--uiuj_F_r",      "uiuj_F_r",     asked_help),
@@ -141,6 +143,15 @@ int main(int argc, char *argv[]) {
     // Read in the toroidal and potential fields
     source_data.load_variable( "F_potential", pot_field_var_name, Helm_input_fname, false, true );
     source_data.load_variable( "F_toroidal",  tor_field_var_name, Helm_input_fname, false, true );
+
+    if ( u_r_input_fname == "NONE" ) {
+        // If no u_r provided, just assume it's zero
+        source_data.variables["u_r"] = std::vector<double>( source_data.variables["F_potential"].size(), 0. );
+        source_data.compute_radial_vel = false;
+    } else {
+        source_data.load_variable( "u_r",  u_r_field_var_name, u_r_input_fname, false, true );
+        source_data.compute_radial_vel = true;
+    }
 
     // Read in the Helmholtz fields for uiuj
     if ( constants::COMP_PI_HELMHOLTZ ) {

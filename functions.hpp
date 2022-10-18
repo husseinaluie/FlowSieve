@@ -36,6 +36,9 @@ class dataset {
         // Store cell areas
         std::vector<double> areas;
 
+        // Boolean to indicate if we're computing u_r from incompressibility
+        bool compute_radial_vel = false;
+
         // Dictionary for the variables (velocity components, density, etc)
         std::map< std::string , std::vector<double> > variables;
 
