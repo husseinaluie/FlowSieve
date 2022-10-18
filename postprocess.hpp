@@ -76,8 +76,7 @@ void compute_time_avg_std(
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<int> & mask_count,
         const std::vector<bool> & always_masked,
-        const int full_Ntime,
-        const MPI_Comm comm = MPI_COMM_WORLD
+        const int full_Ntime
         );
 
 void write_region_avg_and_std(

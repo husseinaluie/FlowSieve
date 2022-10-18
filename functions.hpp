@@ -33,6 +33,11 @@ class dataset {
         int Ntime = -1, Ndepth = -1, Nlat = -1, Nlon = -1;
         int full_Ntime = -1, full_Ndepth = -1;
 
+        // MPI Communicator Objects
+        MPI_Comm MPI_Comm_Global = MPI_COMM_WORLD;
+        MPI_Comm MPI_subcomm_sametimes;
+        MPI_Comm MPI_subcomm_samedepths;
+
         // Store cell areas
         std::vector<double> areas;
 

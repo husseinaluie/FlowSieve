@@ -42,7 +42,7 @@ void Apply_Postprocess_Routines(
 
     // Get full number of time points
     int full_Ntime;
-    MPI_Allreduce(&Ntime, &full_Ntime, 1, MPI_INT, MPI_SUM, comm);
+    MPI_Allreduce(&Ntime, &full_Ntime, 1, MPI_INT, MPI_SUM, source_data.MPI_subcomm_samedepths );
 
     const int Stime  = myStarts.at(0);
     const int Sdepth = myStarts.at(1);
@@ -229,7 +229,7 @@ void Apply_Postprocess_Routines(
                 if ( mask.at(index) ) { mask_count_loc.at(area_index) = mask_count_loc.at(area_index) + 1; }
             }
         }
-        MPI_Allreduce( &(mask_count_loc[0]), &(mask_count[0]), Ndepth * Nlat * Nlon, MPI_INT, MPI_SUM, comm);
+        MPI_Allreduce( &(mask_count_loc[0]), &(mask_count[0]), Ndepth * Nlat * Nlon, MPI_INT, MPI_SUM, source_data.MPI_subcomm_samedepths );
 
         #pragma omp parallel default(none) \
         private( index ) shared( mask_count, always_masked, output_mask )

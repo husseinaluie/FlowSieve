@@ -109,6 +109,19 @@ void dataset::check_processor_divisions( const int Nprocs_in_time_input, const i
     #endif
 
     assert( Nprocs_in_time * Nprocs_in_depth == wSize );
+
+    // Now that processor divisions have been tested, also create the sub-communicator items
+    int color, key;
+
+    // communicator for ranks with the same times
+    color = wRank / Nprocs_in_depth;
+    key   = wRank % Nprocs_in_depth;
+    MPI_Comm_split( MPI_Comm, color, key, MPI_subcomm_sametimes); 
+
+    // communicator for ranks with the same depths
+    color = wRank % Nprocs_in_depth;
+    key   = wRank / Nprocs_in_depth;
+    MPI_Comm_split( MPI_Comm, color, key, MPI_subcomm_samedepths); 
 }
 
 
