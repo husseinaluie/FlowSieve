@@ -15,6 +15,30 @@ For journal articles, proceedings, etc.., we suggest:
 For presentations, posters, etc.., we suggest acknowledging:
 * **FlowSieve** code from the Complex Flow Group at University of Rochester
 
+## Primary Features
+1) computes coarse-grained scalar and vector fields for arbitrary filter scales, in both Cartesian and spherical coordinates,
+2) built-in diagnostics for oceanographic settings, including kinetic energy (KE), KE cascades, vorticity, divergence, etc.,
+3) built-in post-processing tools compute region averages for an arbitrary number of custom user-specified regions [ avoiding storage concerns when handling large datasets ], and
+4) includes Helmholtz-decomposition scripts to allow careful coarse-graining on the sphere [ i.e. to maintain commutativity with derivatives ].
+
+
+## Statement of need
+
+Aluie 2018 demonstrated how, when applied appropriately, coarse-graining can
+not only be applied in a data-processing sense, but also to the governing equations.
+This provides a physically meaningful and mathematically coherent way to quantify not
+only how much energy is contained in different length scales, but also how much energy
+is being transferred to different scales.
+
+`FlowSieve` is a heavily-parallelized coarse-graining codebase that provides
+tools for spatially filtering both scalar fields and vector fields in Cartesian
+and spherical geometries. Specifically, filtering velocity vector fields on a sphere
+provides a high-powered tool for scale-decomposing oceanic and atmospheric flows 
+following the mathematical results in Aluie 2019.
+
+`FlowSieve` is designed to work in high-performance computing (HPC) environments in order to
+efficiently analyse large oceanic and atmospheric datasets, and extract scientifically meaningful
+diagnostics, including scale-wise energy content and energy transfer.
 
 ---
 
