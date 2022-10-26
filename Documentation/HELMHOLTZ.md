@@ -10,7 +10,7 @@ The main executables for apply a Helmholtz decomposition are `toroidal_projectio
 This is done using a sparse least-squares solver using the ALGLIB library.
 
 The main variables controlling the convergence are the maximum number of iterations and the target relative tolerance.
-If the maximum number of iterations are reach, or if the error goes below the tolerance, the solver halts and outputs the computed terms.
+If the maximum number of iterations is reached, or if the error goes below the tolerance, the solver halts and outputs the computed terms.
 
 ## Decomposing High Resolution Velocities {#helmholtz1-1}
 
@@ -26,7 +26,7 @@ Begin by first decomposing the 1 degree data, the result of which can be used as
 The 1/4 can then be fed into the 1/12 degree, and so on.
 
 These steps can be summarized as:
-1. Coarsen the to a grid that can be solved efficienty (e.g. 1 degree)
+1. Coarsen to a grid that can be solved efficienty (e.g. 1 degree)
 2. Apply Helmholtz decomposition.
 3. Using the coarse result, create a 'seed' file for a high-resolution Helmholtz decomposition
 4. Repeat steps 2 and 3 until the final resolution is achieved.

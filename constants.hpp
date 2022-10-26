@@ -37,7 +37,7 @@
  */
 
 /*! 
- * \namespace consants 
+ * \namespace constants 
  * \brief Provide namespace for global constants (physical and computational).
  */
 namespace constants
