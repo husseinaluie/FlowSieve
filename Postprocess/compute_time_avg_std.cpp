@@ -15,11 +15,11 @@ void compute_time_avg_std(
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<int> & mask_count,
         const std::vector<bool> & always_masked,
-        const int full_Ntime,
+        const int full_Ntime
         ){
 
-    //MPI_Comm comm = source_data.MPI_Comm_Global;
-    MPI_Comm comm = source_data.MPI_subcomm_samedepths;
+    //MPI_Comm &comm = source_data.MPI_Comm_Global;
+    const MPI_Comm &comm = source_data.MPI_subcomm_samedepths;
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( comm, &wRank );
