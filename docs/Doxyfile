@@ -339,7 +339,7 @@ MARKDOWN_SUPPORT       = YES
 # Minimum value: 0, maximum value: 99, default value: 5.
 # This tag requires that the tag MARKDOWN_SUPPORT is set to YES.
 
-TOC_INCLUDE_HEADINGS   = 4
+TOC_INCLUDE_HEADINGS   = 6
 
 # When enabled doxygen tries to link words that correspond to documented
 # classes, or namespaces to their corresponding documentation. Such a link can
@@ -886,6 +886,10 @@ INPUT                  = .. \
                          ../Tutorial/Basic \
                          ../Tutorial/Spherical_Demo \
                          ../Tutorial/Spherical_Demo/Helmholtz \
+                         ../Tutorial/Spherical_Demo/Helmholtz/project \
+                         ../Tutorial/Spherical_Demo/Helmholtz/filter \
+                         ../Tutorial/Spherical_Demo/Helmholtz/postprocessing \
+                         ../Tutorial/Spherical_Demo/Low_Resolution \
                          ../Postprocess \
                          ../Preprocess
 

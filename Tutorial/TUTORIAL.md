@@ -14,7 +14,9 @@ Tutorial [details are here](\ref tutorials2).
 
 ## Spherical Demo
 
-This tutorial works through the various steps involved in working with spherical data.
-There are three components, that go through Helmholtz decomposition, filtering, and using on-line post-processing tools.
+These tutorial works through the various steps involved in working with spherical data.
 
-The tutorial [details are here](\ref tutorials3).
+* The tutorial [details are here](\ref tutorials4).
+ * This is a very small case that can run in ~5 minutes on one processor.
+* The tutorial [details are here](\ref tutorials3).
+ * There are three components, that go through Helmholtz decomposition, filtering, and using on-line post-processing tools.
