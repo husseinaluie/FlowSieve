@@ -80,6 +80,7 @@ for Ifp, fp in enumerate(all_fps):
 
 t0s_sort_inds = np.argsort( t0s )
 sorted_fps = [ all_fps[ind] for ind in t0s_sort_inds ]
+Nts = Nts[ t0s_sort_inds ]
 Ntime = np.sum( Nts )
 
 
@@ -180,7 +181,7 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
                     print(".", end = '', flush = True)
                 prog += 5
             
-        if not( varname in all_dims):
+        if not( varname in all_dims ):
             # If it's a variable
             
             # We need to do some unpleasant stuff to handle time being
@@ -204,7 +205,7 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
                 # And increment time
                 time_ind_0 += Nts[Ifp]
         elif (varname != 'time'):
-            # If it's a dimension
+            # If it's a dimension (other than time)
             dims = var_dims
             with Dataset( all_fps[0], 'r' ) as in_dset:
                 nc_var_objs[varname][:] = in_dset[varname][:]
