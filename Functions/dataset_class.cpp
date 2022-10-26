@@ -41,6 +41,12 @@ void dataset::load_depth( const std::string dim_name, const std::string filename
         read_var_from_file(depth, dim_name, filename);
     }
     full_Ndepth = depth.size();
+
+    // Now also check if our depth grid is increasing or decreasing
+    //  i.e. is the bottom the first or last point
+    if (full_Ndepth > 1) {
+        depth_is_increasing = ( depth[0] < depth[1] ) ? true : false;
+    }
 };
 
 void dataset::load_latitude( const std::string dim_name, const std::string filename ) {
@@ -82,7 +88,9 @@ void dataset::load_variable(
                         do_splits );
 };
 
-void dataset::check_processor_divisions( const int Nprocs_in_time_input, const int Nprocs_in_depth_input, const MPI_Comm ) {
+void dataset::check_processor_divisions(    const int Nprocs_in_time_input, 
+                                            const int Nprocs_in_depth_input, 
+                                            const MPI_Comm ) {
 
     assert( (full_Ntime > 0) and (full_Ndepth > 0) and (Nlon > 0) and (Nlat > 0) ); // Must read in dimensions before checking processor divisions.
 
@@ -116,12 +124,15 @@ void dataset::check_processor_divisions( const int Nprocs_in_time_input, const i
     // communicator for ranks with the same times
     color = wRank / Nprocs_in_depth;
     key   = wRank % Nprocs_in_depth;
-    MPI_Comm_split( MPI_Comm, color, key, MPI_subcomm_sametimes); 
+    MPI_Comm_split( MPI_Comm_Global, color, key, &MPI_subcomm_sametimes); 
+    #if DEBUG >= 2
+    fprintf( stdout, "Processor %d has time-color %d and depth-color %d.\n", wRank, color, key );
+    #endif
 
     // communicator for ranks with the same depths
     color = wRank % Nprocs_in_depth;
     key   = wRank / Nprocs_in_depth;
-    MPI_Comm_split( MPI_Comm, color, key, MPI_subcomm_samedepths); 
+    MPI_Comm_split( MPI_Comm_Global, color, key, &MPI_subcomm_samedepths); 
 }
 
 
@@ -193,4 +204,153 @@ void dataset::compute_region_areas() {
             }
         }
     }
+}
+
+
+
+
+void dataset::gather_variable_across_depth( const std::vector<double> & var,
+                                            std::vector<double> & gathered_var
+                                            ) const {
+
+    const MPI_Comm &comm = MPI_subcomm_sametimes;
+
+    int wSize, wRank;
+    MPI_Comm_size( comm, &wSize );
+    MPI_Comm_rank( comm, &wRank );
+
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf( stdout, "Preparing to merge variables across depth. Pre-merge size is %'zu\n", var.size() ); }
+    #endif
+
+    // resize the new variable
+    size_t gathered_size = Ntime * full_Ndepth * Nlat * Nlon;
+    gathered_var.resize( gathered_size, 0. );
+    
+    // Get the Ndepth assignments for each rank
+    std::vector<int> Ndepths( wSize ),
+                     rec_counts( wSize, 1 ),
+                     offsets( wSize );
+    for ( int i = 0; i < wSize; ++i ){ offsets[i] = i; }
+    MPI_Allgatherv( &Ndepth, 1, MPI_INT, &Ndepths[0], &rec_counts[0], &offsets[0], MPI_INT, comm );
+
+    // Now set up for and do the actual gather
+    int sendcount = Ntime * Ndepth * Nlat * Nlon;
+    for ( int i = 0; i < wSize; ++i ){
+        rec_counts.at(i) = Ntime * Ndepths.at(i) * Nlat * Nlon;
+        offsets.at(i) = (i==0) ? 0 : (offsets.at(i-1) + rec_counts.at(i-1));
+    }
+
+    MPI_Allgatherv( &var[0],          sendcount,                   MPI_DOUBLE, 
+                    &gathered_var[0], &rec_counts[0], &offsets[0], MPI_DOUBLE, 
+                    comm );
+}
+
+void dataset::gather_mask_across_depth( const std::vector<bool> & var,
+                                        std::vector<bool> & gathered_var
+                                      ) const {
+
+    const MPI_Comm &comm = MPI_subcomm_sametimes;
+
+    int wSize, wRank;
+    MPI_Comm_size( comm, &wSize );
+    MPI_Comm_rank( comm, &wRank );
+
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf( stdout, "Preparing to merge mask across depth. Pre-merge size is %'zu\n", var.size() ); }
+    #endif
+
+    // resize the new variable
+    size_t gathered_size = Ntime * full_Ndepth * Nlat * Nlon;
+    gathered_var.resize( gathered_size, false );
+    
+    // Get the Ndepth assignments for each rank
+    std::vector<int> Ndepths( wSize ),
+                     rec_counts( wSize, 1 ),
+                     offsets( wSize );
+    for ( int i = 0; i < wSize; ++i ){ offsets[i] = i; }
+    MPI_Allgatherv( &Ndepth, 1, MPI_INT, &Ndepths[0], &rec_counts[0], &offsets[0], MPI_INT, comm );
+
+    // Now set up for and do the actual gather
+    int sendcount = Ntime * Ndepth * Nlat * Nlon;
+    for ( int i = 0; i < wSize; ++i ){
+        rec_counts.at(i) = Ntime * Ndepths.at(i) * Nlat * Nlon;
+        offsets.at(i) = (i==0) ? 0 : (offsets.at(i-1) + rec_counts.at(i-1));
+    }
+
+    // For **really** annoying reasons, std::vector<bool> is a special thing, and
+    //      we can't do things like &var[0] like we would with a std::vector<double>.
+    //      This means we need to make an int array first, and the communicate that.
+    std::vector<int> src(var.size()), dest(gathered_var.size());
+    for ( size_t index = 0; index < var.size(); index++ ) { src.at(index) = (int)var.at(index); }
+    MPI_Allgatherv( &src[0],  sendcount,                   MPI_INT, 
+                    &dest[0], &rec_counts[0], &offsets[0], MPI_INT, 
+                    comm );
+    for ( size_t index = 0; index < gathered_var.size(); index++ ) { gathered_var.at(index) = (bool)dest.at(index); }
+}
+
+
+size_t dataset::local_index(  const int Itime, const int Idepth, const int Ilat, const int Ilon 
+        ) const {
+    return Index( Itime, Idepth, Ilat, Ilon, 
+                  Ntime, Ndepth, Nlat, Nlon );
+}
+
+
+size_t dataset::global_index(   const int Itime, const int Idepth, const int Ilat, const int Ilon,
+                                const std::string merge_kind 
+                            ) const{
+    const bool merged_time  = ((merge_kind == "Time")  or (merge_kind == "TimeDepth")) ? true : false;
+    const bool merged_depth = ((merge_kind == "Depth") or (merge_kind == "TimeDepth")) ? true : false;
+
+    int Itime_global = Itime  + ( merged_time  ? myStarts[0] : 0 ),
+        Ntime_global = merged_time ? full_Ntime : Ntime,
+        Idepth_global = Idepth + ( merged_depth ? myStarts[1] : 0 ),
+        Ndepth_global = merged_depth ? full_Ndepth : Ndepth;
+    return Index( Itime_global, Idepth_global, Ilat, Ilon, 
+                  Ntime_global, Ndepth_global, Nlat, Nlon );
+}
+
+size_t dataset::index_local_to_global(  const size_t index, const std::string merge_kind 
+        ) const {
+    int Itime, Idepth, Ilat, Ilon;
+    Index1to4( index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+    return global_index( Itime, Idepth, Ilat, Ilon, merge_kind );
+}
+
+size_t dataset::index_global_to_local(  const size_t index, const std::string merge_kind 
+        ) const {
+    int Itime, Idepth, Ilat, Ilon;
+
+    const bool merged_time  = ((merge_kind == "Time")  or (merge_kind == "TimeDepth")) ? true : false;
+    const bool merged_depth = ((merge_kind == "Depth") or (merge_kind == "TimeDepth")) ? true : false;
+
+    int Ntime_global  = merged_time  ? full_Ntime  : Ntime,
+        Ndepth_global = merged_depth ? full_Ndepth : Ndepth;
+
+    Index1to4( index, Itime, Idepth, Ilat, Ilon, Ntime_global, Ndepth_global, Nlat, Nlon );
+
+    int Itime_global  = Itime  - ( merged_time  ? myStarts[0] : 0 ),
+        Idepth_global = Idepth - ( merged_depth ? myStarts[1] : 0 );
+
+    return local_index( Itime_global, Idepth_global, Ilat, Ilon );
+}
+
+void dataset::index1to4_local(  const size_t index, 
+                                int & Itime, int & Idepth, int & Ilat, int & Ilon 
+                              ) const {
+    Index1to4( index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+}
+
+void dataset::index1to4_global( const size_t index, 
+                                int & Itime, int & Idepth, int & Ilat, int & Ilon,
+                                const std::string merge_kind
+        ) const {
+    const bool merged_time  = ((merge_kind == "Time")  or (merge_kind == "TimeDepth")) ? true : false;
+    const bool merged_depth = ((merge_kind == "Depth") or (merge_kind == "TimeDepth")) ? true : false;
+
+    int Ntime_global  = merged_time  ? full_Ntime  : Ntime,
+        Ndepth_global = merged_depth ? full_Ndepth : Ndepth;
+
+    Index1to4( index, Itime, Idepth, Ilat, Ilon, Ntime_global, Ndepth_global, Nlat, Nlon );
 }

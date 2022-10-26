@@ -81,6 +81,10 @@ int main(int argc, char *argv[]) {
 
     const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true", asked_help);
 
+    const std::string &do_radial_derivs   = input.getCmdOption("--use_depth_derivs", "false", asked_help);
+
+    const std::string &depth_is_elevation = input.getCmdOption("--depth_is_elevation", "false", asked_help);
+
     const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1", asked_help),
                         &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1", asked_help);
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
@@ -135,6 +139,24 @@ int main(int argc, char *argv[]) {
     // Convert to radians, if appropriate
     if ( latlon_in_degrees == "true" ) {
         convert_coordinates( source_data.longitude, source_data.latitude );
+    }
+
+    // Turn on depth derivatives, if appropriate
+    if ( do_radial_derivs == "true" ) {
+        source_data.use_depth_derivatives = true;
+        if ( constants::DiffOrd != 2 ) {
+            if (wRank == 0) {
+                fprintf( stderr, "WARNING: Depth grid is assumed to be non-uniform.\n" );
+                fprintf( stderr, "         Non-uniform can currently only use 2nd order\n" );
+                fprintf( stderr, "         derivatives. Compile-time setting was %dth order\n", constants::DiffOrd );
+                fprintf( stderr, "         Will adjust to only use 2nd order for depth.\n" );
+            }
+        }
+    }
+
+    // Check if the depth grid is actually an elevation grid
+    if ( depth_is_elevation == "true" ) {
+        source_data.depth_is_elevation = true;
     }
 
     // Compute the area of each 'cell' which will be necessary for integration
@@ -263,6 +285,11 @@ int main(int argc, char *argv[]) {
 
     // Mask out the pole, if necessary (i.e. set lat = 90 to land)
     mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
+
+    // If we need it, go ahead an merge the mask across processors now
+    if (source_data.use_depth_derivatives and ( source_data.Nprocs_in_depth > 1 )) {
+        source_data.gather_mask_across_depth( source_data.mask, source_data.mask_DEPTH );
+    }
 
     // Now pass the data along to the filtering routines
     const double pre_filter_time = MPI_Wtime();

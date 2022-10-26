@@ -248,11 +248,6 @@ void filtering_helmholtz(
         Pi_tot(  num_pts, 0. ),
         Pi_Helm( num_pts, 0. ),
 
-        // Pi - shifted derivatives
-        Pi2_tor(  num_pts, 0. ),
-        Pi2_pot(  num_pts, 0. ),
-        Pi2_tot(  num_pts, 0. ),
-
         // Z ( enstrophy cascade )
         Z_tor( num_pts, 0. ),
         Z_pot( num_pts, 0. ),
@@ -351,11 +346,11 @@ void filtering_helmholtz(
     // Get vorticities
     if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
     compute_vorticity( full_vort_tor_r, null_vector, null_vector, null_vector, null_vector,
-                zero_array, u_lon_tor, u_lat_tor, Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                source_data, zero_array, u_lon_tor, u_lat_tor);
     compute_vorticity( full_vort_pot_r, null_vector, null_vector, null_vector, null_vector,
-                u_r, u_lon_pot, u_lat_pot, Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                source_data, u_r, u_lon_pot, u_lat_pot);
     compute_vorticity( full_vort_tot_r, null_vector, null_vector, null_vector, null_vector,
-                u_r, u_lon_tot, u_lat_tot, Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                source_data, u_r, u_lon_tot, u_lat_tot);
     if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute vorticity"); }
 
 
@@ -406,10 +401,6 @@ void filtering_helmholtz(
         if ( constants::COMP_PI_HELMHOLTZ ) {
             vars_to_write.push_back("Pi_Helm");
         }
-
-        //vars_to_write.push_back("Pi2_tor");
-        //vars_to_write.push_back("Pi2_pot");
-        //vars_to_write.push_back("Pi2_tot");
 
         vars_to_write.push_back("Z_tor");
         vars_to_write.push_back("Z_pot");
@@ -589,11 +580,6 @@ void filtering_helmholtz(
     postprocess_fields_tor.push_back( &Pi_tor );
     postprocess_fields_pot.push_back( &Pi_pot );
     postprocess_fields_tot.push_back( &Pi_tot );
-
-    postprocess_names.push_back( "Pi2" );
-    postprocess_fields_tor.push_back( &Pi2_tor );
-    postprocess_fields_pot.push_back( &Pi2_pot );
-    postprocess_fields_tot.push_back( &Pi2_tot );
 
     if ( constants::COMP_PI_HELMHOLTZ ) {
         postprocess_names.push_back( "Pi_Helm" );
@@ -918,11 +904,10 @@ void filtering_helmholtz(
 
             write_field_to_output(u_lon_pot, "u_lon_pot", starts, counts, fname, &mask);
             write_field_to_output(u_lat_pot, "u_lat_pot", starts, counts, fname, &mask);
-            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");  }
-        }
-        if ( source_data.compute_radial_vel ) {
-            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-            write_field_to_output(u_r_coarse, "u_r", starts, counts, fname, NULL);
+
+            if ( source_data.compute_radial_vel ) {
+                write_field_to_output(u_r_coarse, "u_r", starts, counts, fname, NULL);
+            }
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");  }
         }
 
@@ -943,18 +928,15 @@ void filtering_helmholtz(
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         compute_vorticity(
                 vort_tor_r, null_vector, null_vector, div_tor, OkuboWeiss_tor,
-                zero_array, u_lon_tor, u_lat_tor,
-                Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                source_data, zero_array, u_lon_tor, u_lat_tor);
 
         compute_vorticity(
                 vort_pot_r, null_vector, null_vector, div_pot, OkuboWeiss_pot,
-                u_r_coarse, u_lon_pot, u_lat_pot,
-                Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                source_data, u_r_coarse, u_lon_pot, u_lat_pot);
 
         compute_vorticity(
                 vort_tot_r, null_vector, null_vector, div_tot, OkuboWeiss_tot,
-                u_r_coarse, u_lon_tot, u_lat_tot,
-                Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                source_data, u_r_coarse, u_lon_tot, u_lat_tot);
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute vorticity"); }
 
         if (not(constants::MINIMAL_OUTPUT)) {
@@ -971,27 +953,58 @@ void filtering_helmholtz(
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");  }
         }
 
+
         //
         //// Toroidal diagnostics
         //
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, zero_array, u_lon_tor, u_lat_tor, source_data );
+            vel_Spher_to_Cart( u_x_coarse, u_y_coarse, u_z_coarse, zero_array, u_lon_tor, u_lat_tor, source_data );
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Sphere to Cart Conversion"); }
 
-        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        // Energy cascade (Pi)
-        compute_Pi( Pi_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor );
-        compute_Pi_shift_deriv( Pi2_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor );
+        // If we need depth derivatives, we'll need to communicated across MPI
+        //    ranks in order to rebuild the depth profile. We'll do that here.
+        std::vector<double> u_x_coarse_DEPTH, u_y_coarse_DEPTH, u_z_coarse_DEPTH,
+                            ux_ux_DEPTH, ux_uy_DEPTH, ux_uz_DEPTH, uy_uy_DEPTH, uy_uz_DEPTH, uz_uz_DEPTH,
+                            vort_r_DEPTH, vort_ux_DEPTH, vort_uy_DEPTH, vort_uz_DEPTH;
 
-        // Enstrophy cascade (Z)
-        compute_Z(  Z_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_tor_r, vort_ux_tor, vort_uy_tor, vort_uz_tor );
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+            // Energy cascade (Pi)
+            compute_Pi( Pi_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, 
+                        ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor );
+
+            // Enstrophy cascade (Z)
+            compute_Z(  Z_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, 
+                        vort_tor_r, vort_ux_tor, vort_uy_tor, vort_uz_tor );
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_Pi_and_Z"); }
 
         // Energy transport
+        if (source_data.use_depth_derivatives and ( source_data.Nprocs_in_depth > 1 )) {
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+            MPI_Barrier(source_data.MPI_subcomm_sametimes);
+            source_data.gather_variable_across_depth( u_x_coarse, u_x_coarse_DEPTH );
+            source_data.gather_variable_across_depth( u_y_coarse, u_y_coarse_DEPTH );
+            source_data.gather_variable_across_depth( u_z_coarse, u_z_coarse_DEPTH );
+
+            source_data.gather_variable_across_depth( ux_ux_tor, ux_ux_DEPTH );
+            source_data.gather_variable_across_depth( ux_uy_tor, ux_uy_DEPTH );
+            source_data.gather_variable_across_depth( ux_uz_tor, ux_uz_DEPTH );
+            source_data.gather_variable_across_depth( uy_uy_tor, uy_uy_DEPTH );
+            source_data.gather_variable_across_depth( uy_uz_tor, uy_uz_DEPTH );
+            source_data.gather_variable_across_depth( uz_uz_tor, uz_uz_DEPTH );
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "MPI_COMM_depth_merging"); }
+        }
+        if (wRank == 0) { fprintf( stdout, "Merged variables across depth.\n" ); fflush(stdout); }
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        compute_div_transport( div_J_tor, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor, zero_array,
-               longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+            if (source_data.use_depth_derivatives and ( source_data.Nprocs_in_depth > 1 )) {
+                compute_div_transport( div_J_tor, source_data, u_x_coarse_DEPTH, u_y_coarse_DEPTH, u_z_coarse_DEPTH, 
+                                       ux_ux_DEPTH, ux_uy_DEPTH, ux_uz_DEPTH, uy_uy_DEPTH, uy_uz_DEPTH, uz_uz_DEPTH, 
+                                       zero_array);
+            } else {
+                compute_div_transport( div_J_tor, source_data, u_x_coarse, u_y_coarse, u_z_coarse, 
+                                       ux_ux_tor, ux_uy_tor, ux_uz_tor, uy_uy_tor, uy_uz_tor, uz_uz_tor, 
+                                       zero_array);
+            }
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_transport"); }
 
         //
@@ -1003,18 +1016,41 @@ void filtering_helmholtz(
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Sphere to Cart Conversion"); }
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        // Energy cascade (Pi)
-        compute_Pi( Pi_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot );
-        compute_Pi_shift_deriv( Pi2_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot );
+            // Energy cascade (Pi)
+            compute_Pi( Pi_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, 
+                        ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot );
 
-        // Enstrophy cascade (Z)
-        compute_Z(  Z_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_pot_r, vort_ux_pot, vort_uy_pot, vort_uz_pot );
+            // Enstrophy cascade (Z)
+            compute_Z(  Z_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, 
+                        vort_pot_r, vort_ux_pot, vort_uy_pot, vort_uz_pot );
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_Pi_and_Z"); }
 
         // Energy transport
+        if (source_data.use_depth_derivatives and ( source_data.Nprocs_in_depth > 1 )) {
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+            MPI_Barrier(source_data.MPI_subcomm_sametimes);
+            source_data.gather_variable_across_depth( u_x_coarse, u_x_coarse_DEPTH );
+            source_data.gather_variable_across_depth( u_y_coarse, u_y_coarse_DEPTH );
+            source_data.gather_variable_across_depth( u_z_coarse, u_z_coarse_DEPTH );
+
+            source_data.gather_variable_across_depth( ux_ux_pot, ux_ux_DEPTH );
+            source_data.gather_variable_across_depth( ux_uy_pot, ux_uy_DEPTH );
+            source_data.gather_variable_across_depth( ux_uz_pot, ux_uz_DEPTH );
+            source_data.gather_variable_across_depth( uy_uy_pot, uy_uy_DEPTH );
+            source_data.gather_variable_across_depth( uy_uz_pot, uy_uz_DEPTH );
+            source_data.gather_variable_across_depth( uz_uz_pot, uz_uz_DEPTH );
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "MPI_COMM_depth_merging"); }
+        }
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        compute_div_transport( div_J_pot, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot, u_r_coarse,
-               longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+            if (source_data.use_depth_derivatives and ( source_data.Nprocs_in_depth > 1 )) {
+                compute_div_transport( div_J_pot, source_data, u_x_coarse_DEPTH, u_y_coarse_DEPTH, u_z_coarse_DEPTH, 
+                                       ux_ux_DEPTH, ux_uy_DEPTH, ux_uz_DEPTH, uy_uy_DEPTH, uy_uz_DEPTH, uz_uz_DEPTH, 
+                                       zero_array);
+            } else {
+                compute_div_transport( div_J_pot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, 
+                                       ux_ux_pot, ux_uy_pot, ux_uz_pot, uy_uy_pot, uy_uz_pot, uz_uz_pot, 
+                                       zero_array);
+            }
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_transport"); }
 
         //
@@ -1026,18 +1062,41 @@ void filtering_helmholtz(
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Sphere to Cart Conversion"); }
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        // Energy cascade (Pi)
-        compute_Pi( Pi_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot );
-        compute_Pi_shift_deriv( Pi2_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot );
+            // Energy cascade (Pi)
+            compute_Pi( Pi_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, 
+                        ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot );
 
-        // Enstrophy cascade (Z)
-        compute_Z(  Z_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, vort_tot_r, vort_ux_tot, vort_uy_tot, vort_uz_tot );
+            // Enstrophy cascade (Z)
+            compute_Z(  Z_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, 
+                        vort_tot_r, vort_ux_tot, vort_uy_tot, vort_uz_tot );
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_Pi_and_Z"); }
 
         // Energy transport
+        if (source_data.use_depth_derivatives and ( source_data.Nprocs_in_depth > 1 )) {
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+            MPI_Barrier(source_data.MPI_subcomm_sametimes);
+            source_data.gather_variable_across_depth( u_x_coarse, u_x_coarse_DEPTH );
+            source_data.gather_variable_across_depth( u_y_coarse, u_y_coarse_DEPTH );
+            source_data.gather_variable_across_depth( u_z_coarse, u_z_coarse_DEPTH );
+
+            source_data.gather_variable_across_depth( ux_ux_tot, ux_ux_DEPTH );
+            source_data.gather_variable_across_depth( ux_uy_tot, ux_uy_DEPTH );
+            source_data.gather_variable_across_depth( ux_uz_tot, ux_uz_DEPTH );
+            source_data.gather_variable_across_depth( uy_uy_tot, uy_uy_DEPTH );
+            source_data.gather_variable_across_depth( uy_uz_tot, uy_uz_DEPTH );
+            source_data.gather_variable_across_depth( uz_uz_tot, uz_uz_DEPTH );
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "MPI_COMM_depth_merging"); }
+        }
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        compute_div_transport( div_J_tot, u_x_coarse, u_y_coarse, u_z_coarse, ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot, u_r_coarse,
-               longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+            if (source_data.use_depth_derivatives and ( source_data.Nprocs_in_depth > 1 )) {
+                compute_div_transport( div_J_tot, source_data, u_x_coarse_DEPTH, u_y_coarse_DEPTH, u_z_coarse_DEPTH, 
+                                       ux_ux_DEPTH, ux_uy_DEPTH, ux_uz_DEPTH, uy_uy_DEPTH, uy_uz_DEPTH, uz_uz_DEPTH, 
+                                       zero_array);
+            } else {
+                compute_div_transport( div_J_tot, source_data, u_x_coarse, u_y_coarse, u_z_coarse, 
+                                       ux_ux_tot, ux_uy_tot, ux_uz_tot, uy_uy_tot, uy_uz_tot, uz_uz_tot, 
+                                       zero_array);
+            }
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_transport"); }
 
 
@@ -1054,10 +1113,6 @@ void filtering_helmholtz(
             write_field_to_output( Pi_tor, "Pi_tor", starts, counts, fname, &mask);
             write_field_to_output( Pi_pot, "Pi_pot", starts, counts, fname, &mask);
             write_field_to_output( Pi_tot, "Pi_tot", starts, counts, fname, &mask);
-
-            //write_field_to_output( Pi2_tor, "Pi2_tor", starts, counts, fname, &mask);
-            //write_field_to_output( Pi2_pot, "Pi2_pot", starts, counts, fname, &mask);
-            //write_field_to_output( Pi2_tot, "Pi2_tot", starts, counts, fname, &mask);
 
             if ( constants::COMP_PI_HELMHOLTZ ) {
                 write_field_to_output( Pi_Helm, "Pi_Helm", starts, counts, fname, &mask);

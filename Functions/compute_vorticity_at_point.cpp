@@ -16,11 +16,9 @@
  * @param[in,out]   vort_r_tmp,vort_lon_tmp,vort_lat_tmp    where to store vorticity components
  * @param[in,out]   div_tmp                                 where to store velocity divergence
  * @param[in,out]   OkuboWeiss_tmp                          where to store OkuboWeiss result
+ * @param[in]       source_data                     dataset class instance containing data (Psi, Phi, etc)
  * @param[in]       u_r,u_lon,u_lat                         velocity components
- * @param[in]       Ntime,Ndepth,Nlat,Nlon                  (MPI-local) sizes of dimensions
  * @param[in]       Itime,Idepth,Ilat,Ilon                  Current index in time and space
- * @param[in]       longitude,latitude                      1D grid vectors
- * @param[in]       mask                                    array (2D) to distinguish land from water
  *
  */
 void compute_vorticity_at_point(
@@ -29,21 +27,27 @@ void compute_vorticity_at_point(
         double & vort_lat_tmp,
         double & div_tmp,
         double & OkuboWeiss_tmp,
+        const dataset & source_data,
         const std::vector<double> & u_r,
         const std::vector<double> & u_lon,
         const std::vector<double> & u_lat,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
         const int Itime,
         const int Idepth,
         const int Ilat,
-        const int Ilon,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const std::vector<bool> & mask
+        const int Ilon
         ) {
+
+    const int   Ntime   = source_data.Ntime,    // this is the MPI-local Ntime, not the full Ntime
+                Ndepth  = source_data.Ndepth,   // this is the MPI-local Ndepth, not the full Ndepth
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
+
+    const std::vector<double>   &time       = source_data.time,
+                                &depth      = source_data.depth,
+                                &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude;
+
+    const std::vector<bool> &mask = source_data.mask;
 
     // For the moment, only compute vort_r
     vort_r_tmp   = 0.;
@@ -63,12 +67,8 @@ void compute_vorticity_at_point(
                                 z_deriv_vals {&ux_z, &uy_z, &uz_z};
 
         Cart_derivatives_at_point(
-           x_deriv_vals, y_deriv_vals,
-           z_deriv_vals, deriv_fields,
-           latitude, longitude,
-           Itime, Idepth, Ilat, Ilon,
-           Ntime, Ndepth, Nlat, Nlon,
-           mask);
+           x_deriv_vals, y_deriv_vals, z_deriv_vals, deriv_fields,
+           source_data, Itime, Idepth, Ilat, Ilon);
 
         vort_lon_tmp = uz_y - uy_z;
         vort_lat_tmp = ux_z - uz_x;
@@ -94,6 +94,13 @@ void compute_vorticity_at_point(
 
         spher_derivative_at_point( lon_deriv_vals, deriv_fields, longitude, "lon",
                 Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask);
+
+        //spher_derivative_at_point( r_deriv_vals, deriv_fields, depth, "depth",
+        //        Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask);
+        // Don't compute depth derivatives. It requires merging across MPI ranks.
+        ur_r   = 0.;
+        ulon_r = 0.;
+        ulat_r = 0.;
 
         const double    lat       = latitude.at(Ilat),
                         cos_lat   = cos(lat),

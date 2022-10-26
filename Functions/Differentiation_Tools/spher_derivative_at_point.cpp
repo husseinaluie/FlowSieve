@@ -35,8 +35,7 @@ void spher_derivative_at_point(
     }
 
     // Check which derivative we're taking
-    int index, Iref;
-    const int Nref = grid.size();
+    int index;
     const bool do_dep = (dim == "depth");
     const bool do_lat = (dim == "lat");
     const bool do_lon = (dim == "lon");
@@ -49,9 +48,7 @@ void spher_derivative_at_point(
 
     // If it's a singleton dimension, just return zeros (we zeroed out earlier)
     //      this if for the case of no actual depth values
-    if (Nref == 1) {
-        return;
-    }
+    if (Nref == 1) { return; }
 
     // Determine lowest lower bound (LLB) and upperest upper bound (UUB)
     //   for the integration region. This essentially just depends on periodicity.
@@ -63,10 +60,8 @@ void spher_derivative_at_point(
 
     // Differentiation vector
     const int num_deriv_pts = diff_ord + order_of_deriv;
-    std::vector<double> ddl(num_deriv_pts);
-
-    // Assuming uniform grid
-    const double dl = grid.at(1) - grid.at(0);
+    //std::vector<double> ddl(num_deriv_pts);
+    std::vector<double> ddl(0);
 
     // Build outwards to try and build the stencil, but stop when
     //   we either hit a land cell or have gone far enough.
@@ -124,6 +119,7 @@ void spher_derivative_at_point(
         if ( do_lon or (do_lat and constants::UNIFORM_LAT_GRID)) {
             // Since we're on a uniform grid, we can use pre-computed
             //   differentiation coefficients
+            const double dl = grid.at(1) - grid.at(0);
             differentiation_vector(ddl, dl, Iref - LB, order_of_deriv, diff_ord);
         } else {
             // We're on a non-uniform grid, so we can't guarantee the
@@ -133,9 +129,11 @@ void spher_derivative_at_point(
             // NOTE: This CANNOT handle periodicity
             non_uniform_diff_vector(ddl, grid, Iref, LB, UB, diff_ord);
         }
+
         for (int IND = LB; IND <= UB; IND++) {
 
-            // Apply periodicity adjustment
+            // Apply periodicity adjustment 
+            //   (has no effect for non-periodic, since then LB >= 0 and UB < Nref)
             ind = ( IND % Nref + Nref ) % Nref;
 
             index = Index( Itime, do_dep ? ind : Idepth, do_lat ? ind : Ilat, do_lon ? ind : Ilon,

@@ -25,6 +25,10 @@ class dataset {
 
     public:
 
+        //
+        //// Variables
+        //
+
         // Storage for processor assignments
         int Nprocs_in_time, Nprocs_in_depth;
 
@@ -42,7 +46,10 @@ class dataset {
         std::vector<double> areas;
 
         // Boolean to indicate if we're computing u_r from incompressibility
-        bool compute_radial_vel = false;
+        bool compute_radial_vel    = false,
+             use_depth_derivatives = false,
+             depth_is_elevation    = false,
+             depth_is_increasing   = true;
 
         // Dictionary for the variables (velocity components, density, etc)
         std::map< std::string , std::vector<double> > variables;
@@ -54,11 +61,15 @@ class dataset {
         std::vector<double> region_areas, region_areas_water_only;
 
         // Store mask data (i.e. land vs water)
-        std::vector<bool> mask, reference_mask;
+        std::vector<bool> mask, reference_mask, mask_DEPTH;
 
         // Store data-chunking info. These keep track of the MPI divisions to ensure 
         // that the output is in the same order as the input.
         std::vector<int> myCounts, myStarts;
+
+        //
+        //// Functions
+        //
 
         // Constructor
         dataset();
@@ -88,7 +99,40 @@ class dataset {
         void compute_region_areas();
 
         // Check the processors divions between dimensions
-        void check_processor_divisions( const int Nprocs_in_time_input, const int Nprocs_in_depth_input, const MPI_Comm = MPI_COMM_WORLD );
+        void check_processor_divisions( const int Nprocs_in_time_input, 
+                                        const int Nprocs_in_depth_input, 
+                                        const MPI_Comm = MPI_COMM_WORLD );
+
+        // Function to gather a variable across all depths (i.e. reconstruct depth profile)
+        //  this is necessary for things like depth derivatives
+        void gather_variable_across_depth( const std::vector<double> & var,
+                                            std::vector<double> & gathered_var ) const ;
+        void gather_mask_across_depth( const std::vector<bool> & var,
+                                                std::vector<bool> & gathered_var
+                                              ) const ;
+
+        // Indexing functions
+        size_t local_index( const int Itime, 
+                            const int Idepth, 
+                            const int Ilat, 
+                            const int Ilon 
+                          ) const;
+        size_t global_index(    const int Itime, 
+                                const int Idepth, 
+                                const int Ilat, 
+                                const int Ilon, 
+                                const std::string merge_kind 
+                           ) const;
+        size_t index_local_to_global( const size_t index, const std::string merge_kind ) const;
+        size_t index_global_to_local( const size_t index, const std::string merge_kind ) const;
+        void index1to4_local(   const size_t index, 
+                                int & Itime, int & Idepth, int & Ilat, int & Ilon
+                            ) const;
+        void index1to4_global(  const size_t index, 
+                                int & Itime, int & Idepth, int & Ilat, int & Ilon,
+                                const std::string merge_kind
+                             ) const;
+
 
 };
 
@@ -201,14 +245,11 @@ void compute_vorticity_at_point(
         double & vort_lat_tmp,
         double & div_tmp,
         double & OkuboWeiss_tmp,
+        const dataset & source_data,
         const std::vector<double> & u_r, 
         const std::vector<double> & u_lon, 
         const std::vector<double> & u_lat,
-        const int Ntime,  const int Ndepth, const int Nlat, const int Nlon,
-        const int Itime,  const int Idepth, const int Ilat, const int Ilon,
-        const std::vector<double> & longitude, 
-        const std::vector<double> & latitude,
-        const std::vector<bool> & mask);
+        const int Itime,  const int Idepth, const int Ilat, const int Ilon);
 
 void compute_vorticity(
         std::vector<double> & vort_r,    
@@ -216,13 +257,10 @@ void compute_vorticity(
         std::vector<double> & vort_lat,
         std::vector<double> & vel_div,
         std::vector<double> & OkuboWeiss,
+        const dataset & source_data,
         const std::vector<double> & u_r, 
         const std::vector<double> & u_lon, 
         const std::vector<double> & u_lat,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<double> & longitude, 
-        const std::vector<double> & latitude,
-        const std::vector<bool> & mask,
         const MPI_Comm comm = MPI_COMM_WORLD);
 
 void apply_filter_at_point_for_quadratics(
@@ -348,6 +386,7 @@ double equation_of_state(
 
 void compute_div_transport(
         std::vector<double> & div_J,
+        const dataset & source_data,
         const std::vector<double> & u_x,
         const std::vector<double> & u_y,
         const std::vector<double> & u_z,
@@ -358,13 +397,8 @@ void compute_div_transport(
         const std::vector<double> & uyuz,
         const std::vector<double> & uzuz,
         const std::vector<double> & coarse_p,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
-        const std::vector<bool> & mask);
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
 
 void compute_spatial_average(
         std::vector<double> & means,

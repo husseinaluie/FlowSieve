@@ -55,11 +55,11 @@ void compute_Pi(
 
     double pi_tmp;
     int Itime, Idepth, Ilat, Ilon, ii, jj;
-    size_t index;
+    size_t index, local_index;
     const size_t Npts = energy_transfer.size();
 
     double ui_j, uj_i;
-    std::vector<double> tau_ij( ux.size() );
+    std::vector<double> tau_ij( Npts );
 
     // Some convenience handles
     //   note: the pointers aren't constant, but the things
@@ -77,62 +77,34 @@ void compute_Pi(
     for (ii = 0; ii < 3; ii++) {
         for (jj = 0; jj < 3; jj++) {
 
-            //   Assign the handy pointers: uiuj, ui, uj
+            //   Assign some handy pointers: uiuj, ui, uj
             //
             //   0 -> x
             //   1 -> y
             //   2 -> z
 
             // ui
-            switch (ii) {
-                case 0 : ui = &ux; break;
-                case 1 : ui = &uy; break;
-                case 2 : ui = &uz; break;
-            }
-
-            // uj
-            switch (jj) {
-                case 0 : uj = &ux; break;
-                case 1 : uj = &uy; break;
-                case 2 : uj = &uz; break;
-            }
+            ui = ( ii == 0 ) ? &ux : ( ii == 1 ) ? &uy : &uz;
+            uj = ( jj == 0 ) ? &ux : ( jj == 1 ) ? &uy : &uz;
 
             deriv_fields[0] = ui;
             deriv_fields[1] = uj;
 
             // uiuj (note that they're symmetric i.e. uiuj = ujui)
-            switch (ii) {
-                case 0 :
-                    switch (jj) {
-                        case 0 : uiuj = &uxux; break;
-                        case 1 : uiuj = &uxuy; break;
-                        case 2 : uiuj = &uxuz; break;
-                    }
-                    break;
-                case 1 :
-                    switch (jj) {
-                        case 0 : uiuj = &uxuy; break;
-                        case 1 : uiuj = &uyuy; break;
-                        case 2 : uiuj = &uyuz; break;
-                    }
-                    break;
-                case 2 :
-                    switch (jj) {
-                        case 0 : uiuj = &uxuz; break;
-                        case 1 : uiuj = &uyuz; break;
-                        case 2 : uiuj = &uzuz; break;
-                    }
-                    break;
-            }
+            uiuj =  ( ii == 0 ) ? ( ( jj == 0 ) ? &uxux : ( jj == 1 ) ? &uxuy : &uxuz ) :
+                    ( ii == 1 ) ? ( ( jj == 0 ) ? &uxuy : ( jj == 1 ) ? &uyuy : &uyuz ) :
+                                  ( ( jj == 0 ) ? &uxuz : ( jj == 1 ) ? &uyuz : &uzuz ) ;
 
             // Compute tau_ij 
-            #pragma omp parallel default(none) shared(tau_ij, mask, ui, uj, uiuj) private(index, uiuj_loc, ui_loc, uj_loc)
+            #pragma omp parallel \
+            default(none) \
+            shared(tau_ij, mask, ui, uj, uiuj, source_data) \
+            private(index, uiuj_loc, ui_loc, uj_loc)
             {
                 #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
                 for (index = 0; index < Npts; index++) {
 
                     if ( mask.at(index) ) {
-
                         ui_loc   = ui->at(  index);
                         uj_loc   = uj->at(  index);
                         uiuj_loc = uiuj->at(index);
@@ -143,8 +115,10 @@ void compute_Pi(
             }
 
             #pragma omp parallel default(none) \
-            shared(energy_transfer, latitude, longitude, mask, ii, jj, ui, uj, tau_ij, deriv_fields)\
-            private(Itime, Idepth, Ilat, Ilon, index, pi_tmp, ui_j, uj_i, x_deriv_vals, y_deriv_vals, z_deriv_vals)
+            shared( source_data, energy_transfer, latitude, longitude, mask, \
+                    ii, jj, ui, uj, tau_ij, deriv_fields)\
+            private( Itime, Idepth, Ilat, Ilon, index, pi_tmp, ui_j, uj_i, \
+                     x_deriv_vals, y_deriv_vals, z_deriv_vals)
             {
 
                 x_deriv_vals.resize(2);
@@ -170,13 +144,13 @@ void compute_Pi(
 
                     if ( mask.at(index) ) {
 
-                        Index1to4(index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                        source_data.index1to4_local( index, Itime, Idepth, Ilat, Ilon);
 
                         // Compute the desired derivatives
                         Cart_derivatives_at_point(
-                                x_deriv_vals, y_deriv_vals, z_deriv_vals, deriv_fields,
-                                latitude, longitude, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
-                                mask);
+                                x_deriv_vals, y_deriv_vals, z_deriv_vals, deriv_fields, 
+                                source_data, Itime, Idepth, Ilat, Ilon,
+                                1, constants::DiffOrd);
 
                         double Sij = 0.5 * ( ui_j + uj_i );
                         pi_tmp = - constants::rho0 * Sij * tau_ij.at(index);

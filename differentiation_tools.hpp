@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include "constants.hpp"
+#include "functions.hpp"
 
 /*!
  * \file
@@ -114,26 +115,22 @@ void spher_derivative_at_point(
  * @param[in,out]   y_deriv_vals            vector of pointers to return y-deriv values
  * @param[in,out]   z_deriv_vals            vector of pointers to return z-deriv values
  * @param[in]       fields                  vector of pointers to fields to differentiate
- * @param[in]       latitude                (1D) latitude array
- * @param[in]       longitude               (1D) longitude array
+ * @param[in]       source_data             dataset class instance containing data (Psi, Phi, etc)
  * @param[in]       Itime,Idepth,Ilat,Ilon  Indices for the target point in space
- * @param[in]       Ntime,Ndepth,Nlat,Nlon  Sizes of the dimensions
- * @param[in]       mask                    array to distinguish land/water cells 
  * @param[in]       order_of_deriv          order of the derivative (1st deriv, 2nd deriv, etc)
  * @param[in]       diff_ord                convergence order (default is specified in constants.hpp)
+ * @param[in]       merged_depth            indicates if depth has been merged across MPI ranks
  */
 void Cart_derivatives_at_point(
         const std::vector<double*> & x_deriv_vals,
         const std::vector<double*> & y_deriv_vals,
         const std::vector<double*> & z_deriv_vals,
         const std::vector<const std::vector<double>*> & fields,
-        const std::vector<double> & latitude, 
-        const std::vector<double> & longitude,
+        const dataset & source_data,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
-        const int Ntime, const int Ndepth, const int Nlat, const int Nlon,
-        const std::vector<bool> & mask,
         const int order_of_deriv = 1,
-        const int diff_ord = constants::DiffOrd);
+        const int diff_ord = constants::DiffOrd,
+        const bool include_depth_derivs = false);
 
 
 

@@ -5,6 +5,7 @@
 #include <vector>
 #include <omp.h>
 #include <math.h>
+#include <assert.h>
 
 
 /*!
@@ -85,14 +86,12 @@
  * @param[in]       u_x,u_y,u_z                     coarse Cartesian velocity components
  * @param[in]       uxux,uxuy,uxuz,uyuy,uyuz,uzuz   coarse velocity products (e.g. bar(u*v) )  
  * @param[in]       coarse_p                        coarse pressure
- * @param[in]       longitude,latitude              1D dimension vectors
- * @param[in]       Ntime,Ndepth,Nlat,Nlon          Size of dimensions (MPI-local sizes)
- * @param[in]       mask                            2D array to distinguish land from water
  *
  */
 
 void compute_div_transport(
         std::vector<double> & div_J,
+        const dataset & source_data,
         const std::vector<double> & u_x,
         const std::vector<double> & u_y,
         const std::vector<double> & u_z,
@@ -103,24 +102,49 @@ void compute_div_transport(
         const std::vector<double> & uyuz,
         const std::vector<double> & uzuz,
         const std::vector<double> & coarse_p,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
-        const std::vector<bool> & mask
+        const MPI_Comm comm
         ) {
 
+    const std::vector<double>   &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude;
+
+    //const bool use_depth_mask  = (source_data.use_depth_derivatives 
+    //                              and ( source_data.Nprocs_in_depth > 1 )
+    //                              );
+    //const std::vector<bool> &mask = use_depth_mask ? source_data.mask_DEPTH : source_data.mask;
+    const std::vector<bool> &mask = source_data.mask;
+
+    const int   Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
+
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
+
+    assert( u_x.size() == u_y.size() );
+    assert( u_x.size() == u_z.size() );
+    assert( u_x.size() == uxux.size() );
+    assert( u_x.size() == uxuy.size() );
+    assert( u_x.size() == uxuz.size() );
+    assert( u_x.size() == uyuy.size() );
+    assert( u_x.size() == uyuz.size() );
+    assert( u_x.size() == uzuz.size() );
+
+    #if DEBUG >= 2
+    int wRank, wSize;
+    MPI_Comm_rank( comm, &wRank );
+    MPI_Comm_size( comm, &wSize );
+
+    if (wRank == 0) { fprintf(stdout, "  Starting div(J) computation.\n"); }
+    #endif
 
     double div_J_tmp; 
     
     double dpdx, dpdy, dpdz;
 
     int Itime, Idepth, Ilat, Ilon;
-    size_t index;
-    const size_t Npts = u_x.size();
+    size_t index, global_index;
+    const size_t Npts = div_J.size();
 
     double ux, uy, uz;
 
@@ -155,12 +179,12 @@ void compute_div_transport(
     
     #pragma omp parallel \
     default(none) \
-    shared( div_J, stdout,\
+    shared( div_J, source_data, stdout, \
             latitude, longitude, mask, \
             u_x, u_y, u_z, uxux, uxuy, uxuz,\
             uyuy, uyuz, uzuz,\
             deriv_fields)\
-    private(Itime, Idepth, Ilat, Ilon, index, \
+    private(Itime, Idepth, Ilat, Ilon, index, global_index, \
             ux,   uy,   uz,\
             ux_x, uy_x, uz_x,\
             ux_y, uy_y, uz_y,\
@@ -221,35 +245,35 @@ void compute_div_transport(
 
             if ( mask.at(index) ) { // Skip land areas
 
-                Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                                 Ntime, Ndepth, Nlat, Nlon);
-
                 div_J_tmp = 0.;
 
                 // Compute the desired derivatives
+                if ( source_data.use_depth_derivatives ) {
+                    global_index = source_data.index_local_to_global( index, "Depth" );
+                } else {
+                    global_index = index;
+                }
+                source_data.index1to4_local( index, Itime, Idepth, Ilat, Ilon);
                 Cart_derivatives_at_point(
-                        x_deriv_vals, y_deriv_vals,
-                        z_deriv_vals, deriv_fields,
-                        latitude, longitude,
-                        Itime, Idepth, Ilat, Ilon,
-                        Ntime, Ndepth, Nlat, Nlon,
-                        mask);
+                        x_deriv_vals, y_deriv_vals, z_deriv_vals, deriv_fields,
+                        source_data, Itime, Idepth, Ilat, Ilon,
+                        1, constants::DiffOrd, source_data.use_depth_derivatives);
 
                 // u_i
-                ux = u_x.at(index);
-                uy = u_y.at(index);
-                uz = u_z.at(index);
+                ux = u_x.at(global_index);
+                uy = u_y.at(global_index);
+                uz = u_z.at(global_index);
 
                 // u_iu_j
-                uxux_loc = uxux.at(index);
-                uxuy_loc = uxuy.at(index);
-                uxuz_loc = uxuz.at(index);
-                uyux_loc = uxuy.at(index);
-                uyuy_loc = uyuy.at(index);
-                uyuz_loc = uyuz.at(index);
-                uzux_loc = uxuz.at(index);
-                uzuy_loc = uyuz.at(index);
-                uzuz_loc = uzuz.at(index);
+                uxux_loc = uxux.at(global_index);
+                uxuy_loc = uxuy.at(global_index);
+                uxuz_loc = uxuz.at(global_index);
+                uyux_loc = uxuy.at(global_index);
+                uyuy_loc = uyuy.at(global_index);
+                uyuz_loc = uyuz.at(global_index);
+                uzux_loc = uxuz.at(global_index);
+                uzuy_loc = uyuz.at(global_index);
+                uzuz_loc = uzuz.at(global_index);
 
                 // Advection by coarse velocity field
                 //    0.5 * rho0 * [ (u_i*u_i) * u_j ],j
@@ -285,6 +309,12 @@ void compute_div_transport(
                     );
 
 
+                // the divergent part of the two advection components, combined
+                // - 0.5 * rho0 * (u_i*u_i) * u_j,j
+                // negative sign because 
+                //div_J_tmp += - 0.5 * constants::rho0 * (ux*ux + uy*uy + uz*uz) * ( ux_x + uy_y + uz_z );
+
+
                 // Pressure term
                 // (p * u_j),j = u_j * p_,j
                 if (constants::COMP_BC_TRANSFERS) {
@@ -295,6 +325,12 @@ void compute_div_transport(
 
             div_J.at(index) = div_J_tmp;
 
+
+
         } // end index loop
     } // end pragma
+
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf(stdout, "  Done div(J) computation.\n"); fflush(stdout); }
+    #endif
 }

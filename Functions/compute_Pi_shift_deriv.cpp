@@ -153,7 +153,7 @@ void compute_Pi_shift_deriv(
 
             #pragma omp parallel \
             default(none) \
-            shared(energy_transfer, latitude, longitude, mask,\
+            shared( source_data, energy_transfer, latitude, longitude, mask,\
                     jj, ui, tau_ij, u_i_tau_ij, deriv_fields)\
             private(Itime, Idepth, Ilat, Ilon, index,\
                     pi_tmp, tau_ij_j, u_i_tau_ij_j,\
@@ -190,8 +190,7 @@ void compute_Pi_shift_deriv(
                         // Compute the desired derivatives
                         Cart_derivatives_at_point(
                                 x_deriv_vals, y_deriv_vals, z_deriv_vals, deriv_fields,
-                                latitude, longitude, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
-                                mask);
+                                source_data, Itime, Idepth, Ilat, Ilon );
 
                         // u_i * tau_ij,j - (u_i * tau_ij)_,j
                         pi_tmp = ui->at(index) * tau_ij_j  -  u_i_tau_ij_j;

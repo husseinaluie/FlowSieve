@@ -13,6 +13,7 @@
  *  @param[in,out]      vort_r,vort_lon,vort_lat    where to store computed vorticity components (array)
  *  @param[in,out]      vel_div                     where to store computed velocity divergence (array)
  *  @param[in,out]      OkuboWeiss                  where to store computed OkuboWeiss (array)
+ *  @param[in]          source_data                 dataset class instance containing data (Psi, Phi, etc)
  *  @param[in]          u_r,u_lon,u_lat             velocity components
  *  @param[in]          Ntime,Ndepth,Nlat,Nlon      (MPI-local) dimension sizes
  *  @param[in]          longitude,latitude          1D grid vectors
@@ -26,27 +27,32 @@ void compute_vorticity(
         std::vector<double> & vort_lat,
         std::vector<double> & vel_div,
         std::vector<double> & OkuboWeiss,
+        const dataset & source_data,
         const std::vector<double> & u_r,
         const std::vector<double> & u_lon,
         const std::vector<double> & u_lat,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const std::vector<bool> & mask,
         const MPI_Comm comm
         ) {
+
+    const std::vector<double>   &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude;
+
+    const std::vector<bool> &mask = source_data.mask;
+
+    const int   Ntime   = source_data.Ntime,
+                Ndepth  = source_data.Ndepth,
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
 
     const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
     double vort_r_tmp, vort_lon_tmp, vort_lat_tmp, div_tmp, OkuboWeiss_tmp;
     int Itime, Idepth, Ilat, Ilon;
     size_t index; 
-    const size_t Npts = u_r.size();
+    const size_t Npts = u_lon.size();
 
-    // If any of the 'output' arrays are size zero, don't do them (this is essentially how to 'turn off' outputs)
+    // If any of the 'output' arrays are size zero 
+    // don't do them (this is essentially how to 'turn off' outputs)
     const bool do_vort_r   = vort_r.size() > 0;
     const bool do_vort_lon = vort_lon.size() > 0;
     const bool do_vort_lat = vort_lat.size() > 0;
@@ -61,12 +67,15 @@ void compute_vorticity(
     MPI_Comm_size( comm, &wSize );
 
     if (wRank == 0) { fprintf(stdout, "  Starting vorticity computation.\n"); }
+    fflush(stdout);
     #endif
 
     #pragma omp parallel \
     default(none) \
-    shared(mask, u_r, u_lon, u_lat, longitude, latitude, vort_r, vort_lon, vort_lat, vel_div, OkuboWeiss) \
-    private(Itime, Idepth, Ilat, Ilon, index, vort_r_tmp, vort_lon_tmp, vort_lat_tmp, div_tmp, OkuboWeiss_tmp)
+    shared( source_data, mask, u_r, u_lon, u_lat, longitude, latitude, \
+            vort_r, vort_lon, vort_lat, vel_div, OkuboWeiss) \
+    private( Itime, Idepth, Ilat, Ilon, index, vort_r_tmp, vort_lon_tmp, vort_lat_tmp, \
+             div_tmp, OkuboWeiss_tmp)
     {
         #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
         for (index = 0; index < Npts; index++) {
@@ -85,9 +94,9 @@ void compute_vorticity(
                                  Ntime, Ndepth, Nlat, Nlon);
 
                 compute_vorticity_at_point(
-                        vort_r_tmp, vort_lon_tmp, vort_lat_tmp, div_tmp, OkuboWeiss_tmp,
-                        u_r,        u_lon,        u_lat,
-                        Ntime, Ndepth, Nlat, Nlon, Itime, Idepth, Ilat, Ilon, longitude, latitude, mask);
+                        vort_r_tmp, vort_lon_tmp, vort_lat_tmp, div_tmp, OkuboWeiss_tmp, source_data,
+                        u_r,        u_lon,        u_lat,        
+                        Itime, Idepth, Ilat, Ilon);
             }
 
             if (do_vort_r)   { vort_r.at(  index) = vort_r_tmp; }

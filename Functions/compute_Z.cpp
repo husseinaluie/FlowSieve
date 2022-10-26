@@ -95,35 +95,26 @@ void compute_Z(
         //   2 -> z
 
         // uj
-        switch (jj) {
-            case 0 : uj = &ux; break;
-            case 1 : uj = &uy; break;
-            case 2 : uj = &uz; break;
-        }
+        uj = ( jj == 0 ) ? &ux : ( jj == 1 ) ? &uy : &uz;
 
         // omega_uj 
-        switch (jj) {
-            case 0 : omega_uj = &vort_ux; break;
-            case 1 : omega_uj = &vort_uy; break;
-            case 2 : omega_uj = &vort_uz; break;
-        }
+        omega_uj = ( jj == 0 ) ? &vort_ux : ( jj == 1 ) ? &vort_uy : &vort_uz;
         
             
         // First, compute the appropriate
         //   tau_ij and u_i * tau_ij
         #pragma omp parallel \
         default(none) \
-        shared(tau_ij, u_i_tau_ij, mask, omega, uj, omega_uj)\
+        shared( source_data, tau_ij, u_i_tau_ij, mask, omega, uj, omega_uj)\
         private(index, omega_uj_loc, omega_loc, uj_loc)
         {
             #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
             for (index = 0; index < Npts; index++) {
 
                 if ( mask.at(index) ) {
-
-                    omega_loc    = omega->at(index);
-                    uj_loc       = uj->at(index);
-                    omega_uj_loc = omega_uj->at(index);
+                    omega_loc    = omega->at( index );
+                    uj_loc       = uj->at( index );
+                    omega_uj_loc = omega_uj->at( index );
 
                     tau_ij.at(index) = omega_uj_loc - omega_loc * uj_loc;
                     u_i_tau_ij.at(index) = omega_loc * tau_ij.at(index);
@@ -134,9 +125,9 @@ void compute_Z(
 
         #pragma omp parallel \
         default(none) \
-        shared(enstrophy_transfer, latitude, longitude, mask, stdout, \
+        shared( source_data, enstrophy_transfer, latitude, longitude, mask, stdout, \
                 jj, omega, tau_ij, u_i_tau_ij, deriv_fields,std::cout)\
-        private(Itime, Idepth, Ilat, Ilon, index,\
+        private(Itime, Idepth, Ilat, Ilon, index, \
                 Z_tmp, tau_ij_j, u_i_tau_ij_j,\
                 x_deriv_vals, y_deriv_vals, z_deriv_vals)
         {
@@ -164,16 +155,13 @@ void compute_Z(
 
                 if ( mask.at(index) ) {
 
-                    Index1to4(index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                    source_data.index1to4_local( index, Itime, Idepth, Ilat, Ilon);
 
                     // Compute the desired derivatives
                     Cart_derivatives_at_point(
-                            x_deriv_vals, y_deriv_vals,
-                            z_deriv_vals, deriv_fields,
-                            latitude, longitude,
-                            Itime, Idepth, Ilat, Ilon,
-                            Ntime, Ndepth, Nlat, Nlon,
-                            mask);
+                            x_deriv_vals, y_deriv_vals, z_deriv_vals, deriv_fields,
+                            source_data, Itime, Idepth, Ilat, Ilon,
+                            1, constants::DiffOrd);
 
                     // u_i * tau_ij,j - (u_i * tau_ij)_,j
                     Z_tmp = omega->at(index) * tau_ij_j  -  u_i_tau_ij_j;

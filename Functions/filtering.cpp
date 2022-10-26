@@ -311,12 +311,10 @@ void filtering(
 
         // We'll need vorticity, so go ahead and compute it
         compute_vorticity( coarse_vort_r, coarse_vort_lon, coarse_vort_lat, div, OkuboWeiss,
-                full_u_r, full_u_lon, full_u_lat,
-                Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                source_data, full_u_r, full_u_lon, full_u_lat );
 
         compute_vorticity( full_vort_r, null_vector, null_vector, null_vector, null_vector,
-                full_u_r, full_u_lon, full_u_lat,
-                Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                source_data, full_u_r, full_u_lon, full_u_lat );
 
     int perc_base = 5;
     int perc, perc_count=0;
@@ -650,13 +648,11 @@ void filtering(
             #endif
             if (not(constants::MINIMAL_OUTPUT)) {
                 compute_vorticity(fine_vort_r, fine_vort_lon, fine_vort_lat, div, OkuboWeiss,
-                        fine_u_r, fine_u_lon, fine_u_lat,
-                        Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                        source_data, fine_u_r, fine_u_lon, fine_u_lat );
             }
 
             compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat, div, OkuboWeiss,
-                    coarse_u_r, coarse_u_lon, coarse_u_lat,
-                    Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                    source_data, coarse_u_r, coarse_u_lon, coarse_u_lat );
 
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_vorticity"); }
 
@@ -702,8 +698,7 @@ void filtering(
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
 
             compute_vorticity(tilde_vort_r, tilde_vort_lon, tilde_vort_lat, div, OkuboWeiss,
-                    tilde_u_r, tilde_u_lon, tilde_u_lat,
-                    Ntime, Ndepth, Nlat, Nlon, longitude, latitude, mask);
+                    source_data, tilde_u_r, tilde_u_lon, tilde_u_lat );
 
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_Lambda"); }
 
@@ -727,13 +722,11 @@ void filtering(
         #endif
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         compute_div_transport(
-                div_J,
+                div_J, source_data,
                 coarse_u_x,  coarse_u_y,  coarse_u_z,
                 coarse_uxux, coarse_uxuy, coarse_uxuz,
                 coarse_uyuy, coarse_uyuz, coarse_uzuz,
-                coarse_p, longitude, latitude,
-                Ntime, Ndepth, Nlat, Nlon,
-                mask);
+                coarse_p);
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_transport"); }
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
@@ -753,7 +746,7 @@ void filtering(
             fflush(stdout);
 
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-            Apply_Postprocess_Routines( source_data, postprocess_fields, postprocess_names, OkuboWeiss, scales.at(Iscale), "postprocess");
+            Apply_Postprocess_Routines( source_data, postprocess_fields, postprocess_names, OkuboWeiss, scales.at(Iscale), timing_records, "postprocess");
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess"); }
         }
 
