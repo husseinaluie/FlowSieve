@@ -993,8 +993,8 @@ void filtering_helmholtz(
             source_data.gather_variable_across_depth( uy_uz_tor, uy_uz_DEPTH );
             source_data.gather_variable_across_depth( uz_uz_tor, uz_uz_DEPTH );
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "MPI_COMM_depth_merging"); }
+            if (wRank == 0) { fprintf( stdout, "Merged variables across depth.\n" ); fflush(stdout); }
         }
-        if (wRank == 0) { fprintf( stdout, "Merged variables across depth.\n" ); fflush(stdout); }
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             if (source_data.use_depth_derivatives and ( source_data.Nprocs_in_depth > 1 )) {
                 compute_div_transport( div_J_tor, source_data, u_x_coarse_DEPTH, u_y_coarse_DEPTH, u_z_coarse_DEPTH, 
