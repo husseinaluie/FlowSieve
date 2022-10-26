@@ -103,7 +103,7 @@ void read_var_from_file(
     retval = nc_inq_var(ncid, var_id, NULL, NULL, &num_dims, dim_ids, NULL );
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
     assert( num_dims > 0 );
-    #if DEBUG >= 2
+    #if DEBUG >= 3
     if (wRank == 0) {
         if (num_dims == 1) {
             fprintf(stdout, "  has %'d dimension of size ", num_dims);
@@ -175,7 +175,6 @@ void read_var_from_file(
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }
     fflush(stdout);
-    //if (num_dims == 4) { fprintf( stdout, " MPI rank %d has sizes:a %'zu %'zu %'zu %'zu\n", wRank, count[0], count[1], count[2], count[3] ); }
     #endif
 
     // Now resize the vector to the appropriate size
