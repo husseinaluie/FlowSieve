@@ -19,9 +19,9 @@ int get_omp_chunksize(const int Nlat, const int Nlon) {
 
     int nthreads = omp_get_num_threads();
 
-    // Set the chunk size to be 1% of what each thread would get 
+    // Set the chunk size to be 5% of what each thread would get 
     //    in a uniform distribution
-    int chunksize = std::max(1, (int) (Nlat * Nlon / 100. / nthreads));
+    int chunksize = std::max(1, (int) (Nlat * Nlon / 20. / nthreads));
 
     return chunksize;
 
