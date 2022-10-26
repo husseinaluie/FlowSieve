@@ -7,6 +7,7 @@
 #include <vector>
 #include <omp.h>
 #include <math.h>
+#include <assert.h>
 #include "../ALGLIB/stdafx.h"
 #include "../ALGLIB/linalg.h"
 
@@ -37,8 +38,11 @@ void depth_integrate(
                 Nlon    = source_data.Nlon;
 
     const size_t Npts = Ntime * Ndepth * Nlat * Nlon;
-    size_t index, int_index, index_below;
+    size_t index, int_index, index_below, index_above;
     int Itime, Idepth, Ilat, Ilon, Iz;
+
+    const bool  IS_ELEV = source_data.depth_is_elevation,
+                IS_INCR = source_data.depth_is_increasing;
 
 
     #if DEBUG >= 0
@@ -46,29 +50,42 @@ void depth_integrate(
     #endif
     #pragma omp parallel \
     default(none) \
-    shared( field_to_integrate, depth_integral, depth )\
-    private( Itime, Idepth, Ilat, Ilon, index, index_below, Iz )
+    shared( field_to_integrate, depth_integral, depth, source_data )\
+    private( Itime, Idepth, Ilat, Ilon, index, index_below, index_above, Iz )
     {
         #pragma omp for collapse(3) schedule(static)
         for ( Itime = 0; Itime < Ntime; ++Itime ) {
             for ( Ilat  = 0; Ilat < Nlat;  ++Ilat  ) {
                 for ( Ilon  = 0; Ilon < Nlon;  ++Ilon ) {
-
-                    // For all points but the bottom, compute the integral.
-                    //      the bottom point is assumed to have zero value
-                    // Integrate from the bottom up using trapezoid rule
-                    index = Index( Itime, Ndepth-1, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
-                    depth_integral.at(index) = 0.;
-                    for ( Iz = Ndepth - 2; Iz > -1; --Iz ) {
-                        index       = Index( Itime, Iz,   Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
-                        index_below = Index( Itime, Iz+1, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
-                        depth_integral.at(index) = depth_integral.at( index_below ) + 
-                              ( depth.at(Iz) - depth.at(Iz+1) ) 
-                            * ( 0.5 * ( field_to_integrate.at( index ) + field_to_integrate.at( index_below ) ) );
+                    if ( (IS_ELEV and IS_INCR) or (not(IS_ELEV) and not(IS_INCR)) ) {  
+                        // For all points but the bottom, compute the integral.
+                        //      the bottom point is assumed to have zero value
+                        // Integrate from the bottom up using trapezoid rule
+                        index = Index( Itime, 0, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+                        depth_integral.at(index) = 0.;
+                        for ( Iz = 1; Iz < Ndepth; ++Iz ) {
+                            index       = Index( Itime, Iz,   Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+                            index_above = Index( Itime, Iz-1, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+                            depth_integral.at(index) = depth_integral.at( index_below ) + 
+                                ( depth.at(Iz-1) - depth.at(Iz) ) 
+                                * ( 0.5 * ( field_to_integrate.at( index ) + field_to_integrate.at( index_below ) ) );
+                        }
+                    } else {
+                        // For all points but the bottom, compute the integral.
+                        //      the bottom point is assumed to have zero value
+                        // Integrate from the bottom up using trapezoid rule
+                        index = Index( Itime, Ndepth-1, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+                        depth_integral.at(index) = 0.;
+                        for ( Iz = Ndepth - 2; Iz > -1; --Iz ) {
+                            index       = Index( Itime, Iz,   Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+                            index_below = Index( Itime, Iz+1, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+                            depth_integral.at(index) = depth_integral.at( index_below ) + 
+                                ( depth.at(Iz+1) - depth.at(Iz) ) 
+                                * ( 0.5 * ( field_to_integrate.at( index ) + field_to_integrate.at( index_below ) ) );
+                        }
                     }
                 }
             }
         }
     }
-
 }
