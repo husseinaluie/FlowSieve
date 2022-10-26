@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
     print_header_info();
 
     // Initialize dataset class instance
-    dataset source_data, mask_data;
+    dataset source_data;
 
     // Read in source data / get size information
     #if DEBUG >= 1
@@ -153,6 +153,7 @@ int main(int argc, char *argv[]) {
                         u_lon_pot( num_pts, 0. ),
                         u_lat_pot( num_pts, 0. );
     const std::vector<bool> mask( num_pts, true );
+    source_data.mask = mask;
 
     // We only need the potential velocity, since div(tor vel) = 0 by definition
     #if DEBUG >= 2
@@ -162,13 +163,11 @@ int main(int argc, char *argv[]) {
 
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\nComputing the divergence\n"); }
+    fflush(stdout);
     #endif
     compute_vorticity(
             null_vector, null_vector, null_vector, negative_divergence, null_vector,
-            u_r, u_lon_pot, u_lat_pot,
-            Ntime, Ndepth, Nlat, Nlon, 
-            longitude, latitude, mask
-            );
+            source_data, u_r, u_lon_pot, u_lat_pot );
     int Itime, Idepth, Ilat, Ilon;
     for ( size_t index = 0; index < negative_divergence.size(); ++index) {
         negative_divergence.at(index) = -1. * negative_divergence.at(index);
