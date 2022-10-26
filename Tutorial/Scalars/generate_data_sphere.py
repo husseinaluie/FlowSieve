@@ -1,6 +1,5 @@
 import numpy as np
 from netCDF4 import Dataset
-import FiniteDiff
 
 ##
 #
@@ -29,12 +28,9 @@ R_earth = 6371e3
 dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
 
 # Define some eddy parameters
-eddy_scales = [ 250e3, 750e3, 3500e3 ]
-eddy_counts = [ 1e3,   3e2,   5e1 ]
-eddy_velocs = [ 0.2,   0.4,   0.1 ]
-
-u_lon_mean_value = 0.0
-
+ball_scales = [ 250e3, 750e3, 3500e3 ]
+ball_counts = [ 1e3,   3e2,   5e1 ]
+ball_magnis = [ 0.2,   0.4,   0.1 ]
 
 # Function to compute distances on sphere
 def dist( lon0, lat0, LON = LON, LAT = LAT, R = 6371e3 ):
@@ -52,11 +48,9 @@ def dist( lon0, lat0, LON = LON, LAT = LAT, R = 6371e3 ):
 
 
 # Build streamfunction
-Psi   = np.zeros( (Nlat,Nlon) )
-u_lon = np.zeros( (Nlat,Nlon) )
-u_lat = np.zeros( (Nlat,Nlon) )
+rho   = np.zeros( (Nlat,Nlon) )
 
-for scale, count, veloc in zip( eddy_scales, eddy_counts, eddy_velocs ):
+for scale, count, magnitude in zip( ball_scales, ball_counts, ball_magnis ):
 
     for ii in range(int(count)):
         W = ( scale * (1 + 0.05 * np.random.randn() ) ) / 2
@@ -68,27 +62,7 @@ for scale, count, veloc in zip( eddy_scales, eddy_counts, eddy_velocs ):
 
         sign = np.random.choice( (-1,1) )
 
-        Psi += sign * veloc * W * np.exp( -(D/W)**2 )
-
-# Add in continent info
-D2R = np.pi / 180.
-for coast_lat, coast_wid in zip( [-65*D2R, 65*D2R], [4*D2R, 4*D2R] ):
-    ENV = 0.5 * ( 1 + np.tanh( -1 * np.sign(coast_lat) * (LAT - coast_lat) / coast_wid ) )
-    Psi *= ENV
-
-# Get velocity from streamfunction
-ddlon = FiniteDiff.FiniteDiff( lon, 8, Uniform = True, Periodic = True,  Sparse = True )
-ddlat = FiniteDiff.FiniteDiff( lat, 8, Uniform = True, Periodic = False, Sparse = True )
-
-u_lon = - ddlat.dot( Psi   )   /   6371e3
-u_lat =   ddlon.dot( Psi.T ).T / ( 6371e3 * np.cos(LAT) )
-
-# Remove mean flow
-u_lon_mean = np.sum( u_lon * dAreas ) / np.sum( dAreas )
-u_lat_mean = np.sum( u_lat * dAreas ) / np.sum( dAreas )
-
-u_lon += - u_lon_mean + u_lon_mean_value
-u_lat += - u_lat_mean
+        rho += sign * magnitude * np.exp( -(D/W)**2 )
 
 # Save flow to a file
 dtype_dim = np.float64
@@ -98,7 +72,7 @@ dims = ('time','depth','latitude','longitude')
 
 fill_value = -1e10
 
-with Dataset('velocity_sample.nc', 'w', format='NETCDF4') as fp:
+with Dataset('density_sample.nc', 'w', format='NETCDF4') as fp:
 
     # time
     dim = 'time'
@@ -125,15 +99,7 @@ with Dataset('velocity_sample.nc', 'w', format='NETCDF4') as fp:
     lon_var[:] = lon * 180 / np.pi
 
     #
-    uo_var = fp.createVariable('uo', dtype, dims, contiguous=True, fill_value = fill_value)
-    uo_var.scale_factor = 1.
-    
-    vo_var = fp.createVariable('vo', dtype, dims, contiguous=True, fill_value = fill_value)
-    vo_var.scale_factor = 1.
-    
-    psi_var = fp.createVariable('psi', dtype, dims, contiguous=True, fill_value = fill_value)
-    psi_var.scale_factor = 1.
+    rho_var = fp.createVariable('rho', dtype, dims, contiguous=True, fill_value = fill_value)
+    rho_var.scale_factor = 1.
 
-    uo_var[ 0,0,:,:] = u_lon
-    vo_var[ 0,0,:,:] = u_lat
-    psi_var[0,0,:,:] = Psi
+    rho_var[0,0,:,:] = rho

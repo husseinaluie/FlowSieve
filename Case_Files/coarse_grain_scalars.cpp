@@ -62,32 +62,38 @@ int main(int argc, char *argv[]) {
         if (wRank == 0) { print_compile_info(NULL); } 
         return 0;
     }
+    const bool asked_help = input.cmdOptionExists("--help");
+    if (asked_help) {
+        fprintf( stdout, "The command-line input arguments [and default values] are:\n" );
+    }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string   &input_fname   = input.getCmdOption("--input_file",     "input.nc");
+    const std::string   &input_fname   = input.getCmdOption("--input_file",     "input.nc", asked_help);
 
-    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
-                        &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
-                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude"),
-                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time",      asked_help),
+                        &depth_dim_name     = input.getCmdOption("--depth",       "depth",     asked_help),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude",  asked_help),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude", asked_help);
 
-    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true");
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true", asked_help);
 
-    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1"),
-                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1", asked_help),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1", asked_help);
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
     // Also read in the fields to be filtered from commandline
     //   e.g. --filter_scales "rho salinity p" (names must match with input netcdf file)
     std::vector< std::string > vars_to_filter;
-    input.getListofStrings( vars_to_filter, "--variables" );
+    input.getListofStrings( vars_to_filter, "--variables", asked_help );
     const int Nvars = vars_to_filter.size();
 
     // Also read in the filter scales from the commandline
     //   e.g. --filter_scales "10.e3 150.76e3 1000e3" (units are in metres)
     std::vector<double> filter_scales;
-    input.getFilterScales( filter_scales, "--filter_scales" );
+    input.getFilterScales( filter_scales, "--filter_scales", asked_help );
+
+    if (asked_help) { return 0; }
 
     // Print processor assignments
     const int max_threads = omp_get_max_threads();
@@ -180,7 +186,7 @@ int main(int argc, char *argv[]) {
 
         double scale = filter_scales.at(ell_ind);
 
-        #if DEBUG >= 1
+        #if DEBUG >= 0
         fprintf( stdout, "Filter scale %'g km.\n", scale / 1e3 );
         #endif
 

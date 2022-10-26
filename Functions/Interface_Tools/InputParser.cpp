@@ -109,13 +109,17 @@ void InputParser::getFilterScales(
 
 }
 
-void InputParser::getListofStrings( std::vector<std::string> &list_of_strings, const std::string &argname ) const{
+void InputParser::getListofStrings( 
+        std::vector<std::string> &list_of_strings, 
+        const std::string &argname,
+        const bool help ) const{
 
     int wRank=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
 
     //using namespace std;
-    const std::string raw_input_string = getCmdOption( argname, "" );
+    const std::string raw_input_string = getCmdOption( argname, "", help );
+    if (help) { return; }
     assert( raw_input_string.size() > 0 );
 
     std::istringstream iss( raw_input_string );

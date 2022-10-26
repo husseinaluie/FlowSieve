@@ -884,6 +884,7 @@ INPUT                  = .. \
                          ../Functions/Interface_Tools \
                          ../Tutorial \
                          ../Tutorial/Basic \
+                         ../Tutorial/Scalars \
                          ../Tutorial/Spherical_Demo \
                          ../Tutorial/Spherical_Demo/Helmholtz \
                          ../Tutorial/Spherical_Demo/Helmholtz/project \

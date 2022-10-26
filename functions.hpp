@@ -560,7 +560,12 @@ class InputParser {
          *  Extract, parse, and format, a list of strings. This is typically a list of variable names.
          *  Assumes a string of space-delimited strings (e.g. "rho u v")
          */
-        void getListofStrings( std::vector<std::string> &list_of_strings, const std::string &argname ) const;
+        void getListofStrings( 
+                std::vector<std::string> 
+                &list_of_strings, 
+                const std::string &argname,
+                const bool help = false
+                ) const;
 
     private:
         std::vector <std::string> tokens;

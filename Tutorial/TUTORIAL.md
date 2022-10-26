@@ -12,6 +12,12 @@ Nothing fancy, but introduces the basics of running the code and plotting some o
 
 Tutorial [details are here](\ref tutorials2).
 
+## Scalars
+
+Introduces the basic functionality of `coarse_grain_scalars` by filtering a sample density field.
+
+Tutorial [details are here](\ref tutorialsScalar)
+
 ## Spherical Demo
 
 These tutorial works through the various steps involved in working with spherical data.
