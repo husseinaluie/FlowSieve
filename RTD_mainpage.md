@@ -81,6 +81,8 @@ Various geographic regions of interest can be provided in a netcdf file.
 
 1. `--version`
  * Calling `./coarse_grain.x --version` prints a summary of the constants / variables used when compiling
+2. `--help`
+ * Calling `./coarse_grain.x --help` prints a summary of the run-time command-line arguments, as well as default values (if applicable).
 
 
 ### Specifying Filtering Scales
