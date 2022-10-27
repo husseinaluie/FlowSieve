@@ -103,17 +103,17 @@ for kind in ['u_lon', 'u_lat', 'KE']:
 
     qms = np.zeros(axes.shape, dtype='object')
 
-    qms[0,0] = axes[0,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_tor,  cmap = cmap, norm = norm )
-    qms[1,0] = axes[1,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_pot,  cmap = cmap, norm = norm )
-    qms[2,0] = axes[2,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_proj, cmap = cmap, norm = norm )
-    qms[3,0] = axes[3,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_src,  cmap = cmap, norm = norm )
-    qms[4,0] = axes[4,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_diff, cmap = cmap, norm = norm_diff )
+    qms[0,0] = axes[0,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_tor,  cmap = cmap, norm = norm, rasterized = True )
+    qms[1,0] = axes[1,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_pot,  cmap = cmap, norm = norm, rasterized = True )
+    qms[2,0] = axes[2,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_proj, cmap = cmap, norm = norm, rasterized = True )
+    qms[3,0] = axes[3,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_src,  cmap = cmap, norm = norm, rasterized = True )
+    qms[4,0] = axes[4,0].pcolormesh( Xp_coarse, Yp_coarse, coarse_diff, cmap = cmap, norm = norm_diff, rasterized = True )
 
-    qms[0,1] = axes[0,1].pcolormesh( Xp_fine, Yp_fine, fine_tor,  cmap = cmap, norm = norm )
-    qms[1,1] = axes[1,1].pcolormesh( Xp_fine, Yp_fine, fine_pot,  cmap = cmap, norm = norm )
-    qms[2,1] = axes[2,1].pcolormesh( Xp_fine, Yp_fine, fine_proj, cmap = cmap, norm = norm )
-    qms[3,1] = axes[3,1].pcolormesh( Xp_fine, Yp_fine, fine_src,  cmap = cmap, norm = norm )
-    qms[4,1] = axes[4,1].pcolormesh( Xp_fine, Yp_fine, fine_diff, cmap = cmap, norm = norm_diff )
+    qms[0,1] = axes[0,1].pcolormesh( Xp_fine, Yp_fine, fine_tor,  cmap = cmap, norm = norm, rasterized = True )
+    qms[1,1] = axes[1,1].pcolormesh( Xp_fine, Yp_fine, fine_pot,  cmap = cmap, norm = norm, rasterized = True )
+    qms[2,1] = axes[2,1].pcolormesh( Xp_fine, Yp_fine, fine_proj, cmap = cmap, norm = norm, rasterized = True )
+    qms[3,1] = axes[3,1].pcolormesh( Xp_fine, Yp_fine, fine_src,  cmap = cmap, norm = norm, rasterized = True )
+    qms[4,1] = axes[4,1].pcolormesh( Xp_fine, Yp_fine, fine_diff, cmap = cmap, norm = norm_diff, rasterized = True )
 
 
     cb0 = plt.colorbar( qms[ 0,0], ax = axes[:-1,:] )
@@ -135,7 +135,7 @@ for kind in ['u_lon', 'u_lat', 'KE']:
     axes[3,0].set_ylabel('Full')
     axes[4,0].set_ylabel('Difference')
 
-    plt.savefig( kind + '_projection_results.png', dpi = 250)
+    plt.savefig( kind + '_projection_results.pdf', dpi = 250)
     plt.close()
 
 # we've removed the UiUj decomposition part for now, so don't do it.

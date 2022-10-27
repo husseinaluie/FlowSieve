@@ -53,7 +53,8 @@ Make sure that the variables in `constants.hpp` are set appropraitely. These inc
 - `CARTESIAN = false`
 - `PERIODIC_X = true`
 - `PERIODIC_Y = false`
-- The grid is uniform, and so `UNIFORM_LON_GRID` and `UNIFORM_LAT_GRID` should be set accordingly. However, these are strictly optimization flags, and d not impact the output.
+- `UNIFORM_LON_GRID = true`
+- `UNIFORM_LAT_GRID = true`
 - `FILTER_OVER_LAND = false`
 - `EXTEND_DOMAIN_TO_POLES = false`
 - `FULL_LON_SPAN = true`

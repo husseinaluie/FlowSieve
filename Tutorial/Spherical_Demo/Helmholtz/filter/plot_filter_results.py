@@ -24,7 +24,7 @@ with Dataset( '../velocity_sample.nc', 'r' ) as dset:
     u_lon_full = dset['uo'][0,0,:,:]
     u_lat_full = dset['vo'][0,0,:,:]
 
-plot_params = dict( cmap = 'plasma', norm = colors.LogNorm( vmin = 1e-3, vmax = 1 ) )
+plot_params = dict( cmap = 'plasma', norm = colors.LogNorm( vmin = 1e-3, vmax = 1 ), rasterized = True )
 
 
 # Plot the original unfiltered velocity, for reference
@@ -33,7 +33,7 @@ fig, axes = plt.subplots( 1, 1, sharex = True, sharey = True, figsize = (4,3), g
 qm = axes.pcolormesh( lon, lat, np.sqrt( u_lon_full**2 + u_lat_full**2 ), **plot_params )
 plt.colorbar(qm, ax = axes)
 
-plt.savefig( 'original_RMS_vel.png', dpi = 350 )
+plt.savefig( 'original_RMS_vel.pdf', dpi = 350 )
 plt.close()
 
 
@@ -46,8 +46,8 @@ for Icol, filename in enumerate( filter_files ):
 
     with Dataset( filename, 'r' ) as dset:
 
-        u_lon_coarse = dset['u_lon_tor'][0,0,:,:]
-        u_lat_coarse = dset['u_lat_tor'][0,0,:,:]
+        u_lon_coarse = dset['u_lon_tor'][0,0,:,:] + dset['u_lon_pot'][0,0,:,:]
+        u_lat_coarse = dset['u_lat_tor'][0,0,:,:] + dset['u_lat_pot'][0,0,:,:]
 
         u_lon_fine = u_lon_full - u_lon_coarse
         u_lat_fine = u_lat_full - u_lat_coarse
@@ -72,5 +72,5 @@ axes[0,0].set_ylabel('RMS Coarse Velocity')
 axes[1,0].set_ylabel('RMS Fine Velocity')
 axes[2,0].set_ylabel('Root Fine KE')
 
-plt.savefig('RMS_velocities.png', dpi = 350)
+plt.savefig('RMS_velocities.pdf', dpi = 350)
 plt.close()

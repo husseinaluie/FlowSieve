@@ -32,8 +32,7 @@ dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
 eddy_scales = [ 250e3, 750e3, 3500e3 ]
 eddy_counts = [ 1e3,   3e2,   5e1 ]
 eddy_velocs = [ 0.2,   0.4,   0.1 ]
-
-u_lon_mean_value = 0.0
+eddy_kinds  = ['Tor',  'Pot', 'Tor']
 
 
 # Function to compute distances on sphere
@@ -53,10 +52,11 @@ def dist( lon0, lat0, LON = LON, LAT = LAT, R = 6371e3 ):
 
 # Build streamfunction
 Psi   = np.zeros( (Nlat,Nlon) )
+Phi   = np.zeros( (Nlat,Nlon) )
 u_lon = np.zeros( (Nlat,Nlon) )
 u_lat = np.zeros( (Nlat,Nlon) )
 
-for scale, count, veloc in zip( eddy_scales, eddy_counts, eddy_velocs ):
+for scale, count, veloc, kind in zip( eddy_scales, eddy_counts, eddy_velocs, eddy_kinds ):
 
     for ii in range(int(count)):
         W = ( scale * (1 + 0.05 * np.random.randn() ) ) / 2
@@ -68,13 +68,17 @@ for scale, count, veloc in zip( eddy_scales, eddy_counts, eddy_velocs ):
 
         sign = np.random.choice( (-1,1) )
 
-        Psi += sign * veloc * W * np.exp( -(D/W)**2 )
+        if kind == 'Tor':
+            Psi += sign * veloc * W * np.exp( -(D/W)**2 )
+        elif kind == 'Pot':
+            Phi += sign * veloc * W * np.exp( -(D/W)**2 )
 
 # Add in continent info
 D2R = np.pi / 180.
 for coast_lat, coast_wid in zip( [-65*D2R, 65*D2R], [4*D2R, 4*D2R] ):
     ENV = 0.5 * ( 1 + np.tanh( -1 * np.sign(coast_lat) * (LAT - coast_lat) / coast_wid ) )
     Psi *= ENV
+    Phi *= ENV
 
 # Get velocity from streamfunction
 ddlon = FiniteDiff.FiniteDiff( lon, 8, Uniform = True, Periodic = True,  Sparse = True )
@@ -83,12 +87,8 @@ ddlat = FiniteDiff.FiniteDiff( lat, 8, Uniform = True, Periodic = False, Sparse 
 u_lon = - ddlat.dot( Psi   )   /   6371e3
 u_lat =   ddlon.dot( Psi.T ).T / ( 6371e3 * np.cos(LAT) )
 
-# Remove mean flow
-u_lon_mean = np.sum( u_lon * dAreas ) / np.sum( dAreas )
-u_lat_mean = np.sum( u_lat * dAreas ) / np.sum( dAreas )
-
-u_lon += - u_lon_mean + u_lon_mean_value
-u_lat += - u_lat_mean
+u_lon +=   ddlon.dot( Phi.T ).T / ( 6371e3 * np.cos(LAT) )
+u_lat += - ddlat.dot( Phi   )   /   6371e3
 
 # Save flow to a file
 dtype_dim = np.float64
@@ -133,7 +133,11 @@ with Dataset('velocity_sample.nc', 'w', format='NETCDF4') as fp:
     
     psi_var = fp.createVariable('psi', dtype, dims, contiguous=True, fill_value = fill_value)
     psi_var.scale_factor = 1.
+    
+    phi_var = fp.createVariable('phi', dtype, dims, contiguous=True, fill_value = fill_value)
+    phi_var.scale_factor = 1.
 
     uo_var[ 0,0,:,:] = u_lon
     vo_var[ 0,0,:,:] = u_lat
     psi_var[0,0,:,:] = Psi
+    phi_var[0,0,:,:] = Phi
