@@ -65,8 +65,8 @@ int main(int argc, char *argv[]) {
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
     std::vector< std::string > vars_to_refine, vars_in_output;
-    input.getListofStrings( vars_to_refine, "--input_variables", "",  asked_help );
-    input.getListofStrings( vars_in_output, "--output_variables", "", asked_help );
+    input.getListofStrings( vars_to_refine, "--input_variables",  asked_help );
+    input.getListofStrings( vars_in_output, "--output_variables", asked_help );
     const int Nvars = vars_to_refine.size();
 
     if (asked_help) { return 0; }
