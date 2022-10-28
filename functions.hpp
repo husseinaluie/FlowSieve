@@ -561,8 +561,7 @@ class InputParser {
          *  Assumes a string of space-delimited strings (e.g. "rho u v")
          */
         void getListofStrings( 
-                std::vector<std::string> 
-                &list_of_strings, 
+                std::vector<std::string> &list_of_strings, 
                 const std::string &argname,
                 const bool help = false
                 ) const;
