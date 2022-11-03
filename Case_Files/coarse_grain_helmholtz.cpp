@@ -64,45 +64,100 @@ int main(int argc, char *argv[]) {
     }
     const bool asked_help = input.cmdOptionExists("--help");
     if (asked_help) {
-        fprintf( stdout, "The command-line input arguments [and default values] are:\n" );
+        fprintf( stdout, "\033[1;4mThe command-line input arguments [and default values] are:\033[0m\n" );
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string   &Helm_input_fname  = input.getCmdOption("--Helmholtz_input_file",       "Helmholtz_projection.nc",      asked_help),
-                        &vel_input_fname   = input.getCmdOption("--velocity_input_file",        "vels.nc",                      asked_help),
-                        &u_r_input_fname   = input.getCmdOption("--radial_velocity_input_file", "NONE",                         asked_help),
-                        &wind_input_fname  = input.getCmdOption("--wind_tau_input_file",        "wind_tau_projection.nc",       asked_help),
-                        &quad_input_fname  = input.getCmdOption("--uiuj_Helmholtz_input_file",  "helmholtz_projection_uiuj.nc", asked_help);
+    const std::string   &Helm_input_fname  = input.getCmdOption("--Helmholtz_input_file",       
+                                                                "Helmholtz_projection.nc",      
+                                                                asked_help,
+                                                                "netCDF file containing streamfunction and potential function."),
+                        &vel_input_fname   = input.getCmdOption("--velocity_input_file",        
+                                                                "vels.nc",                      
+                                                                asked_help,
+                                                                "netCDF file containing velocity field (only used to get land mask)"),
+                        &u_r_input_fname   = input.getCmdOption("--radial_velocity_input_file", 
+                                                                "NONE",                         
+                                                                asked_help,
+                                                                "netCDF file containing radial/vertical velocity, if applicable. \nNONE if no radial velocity."),
+                        &wind_input_fname  = constants::COMP_WIND_FORCE ?
+                                                input.getCmdOption("--wind_tau_input_file",        
+                                                                   "wind_tau_projection.nc",       
+                                                                   asked_help,
+                                                                   "netCDF file containing surface wind stress Helmholtz Psi and Phi")
+                                                : "",
+                        &quad_input_fname  = constants::COMP_PI_HELMHOLTZ ? 
+                                                input.getCmdOption("--uiuj_Helmholtz_input_file",  
+                                                                   "helmholtz_projection_uiuj.nc", 
+                                                                   asked_help,
+                                                                   "netCDF file containing Helmholtz components of u*u tensor")
+                                                : "";
 
-    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time",       asked_help),
-                        &depth_dim_name     = input.getCmdOption("--depth",       "depth",      asked_help),
-                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude",   asked_help),
-                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude",  asked_help);
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        
+                                                                 "time",       
+                                                                 asked_help,
+                                                                 "Name of 'time' dimension in netCDF input file."),
+                        &depth_dim_name     = input.getCmdOption("--depth",       
+                                                                 "depth",      
+                                                                 asked_help,
+                                                                 "Name of 'depth' dimension in netCDF input file."),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    
+                                                                 "latitude",   
+                                                                 asked_help,
+                                                                 "Name of 'latitude' dimension in netCDF input file."),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   
+                                                                 "longitude",  
+                                                                 asked_help,
+                                                                 "Name of 'longitude' dimension in netCDF input file.");
 
-    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true", asked_help);
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   
+                                                               "true", 
+                                                               asked_help,
+                                                               "Boolean (true/false) indicating if the grid is in degrees (true) or radians (false).");
 
-    const std::string &do_radial_derivs   = input.getCmdOption("--use_depth_derivs", "false", asked_help);
+    const std::string &do_radial_derivs   = input.getCmdOption("--use_depth_derivs", 
+                                                               "false", 
+                                                               asked_help,
+                                                               "Boolean (true/false) indicating if vertical derivatives should be used.");
 
-    const std::string &depth_is_elevation = input.getCmdOption("--depth_is_elevation", "false", asked_help);
+    const std::string &depth_is_elevation = input.getCmdOption("--depth_is_elevation", 
+                                                               "false", 
+                                                               asked_help,
+                                                               "Boolean (true/false) indicating if the depth grid is actually elevation \n(i.e. points down [true] or up [false])\nOnly impacts vertical derivatives / integrals.");
 
-    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1", asked_help),
-                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1", asked_help);
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  
+                                                                     "1", 
+                                                                     asked_help,
+                                                                     "The number of MPI divisions in time. Optimally divides Ntime evenly.\nIf Ndepth = 1, Nprocs_in_time is automatically determined."),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", 
+                                                                     "1", 
+                                                                     asked_help,
+                                                                     "The number of MPI divisions in depth. Optimally divides Ndepth evenly.\nIf Ntime = 1, Nprocs_in_depth is automatically determined.");
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
-    const std::string   &tor_field_var_name     = input.getCmdOption("--tor_field",     "Psi",          asked_help),
-                        &pot_field_var_name     = input.getCmdOption("--pot_field",     "Phi",          asked_help),
-                        &vel_field_var_name     = input.getCmdOption("--vel_field",     "u_lat",        asked_help),
-                        &u_r_field_var_name     = input.getCmdOption("--u_r_field",     "u_r",          asked_help),
-                        &wind_tau_Psi_var_name  = input.getCmdOption("--wind_tau_Psi",  "wind_tau_Psi", asked_help),
-                        &wind_tau_Phi_var_name  = input.getCmdOption("--wind_tau_Phi",  "wind_tau_Phi", asked_help),
-                        &uiuj_F_r_var_name      = input.getCmdOption("--uiuj_F_r",      "uiuj_F_r",     asked_help),
-                        &uiuj_F_Phi_var_name    = input.getCmdOption("--uiuj_F_Phi",    "uiuj_F_Phi",   asked_help),
-                        &uiuj_F_Psi_var_name    = input.getCmdOption("--uiuj_F_Psi",    "uiuj_F_Psi",   asked_help);
+    const std::string   &tor_field_var_name     = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--tor_field",     "Psi",          asked_help) : "",
+                        &pot_field_var_name     = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--pot_field",     "Phi",          asked_help) : "",
+                        &vel_field_var_name     = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--vel_field",     "u_lat",        asked_help) : "",
+                        &u_r_field_var_name     = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--u_r_field",     "u_r",          asked_help) : "",
+                        &wind_tau_Psi_var_name  = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--wind_tau_Psi",  "wind_tau_Psi", asked_help) : "",
+                        &wind_tau_Phi_var_name  = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--wind_tau_Phi",  "wind_tau_Phi", asked_help) : "",
+                        &uiuj_F_r_var_name      = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--uiuj_F_r",      "uiuj_F_r",     asked_help) : "",
+                        &uiuj_F_Phi_var_name    = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--uiuj_F_Phi",    "uiuj_F_Phi",   asked_help) : "",
+                        &uiuj_F_Psi_var_name    = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--uiuj_F_Psi",    "uiuj_F_Psi",   asked_help) : "";
 
-    const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    "region_definitions.nc", asked_help),
-                        &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     "region",                asked_help),
-                        &region_defs_var_name = input.getCmdOption("--region_definitions_var",     "region_definition",     asked_help);
+    const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    
+                                                                   "region_definitions.nc", 
+                                                                   asked_help,
+                                                                   "netCDF file containing user-specified region definitions."),
+                        &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     
+                                                                   "region",                
+                                                                   asked_help,
+                                                                   "Name of the region dimension in the regions file."),
+                        &region_defs_var_name = input.getCmdOption("--region_definitions_var",     
+                                                                   "region_definition",     
+                                                                   asked_help,
+                                                                   "Name of the variable in the regions file that provides the region definitions.");
 
     // Also read in the filter scales from the commandline
     //   e.g. --filter_scales "10.e3 150.76e3 1000e3" (units are in metres)

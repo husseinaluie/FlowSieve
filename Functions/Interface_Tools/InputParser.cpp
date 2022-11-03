@@ -22,19 +22,48 @@ InputParser::InputParser (int &argc, char **argv){
 const std::string InputParser::getCmdOption(
         const std::string &option,
         const std::string &default_value,
-        const bool help
+        const bool help,
+        const std::string &description
         ) const{
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
-    std::vector<std::string>::const_iterator itr;
-    itr = std::find(this->tokens.begin(), this->tokens.end(), option);
     if (help) {
-            fprintf(stdout, "   %s [ %s ]\n", option.c_str(), default_value.c_str());
-            return default_value;
+        const int paddedGoal   = 30;
+        const int paddedLength = option.size() >= paddedGoal ? 0 : paddedGoal - option.size();
+        std::string opt_name = option;
+        std::string padded_description = description;
+        std::string dot_padding;
+
+        // pad spaces after the option name to make things format nicely
+        //opt_name.insert(opt_name.end(), paddedLength, '.');
+        dot_padding.insert(dot_padding.end(), paddedLength, '.');
+
+        // Also add padding before any newlines and the beginning of the description
+        std::vector<int> newline_locs( 1, 0 ); 
+
+        // find the newlines
+        for( int ii = 0; ii < description.size(); ++ii ) {
+            if (description[ii] == '\n') { newline_locs.push_back( ii+1 ); }
+        }
+
+        // put the padding in
+        for( int ii = newline_locs.size()-1; ii >= 0; --ii ) {
+            padded_description.insert( padded_description.begin() + newline_locs[ii], paddedGoal+4, ' ');
+        }
+
+        // print out the infor
+        fprintf(stdout, "   \033[1m%s\033[0m%s [ %s ]\n", opt_name.c_str(), dot_padding.c_str(), default_value.c_str());
+        if ( not( description == "" ) ) {
+            fprintf(stdout, "%s\n", padded_description.c_str() );
+        }
+        return default_value;
     } else {
+        std::vector<std::string>::const_iterator itr;
+        itr = std::find(this->tokens.begin(), this->tokens.end(), option);
+
         if (itr != this->tokens.end() && ++itr != this->tokens.end()){
             #if DEBUG >= 0
             if (wRank == 0) {
@@ -67,8 +96,12 @@ void InputParser::getFilterScales(
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
 
     //using namespace std;
-    const std::string string_of_scales = getCmdOption( argname, " ", help );
-    if (help) { return; }
+
+    const std::string string_of_scales = getCmdOption( argname, " ", help,
+            "Space-separated list of filter scales in metres.\ne.g. '100.e3 250.e3 1000.e3'");
+    if (help) {
+        return;
+    }
     assert( string_of_scales.size() > 0 );
 
     std::istringstream iss( string_of_scales );
@@ -112,7 +145,9 @@ void InputParser::getFilterScales(
 void InputParser::getListofStrings( 
         std::vector<std::string> &list_of_strings, 
         const std::string &argname,
-        const bool help ) const{
+        const bool help,
+        const std::string &description
+        ) const{
 
     int wRank=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
