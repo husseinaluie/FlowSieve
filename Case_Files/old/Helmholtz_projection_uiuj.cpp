@@ -118,12 +118,54 @@ int main(int argc, char *argv[]) {
         convert_coordinates( source_data.longitude, source_data.latitude );
     }
 
-    // Compute the area of each 'cell' which will be necessary for integration
-    source_data.compute_cell_areas();
-
     // Read in the velocity fields
     source_data.load_variable( "u_lon", zonal_vel_name, input_fname, true, true );
     source_data.load_variable( "u_lat", merid_vel_name, input_fname, true, true );
+
+    // Get the MPI-local dimension sizes
+    source_data.Ntime  = source_data.myCounts[0];
+    source_data.Ndepth = source_data.myCounts[1];
+
+    //
+    //// If necessary, extend the domain to reach the poles
+    //
+    if ( constants::EXTEND_DOMAIN_TO_POLES ) {
+        #if DEBUG >= 0
+        if (wRank == 0) { fprintf( stdout, "Extending the domain to the poles\n" ); }
+        #endif
+
+        // Extend the latitude grid to reach the poles and update source_data with the new info.
+        std::vector<double> extended_latitude;
+        int orig_lat_start_in_extend;
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf( stdout, "    Extending latitude to poles\n" ); }
+        #endif
+        extend_latitude_to_poles( source_data.latitude, extended_latitude, orig_lat_start_in_extend );
+
+        // Extend out the mask
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf( stdout, "    Extending mask to poles\n" ); }
+        #endif
+        extend_mask_to_poles( source_data.mask, source_data, extended_latitude, orig_lat_start_in_extend );
+
+        // Extend out all of the variable fields
+        for(const auto& var_data : source_data.variables) {
+            #if DEBUG >= 1
+            if (wRank == 0) { fprintf( stdout, "    Extending variable %s to poles\n", var_data.first.c_str() ); }
+            #endif
+            extend_field_to_poles( source_data.variables[var_data.first], source_data, extended_latitude, orig_lat_start_in_extend );
+        }
+
+        // Update source_data to use the extended latitude
+        source_data.latitude = extended_latitude;
+        source_data.Nlat = source_data.latitude.size();
+        source_data.myCounts[2] = source_data.Nlat;
+
+    }
+
+    // Compute the area of each 'cell' which will be necessary for integration
+    source_data.compute_cell_areas();
+
 
     // Mask out the pole, if necessary (i.e. set lat = 90 to land)
     mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
