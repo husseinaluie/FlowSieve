@@ -85,35 +85,80 @@ int main(int argc, char *argv[]) {
         if (wRank == 0) { print_compile_info(NULL); } 
         return 0;
     }
+    const bool asked_help = input.cmdOptionExists("--help");
+    if (asked_help) {
+        fprintf( stdout, "\033[1;4mThe command-line input arguments [and default values] are:\033[0m\n" );
+    }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string &input_fname       = input.getCmdOption("--input_file",  "input.nc");
+    const std::string &input_fname       = input.getCmdOption("--input_file",  "input.nc", asked_help,
+                                                              "netCDF file containing the input variables and grid.");
 
-    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
-                        &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
-                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude"),
-                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        
+                                                                 "time",       
+                                                                 asked_help,
+                                                                 "Name of 'time' dimension in netCDF input file."),
+                        &depth_dim_name     = input.getCmdOption("--depth",       
+                                                                 "depth",      
+                                                                 asked_help,
+                                                                 "Name of 'depth' dimension in netCDF input file."),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    
+                                                                 "latitude",   
+                                                                 asked_help,
+                                                                 "Name of 'latitude' dimension in netCDF input file."),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   
+                                                                 "longitude",  
+                                                                 asked_help,
+                                                                 "Name of 'longitude' dimension in netCDF input file.");
 
-    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true");
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   
+                                                               "true", 
+                                                               asked_help,
+                                                               "Boolean (true/false) indicating if the grid is in degrees (true) or radians (false).");
 
-    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1"),
-                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  
+                                                                     "1", 
+                                                                     asked_help,
+                                                                     "The number of MPI divisions in time. Optimally divides Ntime evenly.\nIf Ndepth = 1, Nprocs_in_time is automatically determined."),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", 
+                                                                     "1", 
+                                                                     asked_help,
+                                                                     "The number of MPI divisions in depth. Optimally divides Ndepth evenly.\nIf Ntime = 1, Nprocs_in_depth is automatically determined.");
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
-    const std::string   &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo"),
-                        &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo"),
-                        &density_var_name  = input.getCmdOption("--density",     "rho"),
-                        &pressure_var_name = input.getCmdOption("--pressure",    "p");
+    const std::string   &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo", asked_help,
+                                                                "Name of zonal (eastward) velocity in input file"),
+                        &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo", asked_help,
+                                                                "Name of meridional (northward) velocity in input file"),
+                        &density_var_name  = constants::COMP_BC_TRANSFERS ? 
+                                                    input.getCmdOption("--density",     "rho", asked_help,
+                                                                       "Name of density in input file")
+                                                    : "",
+                        &pressure_var_name = constants::COMP_BC_TRANSFERS ?
+                                                    input.getCmdOption("--pressure",    "p", asked_help,
+                                                                       "Name of pressure in input file")
+                                                    : "";
 
-    const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    "region_definitions.nc"),
-                        &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     "region"),
-                        &region_defs_var_name = input.getCmdOption("--region_definitions_var",     "region_definition");
+    const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    
+                                                                   "region_definitions.nc", 
+                                                                   asked_help,
+                                                                   "netCDF file containing user-specified region definitions."),
+                        &region_defs_dim_name = input.getCmdOption("--region_definitions_dim",     
+                                                                   "region",                
+                                                                   asked_help,
+                                                                   "Name of the region dimension in the regions file."),
+                        &region_defs_var_name = input.getCmdOption("--region_definitions_var",     
+                                                                   "region_definition",     
+                                                                   asked_help,
+                                                                   "Name of the variable in the regions file that provides the region definitions.");
 
     // Also read in the filter scales from the commandline
     //   e.g. --filter_scales "10.e3 150.76e3 1000e3" (units are in metres)
     std::vector<double> filter_scales;
-    input.getFilterScales( filter_scales, "--filter_scales" );
+    input.getFilterScales( filter_scales, "--filter_scales", asked_help );
+
+    if (asked_help) { return 0; }
 
     // Set OpenMP thread number
     const int max_threads = omp_get_max_threads();

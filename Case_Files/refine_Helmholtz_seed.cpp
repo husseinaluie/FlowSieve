@@ -98,6 +98,8 @@ int main(int argc, char *argv[]) {
             "List of names (space-separated) that you want the variables to be called in the output file.\nNote that these must be in the same order!\ne.g. 'rho ulon ulat ur'");
     const int Nvars = vars_to_refine.size();
 
+    if (asked_help) { return 0; }
+
     // Print processor assignments
     const int max_threads = omp_get_max_threads();
     omp_set_num_threads( max_threads );
