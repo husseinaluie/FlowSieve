@@ -153,7 +153,7 @@ void InputParser::getListofStrings(
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
 
     //using namespace std;
-    const std::string raw_input_string = getCmdOption( argname, "", help );
+    const std::string raw_input_string = getCmdOption( argname, "", help, description );
     if (help) { return; }
     assert( raw_input_string.size() > 0 );
 

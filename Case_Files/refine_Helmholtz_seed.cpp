@@ -42,21 +42,49 @@ int main(int argc, char *argv[]) {
         if (wRank == 0) { print_compile_info(NULL); } 
         return 0;
     }
+    const bool asked_help = input.cmdOptionExists("--help");
+    if (asked_help) {
+        fprintf( stdout, "\033[1;4mThe command-line input arguments [and default values] are:\033[0m\n" );
+    }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string   &coarse_fname   = input.getCmdOption("--coarse_file",   "coarse.nc"),
-                        &fine_fname     = input.getCmdOption("--fine_file",     "fine.nc"),
-                        &output_fname   = input.getCmdOption("--output_file",   "coarse_vel.nc");
+    const std::string   &coarse_fname   = input.getCmdOption("--coarse_file",   "coarse.nc", asked_help, 
+                                                "netCDF file containing the variables that you want to refine / upsample."),
+                        &fine_fname     = input.getCmdOption("--fine_file",     "fine.nc", asked_help,
+                                                "netCDF file containing the grid onto which you want to refine the variables."),
+                        &output_fname   = input.getCmdOption("--output_file",   "coarse_vel.nc", asked_help,
+                                                "Filename for where the refined variables should be stored (netCDF).");
 
-    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
-                        &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
-                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude"),
-                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude");
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        
+                                                                 "time",       
+                                                                 asked_help,
+                                                                 "Name of 'time' dimension in netCDF input file."),
+                        &depth_dim_name     = input.getCmdOption("--depth",       
+                                                                 "depth",      
+                                                                 asked_help,
+                                                                 "Name of 'depth' dimension in netCDF input file."),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    
+                                                                 "latitude",   
+                                                                 asked_help,
+                                                                 "Name of 'latitude' dimension in netCDF input file."),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   
+                                                                 "longitude",  
+                                                                 asked_help,
+                                                                 "Name of 'longitude' dimension in netCDF input file.");
 
-    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true");
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   
+                                                               "true", 
+                                                               asked_help,
+                                                               "Boolean (true/false) indicating if the grid is in degrees (true) or radians (false).");
 
-    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1"),
-                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1");
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  
+                                                                     "1", 
+                                                                     asked_help,
+                                                                     "The number of MPI divisions in time. Optimally divides Ntime evenly.\nIf Ndepth = 1, Nprocs_in_time is automatically determined."),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", 
+                                                                     "1", 
+                                                                     asked_help,
+                                                                     "The number of MPI divisions in depth. Optimally divides Ndepth evenly.\nIf Ntime = 1, Nprocs_in_depth is automatically determined.");
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
@@ -64,8 +92,10 @@ int main(int argc, char *argv[]) {
     //const std::string  &var_name_output = input.getCmdOption("--var_in_output", "seed");
 
     std::vector< std::string > vars_to_refine, vars_in_output;
-    input.getListofStrings( vars_to_refine, "--input_variables" );
-    input.getListofStrings( vars_in_output, "--output_variables" );
+    input.getListofStrings( vars_to_refine, "--input_variables", asked_help,
+            "List of variable names (space-separated) that you want to refine / up-sample.\nNames must correspond to the name of the variable in the input file.\ne.g. 'rho u v w'" );
+    input.getListofStrings( vars_in_output, "--output_variables", asked_help,
+            "List of names (space-separated) that you want the variables to be called in the output file.\nNote that these must be in the same order!\ne.g. 'rho ulon ulat ur'");
     const int Nvars = vars_to_refine.size();
 
     // Print processor assignments

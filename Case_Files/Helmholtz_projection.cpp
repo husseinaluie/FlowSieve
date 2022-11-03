@@ -49,44 +49,98 @@ int main(int argc, char *argv[]) {
     }
     const bool asked_help = input.cmdOptionExists("--help");
     if (asked_help) {
-        fprintf( stdout, "The command-line input arguments [and default values] are:\n" );
+        fprintf( stdout, "\033[1;4mThe command-line input arguments [and default values] are:\033[0m\n" );
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string   &input_fname      = input.getCmdOption("--input_file",      "input.nc",                 asked_help),
-                        &output_fname     = input.getCmdOption("--output_file",     "projection_Helmholtz.nc",  asked_help),
-                        &seed_fname       = input.getCmdOption("--seed_file",       "seed.nc",                  asked_help);
+    const std::string   &input_fname      = input.getCmdOption("--input_file",      
+                                                               "input.nc",                 
+                                                               asked_help,
+                                                               "netCDF file containing vector field to Helmholtz decompose"),
+                        &output_fname     = input.getCmdOption("--output_file",     
+                                                               "projection_Helmholtz.nc",  
+                                                               asked_help,
+                                                               "Filename for the output (netCDF file of Helmholtz scalars)"),
+                        &seed_fname       = input.getCmdOption("--seed_file",       
+                                                               "zero",                  
+                                                               asked_help,
+                                                               "netCDF file containing initial guesses for Helmholtz scalars.\nUse 'zero' (the default) for no seed.");
 
-    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time",       asked_help),
-                        &depth_dim_name     = input.getCmdOption("--depth",       "depth",      asked_help),
-                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude",   asked_help),
-                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude",  asked_help);
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        
+                                                                 "time",       
+                                                                 asked_help,
+                                                                 "Name of 'time' dimension in netCDF input file."),
+                        &depth_dim_name     = input.getCmdOption("--depth",       
+                                                                 "depth",      
+                                                                 asked_help,
+                                                                 "Name of 'depth' dimension in netCDF input file."),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    
+                                                                 "latitude",   
+                                                                 asked_help,
+                                                                 "Name of 'latitude' dimension in netCDF input file."),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   
+                                                                 "longitude",  
+                                                                 asked_help,
+                                                                 "Name of 'longitude' dimension in netCDF input file.");
 
-    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true", asked_help);
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   
+                                                               "true", 
+                                                               asked_help,
+                                                               "Boolean (true/false) indicating if the grid is in degrees (true) or radians (false).");
 
-    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1", asked_help),
-                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1", asked_help);
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  
+                                                                     "1", 
+                                                                     asked_help,
+                                                                     "The number of MPI divisions in time. Optimally divides Ntime evenly.\nIf Ndepth = 1, Nprocs_in_time is automatically determined."),
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", 
+                                                                     "1", 
+                                                                     asked_help,
+                                                                     "The number of MPI divisions in depth. Optimally divides Ndepth evenly.\nIf Ntime = 1, Nprocs_in_depth is automatically determined.");
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
-    const std::string   &zonal_vel_name    = input.getCmdOption("--zonal_vel",   "uo",          asked_help),
-                        &merid_vel_name    = input.getCmdOption("--merid_vel",   "vo",          asked_help),
-                        &tor_seed_name     = input.getCmdOption("--tor_seed",    "Psi_seed",    asked_help),
-                        &pot_seed_name     = input.getCmdOption("--pot_seed",    "Phi_seed",    asked_help);
+    const std::string   &zonal_vel_name    = input.getCmdOption("--zonal_vel",   
+                                                                "uo",          
+                                                                asked_help,
+                                                                "Name of zonal (eastward) velocity in netCDF input file"),
+                        &merid_vel_name    = input.getCmdOption("--merid_vel",   
+                                                                "vo",          
+                                                                asked_help,
+                                                                "Name of meridional (northward) velocity in netCDF input file"),
+                        &tor_seed_name     = input.getCmdOption("--tor_seed",    
+                                                                "Psi_seed",    
+                                                                asked_help,
+                                                                "Name of streamfunction (Psi) seed variable in seed file (if applicable)"),
+                        &pot_seed_name     = input.getCmdOption("--pot_seed",    
+                                                                "Phi_seed",    
+                                                                asked_help,
+                                                                "Name of potential function (Phi) seed variable in seed file (if applicable)");
 
-    const std::string &tolerance_string = input.getCmdOption("--tolerance", "5e-3", asked_help);
+    const std::string &tolerance_string = input.getCmdOption("--tolerance", 
+                                                             "1e-120", 
+                                                             asked_help,
+                                                             "Termination tolerance. Note that this is based on matrix norms, and not a great measure of convergence.\nIn general, set to be very small (default) and check the convergence metrics\nthat are provided in the output file.");
     const double tolerance = stod(tolerance_string);  
 
-    const std::string &iteration_string = input.getCmdOption("--max_iterations", "100000", asked_help);
+    const std::string &iteration_string = input.getCmdOption("--max_iterations", 
+                                                             "100000", 
+                                                             asked_help,
+                                                             "Maximum number of iterations for the solver before terminating. Can use exponential notation (e.g. '5e3')");
     const int max_iterations = stod(iteration_string);  
 
     const std::string &Tikhov_Lap_string = input.getCmdOption("--Tikhov_Laplace", "1.", asked_help);
     const double Tikhov_Laplace = stod(Tikhov_Lap_string);  
 
-    const std::string &use_mask_string = input.getCmdOption("--use_mask", "false", asked_help);
+    const std::string &use_mask_string = input.getCmdOption("--use_mask", 
+                                                            "false", 
+                                                            asked_help,
+                                                            "Boolean (true/false) indicating if land masking should be accounted for in the projection.\nThis is generally not advised, especially if coarse-graining will use 'filter over land' anyways.");
     const bool use_mask = string_to_bool(use_mask_string);
 
-    const std::string &use_area_weight_string = input.getCmdOption("--use_area_weight", "true", asked_help);
+    const std::string &use_area_weight_string = input.getCmdOption("--use_area_weight", 
+                                                                   "true", 
+                                                                   asked_help,
+                                                                   "Boolean (true/false) indicating if the least-squares problem should be weighted by area, so that larger cells have more priority.\nSetting to true is generally advised because of the poles.");
     const bool use_area_weight = string_to_bool(use_area_weight_string);
 
     if (asked_help) { return 0; }

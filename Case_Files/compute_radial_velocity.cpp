@@ -65,28 +65,64 @@ int main(int argc, char *argv[]) {
     }
     const bool asked_help = input.cmdOptionExists("--help");
     if (asked_help) {
-        fprintf( stdout, "The command-line input arguments [and default values] are:\n" );
+        fprintf( stdout, "\033[1;4mThe command-line input arguments [and default values] are:\033[0m\n" );
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string   &Helm_input_fname  = input.getCmdOption("--Helmholtz_input_file",       "Helmholtz_projection.nc",      asked_help),
-                        &vel_input_fname   = input.getCmdOption("--velocity_input_file",        "vels.nc",                      asked_help),
-                        &output_fname      = input.getCmdOption("--output_file",                "radial_vel.nc",                asked_help);
+    const std::string   &Helm_input_fname  = input.getCmdOption("--Helmholtz_input_file",       
+                                                                "Helmholtz_projection.nc",      
+                                                                asked_help,
+                                                                "netCDF file where Helmholtz scalars are stored."),
+                        &vel_input_fname   = input.getCmdOption("--velocity_input_file",        
+                                                                "vels.nc",                      
+                                                                asked_help,
+                                                                "netCDF file where velocities are stored (to provide land information)."),
+                        &output_fname      = input.getCmdOption("--output_file",                
+                                                                "radial_vel.nc",                
+                                                                asked_help,
+                                                                "Filename for where the radial velocity should be stored.");
 
-    const std::string   &time_dim_name      = input.getCmdOption("--time",        "time",       asked_help),
-                        &depth_dim_name     = input.getCmdOption("--depth",       "depth",      asked_help),
-                        &latitude_dim_name  = input.getCmdOption("--latitude",    "latitude",   asked_help),
-                        &longitude_dim_name = input.getCmdOption("--longitude",   "longitude",  asked_help);
+    const std::string   &time_dim_name      = input.getCmdOption("--time",        
+                                                                 "time",       
+                                                                 asked_help,
+                                                                 "Name of 'time' dimension in netCDF input file."),
+                        &depth_dim_name     = input.getCmdOption("--depth",       
+                                                                 "depth",      
+                                                                 asked_help,
+                                                                 "Name of 'depth' dimension in netCDF input file."),
+                        &latitude_dim_name  = input.getCmdOption("--latitude",    
+                                                                 "latitude",   
+                                                                 asked_help,
+                                                                 "Name of 'latitude' dimension in netCDF input file."),
+                        &longitude_dim_name = input.getCmdOption("--longitude",   
+                                                                 "longitude",  
+                                                                 asked_help,
+                                                                 "Name of 'longitude' dimension in netCDF input file.");
 
-    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true", asked_help);
+    const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   
+                                                               "true", 
+                                                               asked_help,
+                                                               "Boolean (true/false) indicating if the grid is in degrees (true) or radians (false).");
 
-    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1", asked_help);
+    const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  
+                                                                     "1", 
+                                                                     asked_help,
+                                                                     "The number of MPI divisions in time. Optimally divides Ntime evenly.\nIf Ndepth = 1, Nprocs_in_time is automatically determined.");
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = 1;
 
-    const std::string   &tor_field_var_name     = input.getCmdOption("--tor_field",     "Psi",          asked_help),
-                        &pot_field_var_name     = input.getCmdOption("--pot_field",     "Phi",          asked_help),
-                        &vel_field_var_name     = input.getCmdOption("--vel_field",     "u_lat",        asked_help);
+    const std::string   &tor_field_var_name     = input.getCmdOption("--tor_field",     
+                                                                     "Psi",          
+                                                                     asked_help,
+                                                                     "Name of the streamfunction (Psi) in the input file."),
+                        &pot_field_var_name     = input.getCmdOption("--pot_field",     
+                                                                     "Phi",          
+                                                                     asked_help,
+                                                                     "Name of the potential function (Phi) in the input file."),
+                        &vel_field_var_name     = input.getCmdOption("--vel_field",     
+                                                                     "u_lat",        
+                                                                     asked_help,
+                                                                     "Name of a velocity field in the velocity input file.");
 
     if (asked_help) { return 0; }
 
