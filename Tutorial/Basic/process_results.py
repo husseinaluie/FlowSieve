@@ -38,7 +38,7 @@ with Dataset( 'velocity_sample.nc', 'r' ) as dset:
 fig, axes = plt.subplots( 3, 1, sharex = True, sharey = True, figsize = (7,5), 
                                 gridspec_kw = dict( left = 0.075, right = 0.95, bottom = 0.05, top = 0.95 ) )
 
-plot_params = dict( vmin = -1.5, vmax = 1.5, cmap = 'bwr' )
+plot_params = dict( vmin = -1.5, vmax = 1.5, cmap = 'bwr', rasterized = True )
 
 qm = axes[0].pcolormesh( x, y, uo,                       **plot_params )
 axes[1].pcolormesh( x, y, vo,                       **plot_params )
@@ -50,7 +50,7 @@ axes[0].set_ylabel( 'x-velocity' )
 axes[1].set_ylabel( 'y-velocity' )
 axes[2].set_ylabel( 'velocity magnitude' )
 
-plt.savefig('unfiltered_fields.png', dpi = 350)
+plt.savefig('unfiltered_fields.pdf', dpi = 250)
 plt.close()
 
 
@@ -102,12 +102,12 @@ for var, kind in variables:
             norm = colors.SymLogNorm( vmin = -cv, vmax = cv, linthresh = cv / 1e3 )
             cmap = 'bwr'
 
-        qms[ii] = axes[ii].pcolormesh(x, y, data, norm = norm, cmap = cmap)
+        qms[ii] = axes[ii].pcolormesh(x, y, data, norm = norm, cmap = cmap, rasterized = True)
 
     for q, ax in zip( qms, axes ):
         cbar = plt.colorbar( q, ax = ax )
         if kind == 'lin':
             PlotTools.ScientificCbar( cbar )
 
-    plt.savefig( var + '.png' )
+    plt.savefig( var + '.pdf', dpi = 250 )
     plt.close()
