@@ -1,15 +1,28 @@
 #!/bin/bash
 #SBATCH --output=sim-%j.log
 #SBATCH --error=sim-%j.err
-#SBATCH --time=00-01:00:00                              # time (DD-HH:MM:SS)
+#SBATCH --time=00-00:30:00                              # time (DD-HH:MM:SS)
 #SBATCH --ntasks=1                                      # can only use one MPI process
-#SBATCH --cpus-per-task=6                               # but we can use multiple openmp threads
+#SBATCH --cpus-per-task=28                              # but we can use multiple openmp threads
 #SBATCH --mem-per-cpu=3G
 #SBATCH --job-name="Coarse-grain : Postprocess Demo"
 
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}  # SLURM_CPUS_PER_TASK is the number of Openmp threads per MPI process
 export KMP_AFFINITY="compact"
 export I_MPI_PIN_DOMAIN="auto"
+
+set -ex
+
+###
+##      Define the geographic regions
+###
+
+python define_geographic_regions.py
+
+
+###
+##      Run the filtering routine
+###
 
 FILTER_SCALES="
 1.e4 1.29e4 1.67e4 2.15e4 2.78e4 3.59e4 4.64e4 5.99e4 7.74e4 
@@ -28,3 +41,18 @@ mpirun -n ${SLURM_NTASKS} ./coarse_grain_helmholtz.x \
         --region_definitions_file ${REGIONS_FILE} \
         --filter_scales "${FILTER_SCALES}"
 
+
+
+###
+##      Now merge the postprocess outputs into single files
+###
+
+
+KINDS=("full" "toroidal" "potential")
+
+for KIND in "${KINDS[@]}"
+do
+    python ../../../../PythonTools/OutputHandling/merge_postprocess_results.py \
+        --file_pattern "postprocess_${KIND}_*nc" \
+        --output_filename "RESULTS_${KIND}.nc"
+done

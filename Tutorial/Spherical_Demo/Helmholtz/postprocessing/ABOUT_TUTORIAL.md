@@ -15,8 +15,8 @@ It includes:
 1. Compile `Case_Files/coarse_grain_helmholtz.x` (see notes below) and copy into this directory.
 3. Create the regions definitions file (`python define_geographic_regions.py`)
 4. Run coarse_grain_helmholtz.x ( see the sample submit script for details )
-5. Merge the individual postprocess files into one file that contains all scales ( `./merge_postprocess_files.sh` )
-6. Run the python plotting routine (`python plot_results.py`)
+5. Merge the individual postprocess files into one file that contains all scales ( see bash scripts for usage details )
+6. Run the python plotting routine (`python plot_results.py` or juse the Jupyter notebook)
 
 When specifying filtering scales, consider a wide sweep. It can also be beneficial to use logarithmically-spaced scales, for plotting purposes.
 Python can be helpful for this. For example, `numpy.logspace( np.log(50e3), np.log(2000e3), 10 )` would produce 10 logarithmically-spaced

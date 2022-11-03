@@ -31,7 +31,7 @@ dAreas = R_earth**2 * np.cos(LAT) * dlat * dlon
 # Define some eddy parameters
 eddy_scales = [ 250e3, 750e3, 3500e3 ]
 eddy_counts = [ 1e3,   3e2,   5e1 ]
-eddy_velocs = [ 0.2,   0.4,   0.1 ]
+eddy_velocs = [ 0.7,   0.4,   0.1 ]
 eddy_kinds  = ['Tor',  'Pot', 'Tor']
 
 
@@ -88,7 +88,7 @@ u_lon = - ddlat.dot( Psi   )   /   6371e3
 u_lat =   ddlon.dot( Psi.T ).T / ( 6371e3 * np.cos(LAT) )
 
 u_lon +=   ddlon.dot( Phi.T ).T / ( 6371e3 * np.cos(LAT) )
-u_lat += - ddlat.dot( Phi   )   /   6371e3
+u_lat +=   ddlat.dot( Phi   )   /   6371e3
 
 # Save flow to a file
 dtype_dim = np.float64
