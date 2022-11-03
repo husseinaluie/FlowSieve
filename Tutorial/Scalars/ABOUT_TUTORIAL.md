@@ -1,4 +1,4 @@
-# Small Tutorial for Working on a Sphere {#tutorialsScalar}
+# Tutorial for Filtering Scalars {#tutorialsScalar}
 [TOC]
 
 This tutorial walks through analysing a scalar field with coarse_grain_scalars.x

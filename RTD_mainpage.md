@@ -16,10 +16,10 @@ For presentations, posters, etc.., we suggest acknowledging:
 * **FlowSieve** code from the Complex Flow Group at University of Rochester
 
 ## Primary Features
-1) computes coarse-grained scalar and vector fields for arbitrary filter scales, in both Cartesian and spherical coordinates,
-2) built-in diagnostics for oceanographic settings, including kinetic energy (KE), KE cascades, vorticity, divergence, etc.,
-3) built-in post-processing tools compute region averages for an arbitrary number of custom user-specified regions [ avoiding storage concerns when handling large datasets ], and
-4) includes Helmholtz-decomposition scripts to allow careful coarse-graining on the sphere [ i.e. to maintain commutativity with derivatives ].
+1. computes coarse-grained scalar and vector fields for arbitrary filter scales, in both Cartesian and spherical coordinates,
+2. built-in diagnostics for oceanographic settings, including kinetic energy (KE), KE cascades, vorticity, divergence, etc.,
+3. built-in post-processing tools compute region averages for an arbitrary number of custom user-specified regions [ avoiding storage concerns when handling large datasets ], and
+4. includes Helmholtz-decomposition scripts to allow careful coarse-graining on the sphere [ i.e. to maintain commutativity with derivatives ].
 
 
 ## Statement of need
