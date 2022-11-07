@@ -136,12 +136,12 @@ int main(int argc, char *argv[]) {
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
-    const std::string   &tor_field_var_name     = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--tor_field",     "Psi",          asked_help) : "",
-                        &pot_field_var_name     = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--pot_field",     "Phi",          asked_help) : "",
-                        &vel_field_var_name     = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--vel_field",     "u_lat",        asked_help) : "",
-                        &u_r_field_var_name     = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--u_r_field",     "u_r",          asked_help) : "",
-                        &wind_tau_Psi_var_name  = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--wind_tau_Psi",  "wind_tau_Psi", asked_help) : "",
-                        &wind_tau_Phi_var_name  = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--wind_tau_Phi",  "wind_tau_Phi", asked_help) : "",
+    const std::string   &tor_field_var_name     = input.getCmdOption("--tor_field", "Psi",   asked_help, "Name of toroidal field (streamfunction) in input file."),
+                        &pot_field_var_name     = input.getCmdOption("--pot_field", "Phi",   asked_help, "Name of potential field (potential function) in input file."),
+                        &vel_field_var_name     = input.getCmdOption("--vel_field", "u_lat", asked_help, "Name of a velocity field in input file (used to get land information)."),
+                        &u_r_field_var_name     = input.getCmdOption("--u_r_field", "u_r",   asked_help, "Name of vertical/radial velocity field in input file (if used)."),
+                        &wind_tau_Psi_var_name  = constants::COMP_WIND_FORCE ? input.getCmdOption("--wind_tau_Psi",  "wind_tau_Psi", asked_help) : "",
+                        &wind_tau_Phi_var_name  = constants::COMP_WIND_FORCE ? input.getCmdOption("--wind_tau_Phi",  "wind_tau_Phi", asked_help) : "",
                         &uiuj_F_r_var_name      = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--uiuj_F_r",      "uiuj_F_r",     asked_help) : "",
                         &uiuj_F_Phi_var_name    = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--uiuj_F_Phi",    "uiuj_F_Phi",   asked_help) : "",
                         &uiuj_F_Psi_var_name    = constants::COMP_PI_HELMHOLTZ ? input.getCmdOption("--uiuj_F_Psi",    "uiuj_F_Psi",   asked_help) : "";
