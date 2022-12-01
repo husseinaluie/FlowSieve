@@ -7,7 +7,7 @@
 *.nc
 
 # Don't keep image files
-*.png
+#*.png
 *.pdf
 
 # Don't keep log files
