@@ -5,8 +5,8 @@ from netCDF4 import Dataset
 #
 # The generation script builds a full-sphere data set
 #   at 0.5 degree resolution. It consists of a large
-#   collection of eddies of differing sizes, randomly
-#   distributed around the globe.
+#   collection of 'balls' of differing sizes and densities,
+#   randomly distributed around the globe.
 #
 ##
 
