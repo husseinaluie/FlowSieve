@@ -5,6 +5,14 @@
 
 ---
 
+**NOTE**
+
+Unit-testing is currently out-dated and broadly non-functional.
+The results of the previous unit testings are includied below,
+which tested that the differentiation schemes achieved the stated order of accuracy.
+
+---
+
 ## Spherical Differentiation
 
 As of 12 March 2019, the results of the testing suite are below.
