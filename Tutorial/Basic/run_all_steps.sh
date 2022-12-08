@@ -17,3 +17,6 @@ python generate_data.py
 ##
 
 python process_results.py
+
+##
+echo "Process successfully completed!"

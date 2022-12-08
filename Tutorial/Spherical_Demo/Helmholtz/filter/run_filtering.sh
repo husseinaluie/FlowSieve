@@ -22,3 +22,6 @@ FILTER_SCALES="100e3 500e3 2000e3 5000e3"
     --vel_field uo \
     --filter_scales "${FILTER_SCALES}"
 
+
+##
+echo "Process successfully completed!"

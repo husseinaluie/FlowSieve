@@ -17,3 +17,6 @@ python generate_data_sphere.py
     --filter_scales "100e3 500e3 2000e3" \
     --variables "rho"
 
+
+##
+echo "Process successfully completed!"

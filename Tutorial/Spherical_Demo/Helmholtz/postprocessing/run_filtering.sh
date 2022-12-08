@@ -52,3 +52,6 @@ do
         --file_pattern "postprocess_${KIND}_*nc" \
         --output_filename "RESULTS_${KIND}.nc"
 done
+
+##
+echo "Process successfully completed!"

@@ -80,3 +80,6 @@ echo "\n\n FINE HELMHOLTZ Ui\n\n"
 ###
 
 python analyze_projection.py
+
+##
+echo "Process successfully completed!"
