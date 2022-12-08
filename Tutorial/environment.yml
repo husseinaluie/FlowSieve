@@ -1,0 +1,9 @@
+name: FlowSieve-tutorial-env
+
+dependencies:
+ - python=3.7
+ - numpy=1.17
+ - matplotlib=3.1
+ - netCDF4=1.4
+ - scipy=1.3
+ - glob
