@@ -93,12 +93,15 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
                     print("  .. initializing variable " + varname + " with dimensions {0}".format(var_dims), flush = True)
 
                 # Create netcdf object for variable
-                nc_var_objs[varname] = out_fp.createVariable( varname, var_dtype, var_dims )
+            params = dict()
+            if '_FillValue' in all_vars[varname].ncattrs():
+                params['fill_value'] = all_vars[varname].getncattr('_FillValue')
+                nc_var_objs[varname] = out_fp.createVariable( varname, var_dtype, var_dims, **params )
 
                 # Copy over any attributes that the variable had, except for factor/offset info
                 var_attrs = all_vars[varname].ncattrs()
                 for attr in var_attrs:
-                    if not( attr in ['scale_factor', 'add_offset'] ):
+                    if not( attr in ['scale_factor', 'add_offset', '_FillValue'] ):
                         nc_var_objs[varname].setncattr(attr, all_vars[varname].getncattr( attr ) )
 
         
