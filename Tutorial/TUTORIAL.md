@@ -26,3 +26,16 @@ These tutorial works through the various steps involved in working with spherica
  * This is a very small case that can run in ~5 minutes on one processor.
 * The tutorial [details are here](\ref tutorials3).
  * There are three components, that go through Helmholtz decomposition, filtering, and using on-line post-processing tools.
+
+
+---
+
+## Conda Environment
+
+For convenience and reproducibility, an Anaconda environment file is included in the main Tutorial directory.
+To create the environment, run `conda env create -f environment.yml` (this may take several minutes, but should only need to be done once).
+Barring errors, this will create an environment named `FlowSieve-tutorial-env`.
+To activate the environment, simply call `conda activate FlowSieve-tutorial-env`.
+
+Alternatively, if you don't use Anaconda to manage python packages, the environment file lists the package dependencies needed to run the tutorial.
+The specific package version are sufficient, but may not be strictly necessary (i.e. other version combinations may work, but have not been tested).

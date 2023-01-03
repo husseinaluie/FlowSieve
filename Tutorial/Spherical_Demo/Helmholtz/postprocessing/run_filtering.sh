@@ -43,15 +43,15 @@ REGIONS_FILE="region_definitions.nc"
 ##      Now merge the postprocess outputs into single files
 ###
 
-
-KINDS=("full" "toroidal" "potential")
-
-for KIND in "${KINDS[@]}"
-do
-    python ../../../../PythonTools/OutputHandling/merge_postprocess_results.py \
-        --file_pattern "postprocess_${KIND}_*nc" \
-        --output_filename "RESULTS_${KIND}.nc"
-done
+python ../../../../PythonTools/OutputHandling/merge_postprocess_results.py \
+    --file_pattern "postprocess_full_*nc" \
+    --output_filename "RESULTS_full.nc"
+python ../../../../PythonTools/OutputHandling/merge_postprocess_results.py \
+    --file_pattern "postprocess_toroidal_*nc" \
+    --output_filename "RESULTS_toroidal.nc"
+python ../../../../PythonTools/OutputHandling/merge_postprocess_results.py \
+    --file_pattern "postprocess_potential_*nc" \
+    --output_filename "RESULTS_potential.nc"
 
 ##
 echo "Process successfully completed!"
