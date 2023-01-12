@@ -46,6 +46,10 @@ double kernel(
                 break;
         case 4: kern = 0.5 * (1 - tanh( (D - 1) / (0.1) ));
                 break;
+        case 5: const double arg = (D - 1) / 0.1;
+                const double c1 = 1.45859979150011;
+                kern = 0.5 * (1 - tanh( arg )) - c1 * exp( -pow(arg,2.) );
+                break;
     }
 
     #if DEBUG >= 6
