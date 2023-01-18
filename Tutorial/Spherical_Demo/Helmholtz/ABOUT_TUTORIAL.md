@@ -16,3 +16,7 @@ The generated velocity field is a combination of randomly-seed vortices with spe
  - full spherical domain, 0.5 degree resolution, polar 'continents'
  - velocity field is a collection of eddies of varying sizes, randomly placed throughout the globe
 
+---
+
+In 'postprocess', there is a known issue where the python scripts that run after calling `coarse_grain_helmholtz.x` in the `run_all_steps.sh` script fail to run withour printing an error. 
+If the coarse-graining successfully runs (i.e. directory `outputs` is created and populated with `postprocessing_*.nc` files) but the `RESULTS_*.nc` files are not created, then you will need to manually call the three python scripts listed at the end of `run_all_steps.sh` script.

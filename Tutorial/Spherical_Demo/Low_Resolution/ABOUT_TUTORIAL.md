@@ -11,6 +11,10 @@ The generated data here is very low resolution (2-degree grid spacing), but runs
 2. Run the `run_all_steps.sh` script (`./run_all_steps.sh`)
 3. Afterwards, you can run the jupyter notebook to analyse the results.
 
+---
+
+There is a known issue where the python scripts that run after calling `coarse_grain_helmholtz.x` in the `run_all_steps.sh` script fail to run withour printing an error. 
+If the coarse-graining successfully runs (i.e. directory `outputs` is created and populated with `postprocessing_*.nc` files) but the `RESULTS_*.nc` files are not created, then you will need to manually call the three python scripts listed at the end of `run_all_steps.sh` script.
 
 
 ### Notes when compiling
