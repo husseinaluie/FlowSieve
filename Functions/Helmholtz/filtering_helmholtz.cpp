@@ -77,8 +77,6 @@ void filtering_helmholtz(
     if (wRank == 0) { fprintf( stdout, "\nPreparing to apply %d filters to data with (MPI-local) sizes (%'d - %'d - %'d - %'d) \n", Nscales, Ntime, Ndepth, Nlat, Nlon ); }
     #endif
 
-    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
-
     char fname [50];
     
     const int ndims = 4;
@@ -293,7 +291,7 @@ void filtering_helmholtz(
             u_r, u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot, u_lon_tot, u_lat_tot) \
     private( index )
     {
-        #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+        #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < u_lon_tor.size(); ++index) {
             u_lon_tot.at(index) = u_lon_tor.at(index) + u_lon_pot.at(index);
             u_lat_tot.at(index) = u_lat_tor.at(index) + u_lat_pot.at(index);
@@ -327,7 +325,7 @@ void filtering_helmholtz(
                 u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot ) \
         private( index )
         {
-            #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+            #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < u_lon_tor.size(); ++index) {
 
                 if ( mask.at(index) ) { 
@@ -464,7 +462,8 @@ void filtering_helmholtz(
 
     // Now prepare to filter
     double scale;
-    int Itime, Idepth, Ilat, Ilon, tid;
+    int Itime, Idepth, Ilat, Ilon, Ilatlon, thread_id, num_threads, prev_Ilat = -1;
+    const bool can_roll_in_longitude = ( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) );
 
     int perc_base = 5;
     int perc, perc_count=0;
@@ -667,9 +666,9 @@ void filtering_helmholtz(
                 coarse_wind_tau_Psi, coarse_wind_tau_Phi, \
                 coarse_tau_wind_dot_u_tor, coarse_tau_wind_dot_u_pot, coarse_tau_wind_dot_u_tot \
                 ) \
-        private(Itime, Idepth, Ilat, Ilon, index, \
+        private(Itime, Idepth, Ilat, Ilon, index, prev_Ilat, Ilatlon, \
                 F_tor_tmp, F_pot_tmp, u_r_tmp, uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, \
-                vort_ux_tmp, vort_uy_tmp, vort_uz_tmp, LAT_lb, LAT_ub, tid, filtered_vals, \
+                vort_ux_tmp, vort_uy_tmp, vort_uz_tmp, LAT_lb, LAT_ub, thread_id, num_threads, filtered_vals, \
                 uiuj_F_r_tmp, uiuj_F_Phi_tmp, uiuj_F_Psi_tmp, \
                 wind_tau_Psi_tmp, wind_tau_Phi_tmp, tau_wind_dot_u_tor_tmp, tau_wind_dot_u_pot_tmp ) \
         firstprivate(perc, wRank, local_kernel, perc_count)
@@ -697,161 +696,174 @@ void filtering_helmholtz(
                 filtered_vals.push_back( &tau_wind_dot_u_pot_tmp );
             }
 
-            tid = omp_get_thread_num();
+            thread_id = omp_get_thread_num();  // thread ID
+            num_threads = omp_get_num_threads(); // number of threads
 
-            #pragma omp for collapse(1) schedule(dynamic)
-            for (Ilat = 0; Ilat < Nlat; Ilat++) {
+            prev_Ilat = -1; // forces kernel computation on first iteration
+
+            // Melt latitude and longitude into one loop
+            //   This is done manually (instead of simply using a 'collapse(2)'
+            //   for optimization purposes. If threads jump between latitudes, 
+            //   they need to keep recomputing the kernel, which is costly.
+            //   Here we force them to iterate through one latitude at a time, 
+            //   splitting the longitudes evenly between the group
+            // If cost per point varies heavily, this could have load balancing issues,
+            //   but in the case of filtering over land (the typical Helmholtz case)
+            //   there is no land/water distinction, and so filtering cost should be
+            //   similar at all longitudes.
+            for (Ilatlon = thread_id; Ilatlon < Nlat * Nlon; Ilatlon = Ilatlon + num_threads) {
+                Ilon = Ilatlon % Nlon;
+                Ilat = Ilatlon / Nlon;
 
                 get_lat_bounds(LAT_lb, LAT_ub, latitude,  Ilat, scale); 
-                #if DEBUG >= 3
-                if (wRank == 0) { fprintf(stdout, "Ilat (%d) has loop bounds %d and %d.\n", Ilat, LAT_lb, LAT_ub); }
-                #endif
 
                 // If our longitude grid is uniform, and spans the full periodic domain,
-                // then we can just compute it once and translate it at each lon index
-                if ( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) {
-                    if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
-                    std::fill(local_kernel.begin(), local_kernel.end(), 0);
+                // AND we're at the same latitude as the last iteration of the loop,
+                // then we can just re-use the kernel.
+                // Otherwise, we need to compute the kernel.
+                if ( can_roll_in_longitude and (Ilat == prev_Ilat) ) {
+                    // just re-use the kernel from last time
+                } else if ( can_roll_in_longitude ) {
+                    // At a new latitude, so compute kernel at reference longitude (index 0)
+                    if ( (constants::DO_TIMING) and (thread_id == 0) ) { clock_on = MPI_Wtime(); }
+                    //std::fill(local_kernel.begin(), local_kernel.end(), 0);
                     compute_local_kernel( local_kernel, scale, source_data, Ilat, 0, LAT_lb, LAT_ub );
-                    if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_outer"); }
+                    if ( (constants::DO_TIMING) and (thread_id == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_computation"); }
+                } else {
+                    // Otherwise, we need to compute the whole kernel every time. Boo.
+                    if ( (constants::DO_TIMING) and (thread_id == 0) ) { clock_on = MPI_Wtime(); }
+                    //std::fill(local_kernel.begin(), local_kernel.end(), 0);
+                    compute_local_kernel( local_kernel, scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
+                    if ( (constants::DO_TIMING) and (thread_id == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_computation_all"); }
                 }
+                // And set prev_Ilat before we forget
+                prev_Ilat = Ilat;
 
-                for (Ilon = 0; Ilon < Nlon; Ilon++) {
+                #if DEBUG >= 0
+                if ( (thread_id == 0) and (wRank == 0) ) {
+                    // Every perc_base percent, print a dot, but only the first thread
+                    if ( ((double)(Ilat*Nlon + Ilon + 1) / (Nlon*Nlat)) * 100 >= perc ) {
+                        perc_count++;
+                        if (perc_count % 5 == 0) { fprintf(stdout, "|"); }
+                        else                     { fprintf(stdout, "."); }
+                        fflush(stdout);
+                        perc += perc_base;
+                    }
+                }
+                #endif
 
-                    #if DEBUG >= 0
-                    if ( (tid == 0) and (wRank == 0) ) {
-                        // Every perc_base percent, print a dot, but only the first thread
-                        if ( ((double)(Ilat*Nlon + Ilon + 1) / (Nlon*Nlat)) * 100 >= perc ) {
-                            perc_count++;
-                            if (perc_count % 5 == 0) { fprintf(stdout, "|"); }
-                            else                     { fprintf(stdout, "."); }
-                            fflush(stdout);
-                            perc += perc_base;
+                for (Itime = 0; Itime < Ntime; Itime++) {
+                    for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+
+                        // Convert our four-index to a one-index
+                        index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+
+                        // The F_tor and F_pot fields exist over land from the projection
+                        //     procedure, so do those filtering operations on land as well.
+                        // The other stuff (KE, etc), will only be done on water cells
+
+                        // Apply the filter at the point
+                        if ( (constants::DO_TIMING) and (thread_id == 0) ) { clock_on = MPI_Wtime(); }
+                        apply_filter_at_point(  filtered_vals, filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
+                                LAT_lb, LAT_ub, scale, filt_use_mask, local_kernel );
+                        if ( (constants::DO_TIMING) and (thread_id == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_at_point"); }
+
+                        // Store the filtered values in the appropriate arrays
+                        coarse_F_pot.at(index) = F_pot_tmp;
+                        coarse_F_tor.at(index) = F_tor_tmp;
+                        if ( source_data.compute_radial_vel ) {
+                            u_r_coarse.at(index) = u_r_tmp;
                         }
-                    }
-                    #endif
 
-                    if ( not( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) ) {
-                        if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
-                        // If we couldn't precompute the kernel earlier, then do it now
-                        std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                        compute_local_kernel( local_kernel, scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
-                        if ( constants::DO_TIMING and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_inner"); }
-                    }
+                        if ( constants::COMP_PI_HELMHOLTZ ) {
+                            coarse_uiuj_F_r.at(  index) = uiuj_F_r_tmp;
+                            coarse_uiuj_F_Phi.at(index) = uiuj_F_Phi_tmp;
+                            if ( ( uiuj_F_Phi_tmp == 0 ) and ( wRank == 0 ) ) {
+                                fprintf( stdout, " bar(F_phi[%'d,%'d]) = 0 (loc val is %'.4g)\n", Ilat, Ilon, uiuj_F_Phi.at(index) );
+                            }
+                            coarse_uiuj_F_Psi.at(index) = uiuj_F_Psi_tmp;
+                        }
 
-                    for (Itime = 0; Itime < Ntime; Itime++) {
-                        for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+                        if ( constants::COMP_WIND_FORCE ) {
+                            coarse_wind_tau_Psi.at( index ) = wind_tau_Psi_tmp;
+                            coarse_wind_tau_Phi.at( index ) = wind_tau_Phi_tmp;
+                            coarse_tau_wind_dot_u_tor.at( index ) = tau_wind_dot_u_tor_tmp;
+                            coarse_tau_wind_dot_u_pot.at( index ) = tau_wind_dot_u_pot_tmp;
+                            coarse_tau_wind_dot_u_tot.at( index ) = tau_wind_dot_u_tor_tmp + tau_wind_dot_u_pot_tmp;
+                        }
 
-                            // Convert our four-index to a one-index
-                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                        if ( mask.at(index) ) {
+                            if ( (constants::DO_TIMING) and (thread_id == 0) ) { clock_on = MPI_Wtime(); }
 
-                            // The F_tor and F_pot fields exist over land from the projection
-                            //     procedure, so do those filtering operations on land as well.
-                            // The other stuff (KE, etc), will only be done on water cells
+                            //
+                            //// Also get (uiuj)_bar from Cartesian velocities
+                            //
 
-                            // Apply the filter at the point
-                            if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
-                            apply_filter_at_point(  filtered_vals, filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
-                                                    LAT_lb, LAT_ub, scale, filt_use_mask, local_kernel );
-                            if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_at_point"); }
+                            // tor
+                            apply_filter_at_point_for_quadratics(
+                                    uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, vort_ux_tmp, vort_uy_tmp, vort_uz_tmp,
+                                    u_x_tor,  u_y_tor,  u_z_tor, full_vort_tor_r, source_data, Itime, Idepth, Ilat, Ilon,
+                                    LAT_lb, LAT_ub, scale, local_kernel);
 
-                            // Store the filtered values in the appropriate arrays
-                            coarse_F_pot.at(index) = F_pot_tmp;
-                            coarse_F_tor.at(index) = F_tor_tmp;
-                            if ( source_data.compute_radial_vel ) {
-                                u_r_coarse.at(index) = u_r_tmp;
+                            ux_ux_tor.at(index) = uxux_tmp;
+                            ux_uy_tor.at(index) = uxuy_tmp;
+                            ux_uz_tor.at(index) = uxuz_tmp;
+                            uy_uy_tor.at(index) = uyuy_tmp;
+                            uy_uz_tor.at(index) = uyuz_tmp;
+                            uz_uz_tor.at(index) = uzuz_tmp;
+
+                            vort_ux_tor.at(index) = vort_ux_tmp;
+                            vort_uy_tor.at(index) = vort_uy_tmp;
+                            vort_uz_tor.at(index) = vort_uz_tmp;
+
+                            KE_tor_filt.at(index) = 0.5 * constants::rho0 * (uxux_tmp + uyuy_tmp + uzuz_tmp);
+
+                            // pot
+                            apply_filter_at_point_for_quadratics(
+                                    uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, vort_ux_tmp, vort_uy_tmp, vort_uz_tmp,
+                                    u_x_pot,  u_y_pot,  u_z_pot, full_vort_pot_r, source_data, Itime, Idepth, Ilat, Ilon,
+                                    LAT_lb, LAT_ub, scale, local_kernel);
+
+                            ux_ux_pot.at(index) = uxux_tmp;
+                            ux_uy_pot.at(index) = uxuy_tmp;
+                            ux_uz_pot.at(index) = uxuz_tmp;
+                            uy_uy_pot.at(index) = uyuy_tmp;
+                            uy_uz_pot.at(index) = uyuz_tmp;
+                            uz_uz_pot.at(index) = uzuz_tmp;
+
+                            vort_ux_pot.at(index) = vort_ux_tmp;
+                            vort_uy_pot.at(index) = vort_uy_tmp;
+                            vort_uz_pot.at(index) = vort_uz_tmp;
+
+                            KE_pot_filt.at(index) = 0.5 * constants::rho0 * (uxux_tmp + uyuy_tmp + uzuz_tmp);
+
+                            // tot
+                            apply_filter_at_point_for_quadratics(
+                                    uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, vort_ux_tmp, vort_uy_tmp, vort_uz_tmp,
+                                    u_x_tot,  u_y_tot,  u_z_tot, full_vort_tot_r, source_data, Itime, Idepth, Ilat, Ilon,
+                                    LAT_lb, LAT_ub, scale, local_kernel);
+
+                            ux_ux_tot.at(index) = uxux_tmp;
+                            ux_uy_tot.at(index) = uxuy_tmp;
+                            ux_uz_tot.at(index) = uxuz_tmp;
+                            uy_uy_tot.at(index) = uyuy_tmp;
+                            uy_uz_tot.at(index) = uyuz_tmp;
+                            uz_uz_tot.at(index) = uzuz_tmp;
+
+                            vort_ux_tot.at(index) = vort_ux_tmp;
+                            vort_uy_tot.at(index) = vort_uy_tmp;
+                            vort_uz_tot.at(index) = vort_uz_tmp;
+
+                            KE_tot_filt.at(index) = 0.5 * constants::rho0 * (uxux_tmp + uyuy_tmp + uzuz_tmp);
+
+                            if ( (constants::DO_TIMING) and (thread_id == 0) ) { 
+                                timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_at_point_for_quadratics"); 
                             }
 
-                            if ( constants::COMP_PI_HELMHOLTZ ) {
-                                coarse_uiuj_F_r.at(  index) = uiuj_F_r_tmp;
-                                coarse_uiuj_F_Phi.at(index) = uiuj_F_Phi_tmp;
-                                if ( ( uiuj_F_Phi_tmp == 0 ) and ( wRank == 0 ) ) {
-                                    fprintf( stdout, " bar(F_phi[%'d,%'d]) = 0 (loc val is %'.4g)\n", Ilat, Ilon, uiuj_F_Phi.at(index) );
-                                }
-                                coarse_uiuj_F_Psi.at(index) = uiuj_F_Psi_tmp;
-                            }
-
-                            if ( constants::COMP_WIND_FORCE ) {
-                                coarse_wind_tau_Psi.at( index ) = wind_tau_Psi_tmp;
-                                coarse_wind_tau_Phi.at( index ) = wind_tau_Phi_tmp;
-                                coarse_tau_wind_dot_u_tor.at( index ) = tau_wind_dot_u_tor_tmp;
-                                coarse_tau_wind_dot_u_pot.at( index ) = tau_wind_dot_u_pot_tmp;
-                                coarse_tau_wind_dot_u_tot.at( index ) = tau_wind_dot_u_tor_tmp + tau_wind_dot_u_pot_tmp;
-                            }
-
-                            if ( mask.at(index) ) {
-                                if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
-
-                                //
-                                //// Also get (uiuj)_bar from Cartesian velocities
-                                //
-
-                                // tor
-                                apply_filter_at_point_for_quadratics(
-                                        uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, vort_ux_tmp, vort_uy_tmp, vort_uz_tmp,
-                                        u_x_tor,  u_y_tor,  u_z_tor, full_vort_tor_r, source_data, Itime, Idepth, Ilat, Ilon,
-                                        LAT_lb, LAT_ub, scale, local_kernel);
-
-                                ux_ux_tor.at(index) = uxux_tmp;
-                                ux_uy_tor.at(index) = uxuy_tmp;
-                                ux_uz_tor.at(index) = uxuz_tmp;
-                                uy_uy_tor.at(index) = uyuy_tmp;
-                                uy_uz_tor.at(index) = uyuz_tmp;
-                                uz_uz_tor.at(index) = uzuz_tmp;
-
-                                vort_ux_tor.at(index) = vort_ux_tmp;
-                                vort_uy_tor.at(index) = vort_uy_tmp;
-                                vort_uz_tor.at(index) = vort_uz_tmp;
-
-                                KE_tor_filt.at(index) = 0.5 * constants::rho0 * (uxux_tmp + uyuy_tmp + uzuz_tmp);
-
-                                // pot
-                                apply_filter_at_point_for_quadratics(
-                                        uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, vort_ux_tmp, vort_uy_tmp, vort_uz_tmp,
-                                        u_x_pot,  u_y_pot,  u_z_pot, full_vort_pot_r, source_data, Itime, Idepth, Ilat, Ilon,
-                                        LAT_lb, LAT_ub, scale, local_kernel);
-
-                                ux_ux_pot.at(index) = uxux_tmp;
-                                ux_uy_pot.at(index) = uxuy_tmp;
-                                ux_uz_pot.at(index) = uxuz_tmp;
-                                uy_uy_pot.at(index) = uyuy_tmp;
-                                uy_uz_pot.at(index) = uyuz_tmp;
-                                uz_uz_pot.at(index) = uzuz_tmp;
-
-                                vort_ux_pot.at(index) = vort_ux_tmp;
-                                vort_uy_pot.at(index) = vort_uy_tmp;
-                                vort_uz_pot.at(index) = vort_uz_tmp;
-
-                                KE_pot_filt.at(index) = 0.5 * constants::rho0 * (uxux_tmp + uyuy_tmp + uzuz_tmp);
-
-                                // tot
-                                apply_filter_at_point_for_quadratics(
-                                        uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, vort_ux_tmp, vort_uy_tmp, vort_uz_tmp,
-                                        u_x_tot,  u_y_tot,  u_z_tot, full_vort_tot_r, source_data, Itime, Idepth, Ilat, Ilon,
-                                        LAT_lb, LAT_ub, scale, local_kernel);
-
-                                ux_ux_tot.at(index) = uxux_tmp;
-                                ux_uy_tot.at(index) = uxuy_tmp;
-                                ux_uz_tot.at(index) = uxuz_tmp;
-                                uy_uy_tot.at(index) = uyuy_tmp;
-                                uy_uz_tot.at(index) = uyuz_tmp;
-                                uz_uz_tot.at(index) = uzuz_tmp;
-
-                                vort_ux_tot.at(index) = vort_ux_tmp;
-                                vort_uy_tot.at(index) = vort_uy_tmp;
-                                vort_uz_tot.at(index) = vort_uz_tmp;
-
-                                KE_tot_filt.at(index) = 0.5 * constants::rho0 * (uxux_tmp + uyuy_tmp + uzuz_tmp);
-
-                                if ( (constants::DO_TIMING) and (tid == 0) ) { 
-                                    timing_records.add_to_record(MPI_Wtime() - clock_on, "filter_at_point_for_quadratics"); 
-                                }
-
-                            }  // end if(masked) block
-                        }  // end for(depth) block
-                    }  // end for(time) block
-                }  // end for(longitude) block
-            }  // end for(latitude) block
+                        }  // end if(masked) block
+                    }  // end for(depth) block
+                }  // end for(time) block
+            }  // end for(latitude-longitude) block
         }  // end pragma parallel block
         #if DEBUG >= 0
         if (wRank == 0) { fprintf(stdout, "\n"); }
@@ -887,7 +899,7 @@ void filtering_helmholtz(
         shared( mask, u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot, u_lon_tot, u_lat_tot ) \
         private( index )
         {
-            #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+            #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < u_lon_tor.size(); ++index) {
                 if ( mask.at(index) ) {
                     u_lon_tot.at(index) = u_lon_tor.at(index) + u_lon_pot.at(index);
@@ -1135,7 +1147,7 @@ void filtering_helmholtz(
                 vort_tor_r, vort_pot_r, vort_tot_r ) \
         private( index )
         {
-            #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+            #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < u_lon_tor.size(); ++index) {
                 if ( mask.at(index) ) { 
                     KE_tor_coarse.at(index) = 0.5 * constants::rho0 * ( pow(u_lon_tor.at(index), 2.) + pow(u_lat_tor.at(index), 2.) );
@@ -1200,7 +1212,7 @@ void filtering_helmholtz(
                     u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot ) \
             private( index )
             {
-                #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+                #pragma omp for collapse(1) schedule(guided)
                 for (index = 0; index < u_lon_tor.size(); ++index) {
 
                     if ( mask.at(index) ) { 
