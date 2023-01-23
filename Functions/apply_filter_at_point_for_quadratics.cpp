@@ -151,15 +151,15 @@ void apply_filter_at_point_for_quadratics(
         }
     }
 
-    uxux_tmp *= 1. / kA_sum;
-    uxuy_tmp *= 1. / kA_sum;
-    uxuz_tmp *= 1. / kA_sum;
-    uyuy_tmp *= 1. / kA_sum;
-    uyuz_tmp *= 1. / kA_sum;
-    uzuz_tmp *= 1. / kA_sum;
+    uxux_tmp = (kA_sum == 0) ? 0. : uxux_tmp / kA_sum;
+    uxuy_tmp = (kA_sum == 0) ? 0. : uxuy_tmp / kA_sum;
+    uxuz_tmp = (kA_sum == 0) ? 0. : uxuz_tmp / kA_sum;
+    uyuy_tmp = (kA_sum == 0) ? 0. : uyuy_tmp / kA_sum;
+    uyuz_tmp = (kA_sum == 0) ? 0. : uyuz_tmp / kA_sum;
+    uzuz_tmp = (kA_sum == 0) ? 0. : uzuz_tmp / kA_sum;
 
-    vort_ux_tmp *= 1. / kA_sum;
-    vort_uy_tmp *= 1. / kA_sum;
-    vort_uz_tmp *= 1. / kA_sum;
+    vort_ux_tmp *= (kA_sum == 0) ? 0. : vort_ux_tmp / kA_sum;
+    vort_uy_tmp *= (kA_sum == 0) ? 0. : vort_uy_tmp / kA_sum;
+    vort_uz_tmp *= (kA_sum == 0) ? 0. : vort_uz_tmp / kA_sum;
 }
 
