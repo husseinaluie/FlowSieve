@@ -77,7 +77,12 @@ void spher_derivative_at_point(
         index = Index( Itime, do_dep ? lb : Idepth, do_lat ? lb : Ilat, do_lon ? lb : Ilon,
                        Ntime, Ndepth,               Nlat,               Nlon );
         
+
+        #if DEBUG >= 1
         if ( mask.at(index) )   { LB--;  }  // If next point is still water, extend stencil over it
+        #else
+        if ( mask[index] )      { LB--;  }  // If next point is still water, extend stencil over it
+        #endif
         else                    { break; }  // Otherwise, halt [ without extending stencil ]
     }
 
@@ -93,7 +98,11 @@ void spher_derivative_at_point(
         index = Index( Itime, do_dep ? ub : Idepth, do_lat ? ub : Ilat, do_lon ? ub : Ilon,
                        Ntime, Ndepth,               Nlat,               Nlon );
 
+        #if DEBUG >= 1
         if ( mask.at(index) )   { UB++;  }  // If next point is still water, extend stencil over it
+        #else
+        if ( mask[index] )      { UB++;  }  // If next point is still water, extend stencil over it
+        #endif
         else                    { break; }  // Otherwise, halt [ without extending stencil ]
     }
 
@@ -141,7 +150,11 @@ void spher_derivative_at_point(
 
             for (int ii = 0; ii < num_deriv; ii++) {
                 if (deriv_vals.at(ii) != NULL) {
+                    #if DEBUG >= 1
                     *(deriv_vals.at(ii)) += fields[ii]->at(index) * ddl.at(IND - LB);
+                    #else
+                    *(deriv_vals.at(ii)) += (*fields[ii])[index] * ddl[IND - LB];
+                    #endif
                 }
             }
         }
