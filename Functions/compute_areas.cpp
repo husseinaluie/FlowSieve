@@ -58,7 +58,7 @@ void compute_areas(
         shared(areas, coeff, longitude, latitude)
         {
             dlon = longitude.at(1) - longitude.at(0);
-            #pragma omp for collapse(2) schedule(static)
+            #pragma omp for collapse(2) schedule(guided)
             for (ii = 0; ii < Nlat; ii++) {
                 for (jj = 0; jj < Nlon; jj++) {
 
