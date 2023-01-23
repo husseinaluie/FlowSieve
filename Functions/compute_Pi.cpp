@@ -101,10 +101,10 @@ void compute_Pi(
             shared(tau_ij, mask, ui, uj, uiuj, source_data) \
             private(index, uiuj_loc, ui_loc, uj_loc)
             {
-                #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+                #pragma omp for collapse(1) schedule(guided)
                 for (index = 0; index < Npts; index++) {
 
-                    if ( mask.at(index) ) {
+                    if ( constants::FILTER_OVER_LAND or mask.at(index) ) {
                         ui_loc   = ui->at(  index);
                         uj_loc   = uj->at(  index);
                         uiuj_loc = uiuj->at(index);
@@ -139,10 +139,10 @@ void compute_Pi(
 
                 // Now actually compute Pi
                 //   in particular, compute S_ij * tau_ij
-                #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+                #pragma omp for collapse(1) schedule(guided)
                 for (index = 0; index < Npts; index++) {
 
-                    if ( mask.at(index) ) {
+                    if ( constants::FILTER_OVER_LAND or mask.at(index) ) {
 
                         source_data.index1to4_local( index, Itime, Idepth, Ilat, Ilon);
 

@@ -108,7 +108,7 @@ void compute_Z(
         shared( source_data, tau_ij, u_i_tau_ij, mask, omega, uj, omega_uj)\
         private(index, omega_uj_loc, omega_loc, uj_loc)
         {
-            #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+            #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < Npts; index++) {
 
                 if ( mask.at(index) ) {
@@ -150,7 +150,7 @@ void compute_Z(
 
             // Now actually compute Z -  in particular, compute
             //           u_i * tau_ij,j - (u_i * tau_ij)_,j               
-            #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+            #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < Npts; index++) {
 
                 if ( mask.at(index) ) {

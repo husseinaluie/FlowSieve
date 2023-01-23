@@ -238,7 +238,7 @@ void compute_div_transport(
             z_deriv_vals.push_back(&dpdz);
         }
 
-        #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+        #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < Npts; index++) {
 
             div_J_tmp = constants::fill_value;
