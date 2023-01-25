@@ -93,9 +93,9 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
                     print("  .. initializing variable " + varname + " with dimensions {0}".format(var_dims), flush = True)
 
                 # Create netcdf object for variable
-            params = dict()
-            if '_FillValue' in all_vars[varname].ncattrs():
-                params['fill_value'] = all_vars[varname].getncattr('_FillValue')
+                params = dict()
+                if '_FillValue' in all_vars[varname].ncattrs():
+                    params['fill_value'] = all_vars[varname].getncattr('_FillValue')
                 nc_var_objs[varname] = out_fp.createVariable( varname, var_dtype, var_dims, **params )
 
                 # Copy over any attributes that the variable had, except for factor/offset info
@@ -109,6 +109,8 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
     with Dataset( sorted_inputs[0], 'r' ) as in_dset:
         for Ivar,varname in enumerate(all_dims):
             if not( varname == 'ell' ):
+                #print( nc_var_objs['time'] )
+                #print( in_dset['time'] )
                 nc_var_objs[varname][:] = in_dset[varname][:]
 
     # Now, just iterate through the ells and copy in the data from the highest resolution option
