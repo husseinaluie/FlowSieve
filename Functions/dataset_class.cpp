@@ -138,18 +138,18 @@ void dataset::check_processor_divisions(    const int Nprocs_in_time_input,
 
 void dataset::compute_region_areas() {
 
+    #if DEBUG >= 2
+    int wRank=-1;
+    MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
+
+    if (wRank == 0) { fprintf(stdout, "  Computing geographic region areas\n"); fflush(stdout); }
+    #endif
+
     assert( mask.size() > 0 ); // must read in mask before computing region areas
     assert( areas.size() > 0 ); // must compute cell areas before computing region areas
     const size_t num_regions = region_names.size();
     region_areas.resize( num_regions * Ntime * Ndepth );
     if (constants::FILTER_OVER_LAND) { region_areas_water_only.resize( region_areas.size() ); }
-
-    #if DEBUG >= 2
-    int wRank=-1;
-    MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
-
-    if (wRank == 0) { fprintf(stdout, "  Computing geographic region areas\n"); }
-    #endif
 
     double local_area, local_area_water_only;
     size_t Ilat, Ilon, reg_index, index, area_index;
@@ -168,7 +168,7 @@ void dataset::compute_region_areas() {
                 shared( mask, areas, Iregion, Itime, Idepth ) \
                 reduction(+ : local_area, local_area_water_only)
                 { 
-                    #pragma omp for collapse(2) schedule(dynamic, chunk_size)
+                    #pragma omp for collapse(2) schedule(guided)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                         for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 
