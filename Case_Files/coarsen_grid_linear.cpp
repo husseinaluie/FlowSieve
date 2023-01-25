@@ -196,7 +196,7 @@ int main(int argc, char *argv[]) {
         private( target_lat, target_lon, Itime, Idepth, II_coarse, Ilat_coarse, Ilon_coarse, \
                  RIGHT, LEFT, BOT, TOP, II_fine, Ilat_fine, Ilon_fine, cnt, interp_val, land_cnt )
         {
-            #pragma omp for collapse(1) schedule(static)
+            #pragma omp for collapse(1) schedule(guided)
             for (II_coarse = 0; II_coarse < Npts_coarse; ++II_coarse) {
 
                 Index1to4( II_coarse, Itime, Idepth, Ilat_coarse, Ilon_coarse, Ntime, Ndepth, Nlat_coarse, Nlon_coarse );
@@ -251,10 +251,13 @@ int main(int argc, char *argv[]) {
                         II_fine = Index( Itime, Idepth, Ilat_fine, Ilon_fine, Ntime, Ndepth, Nlat_fine, Nlon_fine );
                         if ( fine_data.mask.at( II_fine ) ) {
                             interp_val += fine_data.variables.at( "fine_field" ).at( II_fine );
+                            cnt++;
                         } else {
                             land_cnt++;
+                            if ( not(constants::DEFORM_AROUND_LAND) ) {
+                                cnt++;
+                            }
                         }
-                        cnt++;
                     }
                 }
 
@@ -262,7 +265,7 @@ int main(int argc, char *argv[]) {
                 var_coarse.at(II_coarse) = ( cnt == 0 ) ? 0 : ( interp_val / cnt );
 
                 // If half or more of the points were land, then the new cell is also land
-                mask_coarse.at(II_coarse) = ( double(land_cnt) / double(cnt) < 0.5 );
+                mask_coarse.at(II_coarse) = ( cnt == 0 ) ? false : ( double(land_cnt) / double(cnt) < 0.5 );
 
                 #if DEBUG >= 3
                 fprintf( stdout, " %'zu : [ %d, %d, %d, %d ] : %g, %d : %g \n", II_coarse, LEFT, BOT, TOP, RIGHT, interp_val, cnt, var_coarse.at(II_coarse) );
