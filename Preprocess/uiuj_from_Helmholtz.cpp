@@ -24,8 +24,7 @@ void build_Helm_matrix(
 
     // Create some tidy names for variables
     const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
-                                &dAreas     = source_data.areas;
+                                &longitude  = source_data.longitude;
     const std::vector<bool> &mask = source_data.mask;
     const std::vector<bool> unmask(mask.size(), true);
 
@@ -234,8 +233,8 @@ void build_Helm_matrix(
         }
     }
 
-    size_t lower_count = alglib::sparsegetlowercount( matr );
-    size_t upper_count = alglib::sparsegetuppercount( matr );
+    //size_t lower_count = alglib::sparsegetlowercount( matr );
+    //size_t upper_count = alglib::sparsegetuppercount( matr );
 
     alglib::sparseconverttocrs( matr );
 
@@ -251,17 +250,12 @@ void uiuj_from_Helmholtz(
         const dataset & source_data
     ) {
 
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude;
-
     const int   Ntime   = source_data.Ntime,    // this is the MPI-local Ntime, not the full Ntime
                 Ndepth  = source_data.Ndepth,   // this is the MPI-local Ndepth, not the full Ndepth
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
     const size_t Npts = Nlat * Nlon;
-
-    const std::vector<bool> &mask = source_data.mask;
 
     assert( not(constants::CARTESIAN) );
 

@@ -31,9 +31,7 @@ void Apply_Helmholtz_Projection_SymTensor(
     MPI_Comm_size( comm, &wSize );
 
     // Create some tidy names for variables
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
+    const std::vector<double>   &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude,
                                 &dAreas     = source_data.areas;
 
@@ -58,7 +56,7 @@ void Apply_Helmholtz_Projection_SymTensor(
 
     const size_t Npts = Nlat * Nlon;
 
-    int Itime, Idepth, Ilat, Ilon;
+    int Itime = 0, Idepth = 0, Ilat, Ilon;
     size_t index, index_sub;
 
     // Fill in the land areas with zero velocity
@@ -485,7 +483,8 @@ void Apply_Helmholtz_Projection_SymTensor(
                         uu_norms(  Ntime * Ndepth, 0. ),
                         uv_norms(  Ntime * Ndepth, 0. ),
                         vv_norms(  Ntime * Ndepth, 0. );
-    double total_area, uu_error, uv_error, vv_error, uu_norm, uv_norm, vv_norm;
+    double total_area = 0, uu_error = 0, uv_error = 0, 
+           vv_error = 0, uu_norm = 0, uv_norm = 0, vv_norm = 0;
     for (int Itime = 0; Itime < Ntime; ++Itime) {
         for (int Idepth = 0; Idepth < Ndepth; ++Idepth) {
             #pragma omp parallel \

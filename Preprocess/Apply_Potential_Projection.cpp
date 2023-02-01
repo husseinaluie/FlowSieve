@@ -29,9 +29,7 @@ void Apply_Potential_Projection(
     MPI_Comm_size( comm, &wSize );
 
     // Create some tidy names for variables
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
+    const std::vector<double>   &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude,
                                 &dAreas     = source_data.areas;
 
@@ -56,7 +54,7 @@ void Apply_Potential_Projection(
 
     const int Npts = Nlat * Nlon;
 
-    int Itime, Idepth, Ilat, Ilon; 
+    int Itime = 0, Idepth = 0, Ilat, Ilon; 
     size_t index, index_sub;
 
     // Get the velocity means ( will be stored in output file for reference )

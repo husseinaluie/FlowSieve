@@ -20,9 +20,7 @@ void vel_Cart_to_Spher(
             const dataset & source_data
         ) {
 
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
+    const std::vector<double>   &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude;
 
     const std::vector<bool> &mask = source_data.mask;
@@ -35,8 +33,6 @@ void vel_Cart_to_Spher(
     size_t index;
     int Itime, Idepth, Ilat, Ilon;
 
-    const int OMP_chunksize = get_omp_chunksize( Nlat, Nlon );
-
     if (constants::CARTESIAN) {
         u_lon = u_x;
         u_lat = u_y;
@@ -46,7 +42,7 @@ void vel_Cart_to_Spher(
         private( Itime, Idepth, Ilat, Ilon, index ) \
         shared( u_x, u_y, u_z, u_r, u_lon, u_lat, longitude, latitude, mask, source_data )
         {
-            #pragma omp for collapse(1) schedule(guided, OMP_chunksize)
+            #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < u_lon.size(); ++index) {
 
                 if ( mask.at(index) ) { // Skip land areas

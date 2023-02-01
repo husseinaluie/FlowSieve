@@ -27,10 +27,8 @@ void compute_zonal_avg_and_std(
 
     const int num_fields = postprocess_fields.size();
 
-    const int chunk_size = get_omp_chunksize(Nlat, Nlon);
-
     int Ifield, Itime, Idepth, Ilat, Ilon;
-    size_t index, space_index, area_index, int_index;
+    size_t index, area_index, int_index;
     double dA;
 
     // First, get the zonal areas

@@ -33,9 +33,6 @@ void compute_Pi_shift_deriv(
         const MPI_Comm comm
         ) {
 
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude;
-
     const std::vector<bool> &mask = source_data.mask;
 
     const int   Ntime   = source_data.Ntime,
@@ -153,7 +150,7 @@ void compute_Pi_shift_deriv(
 
             #pragma omp parallel \
             default(none) \
-            shared( source_data, energy_transfer, latitude, longitude, mask,\
+            shared( source_data, energy_transfer, mask,\
                     jj, ui, tau_ij, u_i_tau_ij, deriv_fields)\
             private(Itime, Idepth, Ilat, Ilon, index,\
                     pi_tmp, tau_ij_j, u_i_tau_ij_j,\

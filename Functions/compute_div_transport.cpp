@@ -105,21 +105,11 @@ void compute_div_transport(
         const MPI_Comm comm
         ) {
 
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude;
-
     //const bool use_depth_mask  = (source_data.use_depth_derivatives 
     //                              and ( source_data.Nprocs_in_depth > 1 )
     //                              );
     //const std::vector<bool> &mask = use_depth_mask ? source_data.mask_DEPTH : source_data.mask;
     const std::vector<bool> &mask = source_data.mask;
-
-    const int   Ntime   = source_data.Ntime,
-                Ndepth  = source_data.Ndepth,
-                Nlat    = source_data.Nlat,
-                Nlon    = source_data.Nlon;
-
-    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
     assert( u_x.size() == u_y.size() );
     assert( u_x.size() == u_z.size() );
@@ -179,8 +169,7 @@ void compute_div_transport(
     
     #pragma omp parallel \
     default(none) \
-    shared( div_J, source_data, stdout, \
-            latitude, longitude, mask, \
+    shared( div_J, source_data, mask, \
             u_x, u_y, u_z, uxux, uxuy, uxuz,\
             uyuy, uyuz, uzuz,\
             deriv_fields)\

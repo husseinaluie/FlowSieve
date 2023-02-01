@@ -112,7 +112,6 @@ void interpolate_over_land_from_coast(
             #if DEBUG >= 1
             fprintf(stdout, "      Adding seed data to the interpolator object...");
             fflush(stdout);
-            perc = perc_base;
             #endif
             cntr = 0;
 
@@ -190,6 +189,8 @@ void interpolate_over_land_from_coast(
             //
             #if DEBUG >= 1
             fprintf(stdout, "      Filling land points with the interpolator object.\n");
+            #endif
+            #if DEBUG >= 0
             perc = perc_base;
             #endif
 

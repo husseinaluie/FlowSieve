@@ -26,8 +26,7 @@ void Cart_derivatives_at_point(
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
+    const std::vector<double>   &depth      = source_data.depth,
                                 &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude;
 

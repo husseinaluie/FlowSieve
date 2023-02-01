@@ -130,7 +130,8 @@ void write_field_to_output(
 
         output_field.resize(field.size());
         #pragma omp parallel \
-        default(none) shared(output_field, field, mask, fmiddle, scale_factor) \
+        default(none) \
+        shared(output_field, field, mask, scale_factor) \
         private(index)
         {
             #pragma omp for collapse(1) schedule(static)

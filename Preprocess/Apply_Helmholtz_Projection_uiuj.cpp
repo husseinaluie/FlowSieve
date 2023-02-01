@@ -61,7 +61,7 @@ void build_main_projection_matrix(
             get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Nlat/2, 0, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
             Ndiff = diff_vec.size();
             double Lap_comp_factor = 0;
-            for ( IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
+            for ( IDIFF = 0; IDIFF < (int) diff_vec.size(); IDIFF++ ) { Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
 
             // These are for the v_r term.
 
@@ -301,8 +301,8 @@ void build_main_projection_matrix(
         }
     }
 
-    size_t lower_count = alglib::sparsegetlowercount( matr );
-    size_t upper_count = alglib::sparsegetuppercount( matr );
+    //size_t lower_count = alglib::sparsegetlowercount( matr );
+    //size_t upper_count = alglib::sparsegetuppercount( matr );
 
     alglib::sparseconverttocrs( matr );
 
@@ -329,10 +329,7 @@ void Apply_Helmholtz_Projection_uiuj(
     MPI_Comm_size( comm, &wSize );
 
     // Create some tidy names for variables
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
+    const std::vector<double>   &latitude   = source_data.latitude,
                                 &dAreas     = source_data.areas;
 
     const std::vector<bool> &mask = source_data.mask;
@@ -356,7 +353,7 @@ void Apply_Helmholtz_Projection_uiuj(
 
     const size_t Npts = Nlat * Nlon;
 
-    int Itime, Idepth, Ilat, Ilon;
+    int Itime = 0, Idepth = 0, Ilat, Ilon;
     size_t index, index_sub;
 
     // Fill in the land areas with zero velocity
@@ -399,7 +396,9 @@ void Apply_Helmholtz_Projection_uiuj(
     get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Nlat/2, 0, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
     int Ndiff = diff_vec.size();
     double Lap_comp_factor = 0;
-    for ( int IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
+    for ( size_t IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { 
+        Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; 
+    }
     if (wRank == 0) { fprintf( stdout, "Lap_comp_factor = %g\n", Lap_comp_factor ); }
 
     // Copy the starting seed.

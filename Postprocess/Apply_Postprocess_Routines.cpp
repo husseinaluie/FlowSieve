@@ -21,16 +21,9 @@ void Apply_Postprocess_Routines(
         ) {
 
     // Create some tidy names for variables
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
-                                &dAreas     = source_data.areas;
-
     const std::vector<bool> &mask = source_data.mask;
 
-    const std::vector<int>  &myCounts = source_data.myCounts,
-                            &myStarts = source_data.myStarts;
+    const std::vector<int>  &myStarts = source_data.myStarts;
 
     const int   Ntime  = source_data.Ntime,
                 Ndepth = source_data.Ndepth,

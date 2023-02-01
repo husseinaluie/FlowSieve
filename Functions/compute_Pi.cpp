@@ -33,17 +33,7 @@ void compute_Pi(
         const MPI_Comm comm
         ) {
 
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude;
-
     const std::vector<bool> &mask = source_data.mask;
-
-    const int   Ntime   = source_data.Ntime,
-                Ndepth  = source_data.Ndepth,
-                Nlat    = source_data.Nlat,
-                Nlon    = source_data.Nlon;
-
-    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
     #if DEBUG >= 2
     int wRank, wSize;
@@ -55,7 +45,7 @@ void compute_Pi(
 
     double pi_tmp;
     int Itime, Idepth, Ilat, Ilon, ii, jj;
-    size_t index, local_index;
+    size_t index;
     const size_t Npts = energy_transfer.size();
 
     double ui_j, uj_i;
@@ -115,7 +105,7 @@ void compute_Pi(
             }
 
             #pragma omp parallel default(none) \
-            shared( source_data, energy_transfer, latitude, longitude, mask, \
+            shared( source_data, energy_transfer, mask, \
                     ii, jj, ui, uj, tau_ij, deriv_fields)\
             private( Itime, Idepth, Ilat, Ilon, index, pi_tmp, ui_j, uj_i, \
                      x_deriv_vals, y_deriv_vals, z_deriv_vals)

@@ -32,9 +32,7 @@ void compute_region_avg_and_std(
     const int   num_regions   = source_data.region_names.size(),
                 num_fields    = postprocess_fields.size();
 
-    const int chunk_size = get_omp_chunksize(Nlat, Nlon);
-
-    double int_val, reg_area, dA, increment;
+    double reg_area, dA, increment;
 
     int Ifield, Iregion, Itime, Idepth, Ilat, Ilon;
     size_t int_index, area_index, index;
@@ -119,7 +117,7 @@ void compute_region_avg_and_std(
                             postprocess_fields, field_averages) \
                     reduction(+ : int_val)
                     { 
-                        #pragma omp for collapse(2) schedule(dynamic, chunk_size)
+                        #pragma omp for collapse(2) schedule(dynamic)
                         for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                             for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 

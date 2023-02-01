@@ -16,6 +16,10 @@ void initialize_output_file(
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
+    #if DEBUG>=1
+    if (wRank == 0) { fprintf(stdout, "\nPreparing to initialize the output file.\n"); }
+    #endif
+
     // Create some tidy names for variables
     const std::vector<double>   &time       = source_data.time,
                                 &depth      = source_data.depth,
@@ -31,6 +35,9 @@ void initialize_output_file(
     retval = nc_create_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
+    #if DEBUG>=2
+    if (wRank == 0) { fprintf(stdout, "    Logging the filter scale\n"); }
+    #endif
     if ( filter_scale >= 0 ) {
         retval = nc_put_att_double(ncid, NC_GLOBAL, "filter_scale", NC_DOUBLE, 1, &filter_scale);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
@@ -40,6 +47,9 @@ void initialize_output_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Record coordinate type
+    #if DEBUG>=2
+    if (wRank == 0) { fprintf(stdout, "    Logging the grid type\n"); }
+    #endif
     if (constants::CARTESIAN) {
         retval = nc_put_att_text(ncid, NC_GLOBAL, "coord-type", 10, "cartesian");
     } else {
@@ -54,6 +64,9 @@ void initialize_output_file(
     const int Nlon    = longitude.size();
 
     // Define the dimensions
+    #if DEBUG>=2
+    if (wRank == 0) { fprintf(stdout, "    Defining the dimensions\n"); }
+    #endif
     int time_dimid, depth_dimid, lat_dimid, lon_dimid;
     retval = nc_def_dim(ncid, "time",      Ntime,     &time_dimid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
@@ -65,6 +78,9 @@ void initialize_output_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Define coordinate variables
+    #if DEBUG>=2
+    if (wRank == 0) { fprintf(stdout, "    Defining the dimension variables\n"); }
+    #endif
     int time_varid, depth_varid, lat_varid, lon_varid;
     retval = nc_def_var(ncid, "time",      NC_DOUBLE, 1, &time_dimid,  &time_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
@@ -76,6 +92,9 @@ void initialize_output_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     if (not(constants::CARTESIAN)) {
+        #if DEBUG>=2
+        if (wRank == 0) { fprintf(stdout, "    Add scale factors for Rad to Degrees\n"); }
+        #endif
         const double rad_to_degree = 180. / M_PI;
         retval = nc_put_att_double(ncid, lon_varid, "scale_factor", 
                 NC_DOUBLE, 1, &rad_to_degree);
@@ -86,6 +105,9 @@ void initialize_output_file(
     }
 
     // Write the coordinate variables
+    #if DEBUG>=2
+    if (wRank == 0) { fprintf(stdout, "    Write the dimensions\n"); }
+    #endif
     size_t start[1], count[1];
     start[0] = 0;
     count[0] = Ntime;
@@ -105,6 +127,9 @@ void initialize_output_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Write the cell areas for convenience
+    #if DEBUG>=2
+    if (wRank == 0) { fprintf(stdout, "    Write the cell areas\n"); }
+    #endif
     int area_dimids[2];
     area_dimids[0] = lat_dimid;
     area_dimids[1] = lon_dimid;
@@ -129,6 +154,9 @@ void initialize_output_file(
     #endif
 
     if (wRank == 0) {
+        #if DEBUG>=2
+        if (wRank == 0) { fprintf(stdout, "    Root rank will now add each variable.\n"); }
+        #endif
         // Loop through and add the desired variables
         // Dimension names (in order!)
         const char* dim_names[] = {"time", "depth", "latitude", "longitude"};
@@ -139,6 +167,9 @@ void initialize_output_file(
     }
 
     // Add some global attributes from constants.hpp
+    #if DEBUG>=2
+    if (wRank == 0) { fprintf(stdout, "    Now add a series of computational details\n"); }
+    #endif
     add_attr_to_file("R_earth",                                      constants::R_earth,    filename);
     add_attr_to_file("rho0",                                         constants::rho0,       filename);
     add_attr_to_file("g",                                            constants::g,          filename);

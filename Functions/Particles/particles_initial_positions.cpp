@@ -29,7 +29,7 @@ void particles_initial_positions(
     lon_mid.push_back( 0.5 * ( longitude.back() + longitude.front()) );
     lat_mid.push_back( 0.5 * ( latitude.back()  + latitude.front() ) );
     
-    const double D2R = M_PI / 180.;
+    //const double D2R = M_PI / 180.;
     // Agulhas
     // plt.xlim( 10,  60)
     // plt.ylim(-40,  20)

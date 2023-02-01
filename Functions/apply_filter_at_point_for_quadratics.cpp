@@ -57,7 +57,7 @@ void apply_filter_at_point_for_quadratics(
         ) {
 
 
-    double  dist, kern, area, mask_val = 0, kA_sum = 0, local_weight,
+    double  kern, area, kA_sum = 0, local_weight,
             u_x_loc, u_y_loc, u_z_loc, vort_r_loc;
     size_t index, kernel_index;
 
