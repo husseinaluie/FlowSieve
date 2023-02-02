@@ -45,7 +45,7 @@ void compute_zonal_avg_and_std(
                     // Sum up the area of water cells
                     if ( ( (constants::FILTER_OVER_LAND) and ( source_data.reference_mask.at(index) ) )
                          or
-                         ( (constants::DEFORM_AROUND_LAND) and ( source_data.mask.at(index) ) )
+                         ( source_data.mask.at(index) )
                        ) {
                         area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
                         dA = source_data.areas.at(area_index);
