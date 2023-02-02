@@ -199,8 +199,14 @@ void initialize_postprocess_file(
     write_regions_to_post( filename, source_data.region_names );
 
     // Write region areas
-    size_t start_r[] = { source_data.myStarts.at(0), source_data.myStarts.at(1),  0       }, 
-           count_r[] = { source_data.Ntime,          source_data.Ndepth,          Nregion };
+    size_t start_r[] = { (size_t) source_data.myStarts.at(0), 
+                         (size_t) source_data.myStarts.at(1),  
+                         0 
+                       }, 
+           count_r[] = { (size_t) source_data.Ntime,          
+                         (size_t) source_data.Ndepth,          
+                         (size_t) Nregion 
+                       };
     write_field_to_output( source_data.region_areas, "region_areas", start_r, count_r, filename, NULL);
 
     if (constants::FILTER_OVER_LAND) {

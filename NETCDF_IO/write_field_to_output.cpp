@@ -81,8 +81,8 @@ void write_field_to_output(
         // Get the median value to let us use offsets
         //      to do this, get min and max (first, MPI_local values)
         //      initalize with first element before looping over all values
-        double  fmax_loc = field.at(0),
-                fmin_loc = field.at(0);
+        double  fmax_loc = 0,
+                fmin_loc = 0;
         #pragma omp parallel \
         default(none) shared(field, mask) private(index) \
         reduction(max : fmax_loc) reduction(min : fmin_loc)
@@ -130,8 +130,10 @@ void write_field_to_output(
 
         output_field.resize(field.size());
         #pragma omp parallel \
-        default(none) shared(output_field, field, mask, fmiddle, scale_factor) \
-        private(index)
+        default(none) \
+        shared(output_field, field, mask, scale_factor) \
+        private(index) \
+        firstprivate( fmiddle )
         {
             #pragma omp for collapse(1) schedule(static)
             for (index = 0; index < field.size(); index++) {

@@ -45,7 +45,7 @@ void Timing_Records::print() const{
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
-    double time_val, mean_val, std_val, tmp, total_time, total_variance;
+    double time_val, mean_val, std_val, tmp, total_time = 0., total_variance = 0.;
     if (wRank == 0) {
         fprintf(stdout, "\n\n## Internal Timings : mean ( standard deviation )\n\n");
     }

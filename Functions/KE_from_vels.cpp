@@ -25,7 +25,10 @@ void KE_from_vels(
     size_t index;
     double tmp;
 
-    #pragma omp parallel default(none) private(index, tmp) shared(KE, u1, u2, u3, mask)
+    #pragma omp parallel default(none) \
+    private(index, tmp) \
+    shared(KE, u1, u2, u3, mask) \
+    firstprivate( rho0 )
     {
         #pragma omp for collapse(1) schedule(dynamic)
         for (index = 0; index < u1->size(); ++index) {

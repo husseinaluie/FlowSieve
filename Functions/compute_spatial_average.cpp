@@ -29,8 +29,6 @@ void compute_spatial_average(
         const std::vector<bool> & mask
         ) {
 
-    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
-
     double integrated_area=0., integrated_sum=0.;
     int index, sub_index, Itime, Idepth, Ilat, Ilon;
 
@@ -46,9 +44,10 @@ void compute_spatial_average(
             default(none) \
             shared( field, mask, areas, Itime, Idepth ) \
             private( Ilat, Ilon, index, sub_index )\
+            firstprivate( Nlat, Nlon, Ndepth, Ntime ) \
             reduction(+ : integrated_area,integrated_sum)
             {
-                #pragma omp for collapse(2) schedule(dynamic, OMP_chunksize)
+                #pragma omp for collapse(2) schedule(guided)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                     for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 

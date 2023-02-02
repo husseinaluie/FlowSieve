@@ -65,7 +65,6 @@ void add_var_to_file(
     ////
     
     // First, check 'type' (i.e. time average, spatial average, toroidal potential, etc)
-    size_t string_index;
     std::string substring = var_name;
 
     const size_t    time_avg_index  = var_name.find("_time_average"),

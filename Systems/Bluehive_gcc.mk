@@ -1,16 +1,16 @@
 # The following modules were last used
-#  openmpi/2.0.1/b1  
-#  hdf5/1.8.19/b1     
-#  netcdf/4.3.3.1
+#  netcdf/4.7.0/b1 (loading this loads the rest)
+#  hdf5/1.10.5/b2
+#  curl/7.56.1
+#  openmpi/2.1.6/b2
 #  gcc/8.2.0/b1
-#  fftw3/3.3.6/b1
 
 # Specify compilers
-CXX     ?= g++
-MPICXX  ?= mpicxx
+CXX     = g++
+MPICXX  = mpicxx
 
 # Linking flags for netcdf
-LINKS:=-lnetcdf -lhdf5_hl -lhdf5 -lz -lcurl -fopenmp
+LINKS:=-lnetcdf -lhdf5_hl -lhdf5 -lm -ldl -lz -lcurl -fopenmp
 
 # Default compiler flags
 CFLAGS:=-Wall -std=c++14
@@ -29,5 +29,5 @@ EXTRA_OPT_FLAGS:=
 ALGLIB_OPT_FLAGS:=-O3
 
 # Modules are automatically on lib dir
-LIB_DIRS:=
-INC_DIRS:=
+LIB_DIRS:=-L/software/netcdf/4.7.0/b1/lib
+INC_DIRS:=-I/software/netcdf/4.7.0/b1/include

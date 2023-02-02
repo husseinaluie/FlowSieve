@@ -123,16 +123,18 @@ void read_mask_from_file(
                 assert( Nprocs_in_depth > 0 ); // Must specify the number of processors used in depth
                 assert( Nprocs_in_time * Nprocs_in_depth == wSize ); // Total number of processors does no match with specified values
 
-                if      ( II == 0 ) { Nprocs_in_dim = Nprocs_in_time;  }
-                else if ( II == 1 ) { Nprocs_in_dim = Nprocs_in_depth; }
+                if      ( II == 0 ) { Nprocs_in_dim = Nprocs_in_time;   }
+                else if ( II == 1 ) { Nprocs_in_dim = Nprocs_in_depth;  }
+                else                { Nprocs_in_dim = 0; assert(false); }  // II <= 1 so won't happen
 
                 my_count = ( (int)count[II] ) / Nprocs_in_dim;
                 overflow = (int)( count[II] - my_count * Nprocs_in_dim );
 
                 Index1to4( wRank, Itime_proc,      Idepth_proc,     Ilat_proc, Ilon_proc,
                                   Nprocs_in_time,  Nprocs_in_depth, 1,         1          );
-                if      ( II == 0 ) { Iproc_in_dim = Itime_proc;  }
-                else if ( II == 1 ) { Iproc_in_dim = Idepth_proc; }
+                if      ( II == 0 ) { Iproc_in_dim = Itime_proc;        }
+                else if ( II == 1 ) { Iproc_in_dim = Idepth_proc;       }
+                else                { Iproc_in_dim = -1; assert(false); }  // II <= 1 so won't happen
 
                 start[II] = (size_t) (   
                           std::min(Iproc_in_dim,            overflow) * (my_count + 1)
@@ -216,7 +218,7 @@ void read_mask_from_file(
 
     // Determine masking, if desired
     double fill_val = 1e100;  // backup value
-    size_t num_land = 0, num_water = 0, num_unmasked = 0;
+    size_t num_land = 0, num_water = 0;
 
     mask.resize(var.size());
 
@@ -241,9 +243,8 @@ void read_mask_from_file(
 
     #if DEBUG >= 1
     if (wRank == 0) {
-        fprintf(stdout, "  Land cover = %'.4g%% (%'zu water vs %'zu land) (%'zu land converted to water) \n", 
-                100 * ((double)num_land) / (num_land + num_water + num_unmasked),
-                num_water + num_unmasked, num_land, num_unmasked);
+        fprintf(stdout, "  Land cover = %'.4g%% (%'zu water vs %'zu land) \n", 
+                100 * ((double)num_land) / (num_land + num_water), num_water, num_land);
     }
     #endif
 

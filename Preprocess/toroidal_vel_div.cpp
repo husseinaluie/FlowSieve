@@ -36,7 +36,8 @@ void toroidal_vel_div(
     shared( latitude, longitude, mask, div, vel_lon, vel_lat, \
             lon_deriv_fields, lat_deriv_fields )\
     private(Itime, Idepth, Ilat, Ilon, index, cos_lat, sin_lat, tmp_val, ulat, \
-            dulon_dlon, dulat_dlat, lon_deriv_vals, lat_deriv_vals, is_pole )
+            dulon_dlon, dulat_dlat, lon_deriv_vals, lat_deriv_vals, is_pole ) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
     {
 
         lon_deriv_vals.push_back(&dulon_dlon);

@@ -38,11 +38,8 @@ void filtering_helmholtz(
     const std::vector<double> zero_vector( num_pts, 0. );
 
     // Create some tidy names for variables
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
-                                &dAreas     = source_data.areas;
+    const std::vector<double>   &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude;
 
     const std::vector<double>   &F_potential    = source_data.variables.at("F_potential"),
                                 &F_toroidal     = source_data.variables.at("F_toroidal"),
@@ -57,8 +54,7 @@ void filtering_helmholtz(
 
     const std::vector<bool> &mask = source_data.mask;
 
-    const std::vector<int>  &myCounts = source_data.myCounts,
-                            &myStarts = source_data.myStarts;
+    const std::vector<int>  &myStarts = source_data.myStarts;
 
     // Get some MPI info
     int wRank, wSize;
@@ -649,7 +645,7 @@ void filtering_helmholtz(
         shared( source_data, mask, stdout, perc_base, \
                 filter_fields, filt_use_mask, \
                 timing_records, clock_on, \
-                longitude, latitude, dAreas, scale, \
+                longitude, latitude, scale, \
                 F_potential, F_toroidal, coarse_F_tor, coarse_F_pot, \
                 u_r, u_r_coarse, \
                 full_vort_tor_r, full_vort_pot_r, full_vort_tot_r, \
@@ -671,7 +667,7 @@ void filtering_helmholtz(
                 vort_ux_tmp, vort_uy_tmp, vort_uz_tmp, LAT_lb, LAT_ub, thread_id, num_threads, filtered_vals, \
                 uiuj_F_r_tmp, uiuj_F_Phi_tmp, uiuj_F_Psi_tmp, \
                 wind_tau_Psi_tmp, wind_tau_Phi_tmp, tau_wind_dot_u_tor_tmp, tau_wind_dot_u_pot_tmp ) \
-        firstprivate(perc, wRank, local_kernel, perc_count)
+        firstprivate(perc, wRank, local_kernel, perc_count, Nlon, Nlat, Ndepth, Ntime )
         {
 
             filtered_vals.clear();

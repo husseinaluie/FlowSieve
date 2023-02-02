@@ -41,7 +41,8 @@ void toroidal_curl_u_dot_er(
     shared( out_arr, latitude, longitude, mask,\
             u_lon, u_lat, deriv_fields, seed )\
     private(Ilat, Ilon, index, index_sub, tmp, is_pole, \
-            dulat_dlon, dulon_dlat, lon_deriv_vals, lat_deriv_vals )
+            dulat_dlon, dulon_dlat, lon_deriv_vals, lat_deriv_vals ) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, Idepth, Itime )
     {
 
         lon_deriv_vals.push_back(NULL);

@@ -38,7 +38,8 @@ void toroidal_Lap_F(
             F, deriv_fields)\
     private(Ilat, Ilon, index, tmp, is_pole, \
             d2Fdlon2, d1Fdlat1, d2Fdlat2, \
-            lon2_deriv_vals, lat1_deriv_vals, lat2_deriv_vals)
+            lon2_deriv_vals, lat1_deriv_vals, lat2_deriv_vals) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime )
     {
 
         lon2_deriv_vals.push_back(&d2Fdlon2);
