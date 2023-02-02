@@ -208,7 +208,8 @@ void Apply_Postprocess_Routines(
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         #pragma omp parallel default(none) \
         private( index, area_index, Itime, Idepth, Ilat, Ilon ) \
-        shared( mask_count_loc, mask )
+        shared( mask_count_loc, mask ) \
+        firstprivate( Nlon, Nlat, Ndepth, Ntime )
         { 
             #pragma omp for collapse(1) schedule(static)
             for (index = 0; index < mask.size(); ++index) {

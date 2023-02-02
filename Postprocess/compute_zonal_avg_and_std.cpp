@@ -58,7 +58,8 @@ void compute_zonal_avg_and_std(
 
     #pragma omp parallel default(none)\
     private( Ifield, Ilat, Ilon, Itime, Idepth, index, int_index, area_index, dA )\
-    shared( postprocess_fields, source_data, zonal_average, zonal_areas )
+    shared( postprocess_fields, source_data, zonal_average, zonal_areas ) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, num_fields )
     { 
         #pragma omp for collapse(3) schedule(dynamic)
         for (Itime = 0; Itime < Ntime; ++Itime){

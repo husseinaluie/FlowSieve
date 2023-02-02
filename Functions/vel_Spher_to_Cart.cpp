@@ -40,7 +40,8 @@ void vel_Spher_to_Cart(
     } else {
         #pragma omp parallel default(none) \
         private( Itime, Idepth, Ilat, Ilon, index ) \
-        shared( u_x, u_y, u_z, u_r, u_lon, u_lat, longitude, latitude, mask, source_data )
+        shared( u_x, u_y, u_z, u_r, u_lon, u_lat, longitude, latitude, mask, source_data ) \
+        firstprivate( Nlon, Nlat, Ntime, Ndepth )
         {
             #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < u_lon.size(); ++index) {

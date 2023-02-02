@@ -105,7 +105,8 @@ void Apply_Potential_Projection(
         #pragma omp parallel \
         default(none) \
         shared(F_seed, seed) \
-        private( Ilat, Ilon, index )
+        private( Ilat, Ilon, index ) \
+        firstprivate( Nlon, Nlat )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -157,7 +158,8 @@ void Apply_Potential_Projection(
                 #pragma omp parallel \
                 default(none) \
                 shared( F_seed, seed, Itime, Idepth ) \
-                private( Ilat, Ilon, index, index_sub )
+                private( Ilat, Ilon, index, index_sub ) \
+                firstprivate( Nlon, Nlat, Ndepth, Ntime )
                 {
                     #pragma omp for collapse(2) schedule(static)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -196,7 +198,8 @@ void Apply_Potential_Projection(
             #pragma omp parallel \
             default(none) \
             shared( div_term, full_div_orig, F_seed_Lap, dAreas, Itime, Idepth ) \
-            private( Ilat, Ilon, index_sub, index )
+            private( Ilat, Ilon, index_sub, index ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, weight_err )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -268,7 +271,8 @@ void Apply_Potential_Projection(
             shared( full_u_lon_pot, u_lon_pot, full_u_lat_pot, u_lat_pot, \
                     full_div_pot, div_pot, full_F, F_vector, full_seed, F_seed, full_RHS, div_term, \
                     Itime, Idepth ) \
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {

@@ -186,7 +186,8 @@ void compute_div_transport(
             uzux_loc, uzuy_loc, uzuz_loc,\
             dpdx, dpdy, dpdz,\
             x_deriv_vals, y_deriv_vals, z_deriv_vals,\
-            div_J_tmp)
+            div_J_tmp) \
+    firstprivate( Npts )
     {
         x_deriv_vals.push_back(&ux_x);
         x_deriv_vals.push_back(&uy_x);

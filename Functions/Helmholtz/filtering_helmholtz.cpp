@@ -667,7 +667,7 @@ void filtering_helmholtz(
                 vort_ux_tmp, vort_uy_tmp, vort_uz_tmp, LAT_lb, LAT_ub, thread_id, num_threads, filtered_vals, \
                 uiuj_F_r_tmp, uiuj_F_Phi_tmp, uiuj_F_Psi_tmp, \
                 wind_tau_Psi_tmp, wind_tau_Phi_tmp, tau_wind_dot_u_tor_tmp, tau_wind_dot_u_pot_tmp ) \
-        firstprivate(perc, wRank, local_kernel, perc_count)
+        firstprivate(perc, wRank, local_kernel, perc_count, Nlon, Nlat, Ndepth, Ntime )
         {
 
             filtered_vals.clear();

@@ -37,7 +37,9 @@ void extend_mask_to_poles(
     #pragma omp parallel \
     default(none) \
     shared( extended_mask, mask_to_extend ) \
-    private( index, Itime, Idepth, Ilat, Ilon, extended_index )
+    private( index, Itime, Idepth, Ilat, Ilon, extended_index ) \
+    firstprivate( size_to_extend, Nlon, Nlat, Ndepth, Ntime, extended_Nlat,\
+                    Ilat_start )
     {
         #pragma omp for collapse(1) schedule(static)
         for ( index = 0; index < size_to_extend; index++ ) {

@@ -405,7 +405,8 @@ void Apply_Helmholtz_Projection_uiuj(
     if (single_seed) {
         #pragma omp parallel default(none) \
         shared( LHS_seed, seed_v_r, seed_Phi_v, seed_Psi_v, Lap_comp_factor ) \
-        private( Ilat, Ilon, index )
+        private( Ilat, Ilon, index ) \
+        firstprivate( Nlon, Nlat, Npts )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -472,7 +473,8 @@ void Apply_Helmholtz_Projection_uiuj(
                 #pragma omp parallel \
                 default(none) \
                 shared( LHS_seed, seed_v_r, seed_Phi_v, seed_Psi_v, Itime, Idepth, Lap_comp_factor ) \
-                private( Ilat, Ilon, index, index_sub )
+                private( Ilat, Ilon, index, index_sub ) \
+                firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
                 {
                     #pragma omp for collapse(2) schedule(static)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -513,7 +515,8 @@ void Apply_Helmholtz_Projection_uiuj(
             double weight_val, u_lon_loc, u_lat_loc;
             #pragma omp parallel default(none) \
             shared( dAreas, Itime, Idepth, RHS_vector, u_lon, u_lat, RHS_seed ) \
-            private( Ilat, Ilon, index, index_sub, weight_val, u_lon_loc, u_lat_loc )
+            private( Ilat, Ilon, index, index_sub, weight_val, u_lon_loc, u_lat_loc ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts, weight_err )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -617,7 +620,8 @@ void Apply_Helmholtz_Projection_uiuj(
             default(none) \
             shared( full_v_r, full_Phi_v, full_Psi_v, full_uu, full_uv, full_vv, \
                     dAreas, LHS_ptr, RHS_result, RHS_result_ptr, Itime, Idepth, Lap_comp_factor ) \
-            private( Ilat, Ilon, index, index_sub, weight_val )
+            private( Ilat, Ilon, index, index_sub, weight_val ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts, weight_err )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -780,7 +784,8 @@ void Apply_Helmholtz_Projection_uiuj(
             shared( u_lon, u_lat, full_uu, full_uv, full_vv, Itime, Idepth, dAreas ) \
             reduction( + : total_area, uu_2error, uv_2error, vv_2error, uu_2norm, uv_2norm, vv_2norm ) \
             reduction( max : uu_Inferror, uv_Inferror, vv_Inferror, uu_Infnorm, uv_Infnorm, vv_Infnorm ) \
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {

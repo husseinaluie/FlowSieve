@@ -40,7 +40,8 @@ void write_integral_to_post(
                  len_fields  = field.front().size();
     #pragma omp parallel \
     default(none) shared(field) private(Iregion, index) \
-    reduction(max : fmax_loc) reduction(min : fmin_loc)
+    reduction(max : fmax_loc) reduction(min : fmin_loc) \
+    firstprivate( num_regions, len_fields )
     {
         #pragma omp for collapse(2) schedule(static)
         for (Iregion = 0; Iregion < num_regions; Iregion++) {
@@ -83,7 +84,8 @@ void write_integral_to_post(
 
         #pragma omp parallel \
         default(none) shared(int_fields, field) \
-        private(Iregion, index, local_double, local_int)
+        private(Iregion, index, local_double, local_int) \
+        firstprivate( num_regions, len_fields, fmiddle, frange )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Iregion = 0; Iregion < num_regions; Iregion++) {
@@ -129,7 +131,8 @@ void write_integral_to_post(
         float_fields.resize( field.size(), std::vector<float>(field.front().size(), 0.) );
         #pragma omp parallel \
         default(none) shared(float_fields, field, scale_factor) \
-        private(Iregion, index)
+        private(Iregion, index) \
+        firstprivate( num_regions, len_fields, fmiddle )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Iregion = 0; Iregion < num_regions; Iregion++) {
@@ -166,7 +169,8 @@ void write_integral_to_post(
         double_fields.resize( field.size(), std::vector<double>(field.front().size(), 0.) );
         #pragma omp parallel \
         default(none) shared(double_fields, field, scale_factor) \
-        private(Iregion, index)
+        private(Iregion, index) \
+        firstprivate( num_regions, len_fields, fmiddle )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Iregion = 0; Iregion < num_regions; Iregion++) {

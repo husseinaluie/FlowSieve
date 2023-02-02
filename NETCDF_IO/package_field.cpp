@@ -49,7 +49,8 @@ void package_field(
     #pragma omp parallel \
     default (none) \
     shared(mask, original, packaged) \
-    private(index, local_double, local_int)
+    private(index, local_double, local_int) \
+    firstprivate( fmiddle, frange )
     {
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < original.size(); index++) {

@@ -48,7 +48,8 @@ void write_regions(
     double curr_lat, curr_lon, reg_test;
     #pragma omp parallel \
     default(none) shared(region_vals, latitude, longitude, mask) \
-    private(index, Ilat, Ilon, Iregion, curr_lat, curr_lon, reg_test)
+    private(index, Ilat, Ilon, Iregion, curr_lat, curr_lon, reg_test) \
+    firstprivate( Nlon, Nlat, Nregion, RegionTest::all_regions )
     {
         #pragma omp for collapse(3) schedule(static)
         for (Iregion = 0; Iregion < Nregion; ++Iregion) {

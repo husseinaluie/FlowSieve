@@ -68,7 +68,9 @@ void compute_vorticity(
     shared( source_data, mask, u_r, u_lon, u_lat, \
             vort_r, vort_lon, vort_lat, vel_div, OkuboWeiss) \
     private( Itime, Idepth, Ilat, Ilon, index, vort_r_tmp, vort_lon_tmp, vort_lat_tmp, \
-             div_tmp, OkuboWeiss_tmp)
+             div_tmp, OkuboWeiss_tmp) \
+    firstprivate( Npts, Nlon, Nlat, Ndepth, Ntime, do_vort_r, do_vort_lon, do_vort_lat, do_vel_div,\
+                  do_OkuboWeiss )
     {
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < Npts; index++) {

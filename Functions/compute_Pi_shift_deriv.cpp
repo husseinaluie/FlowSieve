@@ -40,8 +40,6 @@ void compute_Pi_shift_deriv(
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
-    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
-
     #if DEBUG >= 2
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
@@ -130,9 +128,10 @@ void compute_Pi_shift_deriv(
             #pragma omp parallel \
             default(none) \
             shared(tau_ij, u_i_tau_ij, mask, ui, uj, uiuj)\
-            private(index, uiuj_loc, ui_loc, uj_loc)
+            private(index, uiuj_loc, ui_loc, uj_loc) \
+            firstprivate( Npts )
             {
-                #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+                #pragma omp for collapse(1) schedule(guided)
                 for (index = 0; index < Npts; index++) {
 
                     if ( mask.at(index) ) {
@@ -154,7 +153,8 @@ void compute_Pi_shift_deriv(
                     jj, ui, tau_ij, u_i_tau_ij, deriv_fields)\
             private(Itime, Idepth, Ilat, Ilon, index,\
                     pi_tmp, tau_ij_j, u_i_tau_ij_j,\
-                    x_deriv_vals, y_deriv_vals, z_deriv_vals)
+                    x_deriv_vals, y_deriv_vals, z_deriv_vals) \
+            firstprivate( Npts, Nlon, Nlat, Ndepth, Ntime )
             {
 
                 x_deriv_vals.resize(2);
@@ -177,7 +177,7 @@ void compute_Pi_shift_deriv(
                 // Now actually compute Pi
                 //   in particular, compute
                 //           u_i * tau_ij,j - (u_i * tau_ij)_,j
-                #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+                #pragma omp for collapse(1) schedule(guided)
                 for (index = 0; index < Npts; index++) {
 
                     if ( mask.at(index) ) {

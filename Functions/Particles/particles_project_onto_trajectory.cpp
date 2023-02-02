@@ -70,7 +70,8 @@ void particles_project_onto_trajectory(
                 ref_ind, trajectory_time, trajectory_lat, trajectory_lon,\
                 field_trajectories, fields_to_track, stdout, do_print, wRank )\
         private( Ip, index, Ifield, traj_lat, traj_lon, field_val,\
-                 left, right, bottom, top)
+                 left, right, bottom, top) \
+        firstprivate( Ntraj, Ntime_traj, Ntime )
         {
             #pragma omp for collapse(1) schedule(static)
             for (Ip = 0; Ip < Ntraj; ++Ip) {

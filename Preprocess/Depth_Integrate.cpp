@@ -44,7 +44,8 @@ void depth_integrate(
     #pragma omp parallel \
     default(none) \
     shared( field_to_integrate, depth_integral, depth, source_data )\
-    private( Itime, Ilat, Ilon, index, index_below, Iz )
+    private( Itime, Ilat, Ilon, index, index_below, Iz ) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, IS_INCR, IS_ELEV )
     {
         #pragma omp for collapse(3) schedule(static)
         for ( Itime = 0; Itime < Ntime; ++Itime ) {

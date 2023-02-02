@@ -56,6 +56,7 @@ void compute_region_avg_and_std(
         private(Ilat, Ilon, index, dA, area_index, increment, int_index, \
                 Idepth, Itime, Iregion )\
         shared( source_data, Ifield, postprocess_fields) \
+        firstprivate( Nlon, Nlat, Ndepth, Ntime, num_regions ) \
         reduction(vec_double_plus : field_integrals)
         { 
             #pragma omp for collapse(5) schedule(static)

@@ -24,8 +24,6 @@ void compute_region_areas(
     int Iregion, Itime, Idepth, Ilat, Ilon;
     size_t reg_index, index, area_index;
 
-    const int chunk_size = get_omp_chunksize(Nlat, Nlon);
-
     for (Iregion = 0; Iregion < num_regions; ++Iregion) {
         for (Itime = 0; Itime < Ntime; ++Itime) {
             for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
@@ -38,9 +36,10 @@ void compute_region_areas(
                 #pragma omp parallel default(none)\
                 private(Ilat, Ilon, index, dA, area_index )\
                 shared(latitude, longitude, areas, mask, Iregion, Itime, Idepth) \
+                firstprivate( Nlon, Nlat, Ndepth, Ntime, RegionTest::all_regions ) \
                 reduction(+ : local_area)
                 { 
-                    #pragma omp for collapse(2) schedule(guided, chunk_size)
+                    #pragma omp for collapse(2) schedule(guided)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                         for (Ilon = 0; Ilon < Nlon; ++Ilon) {
 

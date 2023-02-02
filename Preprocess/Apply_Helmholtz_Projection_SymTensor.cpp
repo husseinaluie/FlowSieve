@@ -97,7 +97,8 @@ void Apply_Helmholtz_Projection_SymTensor(
     // Copy the starting seed.
     if (single_seed) {
         #pragma omp parallel default(none) shared( LHS_seed, seed_v_r, seed_v_lon, seed_v_lat ) \
-        private( Ilat, Ilon, index )
+        private( Ilat, Ilon, index ) \
+        firstprivate( Nlon, Nlat, Npts )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -267,7 +268,8 @@ void Apply_Helmholtz_Projection_SymTensor(
                 #pragma omp parallel \
                 default(none) \
                 shared( LHS_seed, seed_v_r, seed_v_lon, seed_v_lat, Itime, Idepth ) \
-                private( Ilat, Ilon, index, index_sub )
+                private( Ilat, Ilon, index, index_sub ) \
+                firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
                 {
                     #pragma omp for collapse(2) schedule(static)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -301,7 +303,8 @@ void Apply_Helmholtz_Projection_SymTensor(
             double weight_val;
             #pragma omp parallel default(none) \
             shared( dAreas, Itime, Idepth, RHS_vector, u_lon, u_lat, RHS_seed ) \
-            private( Ilat, Ilon, index, index_sub, weight_val )
+            private( Ilat, Ilon, index, index_sub, weight_val ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts, weight_err )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -389,7 +392,8 @@ void Apply_Helmholtz_Projection_SymTensor(
             default(none) \
             shared( full_v_r, full_v_lon, full_v_lat, full_uu, full_uv, full_vv, \
                     dAreas, F_array, RHS_result, RHS_seed, Itime, Idepth ) \
-            private( Ilat, Ilon, index, index_sub, weight_val )
+            private( Ilat, Ilon, index, index_sub, weight_val ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts, weight_err )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -491,7 +495,8 @@ void Apply_Helmholtz_Projection_SymTensor(
             default(none) \
             shared( u_lon, u_lat, full_uu, full_uv, full_vv, Itime, Idepth, dAreas ) \
             reduction( + : total_area, uu_error, uv_error, vv_error, uu_norm, uv_norm, vv_norm ) \
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {

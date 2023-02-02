@@ -115,7 +115,8 @@ void Apply_Toroidal_Projection(
         #pragma omp parallel \
         default(none) \
         shared(F_seed, seed) \
-        private( Ilat, Ilon, index )
+        private( Ilat, Ilon, index ) \
+        firstprivate( Nlon, Nlat )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -171,7 +172,8 @@ void Apply_Toroidal_Projection(
                 #pragma omp parallel \
                 default(none) \
                 shared( F_seed, seed, Itime, Idepth ) \
-                private( Ilat, Ilon, index, index_sub )
+                private( Ilat, Ilon, index, index_sub ) \
+                firstprivate( Nlon, Nlat, Ndepth, Ntime )
                 {
                     #pragma omp for collapse(2) schedule(static)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -217,7 +219,8 @@ void Apply_Toroidal_Projection(
                 #pragma omp parallel \
                 default(none) \
                 shared( curl_term, dAreas ) \
-                private( Ilat, Ilon, index_sub )
+                private( Ilat, Ilon, index_sub ) \
+                firstprivate( Nlon, Nlat )
                 {
                     #pragma omp for collapse(2) schedule(static)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -333,7 +336,8 @@ void Apply_Toroidal_Projection(
                     full_u_lon_seed, full_u_lat_seed, u_lon_seed, u_lat_seed, \
                     full_div_tor, div_tor, full_F, F_vector, full_seed, F_seed, full_RHS, curl_term, \
                     Itime, Idepth ) \
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {

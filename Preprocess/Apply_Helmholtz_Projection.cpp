@@ -402,7 +402,11 @@ void Apply_Helmholtz_Projection(
 
     // Copy the starting seed.
     if (single_seed) {
-        #pragma omp parallel default(none) shared(Psi_seed, Phi_seed, seed_tor, seed_pot) private( Ilat, Ilon, index )
+        #pragma omp parallel \
+        default(none) \
+        shared(Psi_seed, Phi_seed, seed_tor, seed_pot) \
+        private( Ilat, Ilon, index ) \
+        firstprivate( Nlon, Nlat )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -491,7 +495,8 @@ void Apply_Helmholtz_Projection(
                 #pragma omp parallel \
                 default(none) \
                 shared( Psi_seed, Phi_seed, seed_tor, seed_pot, Itime, Idepth ) \
-                private( Ilat, Ilon, index, index_sub )
+                private( Ilat, Ilon, index, index_sub ) \
+                firstprivate( Nlon, Nlat, Ndepth, Ntime )
                 {
                     #pragma omp for collapse(2) schedule(static)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -521,7 +526,8 @@ void Apply_Helmholtz_Projection(
             shared( dAreas, Itime, Idepth, RHS_vector, \
                     u_lon, u_lon_tor_seed, u_lon_pot_seed, u_lon_rem, \
                     u_lat, u_lat_tor_seed, u_lat_pot_seed, u_lat_rem ) \
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -555,7 +561,8 @@ void Apply_Helmholtz_Projection(
             double is_pole;
             #pragma omp parallel default(none) \
             shared( dAreas, latitude, Itime, Idepth, RHS_vector, div_term, vort_term, u_lon_rem, u_lat_rem, deriv_scale_factor ) \
-            private( Ilat, Ilon, index, index_sub, is_pole )
+            private( Ilat, Ilon, index, index_sub, is_pole ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts, Tikhov_Laplace, weight_err )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -673,7 +680,8 @@ void Apply_Helmholtz_Projection(
                     full_Psi, full_Phi, Psi_vector, Phi_vector, \
                     Phi_seed, Psi_seed, \
                     Itime, Idepth ) \
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, single_seed )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -823,7 +831,8 @@ void Apply_Helmholtz_Projection(
                     u_lon, u_lat, Itime, Idepth, dAreas, latitude ) \
             reduction(+ : total_area, error2, tor_KE, pot_KE, proj_KE, orig_KE) \
             reduction( max : errorInf, velInf )\
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {

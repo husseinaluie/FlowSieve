@@ -396,7 +396,8 @@ void filtering(
                 vort_ux_tmp, vort_uy_tmp, vort_uz_tmp,\
                 KE_tmp, rho_tmp, p_tmp,\
                 LAT_lb, LAT_ub, tid, filtered_vals, tilde_vals ) \
-        firstprivate(perc, wRank, local_kernel, perc_count)
+        firstprivate(perc, wRank, local_kernel, perc_count,\
+                     Nlon, Nlat, Ndepth, Ntime )
         {
 
             tid = omp_get_thread_num();

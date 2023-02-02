@@ -89,7 +89,8 @@ void compute_Pi(
             #pragma omp parallel \
             default(none) \
             shared(tau_ij, mask, ui, uj, uiuj, source_data) \
-            private(index, uiuj_loc, ui_loc, uj_loc)
+            private(index, uiuj_loc, ui_loc, uj_loc) \
+            firstprivate( Npts )
             {
                 #pragma omp for collapse(1) schedule(guided)
                 for (index = 0; index < Npts; index++) {
@@ -108,7 +109,8 @@ void compute_Pi(
             shared( source_data, energy_transfer, mask, \
                     ii, jj, ui, uj, tau_ij, deriv_fields)\
             private( Itime, Idepth, Ilat, Ilon, index, pi_tmp, ui_j, uj_i, \
-                     x_deriv_vals, y_deriv_vals, z_deriv_vals)
+                     x_deriv_vals, y_deriv_vals, z_deriv_vals) \
+            firstprivate( Npts )
             {
 
                 x_deriv_vals.resize(2);

@@ -38,7 +38,8 @@ void compute_areas(
         else { coeff = pow( constants::R_earth, 2) * dlat * dlon; }
 
         // Compute the area of each cell
-        #pragma omp parallel default(none) private(ii, jj) shared(areas, coeff, latitude)
+        #pragma omp parallel default(none) private(ii, jj) shared(areas, coeff, latitude) \
+        firstprivate( Nlat, Nlon )
         {
             #pragma omp for collapse(2) schedule(static)
             for (ii = 0; ii < Nlat; ii++) {
@@ -55,7 +56,8 @@ void compute_areas(
 
         // Compute the area of each cell
         #pragma omp parallel default(none) private(ii, jj, dlat, dlon)\
-        shared(areas, coeff, longitude, latitude)
+        shared(areas, coeff, longitude, latitude) \
+        firstprivate( Nlat, Nlon )
         {
             dlon = longitude.at(1) - longitude.at(0);
             #pragma omp for collapse(2) schedule(guided)

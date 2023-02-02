@@ -40,8 +40,6 @@ void compute_Pi_Helmholtz(
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
-    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
-
     #if DEBUG >= 2
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
@@ -118,9 +116,10 @@ void compute_Pi_Helmholtz(
             #pragma omp parallel \
             default(none) \
             shared(tau_ij, u_i_tau_ij, mask, ui, uj, uiuj)\
-            private(index, uiuj_loc, ui_loc, uj_loc)
+            private(index, uiuj_loc, ui_loc, uj_loc) \
+            firstprivate( Npts )
             {
-                #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+                #pragma omp for collapse(1) schedule(guided)
                 for (index = 0; index < Npts; index++) {
 
                     if ( mask.at(index) ) {
@@ -141,7 +140,8 @@ void compute_Pi_Helmholtz(
             shared(energy_transfer, latitude, longitude, mask,\
                     ii, jj, ui, uj, tau_ij, u_i_tau_ij, i_deriv_fields, j_deriv_fields)\
             private(Itime, Idepth, Ilat, Ilon, index,\
-                    pi_tmp, tau_ij_j, u_i_tau_ij_j, u_i_j, u_j_i, i_deriv_vals, j_deriv_vals)
+                    pi_tmp, tau_ij_j, u_i_tau_ij_j, u_i_j, u_j_i, i_deriv_vals, j_deriv_vals) \
+            firstprivate( Npts, Nlon, Nlat, Ndepth, Ntime )
             {
 
                 // Now set the appropriate derivative pointers
@@ -160,7 +160,7 @@ void compute_Pi_Helmholtz(
                 // Now actually compute Pi
                 //   in particular, compute
                 //           u_i * tau_ij,j - (u_i * tau_ij)_,j
-                #pragma omp for collapse(1) schedule(dynamic, OMP_chunksize)
+                #pragma omp for collapse(1) schedule(guided)
                 for (index = 0; index < Npts; index++) {
 
                     if ( mask.at(index) ) {
