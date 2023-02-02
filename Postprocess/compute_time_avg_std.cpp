@@ -32,8 +32,6 @@ void compute_time_avg_std(
 
     const int num_fields = postprocess_fields.size();
 
-    const int chunk_size = get_omp_chunksize(Nlat, Nlon);
-
     int Ifield, Itime, Idepth, Ilat, Ilon;
     size_t index, space_index;
 
@@ -46,9 +44,10 @@ void compute_time_avg_std(
 
     #pragma omp parallel default(none)\
     private(Ifield, Ilat, Ilon, Itime, Idepth, index, space_index )\
-    shared(postprocess_fields, source_data, always_masked, mask_count, time_average_loc)
+    shared(postprocess_fields, source_data, always_masked, mask_count, time_average_loc) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, num_fields )
     { 
-        #pragma omp for collapse(3) schedule(dynamic, chunk_size)
+        #pragma omp for collapse(3) schedule(guided)
         for (Ilat = 0; Ilat < Nlat; ++Ilat){
             for (Ilon = 0; Ilon < Nlon; ++Ilon){
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth){

@@ -45,7 +45,7 @@ const std::string InputParser::getCmdOption(
         std::vector<int> newline_locs( 1, 0 ); 
 
         // find the newlines
-        for( int ii = 0; ii < description.size(); ++ii ) {
+        for( size_t ii = 0; ii < description.size(); ++ii ) {
             if (description[ii] == '\n') { newline_locs.push_back( ii+1 ); }
         }
 

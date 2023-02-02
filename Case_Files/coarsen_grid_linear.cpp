@@ -155,8 +155,15 @@ int main(int argc, char *argv[]) {
                 Nlat_fine   = fine_data.Nlat,
                 Nlon_fine   = fine_data.Nlon;
 
-    size_t starts[4] = { fine_data.myStarts.at(0), fine_data.myStarts.at(1), 0,                0                };
-    size_t counts[4] = { fine_data.myCounts.at(0), fine_data.myCounts.at(1), coarse_data.Nlat, coarse_data.Nlon };
+    size_t starts[4] = { (size_t) fine_data.myStarts.at(0), 
+                         (size_t) fine_data.myStarts.at(1), 
+                         0,                
+                         0                
+                       };
+    size_t counts[4] = { (size_t) fine_data.myCounts.at(0), 
+                         (size_t) fine_data.myCounts.at(1), 
+                         (size_t) coarse_data.Nlat, 
+                         (size_t) coarse_data.Nlon };
 
     // Compute the area of each 'cell' which will be necessary for creating the output file
     if (wRank == 0) { fprintf( stdout, "Computing cell areas.\n" ); }
@@ -174,8 +181,7 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Now coarsen the velocity fields
-    const size_t    Npts_coarse = Ntime * Ndepth * Nlat_coarse * Nlon_coarse,
-                    Npts_fine = fine_data.variables.at("fine_field").size();
+    const size_t    Npts_coarse = Ntime * Ndepth * Nlat_coarse * Nlon_coarse;
     std::vector<double> var_coarse(Npts_coarse);
     std::vector<bool> mask_coarse(Npts_coarse, false);
 
@@ -195,7 +201,8 @@ int main(int argc, char *argv[]) {
         default(none) \
         shared( coarse_data, fine_data, var_coarse, mask_coarse, vars_to_refine, stdout ) \
         private( target_lat, target_lon, Itime, Idepth, II_coarse, Ilat_coarse, Ilon_coarse, \
-                 RIGHT, LEFT, BOT, TOP, II_fine, Ilat_fine, Ilon_fine, cnt, interp_val, land_cnt )
+                 RIGHT, LEFT, BOT, TOP, II_fine, Ilat_fine, Ilon_fine, cnt, interp_val, land_cnt ) \
+        firstprivate( Npts_coarse, Nlon_coarse, Nlat_coarse, Nlon_fine, Nlat_fine, Ntime, Ndepth )
         {
             #pragma omp for collapse(1) schedule(guided)
             for (II_coarse = 0; II_coarse < Npts_coarse; ++II_coarse) {

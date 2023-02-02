@@ -28,7 +28,8 @@ void particles_fore_back_difference(
     #pragma omp parallel \
     default(none) \
     shared( fore_lon_hist, fore_lat_hist, back_lon_hist, back_lat_hist, traj_dists ) \
-    private( index, lon1, lat1, lon2, lat2 )
+    private( index, lon1, lat1, lon2, lat2 ) \
+    firstprivate( Npts )
     {
         #pragma omp for collapse(1) schedule(dynamic)
         for (index = 0; index < Npts; ++index) {

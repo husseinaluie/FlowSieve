@@ -24,22 +24,15 @@ void depth_integrate(
     MPI_Comm_size( comm, &wSize );
 
     // Create some tidy names for variables
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude;
-
-    const std::vector<int>  &myCounts = source_data.myCounts,
-                            &myStarts = source_data.myStarts;
+    const std::vector<double>   &depth      = source_data.depth;
 
     const int   Ntime   = source_data.Ntime,    // this is the MPI-local Ntime, not the full Ntime
                 Ndepth  = source_data.Ndepth,   // this is the MPI-local Ndepth, not the full Ndepth
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
-    const size_t Npts = Ntime * Ndepth * Nlat * Nlon;
-    size_t index, int_index, index_below, index_above;
-    int Itime, Idepth, Ilat, Ilon, Iz;
+    size_t index, index_below;
+    int Itime, Ilat, Ilon, Iz;
 
     const bool  IS_ELEV = source_data.depth_is_elevation,
                 IS_INCR = source_data.depth_is_increasing;
@@ -51,7 +44,8 @@ void depth_integrate(
     #pragma omp parallel \
     default(none) \
     shared( field_to_integrate, depth_integral, depth, source_data )\
-    private( Itime, Idepth, Ilat, Ilon, index, index_below, index_above, Iz )
+    private( Itime, Ilat, Ilon, index, index_below, Iz ) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, IS_INCR, IS_ELEV )
     {
         #pragma omp for collapse(3) schedule(static)
         for ( Itime = 0; Itime < Ntime; ++Itime ) {
@@ -65,7 +59,6 @@ void depth_integrate(
                         depth_integral.at(index) = 0.;
                         for ( Iz = 1; Iz < Ndepth; ++Iz ) {
                             index       = Index( Itime, Iz,   Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
-                            index_above = Index( Itime, Iz-1, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
                             depth_integral.at(index) = depth_integral.at( index_below ) + 
                                 ( depth.at(Iz-1) - depth.at(Iz) ) 
                                 * ( 0.5 * ( field_to_integrate.at( index ) + field_to_integrate.at( index_below ) ) );

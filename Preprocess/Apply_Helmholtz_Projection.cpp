@@ -35,7 +35,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
                 Nlon    = myCounts.at(3);
 
     int Ilat, Ilon, IDIFF, Idiff, Ndiff, LB;
-    size_t index, index_sub, diff_index;
+    size_t index_sub, diff_index;
     const size_t Npts = Nlat * Nlon;
     double tmp_val, tan_lat;
     std::vector<double> diff_vec;
@@ -60,13 +60,11 @@ void sparse_vel_from_PsiPhi_vortdiv(
             // If we're too close to the pole (less than 0.01 degrees), bad things happen
             is_pole = std::fabs( std::fabs( latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 0.01;
 
-            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
             index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
             
             double weight_val = weight_err ? dAreas.at(index_sub) : 1.;
 
-            double cos_lat_inv = 1. / cos(latitude.at(Ilat)),
-                   cos2_lat_inv = pow( cos_lat_inv, 2. );
+            double cos_lat_inv = 1. / cos(latitude.at(Ilat));
 
             if ( not(is_pole) ) { // Skip poles
 
@@ -160,9 +158,8 @@ void sparse_vel_from_PsiPhi_vortdiv(
             // If we're too close to the pole (less than 0.01 degrees), bad things happen
             is_pole = std::fabs( std::fabs( latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 0.01;
 
-            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
             index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
-            
+
             double weight_val = weight_err ? dAreas.at(index_sub) : 1.;
 
             double cos_lat_inv = 1. / cos(latitude.at(Ilat)),
@@ -286,6 +283,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
                 get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask, 1, constants::DiffOrd);
 
                 Ndiff = diff_vec.size();
+                tan_lat = tan( latitude.at(Ilat) );
 
                 // If LB is unchanged, then we failed to build a stencil
                 if (LB != - 2 * Nlat) {
@@ -337,9 +335,7 @@ void Apply_Helmholtz_Projection(
     MPI_Comm_size( comm, &wSize );
 
     // Create some tidy names for variables
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
+    const std::vector<double>   &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude,
                                 &dAreas     = source_data.areas;
 
@@ -364,8 +360,8 @@ void Apply_Helmholtz_Projection(
 
     const size_t Npts = Nlat * Nlon;
 
-    int Itime, Idepth, Ilat, Ilon;
-    size_t index, index_sub, iters_used;
+    int Itime=0, Idepth=0, Ilat, Ilon;
+    size_t index, index_sub, iters_used = 0;
 
     // Fill in the land areas with zero velocity
     #pragma omp parallel default(none) shared( u_lon, u_lat, mask, stderr, wRank ) private( index )
@@ -413,7 +409,11 @@ void Apply_Helmholtz_Projection(
 
     // Copy the starting seed.
     if (single_seed) {
-        #pragma omp parallel default(none) shared(Psi_seed, Phi_seed, seed_tor, seed_pot) private( Ilat, Ilon, index )
+        #pragma omp parallel \
+        default(none) \
+        shared(Psi_seed, Phi_seed, seed_tor, seed_pot) \
+        private( Ilat, Ilon, index ) \
+        firstprivate( Nlon, Nlat )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -462,7 +462,9 @@ void Apply_Helmholtz_Projection(
     get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Nlat/2, 0, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
     int Ndiff = diff_vec.size();
     double deriv_scale_factor = 0;
-    for ( int IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { deriv_scale_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
+    for ( size_t IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { 
+        deriv_scale_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; 
+    }
     if (wRank == 0) { fprintf( stdout, "deriv_scale_factor = %g\n", deriv_scale_factor ); }
 
     // Put in {u,v}_from_{psi,phi} bits
@@ -500,7 +502,8 @@ void Apply_Helmholtz_Projection(
                 #pragma omp parallel \
                 default(none) \
                 shared( Psi_seed, Phi_seed, seed_tor, seed_pot, Itime, Idepth ) \
-                private( Ilat, Ilon, index, index_sub )
+                private( Ilat, Ilon, index, index_sub ) \
+                firstprivate( Nlon, Nlat, Ndepth, Ntime )
                 {
                     #pragma omp for collapse(2) schedule(static)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -530,7 +533,8 @@ void Apply_Helmholtz_Projection(
             shared( dAreas, Itime, Idepth, RHS_vector, \
                     u_lon, u_lon_tor_seed, u_lon_pot_seed, u_lon_rem, \
                     u_lat, u_lat_tor_seed, u_lat_pot_seed, u_lat_rem ) \
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -564,7 +568,8 @@ void Apply_Helmholtz_Projection(
             double is_pole;
             #pragma omp parallel default(none) \
             shared( dAreas, latitude, Itime, Idepth, RHS_vector, div_term, vort_term, u_lon_rem, u_lat_rem, deriv_scale_factor ) \
-            private( Ilat, Ilon, index, index_sub, is_pole )
+            private( Ilat, Ilon, index, index_sub, is_pole ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts, Tikhov_Laplace, weight_err )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -682,7 +687,8 @@ void Apply_Helmholtz_Projection(
                     full_Psi, full_Phi, Psi_vector, Phi_vector, \
                     Phi_seed, Psi_seed, \
                     Itime, Idepth ) \
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, single_seed )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -832,7 +838,8 @@ void Apply_Helmholtz_Projection(
                     u_lon, u_lat, Itime, Idepth, dAreas, latitude ) \
             reduction(+ : total_area, error2, tor_KE, pot_KE, proj_KE, orig_KE) \
             reduction( max : errorInf, velInf )\
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {

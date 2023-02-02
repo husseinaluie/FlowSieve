@@ -42,13 +42,6 @@ void compute_vorticity_at_point(
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude;
-
-    const std::vector<bool> &mask = source_data.mask;
-
     // For the moment, only compute vort_r
     vort_r_tmp   = 0.;
     vort_lon_tmp = 0.;
@@ -79,6 +72,11 @@ void compute_vorticity_at_point(
         OkuboWeiss_tmp = pow(ux_x - uy_y, 2) + 4 * ux_y * uy_x;
     } else {
 
+        const std::vector<double>   &latitude   = source_data.latitude,
+                                    &longitude  = source_data.longitude;
+
+        const std::vector<bool> &mask = source_data.mask;
+
         size_t index = Index(Itime, Idepth, Ilat, Ilon,
                              Ntime, Ndepth, Nlat, Nlon);
         double ur_r,   ur_lon,   ur_lat, 
@@ -104,7 +102,6 @@ void compute_vorticity_at_point(
 
         const double    lat       = latitude.at(Ilat),
                         cos_lat   = cos(lat),
-                        sin_lat   = sin(lat),
                         tan_lat   = tan(lat),
                         u_r_loc   = u_r.at(index),
                         u_lon_loc = u_lon.at(index),

@@ -31,7 +31,8 @@ void potential_vel_from_F(
     default(none) \
     shared( latitude, longitude, mask, F, vel_lon, vel_lat, deriv_fields)\
     private(Itime, Idepth, Ilat, Ilon, index, cos_lat, tmp_lon, tmp_lat, \
-            dFdlon, dFdlat, lon_deriv_vals, lat_deriv_vals, is_pole)
+            dFdlon, dFdlat, lon_deriv_vals, lat_deriv_vals, is_pole) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime ) 
     {
 
         lon_deriv_vals.push_back(&dFdlon);

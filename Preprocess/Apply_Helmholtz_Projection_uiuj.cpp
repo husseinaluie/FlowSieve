@@ -70,7 +70,7 @@ void build_main_projection_matrix(
             get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Nlat/2, 0, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
             Ndiff = diff_vec.size();
             double Lap_comp_factor = 0;
-            for ( IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
+            for ( IDIFF = 0; IDIFF < (int) diff_vec.size(); IDIFF++ ) { Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
 
             // These are for the v_r term.
 
@@ -310,8 +310,8 @@ void build_main_projection_matrix(
         }
     }
 
-    size_t lower_count = alglib::sparsegetlowercount( matr );
-    size_t upper_count = alglib::sparsegetuppercount( matr );
+    //size_t lower_count = alglib::sparsegetlowercount( matr );
+    //size_t upper_count = alglib::sparsegetuppercount( matr );
 
     alglib::sparseconverttocrs( matr );
 
@@ -338,10 +338,7 @@ void Apply_Helmholtz_Projection_uiuj(
     MPI_Comm_size( comm, &wSize );
 
     // Create some tidy names for variables
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
+    const std::vector<double>   &latitude   = source_data.latitude,
                                 &dAreas     = source_data.areas;
 
     const std::vector<bool> &mask = source_data.mask;
@@ -365,7 +362,7 @@ void Apply_Helmholtz_Projection_uiuj(
 
     const size_t Npts = Nlat * Nlon;
 
-    int Itime, Idepth, Ilat, Ilon;
+    int Itime = 0, Idepth = 0, Ilat, Ilon;
     size_t index, index_sub, iters_used;
 
     // Fill in the land areas with zero velocity
@@ -408,14 +405,17 @@ void Apply_Helmholtz_Projection_uiuj(
     get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Nlat/2, 0, Ntime, Ndepth, Nlat, Nlon, unmask, 2, constants::DiffOrd);
     int Ndiff = diff_vec.size();
     double Lap_comp_factor = 0;
-    for ( int IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; }
+    for ( size_t IDIFF = 0; IDIFF < diff_vec.size(); IDIFF++ ) { 
+        Lap_comp_factor += std::fabs( diff_vec.at(IDIFF) ) / Ndiff; 
+    }
     if (wRank == 0) { fprintf( stdout, "Lap_comp_factor = %g\n", Lap_comp_factor ); }
 
     // Copy the starting seed.
     if (single_seed) {
         #pragma omp parallel default(none) \
         shared( LHS_seed, seed_v_r, seed_Phi_v, seed_Psi_v, Lap_comp_factor ) \
-        private( Ilat, Ilon, index )
+        private( Ilat, Ilon, index ) \
+        firstprivate( Nlon, Nlat, Npts )
         {
             #pragma omp for collapse(2) schedule(static)
             for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -482,7 +482,8 @@ void Apply_Helmholtz_Projection_uiuj(
                 #pragma omp parallel \
                 default(none) \
                 shared( LHS_seed, seed_v_r, seed_Phi_v, seed_Psi_v, Itime, Idepth, Lap_comp_factor ) \
-                private( Ilat, Ilon, index, index_sub )
+                private( Ilat, Ilon, index, index_sub ) \
+                firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
                 {
                     #pragma omp for collapse(2) schedule(static)
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -523,7 +524,8 @@ void Apply_Helmholtz_Projection_uiuj(
             double weight_val, u_lon_loc, u_lat_loc;
             #pragma omp parallel default(none) \
             shared( dAreas, Itime, Idepth, RHS_vector, u_lon, u_lat, RHS_seed ) \
-            private( Ilat, Ilon, index, index_sub, weight_val, u_lon_loc, u_lat_loc )
+            private( Ilat, Ilon, index, index_sub, weight_val, u_lon_loc, u_lat_loc ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts, weight_err )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -629,7 +631,8 @@ void Apply_Helmholtz_Projection_uiuj(
             default(none) \
             shared( full_v_r, full_Phi_v, full_Psi_v, full_uu, full_uv, full_vv, \
                     dAreas, LHS_ptr, RHS_result, RHS_result_ptr, Itime, Idepth, Lap_comp_factor ) \
-            private( Ilat, Ilon, index, index_sub, weight_val )
+            private( Ilat, Ilon, index, index_sub, weight_val ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts, weight_err )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {
@@ -792,7 +795,8 @@ void Apply_Helmholtz_Projection_uiuj(
             shared( u_lon, u_lat, full_uu, full_uv, full_vv, Itime, Idepth, dAreas ) \
             reduction( + : total_area, uu_2error, uv_2error, vv_2error, uu_2norm, uv_2norm, vv_2norm ) \
             reduction( max : uu_Inferror, uv_Inferror, vv_Inferror, uu_Infnorm, uv_Infnorm, vv_Infnorm ) \
-            private( Ilat, Ilon, index, index_sub )
+            private( Ilat, Ilon, index, index_sub ) \
+            firstprivate( Nlon, Nlat, Ndepth, Ntime )
             {
                 #pragma omp for collapse(2) schedule(static)
                 for (Ilat = 0; Ilat < Nlat; ++Ilat) {

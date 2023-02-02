@@ -35,17 +35,7 @@ void compute_Z(
         const MPI_Comm comm
         ) {
 
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude;
-
     const std::vector<bool> &mask = source_data.mask;
-
-    const int   Ntime   = source_data.Ntime,
-                Ndepth  = source_data.Ndepth,
-                Nlat    = source_data.Nlat,
-                Nlon    = source_data.Nlon;
-
-    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
     #if DEBUG >= 2
     int wRank, wSize;
@@ -56,7 +46,6 @@ void compute_Z(
     #endif
 
     double Z_tmp;
-    const int ii = 0;
     int Itime, Idepth, Ilat, Ilon, jj;
     size_t index;
     const size_t Npts = enstrophy_transfer.size();
@@ -106,7 +95,8 @@ void compute_Z(
         #pragma omp parallel \
         default(none) \
         shared( source_data, tau_ij, u_i_tau_ij, mask, omega, uj, omega_uj)\
-        private(index, omega_uj_loc, omega_loc, uj_loc)
+        private(index, omega_uj_loc, omega_loc, uj_loc) \
+        firstprivate( Npts )
         {
             #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < Npts; index++) {
@@ -125,11 +115,12 @@ void compute_Z(
 
         #pragma omp parallel \
         default(none) \
-        shared( source_data, enstrophy_transfer, latitude, longitude, mask, stdout, \
+        shared( source_data, enstrophy_transfer, mask, \
                 jj, omega, tau_ij, u_i_tau_ij, deriv_fields,std::cout)\
         private(Itime, Idepth, Ilat, Ilon, index, \
                 Z_tmp, tau_ij_j, u_i_tau_ij_j,\
-                x_deriv_vals, y_deriv_vals, z_deriv_vals)
+                x_deriv_vals, y_deriv_vals, z_deriv_vals) \
+        firstprivate( Npts )
         {
 
             x_deriv_vals.resize(2);

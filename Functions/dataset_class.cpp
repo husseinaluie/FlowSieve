@@ -154,11 +154,9 @@ void dataset::compute_region_areas() {
     double local_area, local_area_water_only;
     size_t Ilat, Ilon, reg_index, index, area_index;
 
-    const int chunk_size = get_omp_chunksize(Nlat, Nlon);
-
     for (size_t Iregion = 0; Iregion < num_regions; ++Iregion) {
-        for (size_t Itime = 0; Itime < Ntime; ++Itime) {
-            for (size_t Idepth = 0; Idepth < Ndepth; ++Idepth) {
+        for (size_t Itime = 0; Itime < (size_t) Ntime; ++Itime) {
+            for (size_t Idepth = 0; Idepth < (size_t) Ndepth; ++Idepth) {
 
                 local_area = 0.;
                 local_area_water_only = 0.;
@@ -169,8 +167,8 @@ void dataset::compute_region_areas() {
                 reduction(+ : local_area, local_area_water_only)
                 { 
                     #pragma omp for collapse(2) schedule(guided)
-                    for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                        for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                    for (Ilat = 0; Ilat < (size_t) Nlat; ++Ilat) {
+                        for (Ilon = 0; Ilon < (size_t) Nlon; ++Ilon) {
 
                             index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 

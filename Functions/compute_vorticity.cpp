@@ -15,8 +15,6 @@
  *  @param[in,out]      OkuboWeiss                  where to store computed OkuboWeiss (array)
  *  @param[in]          source_data                 dataset class instance containing data (Psi, Phi, etc)
  *  @param[in]          u_r,u_lon,u_lat             velocity components
- *  @param[in]          Ntime,Ndepth,Nlat,Nlon      (MPI-local) dimension sizes
- *  @param[in]          longitude,latitude          1D grid vectors
  *  @param[in]          mask                        2D array to distinguish land from water
  *  @param[in]          comm                        MPI communicator object
  *
@@ -34,17 +32,12 @@ void compute_vorticity(
         const MPI_Comm comm
         ) {
 
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude;
-
     const std::vector<bool> &mask = source_data.mask;
 
     const int   Ntime   = source_data.Ntime,
                 Ndepth  = source_data.Ndepth,
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
-
-    const int OMP_chunksize = get_omp_chunksize(Nlat,Nlon);
 
     double vort_r_tmp, vort_lon_tmp, vort_lat_tmp, div_tmp, OkuboWeiss_tmp;
     int Itime, Idepth, Ilat, Ilon;
@@ -72,10 +65,12 @@ void compute_vorticity(
 
     #pragma omp parallel \
     default(none) \
-    shared( source_data, mask, u_r, u_lon, u_lat, longitude, latitude, \
+    shared( source_data, mask, u_r, u_lon, u_lat, \
             vort_r, vort_lon, vort_lat, vel_div, OkuboWeiss) \
     private( Itime, Idepth, Ilat, Ilon, index, vort_r_tmp, vort_lon_tmp, vort_lat_tmp, \
-             div_tmp, OkuboWeiss_tmp)
+             div_tmp, OkuboWeiss_tmp) \
+    firstprivate( Npts, Nlon, Nlat, Ndepth, Ntime, do_vort_r, do_vort_lon, do_vort_lat, do_vel_div,\
+                  do_OkuboWeiss )
     {
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < Npts; index++) {

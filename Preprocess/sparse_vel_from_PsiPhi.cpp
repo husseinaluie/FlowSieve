@@ -45,9 +45,9 @@ void sparse_vel_from_PsiPhi(
                 Nlon    = myCounts.at(3);
 
     int Ilat, Ilon, IDIFF, Idiff, Ndiff, LB;
-    size_t index, index_sub, diff_index;
+    size_t index_sub, diff_index;
     const size_t Npts = Nlat * Nlon;
-    double old_val, tmp, cos_lat_inv, tan_lat;
+    double old_val, tmp, cos_lat_inv;
     std::vector<double> diff_vec;
     bool is_pole;
 
@@ -59,7 +59,6 @@ void sparse_vel_from_PsiPhi(
             // If we're too close to the pole (less than 0.01 degrees), bad things happen
             is_pole = std::fabs( std::fabs( latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 0.01;
 
-            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
             index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
 
             cos_lat_inv = 1. / cos(latitude.at(Ilat));

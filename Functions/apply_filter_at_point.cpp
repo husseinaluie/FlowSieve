@@ -52,11 +52,10 @@ void apply_filter_at_point(
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
-    double dist, kern, area, loc_val, loc_weight;
+    double kern, area, loc_val, loc_weight;
     size_t index, kernel_index;
 
-    double  kA_sum   = 0.,
-            mask_val = 0.;
+    double  kA_sum   = 0.;
     std::vector<double> tmp_vals(Nfields);
 
     int curr_lon, curr_lat, LON_lb, LON_ub;
@@ -80,7 +79,6 @@ void apply_filter_at_point(
 
             index = Index(Itime, Idepth, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
 
-            size_t kernel_index;
             if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X) ) {
                 // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
                 //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)

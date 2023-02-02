@@ -27,10 +27,8 @@ void compute_zonal_avg_and_std(
 
     const int num_fields = postprocess_fields.size();
 
-    const int chunk_size = get_omp_chunksize(Nlat, Nlon);
-
     int Ifield, Itime, Idepth, Ilat, Ilon;
-    size_t index, space_index, area_index, int_index;
+    size_t index, area_index, int_index;
     double dA;
 
     // First, get the zonal areas
@@ -60,7 +58,8 @@ void compute_zonal_avg_and_std(
 
     #pragma omp parallel default(none)\
     private( Ifield, Ilat, Ilon, Itime, Idepth, index, int_index, area_index, dA )\
-    shared( postprocess_fields, source_data, zonal_average, zonal_areas )
+    shared( postprocess_fields, source_data, zonal_average, zonal_areas ) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, num_fields )
     { 
         #pragma omp for collapse(3) schedule(dynamic)
         for (Itime = 0; Itime < Ntime; ++Itime){

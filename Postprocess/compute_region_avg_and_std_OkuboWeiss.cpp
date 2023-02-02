@@ -37,7 +37,8 @@ void compute_region_avg_and_std_OkuboWeiss(
     private( Ifield, Iregion, Itime, Idepth, Ilat, Ilon, IOkubo,\
             index, reg_index, area_index, int_index, \
             int_vals, OW_areas, dA, reg_area )\
-    shared( source_data, postprocess_fields, OkuboWeiss, field_averages, OkuboWeiss_areas )
+    shared( source_data, postprocess_fields, OkuboWeiss, field_averages, OkuboWeiss_areas ) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, NOkubo, num_regions, num_fields, OkuboWeiss_bounds )
     { 
     #pragma omp for collapse(4) schedule(static)
         for (Ifield = 0; Ifield < num_fields; ++Ifield) {

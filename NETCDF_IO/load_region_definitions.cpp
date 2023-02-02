@@ -13,7 +13,7 @@ void dataset::load_region_definitions(
 
     assert( check_file_existence( filename.c_str() ) ); // Make sure the file exists
 
-    int wRank, wSize, Nprocs_in_dim, Iproc_in_dim;
+    int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
 

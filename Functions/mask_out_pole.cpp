@@ -42,7 +42,8 @@ void mask_out_pole(
     if (not(constants::CARTESIAN)) {
         #pragma omp parallel default(none) \
             private(Itime, Idepth, Ilat, Ilon, index) \
-            shared(latitude, mask, masked_latitudes)
+            shared(latitude, mask, masked_latitudes) \
+            firstprivate( Nlon, Nlat, Ntime, Ndepth )
         { 
             #pragma omp for collapse(1) schedule(static)
             for (index = 0; index < mask.size(); ++index) {

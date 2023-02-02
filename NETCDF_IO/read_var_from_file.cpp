@@ -148,6 +148,7 @@ void read_var_from_file(
 
                 if      ( II == 0 ) { Nprocs_in_dim = Nprocs_in_time;  }
                 else if ( II == 1 ) { Nprocs_in_dim = Nprocs_in_depth; }
+                else                { Nprocs_in_dim = 0; assert(false); }  // II <= 1 so won't happen
 
                 my_count = ( (int)count[II] ) / Nprocs_in_dim;
                 overflow = (int)( count[II] - my_count * Nprocs_in_dim );
@@ -156,6 +157,7 @@ void read_var_from_file(
                                   Nprocs_in_time,  Nprocs_in_depth, 1,         1          );
                 if      ( II == 0 ) { Iproc_in_dim = Itime_proc;  }
                 else if ( II == 1 ) { Iproc_in_dim = Idepth_proc; }
+                else                { Iproc_in_dim = -1; assert(false); }  // II <= 1 so won't happen
 
                 start[II] = (size_t) (   
                           std::min(Iproc_in_dim,            overflow) * (my_count + 1)

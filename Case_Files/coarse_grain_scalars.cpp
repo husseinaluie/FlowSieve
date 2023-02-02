@@ -53,7 +53,6 @@ int main(int argc, char *argv[]) {
     int thread_safety_provided;
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &thread_safety_provided);
     //MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI::ERRORS_THROW_EXCEPTIONS);
-    const double start_time = MPI_Wtime();
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
@@ -106,7 +105,7 @@ int main(int argc, char *argv[]) {
     //   e.g. --variables "rho salinity p" (names must match with input netcdf file)
     std::vector< std::string > vars_to_filter;
     input.getListofStrings( vars_to_filter, "--variables", asked_help );
-    const int Nvars = vars_to_filter.size();
+    const size_t Nvars = vars_to_filter.size();
 
     // Also read in the filter scales from the commandline
     //   e.g. --filter_scales "10.e3 150.76e3 1000e3" (units are in metres)
@@ -139,8 +138,8 @@ int main(int argc, char *argv[]) {
     source_data.load_latitude(  latitude_dim_name,  input_fname );
     source_data.load_longitude( longitude_dim_name, input_fname );
 
-    const bool one_snapshot = (     (time_dim_name  == "DNE") or (time_dim_name  == "DOES_NOT_EXIST")
-                                and (depth_dim_name == "DNE") or (depth_dim_name == "DOES_NOT_EXIST")
+    const bool one_snapshot = (     ( (time_dim_name  == "DNE") or (time_dim_name  == "DOES_NOT_EXIST") )
+                                and ( (depth_dim_name == "DNE") or (depth_dim_name == "DOES_NOT_EXIST") )
                               );
 
     // Apply some cleaning to the processor allotments if necessary. 
@@ -168,8 +167,7 @@ int main(int argc, char *argv[]) {
     source_data.Ndepth = one_snapshot ? 1 : source_data.myCounts[1];
     const size_t Npts = source_data.Ntime * source_data.Ndepth * source_data.Nlat * source_data.Nlon;
 
-    const std::vector<int>  &myCounts = source_data.myCounts,
-                            &myStarts = source_data.myStarts;
+    const std::vector<int>  &myStarts = source_data.myStarts;
 
     //
     int LAT_lb, LAT_ub, Itime, Idepth, Ilat, Ilon;
@@ -253,7 +251,7 @@ int main(int argc, char *argv[]) {
         private( filter_values_doubles, filter_values_ptrs, \
                  Itime, Idepth, Ilat, Ilon, Ivar, index, \
                  LAT_lb, LAT_ub ) \
-        firstprivate( local_kernel )
+        firstprivate( local_kernel, Nlon, Nlat, Ndepth, Ntime, Nvars )
         {
 
             filter_values_doubles.clear();

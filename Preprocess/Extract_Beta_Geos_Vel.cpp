@@ -20,9 +20,7 @@ void build_LHS_matrix(
         ) {
 
     // Create some tidy names for variables
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
-                                &dAreas     = source_data.areas;
+    const std::vector<double>   &latitude   = source_data.latitude;
 
     const std::vector<int>  &myCounts = source_data.myCounts;
 
@@ -33,7 +31,7 @@ void build_LHS_matrix(
 
     const size_t Npts = Nlat * Nlon;
 
-    double tmp_val, weight_val;
+    double tmp_val;
     size_t column_skip, row_skip, index_sub;
     int IDIFF, Idiff, LB, Ndiff;
     std::vector<double> diff_vec;
@@ -98,8 +96,7 @@ void build_RHS_matrix(
 
     // Create some tidy names for variables
     const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
-                                &dAreas     = source_data.areas;
+                                &longitude  = source_data.longitude;
 
     const std::vector<int>  &myCounts = source_data.myCounts;
 
@@ -111,7 +108,7 @@ void build_RHS_matrix(
     const size_t Npts = Nlat * Nlon;
     const double Omega = 2. * M_PI / (24. * 60. * 60.);
 
-    double tmp_val, weight_val;
+    double tmp_val;
     size_t column_skip, row_skip, index_sub;
     int IDIFF, Idiff, Idiff_lat, Idiff_lon, 
                LB,    LB_lon,    LB_lat, 
@@ -203,14 +200,7 @@ void Extract_Beta_Geos_Vel(
     MPI_Comm_size( comm, &wSize );
 
     // Create some tidy names for variables
-    const std::vector<double>   &time       = source_data.time,
-                                &depth      = source_data.depth,
-                                &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
-                                &dAreas     = source_data.areas;
-
-    const std::vector<int>  &myCounts = source_data.myCounts,
-                            &myStarts = source_data.myStarts;
+    const std::vector<int>  &myCounts = source_data.myCounts;
 
     const int   Ntime   = myCounts.at(0),
                 Ndepth  = myCounts.at(1),
@@ -222,7 +212,7 @@ void Extract_Beta_Geos_Vel(
     if (wRank == 0) { fprintf(stdout, "Working on %'zu points in lat-lon space.\n", Npts); fflush(stdout); }
     #endif
 
-    int Itime, Idepth, Ilat, Ilon;
+    int Itime=0, Idepth=0, Ilat, Ilon;
     size_t index, index_sub;
 
     // alglib variables
