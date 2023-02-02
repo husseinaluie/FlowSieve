@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
     const size_t    Npts_coarse = Ntime * Ndepth * Nlat_coarse * Nlon_coarse,
                     Npts_fine = fine_data.variables.at("fine_field").size();
     std::vector<double> var_coarse(Npts_coarse);
-    std::vector<bool> mask_coarse(Npts_coarse, true);
+    std::vector<bool> mask_coarse(Npts_coarse, false);
 
     // Next, the coarse velocities
     int cnt, land_cnt, Itime, Idepth, LEFT, RIGHT, BOT, TOP, Ilat_fine, Ilon_fine, Ilat_coarse, Ilon_coarse;
@@ -189,6 +189,7 @@ int main(int argc, char *argv[]) {
         fine_data.load_variable( "fine_field", vars_to_refine.at(Ivar), fine_fname, true, true );
 
         std::fill( var_coarse.begin(), var_coarse.end(), 0. );
+        std::fill( mask_coarse.begin(), mask_coarse.end(), false );
 
         #pragma omp parallel \
         default(none) \
@@ -261,11 +262,22 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
+                /*
                 // And drop into the coarse grid
-                var_coarse.at(II_coarse) = ( cnt == 0 ) ? 0 : ( interp_val / cnt );
+                var_coarse.at(II_coarse) = ( cnt == 0 ) ? ( constants::FILTER_OVER_LAND ? 0 : constants::fill_value )
+                                             : ( interp_val / cnt );
 
                 // If half or more of the points were land, then the new cell is also land
                 mask_coarse.at(II_coarse) = ( cnt == 0 ) ? false : ( double(land_cnt) / double(cnt) < 0.5 );
+                */
+
+                if (cnt == 0) {
+                    mask_coarse.at(II_coarse) = false;
+                    var_coarse.at(II_coarse) = constants::FILTER_OVER_LAND ? 0 : constants::fill_value;
+                } else {
+                    mask_coarse.at(II_coarse) = (double(land_cnt) / double(cnt)) < 0.5;
+                    var_coarse.at(II_coarse) = interp_val / cnt;
+                }
 
                 #if DEBUG >= 3
                 fprintf( stdout, " %'zu : [ %d, %d, %d, %d ] : %g, %d : %g \n", II_coarse, LEFT, BOT, TOP, RIGHT, interp_val, cnt, var_coarse.at(II_coarse) );
