@@ -243,7 +243,7 @@ void read_mask_from_file(
 
     #if DEBUG >= 1
     if (wRank == 0) {
-        fprintf(stdout, "  Land cover = %'.4g%% (%'zu water vs %'zu land) (%'zu land converted to water) \n", 
+        fprintf(stdout, "  Land cover = %'.4g%% (%'zu water vs %'zu land) \n", 
                 100 * ((double)num_land) / (num_land + num_water), num_water, num_land);
     }
     #endif
