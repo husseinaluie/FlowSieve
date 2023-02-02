@@ -90,6 +90,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
 
                         tmp_val     = diff_vec.at(IDIFF-LB) * cos_lat_inv * R_inv;
                         tmp_val    *= weight_val;
+                        if (isnan(tmp_val)) { fprintf( stdout, "  Rank %d encountered a NaN at lat/lon %d,%d (codeline %d)\n", wRank, Ilat, Ilon, __LINE__ ); }
 
                         // Psi part
                         size_t  column_skip = 0 * Npts,
@@ -124,6 +125,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
 
                         tmp_val     = diff_vec.at(IDIFF-LB) * R_inv;
                         tmp_val    *= weight_val;
+                        if (isnan(tmp_val)) { fprintf( stdout, "  Rank %d encountered a NaN at lat/lon %d,%d (codeline %d)\n", wRank, Ilat, Ilon, __LINE__ ); }
 
                         // Psi part
                         size_t  column_skip = 0 * Npts,
@@ -164,7 +166,8 @@ void sparse_vel_from_PsiPhi_vortdiv(
             double weight_val = weight_err ? dAreas.at(index_sub) : 1.;
 
             double cos_lat_inv = 1. / cos(latitude.at(Ilat)),
-                   cos2_lat_inv = pow( cos_lat_inv, 2. );
+                   cos2_lat_inv = pow( cos_lat_inv, 2. ),
+                   tan_lat = tan( latitude.at(Ilat) );
 
             if ( ( Ilat == 0 ) and (Tikhov_Laplace == 0) ) {
                 // At the pole-most point, force to be zonally constant. This is to try and remove the null(Laplacian) component
@@ -188,6 +191,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
                         //tmp_val     = diff_vec.at(IDIFF-LB);
                         tmp_val     = diff_vec.at(IDIFF-LB) * cos_lat_inv * R_inv;
                         tmp_val    *= weight_val;
+                        if (isnan(tmp_val)) { fprintf( stdout, "  Rank %d encountered a NaN at lat/lon %d,%d (codeline %d)\n", wRank, Ilat, Ilon, __LINE__ ); }
 
                         // Psi part
                         size_t  column_skip = 1 * Npts,
@@ -224,6 +228,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
 
                         tmp_val     = diff_vec.at(IDIFF-LB) * cos2_lat_inv * R2_inv;
                         tmp_val    *= weight_val * Tikhov_Laplace / deriv_scale_factor;
+                        if (isnan(tmp_val)) { fprintf( stdout, "  Rank %d encountered a NaN at lat/lon %d,%d (codeline %d)\n", wRank, Ilat, Ilon, __LINE__ ); }
 
                         // (2,0) entry
                         size_t  row_skip    = 2 * Npts,
@@ -258,6 +263,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
 
                         tmp_val     = diff_vec.at(IDIFF-LB) * R2_inv;
                         tmp_val    *= weight_val * Tikhov_Laplace / deriv_scale_factor;
+                        if (isnan(tmp_val)) { fprintf( stdout, "  Rank %d encountered a NaN at lat/lon %d,%d (codeline %d)\n", wRank, Ilat, Ilon, __LINE__ ); }
 
                         // (2,0) entry
                         size_t  row_skip    = 2 * Npts,
@@ -292,6 +298,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
 
                         tmp_val     = - diff_vec.at(IDIFF-LB) * tan_lat * R2_inv;
                         tmp_val    *= weight_val * Tikhov_Laplace / deriv_scale_factor;
+                        if (isnan(tmp_val)) { fprintf( stdout, "  Rank %d encountered a NaN at lat/lon %d,%d (codeline %d)\n", wRank, Ilat, Ilon, __LINE__ ); }
 
                         // (2,0) entry
                         size_t  row_skip    = 2 * Npts,
