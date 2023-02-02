@@ -57,6 +57,14 @@ void write_integral_to_post(
     const double frange  = fmax - fmin;
     double scale_factor;
 
+    #if DEBUG >= 2
+    if (wRank == 0) { 
+        fprintf(stdout, "    fmin, fmax, fmiddle, frange = %'g, %'g, %'g, %'g\n", 
+                fmin, fmax, fmiddle, frange);
+        fflush(stdout);
+    }
+    #endif
+
     std::vector< std::vector< signed short > > int_fields;
     std::vector< std::vector< float        > > float_fields;
     std::vector< std::vector< double       > > double_fields;
