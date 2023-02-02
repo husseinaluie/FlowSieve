@@ -146,7 +146,7 @@ void Apply_Helmholtz_Projection_SymTensor(
 
             // Now handle longitude derivatives
             LB = - 2 * Nlon;
-            get_diff_vector(diff_vec, LB, longitude, "lon", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask, 1, constants::DiffOrd);
+            get_diff_vector(diff_vec, LB, longitude, "lon", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
             Ndiff = diff_vec.size();
 
             if ( LB != - 2 * Nlon) {
@@ -173,7 +173,7 @@ void Apply_Helmholtz_Projection_SymTensor(
 
             // Now handle latitude derivatives
             LB = - 2 * Nlat;
-            get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask, 1, constants::DiffOrd);
+            get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, unmask, 1, constants::DiffOrd);
             Ndiff = diff_vec.size();
 
             if ( LB != - 2 * Nlat) {
@@ -247,8 +247,6 @@ void Apply_Helmholtz_Projection_SymTensor(
     size_t lower_count = alglib::sparsegetlowercount( LHS_matr );
     size_t upper_count = alglib::sparsegetuppercount( LHS_matr );
 
-    fprintf( stdout, "counts: %'zu %'zu\n", lower_count, upper_count );
-
     alglib::sparseconverttocrs(LHS_matr);
 
     #if DEBUG >= 1
@@ -287,7 +285,7 @@ void Apply_Helmholtz_Projection_SymTensor(
             // Get velocity from seed
             alglib::sparsemv( LHS_matr, lhs_seed, rhs_seed );
 
-            #if DEBUG >= 1
+            #if DEBUG >= 2
             if ( (wRank == 0) and (Itime == 0) ) {
                 fprintf(stdout, "Building the RHS of the least squares problem.\n");
                 fflush(stdout);
@@ -324,7 +322,7 @@ void Apply_Helmholtz_Projection_SymTensor(
             //
             //// Now apply the least-squares solver
             //
-            #if DEBUG >= 1
+            #if DEBUG >= 2
             if ( (wRank == 0) and (Itime == 0) ) {
                 fprintf(stdout, "Solving the least squares problem.\n");
                 fflush(stdout);
@@ -356,7 +354,7 @@ void Apply_Helmholtz_Projection_SymTensor(
                 * NMV countains number of matrix-vector calculations
             */
 
-            #if DEBUG >= 1
+            #if DEBUG >= 2
             if ( (wRank == 0) and (Itime == 0) ) {
                 fprintf(stdout, " Done solving the least squares problem.\n");
                 fflush(stdout);
@@ -366,11 +364,10 @@ void Apply_Helmholtz_Projection_SymTensor(
             // Extract the solution and add the seed back in
             double *LHS_ptr = F_alglib.getcontent();
             std::vector<double> F_array( LHS_ptr, LHS_ptr + 3 * Npts);
-            //std::copy ( LHS_ptr, LHS_ptr + 3 * Npts, F_array.begin() );
             for (size_t ii = 0; ii < Npts; ++ii) { F_array.at(ii) += LHS_seed.at(ii); }
 
             // Get velocity associated to computed F field
-            #if DEBUG >= 1
+            #if DEBUG >= 2
             if ( (wRank == 0) and (Itime == 0) ) {
                 fprintf(stdout, " Extracting velocities and divergence from toroidal field.\n");
                 fflush(stdout);
@@ -381,7 +378,7 @@ void Apply_Helmholtz_Projection_SymTensor(
             //
             //// Store into the full arrays
             //
-            #if DEBUG >= 1
+            #if DEBUG >= 2
             if ( (wRank == 0) and (Itime == 0) ) {
                 fprintf(stdout, " Storing values into output arrays\n");
                 fflush(stdout);
@@ -421,16 +418,20 @@ void Apply_Helmholtz_Projection_SymTensor(
             // If we don't have a seed for the next iteration, use this solution as the seed
             if (single_seed) { LHS_seed = F_array; }
 
-            #if DEBUG >= 1
-            fprintf(stdout, "  --  --  Rank %d done depth %d\n", wRank, Idepth + myStarts.at(1) );
-            fflush(stdout);
+            #if DEBUG >= 0
+            if ( source_data.full_Ndepth > 1 ) {
+                fprintf(stdout, "  --  --  Rank %d done depth %d\n", wRank, Idepth + myStarts.at(1) );
+                fflush(stdout);
+            }
             #endif
 
         }
 
-        #if DEBUG >= 1
-        fprintf(stdout, " -- Rank %d done time %d\n", wRank, Itime + myStarts.at(0) );
-        fflush(stdout);
+        #if DEBUG >= 0
+        if ( source_data.full_Ntime > 1 ) {
+            fprintf(stdout, " -- Rank %d done time %d\n", wRank, Itime + myStarts.at(0) );
+            fflush(stdout);
+        }
         #endif
     }
 
@@ -453,19 +454,23 @@ void Apply_Helmholtz_Projection_SymTensor(
     vars_to_write.push_back("v_lon");
     vars_to_write.push_back("v_lat");
 
-    vars_to_write.push_back("uu");
-    vars_to_write.push_back("uv");
-    vars_to_write.push_back("vv");
+    if (not(constants::MINIMAL_OUTPUT)) {
+        vars_to_write.push_back("uu");
+        vars_to_write.push_back("uv");
+        vars_to_write.push_back("vv");
+    }
 
     initialize_output_file( source_data, vars_to_write, output_fname.c_str(), -1);
 
-    write_field_to_output(full_v_r,   "v_r",   starts, counts, output_fname.c_str(), &mask);
-    write_field_to_output(full_v_lon, "v_lon", starts, counts, output_fname.c_str(), &mask);
-    write_field_to_output(full_v_lat, "v_lat", starts, counts, output_fname.c_str(), &mask);
+    write_field_to_output(full_v_r,   "v_r",   starts, counts, output_fname.c_str(), &unmask);
+    write_field_to_output(full_v_lon, "v_lon", starts, counts, output_fname.c_str(), &unmask);
+    write_field_to_output(full_v_lat, "v_lat", starts, counts, output_fname.c_str(), &unmask);
 
-    write_field_to_output(full_uu, "uu", starts, counts, output_fname.c_str(), &mask);
-    write_field_to_output(full_uv, "uv", starts, counts, output_fname.c_str(), &mask);
-    write_field_to_output(full_vv, "vv", starts, counts, output_fname.c_str(), &mask);
+    if (not(constants::MINIMAL_OUTPUT)) {
+        write_field_to_output(full_uu, "uu", starts, counts, output_fname.c_str(), &unmask);
+        write_field_to_output(full_uv, "uv", starts, counts, output_fname.c_str(), &unmask);
+        write_field_to_output(full_vv, "vv", starts, counts, output_fname.c_str(), &unmask);
+    }
 
     // Store some solver information
     add_attr_to_file("rel_tol",    rel_tol,                     output_fname.c_str());
@@ -476,22 +481,30 @@ void Apply_Helmholtz_Projection_SymTensor(
 
 
     //
-    //// At the very end, compute the L2 error for each time/depth
+    //// At the very end, compute the L2 and Linf error for each time/depth
     //
 
-    std::vector<double> uu_errors( Ntime * Ndepth, 0. ),
-                        uv_errors( Ntime * Ndepth, 0. ),
-                        vv_errors( Ntime * Ndepth, 0. ),
-                        uu_norms(  Ntime * Ndepth, 0. ),
-                        uv_norms(  Ntime * Ndepth, 0. ),
-                        vv_norms(  Ntime * Ndepth, 0. );
-    double total_area, uu_error, uv_error, vv_error, uu_norm, uv_norm, vv_norm;
+    std::vector<double> uu_2errors( Ntime * Ndepth, 0. ),
+                        uv_2errors( Ntime * Ndepth, 0. ),
+                        vv_2errors( Ntime * Ndepth, 0. ),
+                        uu_2norms(  Ntime * Ndepth, 0. ),
+                        uv_2norms(  Ntime * Ndepth, 0. ),
+                        vv_2norms(  Ntime * Ndepth, 0. ),
+                        uu_Inferrors( Ntime * Ndepth, 0. ),
+                        uv_Inferrors( Ntime * Ndepth, 0. ),
+                        vv_Inferrors( Ntime * Ndepth, 0. ),
+                        uu_Infnorms(  Ntime * Ndepth, 0. ),
+                        uv_Infnorms(  Ntime * Ndepth, 0. ),
+                        vv_Infnorms(  Ntime * Ndepth, 0. );
+    double total_area, uu_2error,   uv_2error,   vv_2error,   uu_2norm,   uv_2norm,   vv_2norm,
+                       uu_Inferror, uv_Inferror, vv_Inferror, uu_Infnorm, uv_Infnorm, vv_Infnorm;
     for (int Itime = 0; Itime < Ntime; ++Itime) {
         for (int Idepth = 0; Idepth < Ndepth; ++Idepth) {
             #pragma omp parallel \
             default(none) \
             shared( u_lon, u_lat, full_uu, full_uv, full_vv, Itime, Idepth, dAreas ) \
-            reduction( + : total_area, uu_error, uv_error, vv_error, uu_norm, uv_norm, vv_norm ) \
+            reduction( + : total_area, uu_2error, uv_2error, vv_2error, uu_2norm, uv_2norm, vv_2norm ) \
+            reduction( max : uu_Inferror, uv_Inferror, vv_Inferror, uu_Infnorm, uv_Infnorm, vv_Infnorm ) \
             private( Ilat, Ilon, index, index_sub )
             {
                 #pragma omp for collapse(2) schedule(static)
@@ -502,46 +515,81 @@ void Apply_Helmholtz_Projection_SymTensor(
 
                         total_area += dAreas.at(index_sub);
 
-                        uu_error += dAreas.at(index_sub) * ( pow( u_lon.at(index) * u_lon.at(index) - full_uu.at(index) , 2.) );
-                        uv_error += dAreas.at(index_sub) * ( pow( u_lon.at(index) * u_lat.at(index) - full_uv.at(index) , 2.) );
-                        vv_error += dAreas.at(index_sub) * ( pow( u_lat.at(index) * u_lat.at(index) - full_vv.at(index) , 2.) );
+                        uu_2error += dAreas.at(index_sub) * ( pow( u_lon.at(index) * u_lon.at(index) - full_uu.at(index) , 2.) );
+                        uv_2error += dAreas.at(index_sub) * ( pow( u_lon.at(index) * u_lat.at(index) - full_uv.at(index) , 2.) );
+                        vv_2error += dAreas.at(index_sub) * ( pow( u_lat.at(index) * u_lat.at(index) - full_vv.at(index) , 2.) );
 
-                        uu_norm += dAreas.at(index_sub) * ( pow( u_lon.at(index) * u_lon.at(index) , 2.) );
-                        uv_norm += dAreas.at(index_sub) * ( pow( u_lon.at(index) * u_lat.at(index) , 2.) );
-                        vv_norm += dAreas.at(index_sub) * ( pow( u_lat.at(index) * u_lat.at(index) , 2.) );
+                        uu_2norm += dAreas.at(index_sub) * ( pow( u_lon.at(index) * u_lon.at(index) , 2.) );
+                        uv_2norm += dAreas.at(index_sub) * ( pow( u_lon.at(index) * u_lat.at(index) , 2.) );
+                        vv_2norm += dAreas.at(index_sub) * ( pow( u_lat.at(index) * u_lat.at(index) , 2.) );
+
+                        uu_Inferror = std::fmax( std::fabs( u_lon.at(index) * u_lon.at(index) - full_uu.at(index) ), uu_Inferror );
+                        uv_Inferror = std::fmax( std::fabs( u_lon.at(index) * u_lat.at(index) - full_uv.at(index) ), uv_Inferror );
+                        vv_Inferror = std::fmax( std::fabs( u_lat.at(index) * u_lat.at(index) - full_vv.at(index) ), vv_Inferror );
+
+                        uu_Infnorm = std::fmax( std::fabs( u_lon.at(index) * u_lon.at(index) ), uu_Infnorm );
+                        uv_Infnorm = std::fmax( std::fabs( u_lon.at(index) * u_lat.at(index) ), uv_Infnorm );
+                        vv_Infnorm = std::fmax( std::fabs( u_lat.at(index) * u_lat.at(index) ), vv_Infnorm );
                     }
                 }
             }
             size_t int_index = Index( Itime, Idepth, 0, 0, Ntime, Ndepth, 1, 1);
-            uu_errors.at( int_index ) = uu_error / total_area;
-            uv_errors.at( int_index ) = uv_error / total_area;
-            vv_errors.at( int_index ) = vv_error / total_area;
+            uu_2errors.at( int_index ) = sqrt( uu_2error / total_area );
+            uv_2errors.at( int_index ) = sqrt( uv_2error / total_area );
+            vv_2errors.at( int_index ) = sqrt( vv_2error / total_area );
 
-            uu_norms.at( int_index ) = uu_norm / total_area;
-            uv_norms.at( int_index ) = uv_norm / total_area;
-            vv_norms.at( int_index ) = vv_norm / total_area;
+            uu_2norms.at( int_index ) = sqrt( uu_2norm / total_area );
+            uv_2norms.at( int_index ) = sqrt( uv_2norm / total_area );
+            vv_2norms.at( int_index ) = sqrt( vv_2norm / total_area );
+
+            uu_Inferrors.at( int_index ) = uu_Inferror;
+            uv_Inferrors.at( int_index ) = uv_Inferror;
+            vv_Inferrors.at( int_index ) = vv_Inferror;
+
+            uu_Infnorms.at( int_index ) = uu_Infnorm;
+            uv_Infnorms.at( int_index ) = uv_Infnorm;
+            vv_Infnorms.at( int_index ) = vv_Infnorm;
         }
     }
 
     const char* dim_names[] = {"time", "depth"};
     const int ndims_error = 2;
-    add_var_to_file( "uu_error", dim_names, ndims_error, output_fname.c_str() );
-    add_var_to_file( "uv_error", dim_names, ndims_error, output_fname.c_str() );
-    add_var_to_file( "vv_error", dim_names, ndims_error, output_fname.c_str() );
+    if (wRank == 0) {
+        add_var_to_file( "uu_2error", dim_names, ndims_error, output_fname.c_str() );
+        add_var_to_file( "uv_2error", dim_names, ndims_error, output_fname.c_str() );
+        add_var_to_file( "vv_2error", dim_names, ndims_error, output_fname.c_str() );
 
-    add_var_to_file( "uu_norm", dim_names, ndims_error, output_fname.c_str() );
-    add_var_to_file( "uv_norm", dim_names, ndims_error, output_fname.c_str() );
-    add_var_to_file( "vv_norm", dim_names, ndims_error, output_fname.c_str() );
+        add_var_to_file( "uu_2norm", dim_names, ndims_error, output_fname.c_str() );
+        add_var_to_file( "uv_2norm", dim_names, ndims_error, output_fname.c_str() );
+        add_var_to_file( "vv_2norm", dim_names, ndims_error, output_fname.c_str() );
+
+        add_var_to_file( "uu_Inferror", dim_names, ndims_error, output_fname.c_str() );
+        add_var_to_file( "uv_Inferror", dim_names, ndims_error, output_fname.c_str() );
+        add_var_to_file( "vv_Inferror", dim_names, ndims_error, output_fname.c_str() );
+
+        add_var_to_file( "uu_Infnorm", dim_names, ndims_error, output_fname.c_str() );
+        add_var_to_file( "uv_Infnorm", dim_names, ndims_error, output_fname.c_str() );
+        add_var_to_file( "vv_Infnorm", dim_names, ndims_error, output_fname.c_str() );
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
 
     size_t starts_error[ndims_error] = { size_t(myStarts.at(0)), size_t(myStarts.at(1)) };
     size_t counts_error[ndims_error] = { size_t(Ntime), size_t(Ndepth) };
 
-    write_field_to_output( uu_errors, "uu_error", starts_error, counts_error, output_fname.c_str() );
-    write_field_to_output( uv_errors, "uv_error", starts_error, counts_error, output_fname.c_str() );
-    write_field_to_output( vv_errors, "vv_error", starts_error, counts_error, output_fname.c_str() );
+    write_field_to_output( uu_2errors, "uu_2error", starts_error, counts_error, output_fname.c_str() );
+    write_field_to_output( uv_2errors, "uv_2error", starts_error, counts_error, output_fname.c_str() );
+    write_field_to_output( vv_2errors, "vv_2error", starts_error, counts_error, output_fname.c_str() );
 
-    write_field_to_output( uu_norms, "uu_norm", starts_error, counts_error, output_fname.c_str() );
-    write_field_to_output( uv_norms, "uv_norm", starts_error, counts_error, output_fname.c_str() );
-    write_field_to_output( vv_norms, "vv_norm", starts_error, counts_error, output_fname.c_str() );
+    write_field_to_output( uu_2norms, "uu_2norm", starts_error, counts_error, output_fname.c_str() );
+    write_field_to_output( uv_2norms, "uv_2norm", starts_error, counts_error, output_fname.c_str() );
+    write_field_to_output( vv_2norms, "vv_2norm", starts_error, counts_error, output_fname.c_str() );
+
+    write_field_to_output( uu_Inferrors, "uu_Inferror", starts_error, counts_error, output_fname.c_str() );
+    write_field_to_output( uv_Inferrors, "uv_Inferror", starts_error, counts_error, output_fname.c_str() );
+    write_field_to_output( vv_Inferrors, "vv_Inferror", starts_error, counts_error, output_fname.c_str() );
+
+    write_field_to_output( uu_Infnorms, "uu_Infnorm", starts_error, counts_error, output_fname.c_str() );
+    write_field_to_output( uv_Infnorms, "uv_Infnorm", starts_error, counts_error, output_fname.c_str() );
+    write_field_to_output( vv_Infnorms, "vv_Infnorm", starts_error, counts_error, output_fname.c_str() );
 
 }
