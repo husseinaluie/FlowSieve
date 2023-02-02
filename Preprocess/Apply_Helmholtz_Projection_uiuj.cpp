@@ -17,8 +17,13 @@ void build_main_projection_matrix(
         const int Itime,
         const int Idepth,
         const bool weight_err,
-        const double v_r_noise_damp
+        const double v_r_noise_damp,
+        const MPI_Comm comm
         ) {
+
+    int wRank, wSize;
+    MPI_Comm_rank( comm, &wRank );
+    MPI_Comm_size( comm, &wSize );
 
     // Create some tidy names for variables
     const std::vector<double>   &latitude   = source_data.latitude,
@@ -44,8 +49,12 @@ void build_main_projection_matrix(
     std::vector<double> diff_vec, diff_vec_lon, diff_vec_lat;
     for ( int Ilat = 0; Ilat < Nlat; Ilat++ ) {
 
-        double tan_lat = tan(latitude.at(Ilat));
-        double cos_lat = cos(latitude.at(Ilat));
+        double  tan_lat = tan(latitude.at(Ilat)),
+                cos_lat = cos(latitude.at(Ilat));
+
+        //if (wRank == 0) {
+        //    fprintf( stdout, "lat = %.4g, tan(lat) = %.4g,  cos(lat) = %.4g\n", latitude.at(Ilat), tan_lat, cos_lat );
+        //}
         
         for ( int Ilon = 0; Ilon < Nlon; Ilon++ ) {
             index_sub = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
@@ -162,7 +171,7 @@ void build_main_projection_matrix(
                     tmp_val    *= weight_val;
                     alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
 
-                    // Try to remove jagged noise from v_r
+                    // Try to remove jagged noise (Laplace weight)
                     if ( not( (Ilat == 0) or (Ilat == Nlat - 1) ) ) {
                         for ( int II = 0; II < 3; II++ ) {
                             row_skip    = (3+II) * Npts;
@@ -200,7 +209,7 @@ void build_main_projection_matrix(
                     tmp_val    *= weight_val;
                     alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
 
-                    // Try to remove jagged noise from v_r
+                    // Try to remove jagged noise from (Laplace weight)
                     if ( not( (Ilat == 0) or (Ilat == Nlat - 1) ) ) {
                         for ( int II = 0; II < 3; II++ ) {
                             row_skip    = (3+II) * Npts;
@@ -238,7 +247,7 @@ void build_main_projection_matrix(
                     tmp_val    *= weight_val;
                     alglib::sparseadd(  matr, row_skip + index_sub, column_skip + diff_index, tmp_val);
 
-                    // Try to remove jagged noise from v_r
+                    // Try to remove jagged noise (Laplace weight)
                     if ( not( (Ilat == 0) or (Ilat == Nlat - 1) ) ) {
                         for ( int II = 0; II < 3; II++ ) {
                             row_skip    = (3+II) * Npts;
@@ -357,7 +366,7 @@ void Apply_Helmholtz_Projection_uiuj(
     const size_t Npts = Nlat * Nlon;
 
     int Itime, Idepth, Ilat, Ilon;
-    size_t index, index_sub;
+    size_t index, index_sub, iters_used;
 
     // Fill in the land areas with zero velocity
     #pragma omp parallel default(none) shared( u_lon, u_lat, mask ) private( index )
@@ -445,7 +454,7 @@ void Apply_Helmholtz_Projection_uiuj(
     alglib::sparsecreate(6*Npts, 3*Npts, proj_matr);
 
     const double v_r_noise_damp = Tikhov_Laplace; // 0.05
-    build_main_projection_matrix(    proj_matr,   source_data, Itime, Idepth, weight_err, v_r_noise_damp );
+    build_main_projection_matrix(    proj_matr,   source_data, Itime, Idepth, weight_err, v_r_noise_damp, comm);
 
     #if DEBUG >= 1
     if (wRank == 0) {
@@ -582,6 +591,8 @@ void Apply_Helmholtz_Projection_uiuj(
             else if (report.terminationtype == 8) { terminate_count_other++; }
             else                                  { terminate_count_other++; }
 
+            iters_used = linlsqrpeekiterationscount( state );
+
             #if DEBUG >= 2
             if ( (wRank == 0) and (Itime == 0) ) {
                 fprintf(stdout, " Done solving the least squares problem.\n");
@@ -647,7 +658,7 @@ void Apply_Helmholtz_Projection_uiuj(
 
             #if DEBUG >= 0
             if ( source_data.full_Ndepth > 1 ) {
-                fprintf(stdout, "  --  --  Rank %d done depth %d\n", wRank, Idepth + myStarts.at(1) );
+                fprintf(stdout, "  --  --  Rank %d done depth %d after %'zu iterations\n", wRank, Idepth + myStarts.at(1), iters_used );
                 fflush(stdout);
             }
             #endif
@@ -656,7 +667,7 @@ void Apply_Helmholtz_Projection_uiuj(
 
         #if DEBUG >= 0
         if ( source_data.full_Ntime > 1 ) {
-            fprintf(stdout, " -- Rank %d done time %d\n", wRank, Itime + myStarts.at(0) );
+            fprintf(stdout, " -- Rank %d done time %d after %'zu iterations\n", wRank, Itime + myStarts.at(0), iters_used );
             fflush(stdout);
         }
         #endif
