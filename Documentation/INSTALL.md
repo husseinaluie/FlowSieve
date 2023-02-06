@@ -7,6 +7,28 @@
 
 ---
 
+## Requirements
+
+* netcdf4 (tested on versions 4.7 and 4.8)
+  * requires parallel installation
+  * hdf5-mpi required
+* mpi (openmpi or intel mpi, not mpich)
+* compilers: either gcc or icpc (intel compiler)
+  * For gcc, tested on gcc8 and gcc9. When tested, FlowSieve compiled _without_ warnings or errors.
+  * Intended to be compiled with c++14 standard (this is specified in the compiler flags in the `system.mk` file)
+  * If Intel compilers are available, they are recommended, since the additional compiler optimizations provide a minor performance improvement. 
+* curl
+
+The following, while not required to run FlowSieve itself, are required to run the tutorial. These requirements are outline in `Tutorials/environment.yml` to facility create an anaconda environment. Note that these _exact_ package versions may not be required, but they are sufficient. That is, other package versions may work, but have not been tested.
+* python=3.7
+* numpy=1.17
+* matplotlib=3.1
+* netCDF4=1.4
+* scipy=1.3
+* pip
+
+---
+
 ## Initial (one-time) set-up
 
 First, you will need to copy the FlowSieve source files onto your HPC system.
