@@ -126,6 +126,12 @@ int main(int argc, char *argv[]) {
     fine_data.load_latitude(  latitude_dim_name,  fine_fname );
     fine_data.load_longitude( longitude_dim_name, fine_fname );
 
+    const bool  COARSE_LAT_GRID_INCREASING = ( coarse_data.latitude[1]  > coarse_data.latitude[0]  ) ? true : false,
+                COARSE_LON_GRID_INCREASING = ( coarse_data.longitude[1] > coarse_data.longitude[0] ) ? true : false;
+
+    const bool  FINE_LAT_GRID_INCREASING = ( fine_data.latitude[1]  > fine_data.latitude[0]  ) ? true : false,
+                FINE_LON_GRID_INCREASING = ( fine_data.longitude[1] > fine_data.longitude[0] ) ? true : false;
+
     // Apply some cleaning to the processor allotments if necessary. 
     coarse_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
      
@@ -221,24 +227,50 @@ int main(int argc, char *argv[]) {
                 Index1to4( II_fine, Itime, Idepth, Ilat_fine, Ilon_fine, Ntime, Ndepth, Nlat_fine, Nlon_fine );
 
 
-                // lat_lb is the smallest index such that coarse_lat(lat_lb) >= fine_lat(Ilat_fine)
                 target_lat = fine_data.latitude.at(Ilat_fine);
-                lat_lb =  std::lower_bound( coarse_data.latitude.begin(), coarse_data.latitude.end(), target_lat ) - coarse_data.latitude.begin();
+                if ( COARSE_LAT_GRID_INCREASING ) {
+                    // lat_lb is the smallest index such that coarse_lat(lat_lb) >= fine_lat(Ilat_fine)
+                    lat_lb = std::lower_bound( coarse_data.latitude.begin(), coarse_data.latitude.end(), target_lat ) 
+                                - coarse_data.latitude.begin();
+                } else {
+                    // lat_lb is the smallest index such that coarse_lat(lat_lb) < fine_lat(Ilat_fine)
+                    lat_lb = std::lower_bound( coarse_data.latitude.rbegin(), coarse_data.latitude.rend(), target_lat ) 
+                                - coarse_data.latitude.rbegin();
+                    lat_lb = (Nlat_coarse - 1) - lat_lb;
+                }
                 lat_lb = (lat_lb < 0) ? 0 : (lat_lb >= Nlat_coarse) ? Nlat_coarse - 1 : lat_lb;
 
 
-                // lon_lb is the smallest index such that coarse_lon(lon_lb) >= fine_lon(Ilon_fine)
                 target_lon = fine_data.longitude.at(Ilon_fine);
-                lon_lb =  std::lower_bound( coarse_data.longitude.begin(), coarse_data.longitude.end(), target_lon ) - coarse_data.longitude.begin();
+                if ( COARSE_LON_GRID_INCREASING ) {
+                    // lon_lb is the smallest index such that coarse_lon(lon_lb) >= fine_lon(Ilon_fine)
+                    lon_lb = std::lower_bound( coarse_data.longitude.begin(), coarse_data.longitude.end(), target_lon ) 
+                                - coarse_data.longitude.begin();
+                } else {
+                    // lon_lb is the smallest index such that coarse_lon(lon_lb) < fine_lon(Ilon_fine)
+                    lon_lb = std::lower_bound( coarse_data.longitude.rbegin(), coarse_data.longitude.rend(), target_lon ) 
+                                - coarse_data.longitude.rbegin();
+                    lon_lb = (Nlon_coarse - 1) - lon_lb;
+                }
                 lon_lb = (lon_lb < 0) ? 0 : (lon_lb >= Nlon_coarse) ? Nlon_coarse - 1 : lon_lb;
 
                 // Get the points for the bounding box in the coarse grid
-                RIGHT   = lon_lb == 0 ? 1 : lon_lb;
-                LEFT    = RIGHT - 1;
+                if ( COARSE_LON_GRID_INCREASING ) {
+                    RIGHT   = lon_lb == 0 ? 1 : lon_lb;
+                    LEFT    = RIGHT - 1;
+                } else {
+                    LEFT  = lon_lb == 0 ? 1 : lon_lb;
+                    RIGHT = LEFT - 1;
+                }
                 LR_perc = ( target_lon - coarse_data.longitude.at(LEFT) ) / ( coarse_data.longitude.at(RIGHT) - coarse_data.longitude.at(LEFT) );
 
-                TOP = lat_lb == 0 ? 1 : lat_lb;
-                BOT = TOP - 1;
+                if ( COARSE_LAT_GRID_INCREASING ) {
+                    TOP = lat_lb == 0 ? 1 : lat_lb;
+                    BOT = TOP - 1;
+                } else {
+                    BOT = lat_lb == 0 ? 1 : lat_lb;
+                    TOP = BOT - 1;
+                }
                 TB_perc = ( target_lat - coarse_data.latitude.at(BOT) ) / ( coarse_data.latitude.at(TOP) - coarse_data.latitude.at(BOT) );
 
                 // Get the corresponding indices in the coarse grid
