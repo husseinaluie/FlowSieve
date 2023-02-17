@@ -225,9 +225,10 @@ int main(int argc, char *argv[]) {
             if (vars_to_filter.at(Ivar) == "wo" ) { wo_ind = Ivar; }
         }
     }
+    std::vector<double> barrho_barwo(  0 );
     if ( compute_PEKE_conv == "true" ) {
         postprocess_names.push_back( "barrho_barwo" );
-        std::vector<double> barrho_barwo( filter_fields[0]->size(), 0. );
+        barrho_barwo.resize( filter_fields[0]->size() );
         postprocess_fields.push_back( &barrho_barwo );
         assert( rho_ind >= 0 );
         assert( wo_ind >= 0 );
@@ -247,7 +248,7 @@ int main(int argc, char *argv[]) {
         #pragma omp parallel \
         default(none) \
         shared( source_data, filter_fields, coarse_fields, scale, stdout, \
-              barrho_barwo, rho_ind, wo_ind ) \
+              barrho_barwo, rho_ind, wo_ind, compute_PEKE_conv ) \
         private( filter_values_doubles, filter_values_ptrs, \
                  Itime, Idepth, Ilat, Ilon, Ivar, index, \
                  LAT_lb, LAT_ub ) \
@@ -295,7 +296,9 @@ int main(int argc, char *argv[]) {
                                 coarse_fields.at(Ivar).at(index) = filter_values_doubles.at(Ivar);
                             }
 
-                            barrho_barwo.at(index) = coarse_fields.at(rho_ind).at(index) * coarse_fields.at(wo_ind).at(index);
+                            if ( compute_PEKE_conv == "true" ) {
+                                barrho_barwo.at(index) = coarse_fields.at(rho_ind).at(index) * coarse_fields.at(wo_ind).at(index);
+                            }
                         }
                     }
                 }
