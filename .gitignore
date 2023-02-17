@@ -29,5 +29,8 @@ system.mk
 # use .tmp to ignore my own temporary files
 *.tmp
 
+# use .dev to ignore my own backup development files
+*.dev
+
 # Ignore any jupyter notebook stuff
 .ipynb_checkpoints/
