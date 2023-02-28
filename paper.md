@@ -42,23 +42,29 @@ The core features of `FlowSieve` are:
 3) built-in post-processing tools compute region averages for an arbitrary number of custom user-specified regions [ avoiding storage concerns when handling large datasets ], and
 4) includes Helmholtz-decomposition scripts to allow careful coarse-graining on the sphere [ i.e. to maintain commutativity with derivatives ].
 
-`FlowSieve` is written in C++, with some python user-friendliness scripts included. 
+`FlowSieve` is written in C++, with some user-friendly Python scripts included. 
 Input and output files are netCDF.
 `FlowSieve` is designed with heavy parallelization in mind, as well as several context-based optimizations, in order to facilitate processing high-resolution datasets. 
 In particular, MPI is used to divide time and depth [ with minimal communication costs, since coarse-graining is applied at each time and depth independently ], while OpenMP is used to parallelize latitude and longitude loops, taking advantage of shared memory to reduce communication overhead.
 
 
 `FlowSieve` can currently only work on mesh grids ( i.e. latitude grid is independent of longitude, and vice-versa ), but those grids need not be uniform.
-This is not a restriction of the coarse-graining methodology, however, and future developments may extend this functionality if there is sufficient interest / need.
+This is not a restriction of the coarse-graining methodology, however, and future developments may extend this functionality (e.g. to include unstructured grids) if there is sufficient interest / need.
 
 
 # State of the Field
 
 Coarse-graining is being increasingly used as an analytical method in oceanographic communities. While coarse-graining is similar to blurring / convolutions in image-processing, for which many software packages exist, those tools do not readily apply to oceanographic contexts: they often rely on uniform, rectangular, Cartesian grids, which typically do not apply in Global Climate Model (GCM) data.
-An established package in the fied, GCM-Filters (@Grooms2021, @Loose2022), is designed to work on GCM data and grids. It uses a diffusion-type coarse-graining method that is made available to users through python utilities.
+An established package in the fied, GCM-Filters (@Grooms2021, @Loose2022), is designed to work on GCM data and grids. It uses a diffusion-type coarse-graining method that is made available to users through Python utilities.
 Another approach applies structure functions to Lagrangian trajectories to extract spectral diagnostics, such as power spectra and inter-scale energy transfers (@Frisch1995, @Balwada2022).
 
-The unique contributions of `FlowSieve` to the field are: follows the rigorous underlying mathematical framework to preserve physical properties of the data, designed for use on full spherical geometries, and can apply any arbitrary filtering scale spanning from sub-grid to domain-size.
+The unique contributions of `FlowSieve` to the field are: 
+1. designed for use on full spherical geometries, allowing the processing of global data
+2. can apply any arbitrary filtering scale spanning from sub-grid to domain-size (e.g. @Storer2022 extracts global power spectra for scales spanning 10s of km to 40000 km - the equatorial cirfumerence of the Earth)
+3. on-line diagnostic calculations [e.g. across-scale energy transfers, large-scale vorticity and divergence]
+4. on-line post-processing to reduce output file sizes [e.g. averages over user-specified regions, zonal averages]
+5. follows the rigorous underlying mathematical framework of @Aluie2019 to preserve physical properties of the data (e.g. non-divergence of flow) and to accurately filter flows that not divergence-free
+6. heavily parallelized to utilize HPC environments
 
 
 # Statement of need
