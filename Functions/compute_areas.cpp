@@ -31,8 +31,8 @@ void compute_areas(
 
     if (constants::UNIFORM_LAT_GRID) {
         // For the moment, assume a uniform grid
-        dlat = latitude.at( 1) - latitude.at( 0);
-        dlon = longitude.at(1) - longitude.at(0);
+        dlat = fabs(latitude.at( 1) - latitude.at( 0));
+        dlon = fabs(longitude.at(1) - longitude.at(0));
 
         if (constants::CARTESIAN) { coeff = dlat * dlon; }
         else { coeff = pow( constants::R_earth, 2) * dlat * dlon; }
