@@ -174,7 +174,7 @@ cleandocs:
 	rm -r docs/html
 	rm -r docs/latex
 
-all: coarse_grain.x integrator.x ${TEST_EXES}
+#all: coarse_grain.x integrator.x ${TEST_EXES}
 
 tests: ${TEST_EXES}
 
@@ -236,12 +236,12 @@ TOROID_TARGET_EXES := 	Case_Files/toroidal_projection.x \
 						Case_Files/Helmholtz_projection_uiuj.x \
 						Case_Files/interpolator.x \
 						Case_Files/geostrophic_vel.x \
-						Case_Files/coarsen_grid.x \
 						Case_Files/coarsen_grid_linear.x \
 						Case_Files/refine_Helmholtz_seed.x \
 						Case_Files/Pi_helm_breakdown.x \
 						Case_Files/thermal_wind.x \
-						Case_Files/compute_radial_velocity.x
+						Case_Files/compute_radial_velocity.x \
+						Case_Files/LLC_interpolator_simple.x
 TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
 						Case_Files/potential_projection.o \
 						Case_Files/Helmholtz_projection.o \
@@ -249,12 +249,12 @@ TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
 						Case_Files/Helmholtz_projection_uiuj.o \
 						Case_Files/interpolator.o \
 						Case_Files/geostrophic_vel.o \
-						Case_Files/coarsen_grid.o \
 						Case_Files/coarsen_grid_linear.o \
 						Case_Files/refine_Helmholtz_seed.o \
 						Case_Files/Pi_helm_breakdown.o \
 						Case_Files/thermal_wind.o \
-						Case_Files/compute_radial_velocity.o
+						Case_Files/compute_radial_velocity.o \
+						Case_Files/LLC_interpolator_simple.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 

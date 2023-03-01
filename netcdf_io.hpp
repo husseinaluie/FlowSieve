@@ -327,4 +327,14 @@ void package_field(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
+
+
+// LLC utilities
+void read_LLC_latlon_from_file(
+        std::vector<double> &var,
+        const std::string & var_name,
+        const std::string & filename,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 #endif
