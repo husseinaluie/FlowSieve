@@ -150,7 +150,7 @@ void initialize_postprocess_file(
         const int ndims = 3;
         for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
             add_var_to_file( int_vars.at(varInd)+"_area_average", dim_names, ndims, buffer);
-            //add_var_to_file(int_vars.at(varInd)+"_area_std_dev", dim_names, ndims, buffer);
+            add_var_to_file(int_vars.at(varInd)+"_area_std_dev", dim_names, ndims, buffer);
         }
 
         // time averages
@@ -169,7 +169,7 @@ void initialize_postprocess_file(
             const int ndims_time_ave = 3;
             for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
                 add_var_to_file( int_vars.at(varInd)+"_zonal_average", dim_names_time_ave, ndims_time_ave, buffer);
-                //add_var_to_file(int_vars.at(varInd)+"_time_std_dev", dim_names_time_ave, ndims_time_ave, buffer);
+                //add_var_to_file(int_vars.at(varInd)+"_zonal_std_dev", dim_names_time_ave, ndims_time_ave, buffer);
             }
         }
 
