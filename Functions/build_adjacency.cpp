@@ -8,6 +8,7 @@
 #include <mpi.h>
 #include <omp.h>
 #include <cassert>
+#include <bitset>
 
 #include "../functions.hpp"
 #include "../constants.hpp"
@@ -29,8 +30,9 @@ void dataset::build_adjacency(
     }
     #endif
 
-    size_t pt_index, search_index;
-    const size_t num_pts = longitude.size();
+    size_t pt_index, search_index, Ineighbour;
+    const size_t num_pts = longitude.size(),
+                 num_neighbours = 8;
 
     adjacency_indices.resize( num_pts );
     adjacency_projected_x.resize( num_pts );
@@ -50,13 +52,15 @@ void dataset::build_adjacency(
     const double    typical_spacing = sqrt( 4 * M_PI / num_pts ) * constants::R_earth,
                     max_distance = 10 * typical_spacing;
 
-    double UR_x, UR_y, UR_dist, UL_x, UL_y, UL_dist, LR_x, LR_y, LR_dist, LL_x, LL_y, LL_dist;
-    size_t UR_ind, UL_ind, LR_ind, LL_ind;
+    std::vector<double> neighbour_x, neighbour_y, neighbour_dist;
+    std::vector<size_t> neighbour_ind;
+    std::bitset<16> stencil_set;
 
     double pt_lon, pt_lat, search_lon, search_lat, poleward_lat, del_lon_lim,
-           proj_x, proj_y, local_dist, denom, stencil_count;
+           proj_x, proj_y, proj_theta, local_dist, denom, denom_sign, stencil_count,
+           stencil_min_x, stencil_min_y, stencil_max_x, stencil_max_y;
     bool near_pole;
-    int Istencil, II, JJ;
+    int Istencil, II, JJ, angle_ind;
 
     std::vector< double > xi, yi, ddx_coeffs, ddy_coeffs;
 
@@ -64,22 +68,29 @@ void dataset::build_adjacency(
     default(none) \
     shared( longitude, latitude, adjacency_indices, adjacency_projected_x, adjacency_projected_y, \
             adjacency_distances, adjacency_ddlon_weights, adjacency_ddlat_weights ) \
-    private( pt_index, search_index, pt_lon, pt_lat, search_lon, search_lat, \
-             proj_x, proj_y, near_pole, poleward_lat, del_lon_lim, local_dist, \
-             LL_ind, LL_x, LL_y, LL_dist, LR_ind, LR_x, LR_y, LR_dist, \
-             UL_ind, UL_x, UL_y, UL_dist, UR_ind, UR_x, UR_y, UR_dist, \
-             Istencil, II, JJ, xi, yi, denom, stencil_count, ddx_coeffs, ddy_coeffs ) \
-    firstprivate( num_pts, max_distance )
+    private( pt_index, search_index, pt_lon, pt_lat, search_lon, search_lat, angle_ind, \
+             proj_x, proj_y, proj_theta, near_pole, poleward_lat, del_lon_lim, local_dist, \
+             Ineighbour, neighbour_x, neighbour_y, neighbour_dist, neighbour_ind, stencil_set, \
+             Istencil, II, JJ, xi, yi, denom, denom_sign, stencil_count, ddx_coeffs, ddy_coeffs, \
+             stencil_min_x, stencil_min_y, stencil_max_x, stencil_max_y ) \
+    firstprivate( num_pts, max_distance, stdout )
     {
         #pragma omp for collapse(1) schedule(guided)
         for ( pt_index = 0; pt_index < num_pts; pt_index++ ) {
 
+            //fprintf( stdout, "Starting point %'zu\n", pt_index );
+
             search_index = 0;
 
-            UR_dist = 1e100;
-            UL_dist = 1e100;
-            LR_dist = 1e100;
-            LL_dist = 1e100;
+            neighbour_x.clear();
+            neighbour_y.clear();
+            neighbour_dist.clear();
+            neighbour_ind.clear();
+
+            neighbour_x.resize( num_neighbours, 0. );
+            neighbour_y.resize( num_neighbours, 0. );
+            neighbour_dist.resize( num_neighbours, 1e100 );
+            neighbour_ind.resize( num_neighbours, 0 );
 
             #if DEBUG > 0
             pt_lon = longitude.at( pt_index );
@@ -121,91 +132,82 @@ void dataset::build_adjacency(
                                                      // I think it's rounding errors in the 
                                                      // map projection operator?
 
-                //if ( (proj_x >= 0) and (proj_y > 1e-10) and ( local_dist < UR_dist ) ) {
-                if ( (proj_y > fabs(proj_x)) and ( local_dist < UR_dist ) ) {
-                    UR_x = proj_x;
-                    UR_y = proj_y;
-                    UR_ind = search_index;
-                    UR_dist = local_dist;
-                //} else if ( (proj_x > 1e-10) and (proj_y <= 0) and ( local_dist < LR_dist ) ) {
-                } else if ( (proj_x > fabs(proj_y)) and ( local_dist < LR_dist ) ) {
-                    LR_x = proj_x;
-                    LR_y = proj_y;
-                    LR_ind = search_index;
-                    LR_dist = local_dist;
-                //} else if ( (proj_x < -1e-10) and (proj_y >= 0) and ( local_dist < UL_dist ) ) {
-                } else if ( (proj_y < -fabs(proj_x)) and ( local_dist < UL_dist ) ) {
-                    UL_x = proj_x;
-                    UL_y = proj_y;
-                    UL_ind = search_index;
-                    UL_dist = local_dist;
-                //} else if ( (proj_x <= 0) and (proj_y < -1e-10) and ( local_dist < LL_dist ) ) {
-                } else if ( (proj_x < -fabs(proj_y)) and ( local_dist < LL_dist ) ) {
-                    LL_x = proj_x;
-                    LL_y = proj_y;
-                    LL_ind = search_index;
-                    LL_dist = local_dist;
-                }
-            }
+                // We're dividing angles up into 360 / num_neighbours = 45 degree segments
+                proj_theta = std::fmax( 0, std::fmin( 360-1e-10, (M_PI + atan2( proj_y, proj_x )) * 180. / M_PI ));
+                angle_ind = proj_theta / (int)( 360. / num_neighbours );
+                #if DEBUG >= 1
+                if ( angle_ind < 0 ) { fprintf(stdout, "%d\n", angle_ind); assert(false); }
+                if ( angle_ind >= num_neighbours ) { fprintf(stdout, "%d\n", angle_ind); assert(false); }
+                #endif
 
-            assert( (UR_dist <= max_distance) and 
-                    (UL_dist <= max_distance) and
-                    (LR_dist <= max_distance) and
-                    (LL_dist <= max_distance) 
-                  ); // otherwise failed to build adjacency
+                if ( local_dist < neighbour_dist.at(angle_ind) ) {
+                    neighbour_x[   angle_ind] = proj_x;
+                    neighbour_y[   angle_ind] = proj_y;
+                    neighbour_ind[ angle_ind] = search_index;
+                    neighbour_dist[angle_ind] = local_dist;
+                }
+
+            }
 
             // Now that we've searched all of the points to the adjacent ones, 
             // store the adjacent values and move on.
-            adjacency_indices.at(pt_index).resize(4, 0.);
-            adjacency_projected_x.at(pt_index).resize(4, 0.);
-            adjacency_projected_y.at(pt_index).resize(4, 0.);
-            adjacency_distances.at(pt_index).resize(4, 0.);
+            adjacency_indices.at(    pt_index).resize(num_neighbours, 0);
+            adjacency_projected_x.at(pt_index).resize(num_neighbours, 0.);
+            adjacency_projected_y.at(pt_index).resize(num_neighbours, 0.);
+            adjacency_distances.at(  pt_index).resize(num_neighbours, 0.);
 
-            adjacency_indices.at(pt_index)[0] = LL_ind;
-            adjacency_indices.at(pt_index)[1] = LR_ind;
-            adjacency_indices.at(pt_index)[2] = UL_ind;
-            adjacency_indices.at(pt_index)[3] = UR_ind;
-
-            adjacency_projected_x.at(pt_index)[0] = LL_x;
-            adjacency_projected_x.at(pt_index)[1] = LR_x;
-            adjacency_projected_x.at(pt_index)[2] = UL_x;
-            adjacency_projected_x.at(pt_index)[3] = UR_x;
-
-            adjacency_projected_y.at(pt_index)[0] = LL_y;
-            adjacency_projected_y.at(pt_index)[1] = LR_y;
-            adjacency_projected_y.at(pt_index)[2] = UL_y;
-            adjacency_projected_y.at(pt_index)[3] = UR_y;
-
-            adjacency_distances.at(pt_index)[0] = LL_dist;
-            adjacency_distances.at(pt_index)[1] = LR_dist;
-            adjacency_distances.at(pt_index)[2] = UL_dist;
-            adjacency_distances.at(pt_index)[3] = UR_dist;
-
+            for (Ineighbour = 0; Ineighbour < num_neighbours; Ineighbour++) {
+                //fprintf( stdout, "%'zu: %'zu, %g, %g, %g\n", 
+                //        pt_index, neighbour_ind[Ineighbour], neighbour_x[Ineighbour], neighbour_y[Ineighbour],
+                //        neighbour_dist[Ineighbour] );
+                adjacency_indices.at(pt_index)[Ineighbour] = neighbour_ind[Ineighbour];
+                adjacency_projected_x.at(pt_index)[Ineighbour] = neighbour_x[Ineighbour];
+                adjacency_projected_y.at(pt_index)[Ineighbour] = neighbour_y[Ineighbour];
+                adjacency_distances.at(pt_index)[Ineighbour] = neighbour_dist[Ineighbour];
+            }
 
             // Since we're here, let's also build the differentiation weights, since we'll be using
             // the adjacency points as our differentiation stencil.
-            // 4 neighbours + centre point = 5 point stencil
+            // 8 neighbours + centre point = 9 point stencil
             // But a bi-linear spline only requires 4 points
-            // So we'll just take the average over the five different
+            // So we'll just take the average over the different available
             // differentiation stencils
+            // Some will be ill-conditioned, so ignore those ones
             xi.resize(4);
             yi.resize(4);
-            adjacency_ddlon_weights.at(pt_index).resize(5, 0.);
-            adjacency_ddlat_weights.at(pt_index).resize(5, 0.);
+            adjacency_ddlon_weights.at(pt_index).resize(num_neighbours+1, 0.);
+            adjacency_ddlat_weights.at(pt_index).resize(num_neighbours+1, 0.);
             stencil_count = 0;
-            for ( Istencil = 0; Istencil < 5; Istencil++ ) {
 
+            for ( Istencil = 0; Istencil < pow(2,num_neighbours+1); Istencil++ ) {
+
+                // First, reject any stencil subsets that don't contain exactly four points
+                stencil_set = std::bitset<16>(Istencil);
+                if (stencil_set.count() != 4) { continue; }
+
+                // Pull out the four points
                 // Get the xi and yi for the stencil
-                //   [ 4 -> centre point ]
+                // the 'last neighbour' is the point itself
                 II = 0;
-                for ( JJ = 0; JJ < 5; JJ++ ) {
-                    // JJ indicates which point is *excluded* from the stencil
-                    // with 4 -> centre point and 0-3 mapping to the neighbours
-                    if (JJ == Istencil) { continue; }
-                    xi[II] = (JJ == 4) ? 0. : adjacency_projected_x.at(pt_index)[JJ];
-                    yi[II] = (JJ == 4) ? 0. : adjacency_projected_y.at(pt_index)[JJ];
+                stencil_min_x = 1e100;
+                stencil_min_y = 1e100;
+                stencil_max_x = -1e100;
+                stencil_max_y = -1e100;
+                for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
+                    // 
+                    if ( stencil_set[JJ] == 0 ) { continue; }
+                    xi[II] = (JJ == num_neighbours) ? 0. : adjacency_projected_x.at(pt_index)[JJ];
+                    yi[II] = (JJ == num_neighbours) ? 0. : adjacency_projected_y.at(pt_index)[JJ];
                     II++;
+
+                    stencil_min_x = fmin( stencil_min_x, xi[II] );
+                    stencil_max_x = fmax( stencil_max_x, xi[II] );
+
+                    stencil_min_y = fmin( stencil_min_y, yi[II] );
+                    stencil_max_y = fmax( stencil_max_y, yi[II] );
                 }
+                if ( stencil_min_x * stencil_max_x > 1e-10 ) { continue; }
+                if ( stencil_min_y * stencil_max_y > 1e-10 ) { continue; }
 
                 // Denominator / determinant of the spline matrix
                 denom = - xi[0] * (   xi[1] * (yi[0] - yi[1]) * (yi[2] - yi[3]) 
@@ -215,10 +217,17 @@ void dataset::build_adjacency(
                         - xi[1] * xi[2] * (yi[0] - yi[3]) * (yi[1] - yi[2]) 
                         + xi[1] * xi[3] * (yi[0] - yi[2]) * (yi[1] - yi[3]) 
                         - xi[2] * xi[3] * (yi[0] - yi[1]) * (yi[2] - yi[3]);
+               
+                denom_sign = (denom > 0) ? 1 : (denom < 0) ? -1 : 0;
 
                 // If the denominator is too small in magnitude, discard this stencil.
-                if ( fabs(denom) < 1e-10 ) { continue; }
-                stencil_count++;
+                if ( fabs(denom) < 1e-0 ) { 
+                    //fprintf(stdout, "Pt %'zu Rejecting stencil %d (denom = %g) (%.6e, %.6e, %.6e, %.6e) (%.6e, %.6e, %.6e, %.6e)\n", 
+                    //        pt_index, Istencil, denom, xi[0], xi[1], xi[2], xi[3], yi[0], yi[1], yi[2], yi[3] ); 
+                    continue; 
+                }
+                //stencil_count++;
+                stencil_count += fabs(denom);
 
                 ddx_coeffs.clear();
                 // x1 y1 y2 - x2 y1 y2 - x1 y1 y3 + x3 y1 y3 + x2 y2 y3 -  x3 y2 y3,
@@ -229,7 +238,8 @@ void dataset::build_adjacency(
                             + xi[3] * yi[1] * yi[3]
                             + xi[2] * yi[2] * yi[3]
                             - xi[3] * yi[2] * yi[3]
-                            ) / denom );
+                            ) * denom_sign );
+                            //) / denom );
 
                 // -x0 y0 y2 + x2 y0 y2 + x0 y0 y3 - x3 y0 y3 - x2 y2 y3 +  x3 y2 y3,
                 ddx_coeffs.push_back( (
@@ -239,7 +249,8 @@ void dataset::build_adjacency(
                             - xi[3] * yi[0] * yi[3]
                             - xi[2] * yi[2] * yi[3]
                             + xi[3] * yi[2] * yi[3]
-                            ) / denom );
+                            ) * denom_sign );
+                            //) / denom );
 
                 //  x0 y0 y1 - x1 y0 y1 - x0 y0 y3 + x3 y0 y3 + x1 y1 y3 -  x3 y1 y3,
                 ddx_coeffs.push_back( (
@@ -249,7 +260,8 @@ void dataset::build_adjacency(
                             + xi[3] * yi[0] * yi[3]
                             + xi[1] * yi[1] * yi[3]
                             - xi[3] * yi[1] * yi[3]
-                            ) / denom );
+                            ) * denom_sign );
+                            //) / denom );
 
                 // -x0 y0 y1 + x1 y0 y1 + x0 y0 y2 - x2 y0 y2 - x1 y1 y2 +  x2 y1 y2
                 ddx_coeffs.push_back( (
@@ -259,13 +271,12 @@ void dataset::build_adjacency(
                             - xi[2] * yi[0] * yi[2]
                             - xi[1] * yi[1] * yi[2]
                             + xi[2] * yi[1] * yi[2]
-                            ) / denom );
+                            ) * denom_sign );
+                            //) / denom );
 
                 II = 0;
-                for ( JJ = 0; JJ < 5; JJ++ ) {
-                    if (JJ == Istencil) { continue; }
-                    // Factor 5 is from having 5 stencils
-                    // factor R*cos(lat) comes from converting y deriv to lat deriv
+                for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
+                    if ( stencil_set[JJ] == 0 ) { continue; }
                     adjacency_ddlon_weights.at(pt_index)[JJ] += ddx_coeffs[II];
                     II++;
                 }
@@ -278,7 +289,8 @@ void dataset::build_adjacency(
                               xi[1] * xi[2] * (-yi[1] + yi[2])
                             + xi[1] * xi[3] * ( yi[1] - yi[3])
                             + xi[2] * xi[3] * (-yi[2] + yi[3])
-                            ) / denom );
+                            ) * denom_sign );
+                            //) / denom );
 
                 // x0 x2 y0 - x0 x3 y0 - x0 x2 y2 + x2 x3 y2 + x0 x3 y3 -  x2 x3 y3, 
                 // x0 x2 ( y0 - y2) + x2 x3 (y2 - y3) + x0 x3 (-y0 + y3),
@@ -286,7 +298,8 @@ void dataset::build_adjacency(
                             + xi[0] * xi[2] * ( yi[0] - yi[2])
                             + xi[2] * xi[3] * ( yi[2] - yi[3])
                             + xi[0] * xi[3] * (-yi[0] + yi[3])
-                            ) / denom );
+                            ) * denom_sign );
+                            //) / denom );
 
                 // -x0 x1 y0 + x0 x3 y0 + x0 x1 y1 - x1 x3 y1 - x0 x3 y3 +  x1 x3 y3,
                 // x0 x1 (-y0 + y1) + x0 x3 (y0 - y3) + x1 x3 (-y1 + y3),
@@ -297,7 +310,8 @@ void dataset::build_adjacency(
                             - xi[1] * xi[3] * yi[1]
                             - xi[0] * xi[3] * yi[3]
                             + xi[1] * xi[3] * yi[3]
-                            ) / denom );
+                            ) * denom_sign );
+                            //) / denom );
 
                 // x0 x1 y0 - x0 x2 y0 - x0 x1 y1 + x1 x2 y1 + x0 x2 y2 - x1 x2 y2
                 // x0 x1 ( y0 - y1) + x1 x2 (y1 - y2) + x0 x2 (-y0 + y2)
@@ -308,21 +322,21 @@ void dataset::build_adjacency(
                             + xi[1] * xi[2] * yi[1]
                             + xi[0] * xi[2] * yi[2]
                             - xi[1] * xi[2] * yi[2]
-                            ) / denom );
+                            ) * denom_sign );
+                            //) / denom );
 
                 II = 0;
-                for ( JJ = 0; JJ < 5; JJ++ ) {
-                    if (JJ == Istencil) { continue; }
+                for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
+                    if ( stencil_set[JJ] == 0 ) { continue; }
                     adjacency_ddlat_weights.at(pt_index)[JJ] += ddy_coeffs[II];
                     II++;
                 }
             }
-            for ( JJ = 0; JJ < 5; JJ++ ) {
-                // Factor 5 is from having 5 stencils
+            assert( stencil_count > 0 );
+            for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
                 // factor R*cos(lat) comes from converting y deriv to lat deriv
                 adjacency_ddlon_weights.at(pt_index)[JJ] *= 
                     constants::R_earth * cos(pt_lat) / stencil_count;
-                // Factor 5 is from having 5 stencils
                 // factor R comes from converting y deriv to lat deriv
                 adjacency_ddlat_weights.at(pt_index)[JJ] *= constants::R_earth / stencil_count;
             }
