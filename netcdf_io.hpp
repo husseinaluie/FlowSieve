@@ -337,4 +337,12 @@ void read_LLC_latlon_from_file(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
+void initialize_adjacency_file(
+        const dataset & source_data,
+        const std::vector<std::string> & vars,
+        const char * filename,
+        const double filter_scale = -1,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 #endif

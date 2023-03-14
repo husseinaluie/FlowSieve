@@ -10,14 +10,11 @@ void spher_derivative_at_point(
         const std::vector<const std::vector<double>*> & fields,
         const std::vector<double> & grid,
         const std::string & dim,
+        const dataset & source_data,
         const int Itime,
         const int Idepth,
         const int Ilat,
         const int Ilon,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
         const std::vector<bool> & mask,
         const int order_of_deriv,
         const int diff_ord
@@ -40,6 +37,56 @@ void spher_derivative_at_point(
     const bool do_lat = (dim == "lat");
     const bool do_lon = (dim == "lon");
     assert( do_dep ^ (do_lat ^ do_lon) ); // ^ = xor
+
+    if ( (not(do_dep)) and ( constants::GRID_TYPE == constants::GridType::LLC ) ) {
+        // If we're on an LLC grid, then we've already computed
+        // the differentiation weights / stencils when we build
+        // the adjacency matrix. So just apply those now and exit.
+
+        // Unless we want a depth derivative, in which case just use the
+        // previous method
+        // NOTE:: THIS REALLY SHOULD BE TESTED TO MAKE SURE THERE ARE NO GREMLINS HIDING
+
+        assert( Ilat == Ilon );
+
+        double weight, val;
+        size_t val_ind;
+
+        for (int ii = 0; ii < num_deriv; ii++) {
+            if (deriv_vals.at(ii) != NULL) {
+                for ( size_t II = 0; II < source_data.num_neighbours+1; II++ ) {
+                    if ( II < source_data.num_neighbours ) {
+                        val_ind = source_data.adjacency_indices.at(index).at(II);
+                    } else {
+                        val_ind = index;
+                    }
+                    #if DEBUG >= 1
+                    if (do_lat) {
+                        weight = source_data.adjacency_ddlat_weights.at(Ilat).at(II);
+                    } else {
+                        weight = source_data.adjacency_ddlon_weights.at(Ilat).at(II);
+                    }
+                    val = fields[ii]->at( val_ind );
+                    #else
+                    if (do_lat) {
+                        weight = source_data.adjacency_ddlat_weights[Ilat][II];
+                    } else {
+                        weight = source_data.adjacency_ddlon_weights[Ilat][II];
+                    }
+                    val = (*fields[ii])[ val_ind ];
+                    #endif
+                    *(deriv_vals.at(ii)) += val * weight;
+                }
+            }
+        }
+
+        return;
+    }
+
+    const int   Ntime   = source_data.Ntime,    // this is the MPI-local Ntime, not the full Ntime
+                Ndepth  = source_data.Ndepth,   // this is the MPI-local Ndepth, not the full Ndepth
+                Nlat    = source_data.Nlat,
+                Nlon    = source_data.Nlon;
 
     int Iref = do_dep ? Idepth :
                do_lat ? Ilat :
@@ -164,9 +211,8 @@ void spher_derivative_at_point(
         //   to fill in smaller areas with at least something,
         //   if not the most accurate something.
         spher_derivative_at_point(
-                deriv_vals, fields, grid, dim,
+                deriv_vals, fields, grid, dim, source_data,
                 Itime, Idepth, Ilat, Ilon,
-                Ntime, Ndepth, Nlat, Nlon,
                 mask, order_of_deriv, diff_ord - 2);
     }
 }

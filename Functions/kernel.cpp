@@ -36,17 +36,17 @@ double kernel(
     const double D = ( scale > 0 ) ? ( dist / ( scale / 2. ) ) : ( dist == 0 ) ? 1. : 0.;
 
     switch (constants::KERNEL_OPT) {
-        case 0: kern = D < 1 ? 1. : 0;
+        case constants::KernelTypes::TopHat: kern = D < 1 ? 1. : 0;
                 break;
-        case 1: kern = exp( -pow( D, 4) );
+        case constants::KernelTypes::HyperGaus: kern = exp( -pow( D, 4) );
                 break;
-        case 2: kern = exp( -pow( D, 2) );
+        case constants::KernelTypes::Gaus: kern = exp( -pow( D, 2) );
                 break;
-        case 3: kern = sinc( M_PI * D );
+        case constants::KernelTypes::Sinc: kern = sinc( M_PI * D );
                 break;
-        case 4: kern = 0.5 * (1 - tanh( (D - 1) / (0.1) ));
+        case constants::KernelTypes::SmoothHat: kern = 0.5 * (1 - tanh( (D - 1) / (0.1) ));
                 break;
-        case 5: const double arg = (D - 1) / 0.1;
+        case constants::KernelTypes::SmoothHatHighOrder: const double arg = (D - 1) / 0.1;
                 const double c1 = 1.45859979150011;
                 kern = 0.5 * (1 - tanh( arg )) - c1 * exp( -pow(arg,2.) );
                 break;

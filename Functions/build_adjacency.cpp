@@ -10,6 +10,9 @@
 #include <cassert>
 #include <bitset>
 
+#include "../ALGLIB/stdafx.h"
+#include "../ALGLIB/interpolation.h"
+
 #include "../functions.hpp"
 #include "../constants.hpp"
 
@@ -31,8 +34,7 @@ void dataset::build_adjacency(
     #endif
 
     size_t pt_index, search_index, Ineighbour;
-    const size_t num_pts = longitude.size(),
-                 num_neighbours = 8;
+    const size_t num_pts = longitude.size();
 
     adjacency_indices.resize( num_pts );
     adjacency_projected_x.resize( num_pts );
@@ -41,6 +43,9 @@ void dataset::build_adjacency(
 
     adjacency_ddlon_weights.resize( num_pts );
     adjacency_ddlat_weights.resize( num_pts );
+
+    adjacency_d2dlon2_weights.resize( num_pts );
+    adjacency_d2dlat2_weights.resize( num_pts );
 
     // Be a litlle sneaky. We want to make this search faster if possible.
     // To do that, it would be helpful to have a coarse estimate of how far apart points
@@ -64,6 +69,13 @@ void dataset::build_adjacency(
 
     std::vector< double > xi, yi, ddx_coeffs, ddy_coeffs;
 
+    std::vector< double > LHS_vec;
+    alglib::real_2d_array LHS;
+    alglib::matinvreport report;
+    double *LHS_list;
+    alglib::ae_int_t alglib_info;
+    bool solve;
+
     #pragma omp parallel \
     default(none) \
     shared( longitude, latitude, adjacency_indices, adjacency_projected_x, adjacency_projected_y, \
@@ -72,9 +84,15 @@ void dataset::build_adjacency(
              proj_x, proj_y, proj_theta, near_pole, poleward_lat, del_lon_lim, local_dist, \
              Ineighbour, neighbour_x, neighbour_y, neighbour_dist, neighbour_ind, stencil_set, \
              Istencil, II, JJ, xi, yi, denom, denom_sign, stencil_count, ddx_coeffs, ddy_coeffs, \
-             stencil_min_x, stencil_min_y, stencil_max_x, stencil_max_y ) \
-    firstprivate( num_pts, max_distance, stdout )
+             stencil_min_x, stencil_min_y, stencil_max_x, stencil_max_y, \
+             LHS, report, alglib_info, LHS_vec, solve, LHS_list \
+           ) \
+    firstprivate( num_pts, max_distance, stdout, alglib::xdefault )
     {
+        LHS_vec.resize( (num_neighbours+1)*(num_neighbours+1), 0. );
+        LHS.setlength( num_neighbours+1, num_neighbours+1 );
+        LHS.attach_to_ptr( num_neighbours+1, num_neighbours+1, &LHS_vec[0] );
+
         #pragma omp for collapse(1) schedule(guided)
         for ( pt_index = 0; pt_index < num_pts; pt_index++ ) {
 
@@ -156,189 +174,71 @@ void dataset::build_adjacency(
             adjacency_projected_y.at(pt_index).resize(num_neighbours, 0.);
             adjacency_distances.at(  pt_index).resize(num_neighbours, 0.);
 
+            LHS_vec.resize( (num_neighbours+1)*(num_neighbours+1), 0. );
+            LHS_vec.at( num_neighbours * (num_neighbours+1) + 0 ) = 1.;
+            LHS_vec.at( num_neighbours * (num_neighbours+1) + 1 ) = 0.;
+            LHS_vec.at( num_neighbours * (num_neighbours+1) + 2 ) = 0.;
+            LHS_vec.at( num_neighbours * (num_neighbours+1) + 3 ) = 0.;
+            LHS_vec.at( num_neighbours * (num_neighbours+1) + 4 ) = 0.;
+            LHS_vec.at( num_neighbours * (num_neighbours+1) + 5 ) = 0.;
             for (Ineighbour = 0; Ineighbour < num_neighbours; Ineighbour++) {
-                //fprintf( stdout, "%'zu: %'zu, %g, %g, %g\n", 
-                //        pt_index, neighbour_ind[Ineighbour], neighbour_x[Ineighbour], neighbour_y[Ineighbour],
-                //        neighbour_dist[Ineighbour] );
+
                 adjacency_indices.at(pt_index)[Ineighbour] = neighbour_ind[Ineighbour];
                 adjacency_projected_x.at(pt_index)[Ineighbour] = neighbour_x[Ineighbour];
                 adjacency_projected_y.at(pt_index)[Ineighbour] = neighbour_y[Ineighbour];
                 adjacency_distances.at(pt_index)[Ineighbour] = neighbour_dist[Ineighbour];
+
+                // 1
+                LHS_vec.at( Ineighbour * (num_neighbours+1) + 0 ) = 1.;
+
+                // x
+                LHS_vec.at( Ineighbour * (num_neighbours+1) + 1 ) = 
+                    neighbour_x[Ineighbour];
+
+                // y
+                LHS_vec.at( Ineighbour * (num_neighbours+1) + 2 ) = 
+                    neighbour_y[Ineighbour];
+
+                // x y 
+                LHS_vec.at( Ineighbour * (num_neighbours+1) + 3 ) = 
+                    neighbour_x[Ineighbour] * neighbour_y[Ineighbour];
+
+                // x^2
+                LHS_vec.at( Ineighbour * (num_neighbours+1) + 4 ) = 
+                    neighbour_x[Ineighbour] * neighbour_x[Ineighbour];
+                
+                // y^2
+                LHS_vec.at( Ineighbour * (num_neighbours+1) + 5 ) = 
+                    neighbour_y[Ineighbour] * neighbour_y[Ineighbour];
+
             }
 
-            // Since we're here, let's also build the differentiation weights, since we'll be using
-            // the adjacency points as our differentiation stencil.
-            // 8 neighbours + centre point = 9 point stencil
-            // But a bi-linear spline only requires 4 points
-            // So we'll just take the average over the different available
-            // differentiation stencils
-            // Some will be ill-conditioned, so ignore those ones
-            xi.resize(4);
-            yi.resize(4);
+
+            alglib::rmatrixinverse( LHS, alglib_info, report );
+
             adjacency_ddlon_weights.at(pt_index).resize(num_neighbours+1, 0.);
             adjacency_ddlat_weights.at(pt_index).resize(num_neighbours+1, 0.);
-            stencil_count = 0;
 
-            for ( Istencil = 0; Istencil < pow(2,num_neighbours+1); Istencil++ ) {
-
-                // First, reject any stencil subsets that don't contain exactly four points
-                stencil_set = std::bitset<16>(Istencil);
-                if (stencil_set.count() != 4) { continue; }
-
-                // Pull out the four points
-                // Get the xi and yi for the stencil
-                // the 'last neighbour' is the point itself
-                II = 0;
-                stencil_min_x = 1e100;
-                stencil_min_y = 1e100;
-                stencil_max_x = -1e100;
-                stencil_max_y = -1e100;
-                for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
-                    // 
-                    if ( stencil_set[JJ] == 0 ) { continue; }
-                    xi[II] = (JJ == num_neighbours) ? 0. : adjacency_projected_x.at(pt_index)[JJ];
-                    yi[II] = (JJ == num_neighbours) ? 0. : adjacency_projected_y.at(pt_index)[JJ];
-                    II++;
-
-                    stencil_min_x = fmin( stencil_min_x, xi[II] );
-                    stencil_max_x = fmax( stencil_max_x, xi[II] );
-
-                    stencil_min_y = fmin( stencil_min_y, yi[II] );
-                    stencil_max_y = fmax( stencil_max_y, yi[II] );
-                }
-                if ( stencil_min_x * stencil_max_x > 1e-10 ) { continue; }
-                if ( stencil_min_y * stencil_max_y > 1e-10 ) { continue; }
-
-                // Denominator / determinant of the spline matrix
-                denom = - xi[0] * (   xi[1] * (yi[0] - yi[1]) * (yi[2] - yi[3]) 
-                                    - xi[2] * (yi[0] - yi[2]) * (yi[1] - yi[3]) 
-                                    + xi[3] * (yi[0] - yi[3]) * (yi[1] - yi[2])
-                                  )
-                        - xi[1] * xi[2] * (yi[0] - yi[3]) * (yi[1] - yi[2]) 
-                        + xi[1] * xi[3] * (yi[0] - yi[2]) * (yi[1] - yi[3]) 
-                        - xi[2] * xi[3] * (yi[0] - yi[1]) * (yi[2] - yi[3]);
-               
-                denom_sign = (denom > 0) ? 1 : (denom < 0) ? -1 : 0;
-
-                // If the denominator is too small in magnitude, discard this stencil.
-                if ( fabs(denom) < 1e-0 ) { 
-                    //fprintf(stdout, "Pt %'zu Rejecting stencil %d (denom = %g) (%.6e, %.6e, %.6e, %.6e) (%.6e, %.6e, %.6e, %.6e)\n", 
-                    //        pt_index, Istencil, denom, xi[0], xi[1], xi[2], xi[3], yi[0], yi[1], yi[2], yi[3] ); 
-                    continue; 
-                }
-                //stencil_count++;
-                stencil_count += fabs(denom);
-
-                ddx_coeffs.clear();
-                // x1 y1 y2 - x2 y1 y2 - x1 y1 y3 + x3 y1 y3 + x2 y2 y3 -  x3 y2 y3,
-                ddx_coeffs.push_back( (
-                            + xi[1] * yi[1] * yi[2] 
-                            - xi[2] * yi[1] * yi[2]
-                            - xi[1] * yi[1] * yi[3]
-                            + xi[3] * yi[1] * yi[3]
-                            + xi[2] * yi[2] * yi[3]
-                            - xi[3] * yi[2] * yi[3]
-                            ) * denom_sign );
-                            //) / denom );
-
-                // -x0 y0 y2 + x2 y0 y2 + x0 y0 y3 - x3 y0 y3 - x2 y2 y3 +  x3 y2 y3,
-                ddx_coeffs.push_back( (
-                            - xi[0] * yi[0] * yi[2]
-                            + xi[2] * yi[0] * yi[2]
-                            + xi[0] * yi[0] * yi[3]
-                            - xi[3] * yi[0] * yi[3]
-                            - xi[2] * yi[2] * yi[3]
-                            + xi[3] * yi[2] * yi[3]
-                            ) * denom_sign );
-                            //) / denom );
-
-                //  x0 y0 y1 - x1 y0 y1 - x0 y0 y3 + x3 y0 y3 + x1 y1 y3 -  x3 y1 y3,
-                ddx_coeffs.push_back( (
-                            + xi[0] * yi[0] * yi[1]
-                            - xi[1] * yi[0] * yi[1]
-                            - xi[0] * yi[0] * yi[3]
-                            + xi[3] * yi[0] * yi[3]
-                            + xi[1] * yi[1] * yi[3]
-                            - xi[3] * yi[1] * yi[3]
-                            ) * denom_sign );
-                            //) / denom );
-
-                // -x0 y0 y1 + x1 y0 y1 + x0 y0 y2 - x2 y0 y2 - x1 y1 y2 +  x2 y1 y2
-                ddx_coeffs.push_back( (
-                            - xi[0] * yi[0] * yi[1]
-                            + xi[1] * yi[0] * yi[1]
-                            + xi[0] * yi[0] * yi[2]
-                            - xi[2] * yi[0] * yi[2]
-                            - xi[1] * yi[1] * yi[2]
-                            + xi[2] * yi[1] * yi[2]
-                            ) * denom_sign );
-                            //) / denom );
-
-                II = 0;
-                for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
-                    if ( stencil_set[JJ] == 0 ) { continue; }
-                    adjacency_ddlon_weights.at(pt_index)[JJ] += ddx_coeffs[II];
-                    II++;
-                }
-
-
-                ddy_coeffs.clear();
-                // -x1 x2 y1 + x1 x3 y1 + x1 x2 y2 - x2 x3 y2 - x1 x3 y3 + x2 x3 y3,
-                // x1 x2 (-y1 + y2) + x1 x3 (y1 - y3) + x2 x3 (-y2 + y3),
-                ddy_coeffs.push_back( (
-                              xi[1] * xi[2] * (-yi[1] + yi[2])
-                            + xi[1] * xi[3] * ( yi[1] - yi[3])
-                            + xi[2] * xi[3] * (-yi[2] + yi[3])
-                            ) * denom_sign );
-                            //) / denom );
-
-                // x0 x2 y0 - x0 x3 y0 - x0 x2 y2 + x2 x3 y2 + x0 x3 y3 -  x2 x3 y3, 
-                // x0 x2 ( y0 - y2) + x2 x3 (y2 - y3) + x0 x3 (-y0 + y3),
-                ddy_coeffs.push_back( (
-                            + xi[0] * xi[2] * ( yi[0] - yi[2])
-                            + xi[2] * xi[3] * ( yi[2] - yi[3])
-                            + xi[0] * xi[3] * (-yi[0] + yi[3])
-                            ) * denom_sign );
-                            //) / denom );
-
-                // -x0 x1 y0 + x0 x3 y0 + x0 x1 y1 - x1 x3 y1 - x0 x3 y3 +  x1 x3 y3,
-                // x0 x1 (-y0 + y1) + x0 x3 (y0 - y3) + x1 x3 (-y1 + y3),
-                ddy_coeffs.push_back( (
-                            - xi[0] * xi[1] * yi[0]
-                            + xi[0] * xi[3] * yi[0]
-                            + xi[0] * xi[1] * yi[1]
-                            - xi[1] * xi[3] * yi[1]
-                            - xi[0] * xi[3] * yi[3]
-                            + xi[1] * xi[3] * yi[3]
-                            ) * denom_sign );
-                            //) / denom );
-
-                // x0 x1 y0 - x0 x2 y0 - x0 x1 y1 + x1 x2 y1 + x0 x2 y2 - x1 x2 y2
-                // x0 x1 ( y0 - y1) + x1 x2 (y1 - y2) + x0 x2 (-y0 + y2)
-                ddy_coeffs.push_back( (
-                            + xi[0] * xi[1] * yi[0]
-                            - xi[0] * xi[2] * yi[0]
-                            - xi[0] * xi[1] * yi[1]
-                            + xi[1] * xi[2] * yi[1]
-                            + xi[0] * xi[2] * yi[2]
-                            - xi[1] * xi[2] * yi[2]
-                            ) * denom_sign );
-                            //) / denom );
-
-                II = 0;
-                for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
-                    if ( stencil_set[JJ] == 0 ) { continue; }
-                    adjacency_ddlat_weights.at(pt_index)[JJ] += ddy_coeffs[II];
-                    II++;
-                }
-            }
-            assert( stencil_count > 0 );
+            adjacency_d2dlon2_weights.at(pt_index).resize(num_neighbours+1, 0.);
+            adjacency_d2dlat2_weights.at(pt_index).resize(num_neighbours+1, 0.);
             for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
-                // factor R*cos(lat) comes from converting y deriv to lat deriv
-                adjacency_ddlon_weights.at(pt_index)[JJ] *= 
-                    constants::R_earth * cos(pt_lat) / stencil_count;
-                // factor R comes from converting y deriv to lat deriv
-                adjacency_ddlat_weights.at(pt_index)[JJ] *= constants::R_earth / stencil_count;
+
+                // factor R*cos(lat) comes from converting proj-y deriv to lat deriv
+                adjacency_ddlon_weights.at(pt_index)[JJ] = LHS( 1, JJ ) * 
+                    constants::R_earth * cos(pt_lat);
+
+                // factor R comes from converting proj-x deriv to lat deriv
+                adjacency_ddlat_weights.at(pt_index)[JJ] = LHS( 2, JJ ) *
+                    constants::R_earth;
+
+                // second lon derivative
+                adjacency_d2dlon2_weights.at(pt_index)[JJ] = 0.5 * LHS( 4, JJ ) * 
+                    pow( constants::R_earth * cos(pt_lat), 2);
+
+                // second lat derivative
+                adjacency_d2dlat2_weights.at(pt_index)[JJ] = 0.5 * LHS( 5, JJ ) * 
+                    pow( constants::R_earth, 2);
+
             }
         }
     }

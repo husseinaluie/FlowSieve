@@ -63,21 +63,21 @@ void Cart_derivatives_at_point(
 
     // Compute spherical derivatives
     spher_derivative_at_point(
-        dfields_dlon_p, fields, longitude, "lon",
-        Itime, Idepth_DEPTH, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
+        dfields_dlon_p, fields, longitude, "lon", source_data,
+        Itime, Idepth_DEPTH, Ilat, Ilon, 
         mask, order_of_deriv, diff_ord);
 
     spher_derivative_at_point(
-        dfields_dlat_p, fields, latitude, "lat",
-        Itime, Idepth_DEPTH, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
+        dfields_dlat_p, fields, latitude, "lat", source_data,
+        Itime, Idepth_DEPTH, Ilat, Ilon, 
         mask, order_of_deriv, diff_ord);
 
     if ( include_depth_derivs ) {
         // At the moment, can only use second order for
         // depth derivatives since it's non-uniform.
         spher_derivative_at_point(
-            dfields_dr_p, fields, depth, "depth",
-            Itime, Idepth_DEPTH, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon,
+            dfields_dr_p, fields, depth, "depth", source_data,
+            Itime, Idepth_DEPTH, Ilat, Ilon, 
             mask, order_of_deriv, 2);
         if (not(source_data.depth_is_elevation)) {
             // If we have an actual depth grid, multiply by

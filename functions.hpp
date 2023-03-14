@@ -133,6 +133,19 @@ class dataset {
                                 const std::string merge_kind
                              ) const;
 
+        // Functions / variables for working with LLC-type grids
+        const size_t num_neighbours = 5;
+        std::vector< std::vector< size_t > >    adjacency_indices;
+        std::vector< std::vector< double > >    adjacency_projected_x,
+                                                adjacency_projected_y,
+                                                adjacency_distances,
+                                                adjacency_ddlon_weights,
+                                                adjacency_ddlat_weights,
+                                                adjacency_d2dlon2_weights,
+                                                adjacency_d2dlat2_weights;
+        void build_adjacency( const MPI_Comm comm = MPI_COMM_WORLD );
+        void write_adjacency( const std::string filename, 
+                              const MPI_Comm comm = MPI_COMM_WORLD );
 
 };
 
@@ -481,6 +494,18 @@ void extend_mask_to_poles(
         const std::vector<double> & extended_latitude,
         const int Ilat_start,
         const bool extend_val = constants::FILTER_OVER_LAND
+        );
+
+
+// Map projections
+void near_sided_project( 
+       double & proj_x,
+       double & proj_y,
+       const double & pt_lon,
+       const double & pt_lat,
+       const double & centre_lon,
+       const double & centre_lat,
+       const double & viewing_elev
         );
 
 /*!

@@ -522,8 +522,8 @@ void Apply_Helmholtz_Projection(
             fprintf( stdout, "Getting velocities from seed.\n" );
             fflush(stdout);
             #endif
-            toroidal_vel_from_F(  u_lon_tor_seed, u_lat_tor_seed, Psi_seed, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
-            potential_vel_from_F( u_lon_pot_seed, u_lat_pot_seed, Phi_seed, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
+            toroidal_vel_from_F(  u_lon_tor_seed, u_lat_tor_seed, Psi_seed, source_data, use_mask ? mask : unmask);
+            potential_vel_from_F( u_lon_pot_seed, u_lat_pot_seed, Phi_seed, source_data, use_mask ? mask : unmask);
 
             #if DEBUG >= 3
             fprintf( stdout, "Subtracting seed velocity to get remaining.\n" );
@@ -551,8 +551,8 @@ void Apply_Helmholtz_Projection(
             fprintf( stdout, "Getting divergence and vorticity from remaining velocity.\n" );
             fflush(stdout);
             #endif
-            toroidal_vel_div(        div_term, u_lon_rem, u_lat_rem, longitude, latitude,       1, 1, Nlat, Nlon, use_mask ? mask : unmask );
-            toroidal_curl_u_dot_er( vort_term, u_lon_rem, u_lat_rem, longitude, latitude, 0, 0, 1, 1, Nlat, Nlon, use_mask ? mask : unmask );
+            toroidal_vel_div(        div_term, u_lon_rem, u_lat_rem, source_data, use_mask ? mask : unmask );
+            toroidal_curl_u_dot_er( vort_term, u_lon_rem, u_lat_rem, source_data, use_mask ? mask : unmask );
 
             #if DEBUG >= 2
             if ( wRank == 0 ) {
@@ -668,8 +668,8 @@ void Apply_Helmholtz_Projection(
             #endif
 
             std::vector<double> u_lon_tor(Npts, 0.), u_lat_tor(Npts, 0.), u_lon_pot(Npts, 0.), u_lat_pot(Npts, 0.);
-            toroidal_vel_from_F(  u_lon_tor, u_lat_tor, Psi_vector, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
-            potential_vel_from_F( u_lon_pot, u_lat_pot, Phi_vector, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, use_mask ? mask : unmask);
+            toroidal_vel_from_F(  u_lon_tor, u_lat_tor, Psi_vector, source_data, use_mask ? mask : unmask);
+            potential_vel_from_F( u_lon_pot, u_lat_pot, Phi_vector, source_data, use_mask ? mask : unmask);
 
             //
             //// Store into the full arrays

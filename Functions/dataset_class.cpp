@@ -352,3 +352,63 @@ void dataset::index1to4_global( const size_t index,
 
     Index1to4( index, Itime, Idepth, Ilat, Ilon, Ntime_global, Ndepth_global, Nlat, Nlon );
 }
+
+void dataset::write_adjacency(
+        const std::string filename,
+        const MPI_Comm comm
+        ) {
+
+    std::vector<std::string> vars_to_write;
+
+    vars_to_write.push_back("adjacency_indices");
+    vars_to_write.push_back("adjacency_proj_x");
+    vars_to_write.push_back("adjacency_proj_y");
+    vars_to_write.push_back("adjacency_distances");
+    vars_to_write.push_back("adjacency_ddlon_weights");
+    vars_to_write.push_back("adjacency_ddlat_weights");
+
+    initialize_adjacency_file( *this, vars_to_write, filename.c_str() );
+
+    std::vector<double> var_to_write;
+
+    const size_t Npts = longitude.size(),
+                 Nneighbours = num_neighbours;
+
+    size_t starts[2] = { 0,   0  };
+    size_t counts[2] = { Npts, Nneighbours };
+    var_to_write.resize( Npts*Nneighbours );
+    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
+            var_to_write.at( Nneighbours*II + JJ ) = (double) adjacency_indices[II][JJ];
+    } }
+    write_field_to_output( var_to_write, "adjacency_indices", starts, counts, filename.c_str() );
+
+    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
+            var_to_write.at( Nneighbours*II + JJ ) = adjacency_projected_x[II][JJ];
+    } }
+    write_field_to_output( var_to_write, "adjacency_proj_x", starts, counts, filename.c_str() );
+
+    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
+            var_to_write.at( Nneighbours*II + JJ ) = adjacency_projected_y[II][JJ];
+    } }
+    write_field_to_output( var_to_write, "adjacency_proj_y", starts, counts, filename.c_str() );
+
+    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
+            var_to_write.at( Nneighbours*II + JJ ) = adjacency_distances[II][JJ];
+    } }
+    write_field_to_output( var_to_write, "adjacency_distances", starts, counts, filename.c_str() );
+
+    counts[1] = Nneighbours+1;
+    var_to_write.resize( Npts*(Nneighbours+1) );
+    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_ddlon_weights[II][JJ];
+    } }
+    write_field_to_output( var_to_write, "adjacency_ddlon_weights", 
+            starts, counts, filename.c_str() );
+
+    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_ddlat_weights[II][JJ];
+    } }
+    write_field_to_output( var_to_write, "adjacency_ddlat_weights", 
+            starts, counts, filename.c_str() );
+
+}

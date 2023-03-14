@@ -10,18 +10,13 @@ void toroidal_vel_div(
         std::vector<double> & div,
         const std::vector<double> & vel_lon,
         const std::vector<double> & vel_lat,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
+        const dataset & source_data,
         const std::vector<bool> & mask
     ) {
 
     size_t index;
     int Itime, Idepth, Ilat, Ilon;
-    double dulon_dlon, dulat_dlat, ulat, cos_lat, sin_lat, tmp_val;
+    double dulon_dlon, dulat_dlat, local_lat, ulat, cos_lat, sin_lat, tmp_val;
     std::vector<double*> lon_deriv_vals, lat_deriv_vals;
     std::vector<const std::vector<double>*> lon_deriv_fields, lat_deriv_fields;
     bool is_pole;
@@ -29,14 +24,22 @@ void toroidal_vel_div(
     lon_deriv_fields.push_back(&vel_lon);
     lat_deriv_fields.push_back(&vel_lat);
 
-    const size_t Npts = Ntime * Ndepth * Nlat * Nlon;
+    const std::vector<double>   &latitude   = source_data.latitude,
+                                &longitude  = source_data.longitude;
+    const std::vector<int>  &myCounts = source_data.myCounts;
+
+    const int   Ntime  = myCounts.at(0),
+                Ndepth = myCounts.at(1),
+                Nlat   = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? myCounts.at(2) : 1,
+                Nlon   = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? myCounts.at(3) : 1;
+    const size_t Npts  = vel_lon.size();
 
     #pragma omp parallel \
     default(none) \
     shared( latitude, longitude, mask, div, vel_lon, vel_lat, \
-            lon_deriv_fields, lat_deriv_fields )\
+            lon_deriv_fields, lat_deriv_fields, source_data )\
     private(Itime, Idepth, Ilat, Ilon, index, cos_lat, sin_lat, tmp_val, ulat, \
-            dulon_dlon, dulat_dlat, lon_deriv_vals, lat_deriv_vals, is_pole ) \
+            local_lat, dulon_dlon, dulat_dlat, lon_deriv_vals, lat_deriv_vals, is_pole ) \
     firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
     {
 
@@ -50,30 +53,38 @@ void toroidal_vel_div(
 
             if (mask.at(index)) { // Skip land areas
 
-                Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                                 Ntime, Ndepth, Nlat, Nlon);
+                if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
+                    Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                                     Ntime, Ndepth, Nlat, Nlon);
 
-                spher_derivative_at_point(
-                        lon_deriv_vals, lon_deriv_fields,
-                        longitude, "lon",
-                        Itime, Idepth, Ilat, Ilon,
-                        Ntime, Ndepth, Nlat, Nlon,
-                        mask);
+                    spher_derivative_at_point(
+                            lon_deriv_vals, lon_deriv_fields, longitude, "lon",
+                            source_data, Itime, Idepth, Ilat, Ilon, mask);
 
-                spher_derivative_at_point(
-                        lat_deriv_vals, lat_deriv_fields,
-                        latitude, "lat",
-                        Itime, Idepth, Ilat, Ilon,
-                        Ntime, Ndepth, Nlat, Nlon,
-                        mask);
+                    spher_derivative_at_point(
+                            lat_deriv_vals, lat_deriv_fields, latitude, "lat",
+                            source_data, Itime, Idepth, Ilat, Ilon, mask);
+                } else {
+                    spher_derivative_at_point(
+                            lon_deriv_vals, lon_deriv_fields, longitude, "lon",
+                            source_data, 0, 0, index, index, mask);
 
-                cos_lat = cos(latitude.at(Ilat));
-                sin_lat = sin(latitude.at(Ilat));
+                    spher_derivative_at_point(
+                            lat_deriv_vals, lat_deriv_fields, latitude, "lat",
+                            source_data, 0, 0, index, index, mask);
+                }
+
+                local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
+                                ? latitude.at(Ilat)
+                                : latitude.at(index);
+
+                cos_lat = cos(local_lat);
+                sin_lat = sin(local_lat);
 
                 ulat = vel_lat.at(index);
 
                 // If we're too close to the pole (less than 0.01 degrees), bad things happen
-                is_pole = std::fabs( std::fabs( latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 0.01;
+                is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 0.01;
 
                 if ( is_pole ) {
                     tmp_val = 0.;

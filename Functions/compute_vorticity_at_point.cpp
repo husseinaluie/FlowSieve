@@ -87,11 +87,11 @@ void compute_vorticity_at_point(
                                 lat_deriv_vals {&ulon_lat, &ulat_lat, &ur_lat},
                                 r_deriv_vals   {&ulon_r,   &ulat_r,   &ur_r  };
 
-        spher_derivative_at_point( lat_deriv_vals, deriv_fields, latitude, "lat",
-                Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask);
+        spher_derivative_at_point( lat_deriv_vals, deriv_fields, latitude, "lat", source_data,
+                Itime, Idepth, Ilat, Ilon, mask);
 
-        spher_derivative_at_point( lon_deriv_vals, deriv_fields, longitude, "lon",
-                Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask);
+        spher_derivative_at_point( lon_deriv_vals, deriv_fields, longitude, "lon", source_data,
+                Itime, Idepth, Ilat, Ilon, mask);
 
         //spher_derivative_at_point( r_deriv_vals, deriv_fields, depth, "depth",
         //        Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask);

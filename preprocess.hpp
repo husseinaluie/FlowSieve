@@ -67,46 +67,6 @@ void get_coast(
         const int Nlat,
         const int Nlon);
 
-/*!
- *  \addtogroup ToroidalProjection
- *  @{
- * \brief Functions directly pertaining to toroidal projection.
- */
-
-/*!
- * \brief Applies toroidal projection to the specified velocity field.
- * @ingroup ToroidalProjection
- *
- * Specifically, solves for (scalar field) F that minimizes error in 
- * \f$ \nabla_H^2 F = \nabla_H \times \vec{u} \cdot \hat{e}_r \f$
- *
- * This uses sparse differentiation matrices (of the order specified in constants.hpp) and the ALGLIB least-squares solver.
- *
- * *single_seed*: If true, then only one seed is provided and should be used as the seed for all different times. If false, then the provided seed incorporates a different seed for each time.
- *
- * @param[in]       output_fname                    Name for the output file
- * @param[in,out]   u_lon,u_lat                     velocity field to be projected
- * @param[in]       time,depth,latitude,longitude   dimension vectors (1D)
- * @param[in]       mask                            array to distinguish land/water
- * @param[in]       myCounts                        Local (to MPI process) dimension sizes
- * @param[in]       myStarts                        Vector indicating where the local (to MPI process) region fits in the whole
- * @param[in]       seed                            Seed for the least-squares solver
- * @param[in]       single_seed                     Indicates if a single seed is used - see notes
- * @param[in]       comm                            MPI communicator (default MPI_COMM_WORLD)
- *
- */
-void Apply_Toroidal_Projection(
-        const std::string output_fname,
-        dataset & source_data,
-        const std::vector<double> & seed,
-        const bool single_seed,
-        const double rel_tol,
-        const int max_iters,
-        const bool weight_err,
-        const bool use_mask,
-        const MPI_Comm comm = MPI_COMM_WORLD
-        );
-
 void depth_integrate(
         std::vector<double> & depth_integral,
         const std::vector<double> & field_to_integrate,
@@ -114,19 +74,21 @@ void depth_integrate(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
-void Apply_Potential_Projection(
+void Apply_Helmholtz_Projection(
         const std::string output_fname,
         dataset & source_data,
-        const std::vector<double> & seed,
+        const std::vector<double> & seed_tor,
+        const std::vector<double> & seed_pot,
         const bool single_seed,
         const double rel_tol,
         const int max_iters,
         const bool weight_err,
         const bool use_mask,
+        const double Tikhov_Laplace,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
-void Apply_Helmholtz_Projection(
+void Apply_LLC_Helmholtz_Projection(
         const std::string output_fname,
         dataset & source_data,
         const std::vector<double> & seed_tor,
@@ -187,12 +149,7 @@ void toroidal_vel_from_F(
         std::vector<double> & vel_lon,
         std::vector<double> & vel_lat,
         const std::vector<double> & F,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
+        const dataset & source_data,
         const std::vector<bool> & mask
     );
 
@@ -200,12 +157,7 @@ void potential_vel_from_F(
         std::vector<double> & vel_lon,
         std::vector<double> & vel_lat,
         const std::vector<double> & F,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
+        const dataset & source_data,
         const std::vector<bool> & mask
     );
 
@@ -247,14 +199,7 @@ void toroidal_curl_u_dot_er(
         std::vector<double> & out_arr,
         const std::vector<double> & u_lon,
         const std::vector<double> & u_lat,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const int Itime,
-        const int Idepth,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
+        const dataset & source_data,
         const std::vector<bool> & mask,
         const std::vector<double> * seed = NULL
         );
@@ -320,12 +265,7 @@ void toroidal_vel_div(
         std::vector<double> & div,
         const std::vector<double> & vel_lon,
         const std::vector<double> & vel_lat,
-        const std::vector<double> & longitude,
-        const std::vector<double> & latitude,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon,
+        const dataset & source_data,
         const std::vector<bool> & mask
     );
 

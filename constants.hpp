@@ -2,6 +2,7 @@
 #define CONSTANTS_HPP 1
 
 #include <map>
+#include <string>
 
 /*!
  * \param DEBUG
@@ -143,7 +144,15 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool EXTEND_DOMAIN_TO_POLES = true;
+    const bool EXTEND_DOMAIN_TO_POLES = false;
+
+    /*!
+     * \param GRID_TYPE
+     * \brief Variable indicating type of grid system (e.g. LLC, Meshgrid)
+     * @ingroup constants
+     */
+    enum GridType : int { LLC, MeshGrid };
+    const int GRID_TYPE = GridType::LLC;
 
     /*!
      * \param CARTESIAN
@@ -243,7 +252,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool MINIMAL_OUTPUT = true;
+    const bool MINIMAL_OUTPUT = false;
 
     /*! 
      * \param NO_FULL_OUTPUTS
@@ -265,7 +274,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool CAST_TO_SINGLE = true;
+    const bool CAST_TO_SINGLE = false;
 
     /*!
      * \param CAST_TO_INT
@@ -315,7 +324,9 @@ namespace constants
      *  4 = tanh        ( 1 - tanh( (x - 1) / (0.1) )  )
      * @ingroup constants
      */
-    const int KERNEL_OPT = 4;
+    enum KernelTypes : int { TopHat = 0, HyperGaus = 1, Gaus = 2, Sinc = 3, 
+                             SmoothHat = 4, SmoothHatHighOrder = 5 };
+    const int KERNEL_OPT = KernelTypes::SmoothHat;
 
     /*!
      * \param KernPad

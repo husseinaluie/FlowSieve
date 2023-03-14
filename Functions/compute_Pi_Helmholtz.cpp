@@ -137,7 +137,7 @@ void compute_Pi_Helmholtz(
 
             #pragma omp parallel \
             default(none) \
-            shared(energy_transfer, latitude, longitude, mask,\
+            shared(energy_transfer, latitude, longitude, mask, source_data, \
                     ii, jj, ui, uj, tau_ij, u_i_tau_ij, i_deriv_fields, j_deriv_fields)\
             private(Itime, Idepth, Ilat, Ilon, index,\
                     pi_tmp, tau_ij_j, u_i_tau_ij_j, u_i_j, u_j_i, i_deriv_vals, j_deriv_vals) \
@@ -168,16 +168,16 @@ void compute_Pi_Helmholtz(
                         Index1to4(index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                         switch (ii) {
-                            case 0 : spher_derivative_at_point( i_deriv_vals, i_deriv_fields, longitude, "lon",
-                                Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask); break;
-                            case 1 : spher_derivative_at_point( i_deriv_vals, i_deriv_fields, latitude, "lat",
-                                Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask); break;
+                            case 0 : spher_derivative_at_point( i_deriv_vals, i_deriv_fields, longitude, "lon", source_data,
+                                Itime, Idepth, Ilat, Ilon, mask); break;
+                            case 1 : spher_derivative_at_point( i_deriv_vals, i_deriv_fields, latitude, "lat", source_data,
+                                Itime, Idepth, Ilat, Ilon, mask); break;
                         }
                         switch (jj) {
-                            case 0 : spher_derivative_at_point( j_deriv_vals, j_deriv_fields, longitude, "lon",
-                                Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask); break;
-                            case 1 : spher_derivative_at_point( j_deriv_vals, j_deriv_fields, latitude, "lat",
-                                Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask); break;
+                            case 0 : spher_derivative_at_point( j_deriv_vals, j_deriv_fields, longitude, "lon", source_data,
+                                Itime, Idepth, Ilat, Ilon, mask); break;
+                            case 1 : spher_derivative_at_point( j_deriv_vals, j_deriv_fields, latitude, "lat", source_data,
+                                Itime, Idepth, Ilat, Ilon, mask); break;
                         }
 
                         double i_scale_factor = ( (ii == 0) ? 1. / ( cos(latitude.at(Ilat) ) ) : 1. ) / constants::R_earth;
