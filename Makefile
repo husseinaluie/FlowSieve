@@ -5,12 +5,12 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=0 $(CFLAGS)
+CFLAGS:=-DDEBUG=2 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
-DEBUG:=false
-EXTRA_OPT:=true
+DEBUG:=true
+EXTRA_OPT:=false
 USE_GPROF:=false
 
 ##
@@ -229,11 +229,10 @@ $(SW_TARGET_EXES): %.x : ${SW_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building toroidal projection
-TOROID_TARGET_EXES := 	Case_Files/toroidal_projection.x \
-						Case_Files/potential_projection.x \
-						Case_Files/Helmholtz_projection.x \
+TOROID_TARGET_EXES := 	Case_Files/Helmholtz_projection.x \
 						Case_Files/Helmholtz_projection_SymTensor.x \
 						Case_Files/Helmholtz_projection_uiuj.x \
+						Case_Files/LLC_Helmholtz_projections.x \
 						Case_Files/interpolator.x \
 						Case_Files/geostrophic_vel.x \
 						Case_Files/coarsen_grid_linear.x \
@@ -241,12 +240,12 @@ TOROID_TARGET_EXES := 	Case_Files/toroidal_projection.x \
 						Case_Files/Pi_helm_breakdown.x \
 						Case_Files/thermal_wind.x \
 						Case_Files/compute_radial_velocity.x \
-						Case_Files/LLC_interpolator_simple.x
-TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
-						Case_Files/potential_projection.o \
-						Case_Files/Helmholtz_projection.o \
+						Case_Files/LLC_interpolator_simple.x \
+						Case_Files/LLC_testbed.x
+TOROID_TARGET_OBJS := 	Case_Files/Helmholtz_projection.o \
 						Case_Files/Helmholtz_projection_SymTensor.o \
 						Case_Files/Helmholtz_projection_uiuj.o \
+						Case_Files/LLC_Helmholtz_projections.o \
 						Case_Files/interpolator.o \
 						Case_Files/geostrophic_vel.o \
 						Case_Files/coarsen_grid_linear.o \
@@ -254,7 +253,8 @@ TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
 						Case_Files/Pi_helm_breakdown.o \
 						Case_Files/thermal_wind.o \
 						Case_Files/compute_radial_velocity.o \
-						Case_Files/LLC_interpolator_simple.o
+						Case_Files/LLC_interpolator_simple.o \
+						Case_Files/LLC_testbed.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
