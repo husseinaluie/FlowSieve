@@ -2,6 +2,7 @@
 *.o
 *.x
 *dSYM
+*.optrpt
 
 # Don't keep data files
 *.nc
