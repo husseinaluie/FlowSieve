@@ -146,6 +146,8 @@ class dataset {
         void build_adjacency( const MPI_Comm comm = MPI_COMM_WORLD );
         void write_adjacency( const std::string filename, 
                               const MPI_Comm comm = MPI_COMM_WORLD );
+        void load_adjacency(  const std::string filename, 
+                              const MPI_Comm comm = MPI_COMM_WORLD );
 
 };
 

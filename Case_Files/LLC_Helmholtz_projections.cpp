@@ -57,6 +57,10 @@ int main(int argc, char *argv[]) {
                                                                "input.nc",                 
                                                                asked_help,
                                                                "netCDF file containing vector field to Helmholtz decompose"),
+                        &adjacency_fname  = input.getCmdOption("--adjacency_file",     
+                                                               "adjacency.nc",  
+                                                               asked_help,
+                                                               "Filename for the adjacency data (from the LLC_build_adjacency routine)"),
                         &output_fname     = input.getCmdOption("--output_file",     
                                                                "projection_Helmholtz.nc",  
                                                                asked_help,
@@ -178,8 +182,9 @@ int main(int argc, char *argv[]) {
 
     // Build the adjacency matrix and other adjacency-adjacent arrays
     //  down the road, just load in a pre-built one, but for right now
-    //  this is faster.
+    //  this is easier.
     source_data.build_adjacency();
+    //source_data.load_adjacency( adjacency_fname );
 
     // Read in the velocity fields
     source_data.load_variable( "u_lon", zonal_vel_name, input_fname, true, true );

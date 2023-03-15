@@ -241,7 +241,8 @@ TOROID_TARGET_EXES := 	Case_Files/Helmholtz_projection.x \
 						Case_Files/thermal_wind.x \
 						Case_Files/compute_radial_velocity.x \
 						Case_Files/LLC_interpolator_simple.x \
-						Case_Files/LLC_testbed.x
+						Case_Files/LLC_testbed.x \
+						Case_Files/LLC_build_adjacency.x
 TOROID_TARGET_OBJS := 	Case_Files/Helmholtz_projection.o \
 						Case_Files/Helmholtz_projection_SymTensor.o \
 						Case_Files/Helmholtz_projection_uiuj.o \
@@ -254,7 +255,8 @@ TOROID_TARGET_OBJS := 	Case_Files/Helmholtz_projection.o \
 						Case_Files/thermal_wind.o \
 						Case_Files/compute_radial_velocity.o \
 						Case_Files/LLC_interpolator_simple.o \
-						Case_Files/LLC_testbed.o
+						Case_Files/LLC_testbed.o \
+						Case_Files/LLC_build_adjacency.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 

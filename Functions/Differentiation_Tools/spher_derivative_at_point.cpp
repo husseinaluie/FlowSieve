@@ -32,7 +32,7 @@ void spher_derivative_at_point(
     }
 
     // Check which derivative we're taking
-    int index;
+    int index = 0;
     const bool do_dep = (dim == "depth");
     const bool do_lat = (dim == "lat");
     const bool do_lon = (dim == "lon");
@@ -48,6 +48,7 @@ void spher_derivative_at_point(
         // NOTE:: THIS REALLY SHOULD BE TESTED TO MAKE SURE THERE ARE NO GREMLINS HIDING
 
         assert( Ilat == Ilon );
+        index = (size_t) Ilat;
 
         double weight, val;
         size_t val_ind;
