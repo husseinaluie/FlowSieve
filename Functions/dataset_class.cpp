@@ -377,38 +377,35 @@ void dataset::write_adjacency(
                  Nneighbours = num_neighbours;
 
     size_t starts[2] = { 0,   0  };
-    size_t counts[2] = { Npts, Nneighbours };
+    size_t counts[2] = { Npts, Nneighbours+1 };
+    var_to_write.resize( Npts*(Nneighbours+1) );
 
     // Indices
-    var_to_write.resize( Npts*Nneighbours );
-    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
-            var_to_write.at( Nneighbours*II + JJ ) = (double) adjacency_indices[II][JJ];
+    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            var_to_write.at( (Nneighbours+1)*II + JJ ) = (double) adjacency_indices[II][JJ];
     } }
     write_field_to_output( var_to_write, "adjacency_indices", starts, counts, filename.c_str() );
 
     // Projected x
-    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
-            var_to_write.at( Nneighbours*II + JJ ) = adjacency_projected_x[II][JJ];
+    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_projected_x[II][JJ];
     } }
     write_field_to_output( var_to_write, "adjacency_proj_x", starts, counts, filename.c_str() );
 
     // Projected y
-    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
-            var_to_write.at( Nneighbours*II + JJ ) = adjacency_projected_y[II][JJ];
+    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_projected_y[II][JJ];
     } }
     write_field_to_output( var_to_write, "adjacency_proj_y", starts, counts, filename.c_str() );
 
     // Distances
-    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
-            var_to_write.at( Nneighbours*II + JJ ) = adjacency_distances[II][JJ];
+    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_distances[II][JJ];
     } }
     write_field_to_output( var_to_write, "adjacency_distances", starts, counts, filename.c_str() );
 
 
-    counts[1] = Nneighbours+1;
-
     // 1st lon deriv weights
-    var_to_write.resize( Npts*(Nneighbours+1) );
     for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
             var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_ddlon_weights[II][JJ];
     } }
@@ -454,9 +451,9 @@ void dataset::load_adjacency(
                         filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
     adjacency_indices.resize(Npts);
     for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_indices.at(II).resize(Nneighbours);
-        for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
-            adjacency_indices[II][JJ] = (size_t) round(tmp_var.at(II*Nneighbours + JJ));
+        adjacency_indices.at(II).resize(Nneighbours+1);
+        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            adjacency_indices[II][JJ] = (size_t) round(tmp_var.at(II*(Nneighbours+1) + JJ));
         } 
     }
 
@@ -466,9 +463,9 @@ void dataset::load_adjacency(
                         filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
     adjacency_projected_x.resize(Npts);
     for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_projected_x.at(II).resize(Nneighbours);
-        for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
-            adjacency_projected_x[II][JJ] = tmp_var.at(II*Nneighbours + JJ);
+        adjacency_projected_x.at(II).resize(Nneighbours+1);
+        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            adjacency_projected_x[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
         } 
     }
 
@@ -478,9 +475,9 @@ void dataset::load_adjacency(
                         filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
     adjacency_projected_y.resize(Npts);
     for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_projected_y.at(II).resize(Nneighbours);
-        for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
-            adjacency_projected_y[II][JJ] = tmp_var.at(II*Nneighbours + JJ);
+        adjacency_projected_y.at(II).resize(Nneighbours+1);
+        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            adjacency_projected_y[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
         } 
     }
 
@@ -490,9 +487,9 @@ void dataset::load_adjacency(
                         filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
     adjacency_distances.resize(Npts);
     for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_distances.at(II).resize(Nneighbours);
-        for ( size_t JJ = 0; JJ < Nneighbours; JJ++ ) {
-            adjacency_distances[II][JJ] = tmp_var.at(II*Nneighbours + JJ);
+        adjacency_distances.at(II).resize(Nneighbours+1);
+        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            adjacency_distances[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
         } 
     }
 

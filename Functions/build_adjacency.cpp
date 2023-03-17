@@ -169,18 +169,24 @@ void dataset::build_adjacency(
 
             // Now that we've searched all of the points to the adjacent ones, 
             // store the adjacent values and move on.
-            adjacency_indices.at(    pt_index).resize(num_neighbours, 0);
-            adjacency_projected_x.at(pt_index).resize(num_neighbours, 0.);
-            adjacency_projected_y.at(pt_index).resize(num_neighbours, 0.);
-            adjacency_distances.at(  pt_index).resize(num_neighbours, 0.);
+            adjacency_indices.at(    pt_index).resize(num_neighbours+1, 0);
+            adjacency_projected_x.at(pt_index).resize(num_neighbours+1, 0.);
+            adjacency_projected_y.at(pt_index).resize(num_neighbours+1, 0.);
+            adjacency_distances.at(  pt_index).resize(num_neighbours+1, 0.);
 
-            LHS_vec.resize( (num_neighbours+1)*(num_neighbours+1), 0. );
-            LHS_vec.at( num_neighbours * (num_neighbours+1) + 0 ) = 1.;
-            LHS_vec.at( num_neighbours * (num_neighbours+1) + 1 ) = 0.;
-            LHS_vec.at( num_neighbours * (num_neighbours+1) + 2 ) = 0.;
-            LHS_vec.at( num_neighbours * (num_neighbours+1) + 3 ) = 0.;
-            LHS_vec.at( num_neighbours * (num_neighbours+1) + 4 ) = 0.;
-            LHS_vec.at( num_neighbours * (num_neighbours+1) + 5 ) = 0.;
+            // the last 'neighbour' is the point itself
+            adjacency_indices.at(    pt_index)[num_neighbours] = pt_index;
+            adjacency_projected_x.at(pt_index)[num_neighbours] = 0.;
+            adjacency_projected_y.at(pt_index)[num_neighbours] = 0.;
+            adjacency_distances.at(  pt_index)[num_neighbours] = 0.;
+
+            LHS_vec.resize( (num_neighbours+1) * (num_neighbours+1), 0. );
+            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 0 ) = 1.;
+            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 1 ) = 0.;
+            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 2 ) = 0.;
+            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 3 ) = 0.;
+            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 4 ) = 0.;
+            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 5 ) = 0.;
             for (Ineighbour = 0; Ineighbour < num_neighbours; Ineighbour++) {
 
                 adjacency_indices.at(pt_index)[Ineighbour] = neighbour_ind[Ineighbour];
