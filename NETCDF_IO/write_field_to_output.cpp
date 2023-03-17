@@ -49,9 +49,19 @@ void write_field_to_output(
     double add_offset, scale_factor;
 
     // This is the maximum value of the transformed variable
+    const double max_val =
+        constants::CAST_TO_SINGLE ?
+            ( constants::fill_value < 0 ? 
+              constants::fill_value + 2 : 
+              constants::fill_value - 2 ) :
+            ( constants::fill_value_double < 0 ? 
+              constants::fill_value_double + 2 : 
+              constants::fill_value_double - 2 ) ;
+    /*
     const double max_val =   constants::fill_value < 0 
                            ? constants::fill_value + 2 
                            : constants::fill_value - 2;
+                           */
     if (constants::CAST_TO_INT) {
         // If we want to reduce output size, pack into short ints
         //   floats are 32bit, short ints are 16bit, so we can cut
@@ -140,7 +150,9 @@ void write_field_to_output(
                 if ( (mask == NULL) or ( mask->at(index) ) ) {
                     output_field.at(index) = ( field.at(index) - fmiddle ) / scale_factor;
                 } else {
-                    output_field.at(index) = constants::fill_value;
+                    output_field.at(index) = constants::CAST_TO_SINGLE ?
+                                                constants::fill_value :
+                                                constants::fill_value_double;
                 }
             }
         }
