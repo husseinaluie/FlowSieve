@@ -86,8 +86,8 @@ void initialize_adjacency_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     retval = nc_def_var(ncid, "longitude", NC_DOUBLE, 1, &lon_dimid,   &lon_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    retval = nc_def_var(ncid, "neighbour", NC_DOUBLE, 1, &neighbour_dimid,   &neighbour_varid);
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    //retval = nc_def_var(ncid, "neighbour", NC_DOUBLE, 1, &neighbour_dimid,   &neighbour_varid);
+    //if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     if (not(constants::CARTESIAN)) {
         #if DEBUG>=2
