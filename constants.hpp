@@ -95,6 +95,7 @@ namespace constants
      * @ingroup constants
      */
     const double fill_value = -1e8;
+    const double fill_value_double = -1e15;
 
     /*!
      * \param fill_value_s
