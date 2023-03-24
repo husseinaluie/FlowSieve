@@ -19,21 +19,4 @@ If the coarse-graining successfully runs (i.e. directory `outputs` is created an
 
 ### Notes when compiling
 
-When compiling the executables, set the `constants.hpp` variables as follows:
-- `CARTESIAN = false`
-- `PERIODIC_X = true`
-- `PERIODIC_Y = false`
-- `DEFORM_AROUND_LAND = false`
-- `FILTER_OVER_LAND = true`
-- `UNIFORM_LON_GRID = true`
-- `UNIFORM_LAT_GRID = true`
-- `EXTEND_DOMAIN_TO_POLES = false`
-- `FULL_LON_SPAN = true`
-- `MINIMAL_OUTPUT = true`
-- `NO_FULL_OUTPUTS = true`
-- `CAST_TO_SINGLE = true`
-- `CAST_TO_INT = false`
-- `APPLY_POSTPROCESS = true`
-- `POSTPROCESS_DO_ZONAL_MEANS = true`
-- `POSTPROCESS_DO_TIME_MEANS = false`
-- `DO_OKUBOWEISS_ANALYSIS = false`
+When compiling the executables, set the `constants.hpp` with the provided file.

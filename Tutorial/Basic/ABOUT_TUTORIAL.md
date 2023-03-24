@@ -31,18 +31,4 @@ While the codebase is heavily parallelized, it unnecessary for this example and 
 
 ### Notes when compiling
 
-Make sure that the variables in `constants.hpp` are set appropraitely. These include:
-- `CARTESIAN = true`
-- `PERIODIC_X = true`
-- `PERIODIC_Y = true`
-- `EXTEND_DOMAIN_TO_POLES = false`
-- `COMP_BC_TRANSFERS = false`
-- Since there are no 'land' areas in this tutorial, the choice of land treatment (set by `DEFORM_AROUND_LAND` and `FILTER_OVER_LAND`) has no effect.
-- `UNIFORM_LON_GRID = true`
-- `UNIFORM_LAT_GRID = true`
-- `FULL_LON_SPAN = true`
-- `MINIMAL_OUTPUT` and `NO_FULL_OUTPUTS` both to `false`. We want the full output files (file size is not a concern, since the sample is small)
-- `CAST_TO_SINGLE` and `CAST_TO_INT` simply modify the data type (i.e. precision) used to store the outputs, and can be set however you wish
-- `DO_TIMING = true` prints some summary information about how long different parts of the code took. Turn on or off as you wish.
-- `APPLY_POSTPROCESS = false`, this will be handled in another tutorial
-- `DO_OKUBOWEISS_ANALYSIS = false`, this will be handled in another tutorial
+When compiling, use the `constants.hpp` file provided in this directory.

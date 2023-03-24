@@ -49,14 +49,4 @@ The other `for` loops (such as computing velocities, setting up the least square
 
 ### Notes when compiling
 
-Make sure that the variables in `constants.hpp` are set appropraitely. These include:
-- `CARTESIAN = false`
-- `PERIODIC_X = true`
-- `PERIODIC_Y = false`
-- `UNIFORM_LON_GRID = true`
-- `UNIFORM_LAT_GRID = true`
-- `FILTER_OVER_LAND = false`
-- `EXTEND_DOMAIN_TO_POLES = false`
-- `FULL_LON_SPAN = true`
-- `CAST_TO_SINGLE` and `CAST_TO_INT` simply modify the data type (i.e. precision) used to store the outputs, and can be set however you wish
-- `MINIMAL_OUTPUT = false` to get extra output variables
+When compiling, use the `constants.hpp` provided in this directory.

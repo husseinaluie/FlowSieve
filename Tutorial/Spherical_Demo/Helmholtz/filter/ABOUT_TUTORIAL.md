@@ -31,15 +31,4 @@ While this is a coarse grid and does not require high computing power, we can ta
 
 ### Notes when compiling
 
-Make sure that the variables in `constants.hpp` are set appropraitely. These include:
-- `CARTESIAN = false`
-- `PERIODIC_X = true`
-- `PERIODIC_Y = false`
-- The grid is uniform, and so `UNIFORM_LON_GRID` and `UNIFORM_LAT_GRID` should be set accordingly. However, these are strictly optimization flags, and d not impact the output.
-- `FILTER_OVER_LAND = true`
-- `EXTEND_DOMAIN_TO_POLES = false`
-- `FULL_LON_SPAN = true`
-- `CAST_TO_SINGLE` and `CAST_TO_INT` simply modify the data type (i.e. precision) used to store the outputs, and can be set however you wish
-- `MINIMAL_OUTPUT = false` to get extra output variables
-- `APPLY_POSTPROCESS = false` (this will be explored in the postprocessing part of the tutorial)
-- `DO_OKUBOWEISS_ANALYSIS = false`, this will be handled in another tutorial
+When compiling, use the `constants.hpp` provided in this directory.
