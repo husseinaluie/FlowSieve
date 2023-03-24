@@ -59,12 +59,13 @@ An established package in the fied, GCM-Filters (@Grooms2021, @Loose2022), is de
 Another approach applies structure functions to Lagrangian trajectories to extract spectral diagnostics, such as power spectra and inter-scale energy transfers (@Frisch1995, @Balwada2022).
 
 The unique contributions of `FlowSieve` to the field are: 
-1) Designed for use on full spherical geometries, allowing the processing of global data. 
-2) can apply any arbitrary filtering scale spanning from sub-grid to domain-size (e.g. @Storer2022 extracts global power spectra for scales spanning 10s of km to 40000 km - the equatorial cirfumerence of the Earth). 
-3) on-line diagnostic calculations [e.g. across-scale energy transfers, large-scale vorticity and divergence]. 
-4) on-line post-processing to reduce output file sizes [e.g. averages over user-specified regions, zonal averages]. 
-5) follows the rigorous underlying mathematical framework of @Aluie2019 to preserve physical properties of the data (e.g. non-divergence of flow) and to accurately filter flows that not divergence-free. 
-6) heavily parallelized to utilize HPC environments. 
+1) analysis on full spherical geometries, allowing the processing of global data, 
+2) arbitrary filtering scales spanning from sub-grid to domain-size (e.g. @Storer2022 extracts global power spectra for scales spanning 10s of km to 40000 km - the equatorial circumference of the Earth), 
+3) on-line diagnostic calculations [e.g. across-scale energy transfers, large-scale vorticity and divergence], 
+4) on-line post-processing to reduce output file sizes [e.g. averages over user-specified regions, zonal averages], 
+5) rigorous underlying mathematical framework of @Aluie2019 to preserve physical properties of the data (e.g. non-divergence of flow) to accurately filter realistic flows and ensure commutativity between filtering and differential operators, and 
+6) heavy parallelization to utilize HPC environments efficiently. 
+
 
 
 # Statement of need
