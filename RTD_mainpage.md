@@ -9,6 +9,7 @@ We kindly request that you cite the code in your publications and presentations.
 The following citations are suggested:
 
 For journal articles, proceedings, etc.., we suggest:
+* Storer, B.A., Buzzicotti, M., Khatri, H. et al. Global energy spectrum of the general oceanic circulation. Nat Commun 13, 5314 (2022). (https://doi.org/10.1038/s41467-022-33031-3)
 * Aluie, Hussein, Matthew Hecht, and Geoffrey K. Vallis. "Mapping the energy cascade in the North Atlantic Ocean: The coarse-graining approach." Journal of Physical Oceanography 48.2 (2018): 225-244: (https://doi.org/10.1175/JPO-D-17-0100.1)
 * Aluie, Hussein. "Convolutions on the sphere: Commutation with differential operators." GEM-International Journal on Geomathematics 10.1 (2019): 1-31: (https://doi.org/10.1007/s13137-019-0123-9)
 
@@ -21,6 +22,10 @@ For presentations, posters, etc.., we suggest acknowledging:
 3. built-in post-processing tools compute region averages for an arbitrary number of custom user-specified regions [ avoiding storage concerns when handling large datasets ], and
 4. includes Helmholtz-decomposition scripts to allow careful coarse-graining on the sphere [ i.e. to maintain commutativity with derivatives ].
 
+## Usage
+
+* **Users** can expect to compile the executables in 'Case Files' and use them as command-line utilities to process existing netCDF-4 data. The tutorials illustrate the steps required for this usage, as well as highlighting the kind of outputs / analysis that can be obtained.
+* **Developers** can use FlowSieve as a C++ library and develop additional diagnostic / analysis routines using the FlowSieve codebase.
 
 ## Statement of need
 
