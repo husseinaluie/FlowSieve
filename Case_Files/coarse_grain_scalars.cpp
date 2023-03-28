@@ -146,7 +146,9 @@ int main(int argc, char *argv[]) {
     source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
      
     // Convert to radians, if appropriate
-    if ( latlon_in_degrees == "true" ) { convert_coordinates( source_data.longitude, source_data.latitude ); }
+    if ( ( latlon_in_degrees == "true" ) and not( constants::CARTESIAN ) ) { 
+        convert_coordinates( source_data.longitude, source_data.latitude ); 
+    }
 
     // Compute the area of each 'cell' which will be necessary for integration
     #if DEBUG >= 2
