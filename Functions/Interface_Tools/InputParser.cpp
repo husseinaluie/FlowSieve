@@ -165,7 +165,7 @@ void InputParser::getListofStrings(
           std::back_inserter( list_of_strings ));
 
     #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "String arguments for %s are: ", argname.c_str()); }
+    if (wRank == 0) { fprintf(stdout, "String arguments (%zu) for %s are: ", list_of_strings.size(), argname.c_str()); }
     for ( size_t II = 0; II < list_of_strings.size(); II++ ) {
         if (wRank == 0) { fprintf(stdout, "  %s", list_of_strings.at(II).c_str()); }
     }
