@@ -10,7 +10,7 @@ import FiniteDiff
 ##
 
 # Make grid
-Nlon, Nlat, Ndepth = int(360//2), int(180//2), 50
+Nlon, Nlat, Ndepth = int(360//2), int(180//2), 48
 
 Llon, Llat, Ldepth = 2 * np.pi, np.pi, 500.
 

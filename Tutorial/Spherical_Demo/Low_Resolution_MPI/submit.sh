@@ -3,8 +3,8 @@
 #SBATCH --error=sim-%j.err
 #SBATCH --time=00-00:15:00         # time (DD-HH:MM:SS)
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=10
-#SBATCH --cpus-per-task=4
+#SBATCH --ntasks-per-node=24
+#SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=4G
 #SBATCH --job-name="tutorial - MPI"
 
