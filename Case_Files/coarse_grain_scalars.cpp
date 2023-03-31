@@ -194,10 +194,10 @@ int main(int argc, char *argv[]) {
 
     //
     #if DEBUG >= 1
-    if (wRank == 0) { fprintf( stdout, "Setting up coarse fields.\n" ); fflush(stdout); }
+    if (wRank == 0) { fprintf( stdout, "Setting up %'zu coarse fields.\n", Nvars ); fflush(stdout); }
     #endif
     std::vector< std::vector<double> > coarse_fields(Nvars);
-    for (size_t field_ind = 0; field_ind < vars_to_filter.size(); field_ind++) {
+    for (size_t field_ind = 0; field_ind < Nvars; field_ind++) {
         coarse_fields.at(field_ind).resize( Npts );
     }
 
