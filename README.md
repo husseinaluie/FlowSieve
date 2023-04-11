@@ -1,5 +1,7 @@
 # FlowSieve
 
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.04277/status.svg)](https://doi.org/10.21105/joss.04277)
+
 [![Documentation Status](https://readthedocs.org/projects/flowsieve/badge/?version=latest)](https://flowsieve.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7818192.svg)](https://doi.org/10.5281/zenodo.7818192)
 
