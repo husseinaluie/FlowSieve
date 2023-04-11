@@ -1,0 +1,38 @@
+cff-version: "1.2.0"
+authors:
+- family-names: Storer
+  given-names: Benjamin A.
+  orcid: "https://orcid.org/0000-0001-5955-2158"
+- family-names: Aluie
+  given-names: Hussein
+  orcid: "https://orcid.org/0000-0003-3516-3697"
+contact:
+- family-names: Aluie
+  given-names: Hussein
+  orcid: "https://orcid.org/0000-0003-3516-3697"
+doi: 10.5281/zenodo.7818192
+message: If you use this software, please cite our article in the
+  Journal of Open Source Software.
+preferred-citation:
+  authors:
+  - family-names: Storer
+    given-names: Benjamin A.
+    orcid: "https://orcid.org/0000-0001-5955-2158"
+  - family-names: Aluie
+    given-names: Hussein
+    orcid: "https://orcid.org/0000-0003-3516-3697"
+  date-published: 2023-04-11
+  doi: 10.21105/joss.04277
+  issn: 2475-9066
+  issue: 84
+  journal: Journal of Open Source Software
+  publisher:
+    name: Open Journals
+  start: 4277
+  title: "FlowSieve: A Coarse-Graining Utility for Geophysical Flows on
+    the Sphere"
+  type: article
+  url: "https://joss.theoj.org/papers/10.21105/joss.04277"
+  volume: 8
+title: "FlowSieve: A Coarse-Graining Utility for Geophysical Flows on
+  the Sphere"
