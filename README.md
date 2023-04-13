@@ -16,10 +16,11 @@ The following citations are suggested:
 
 For journal articles, proceedings, etc.., we suggest:
 * Storer et al., (2023). FlowSieve: A Coarse-Graining Utility for Geophysical Flows on the Sphere. Journal of Open Source Software, 8(84), 4277, (https://doi.org/10.21105/joss.04277)
+* Storer et al., (2022). Global energy spectrum of the general oceanic circulation. Nature Communications, 13, 5314, (https://doi.org/10.1038/s41467-022-33031-3)
+* Aluie, Hussein. "Convolutions on the sphere: Commutation with differential operators." GEM-International Journal on Geomathematics 10.1 (2019): 1-31: (https://doi.org/10.1007/s13137-019-0123-9)
 
 Other articles that may be relevant to the work are:
 * Aluie, Hussein, Matthew Hecht, and Geoffrey K. Vallis. "Mapping the energy cascade in the North Atlantic Ocean: The coarse-graining approach." Journal of Physical Oceanography 48.2 (2018): 225-244: (https://doi.org/10.1175/JPO-D-17-0100.1)
-* Aluie, Hussein. "Convolutions on the sphere: Commutation with differential operators." GEM-International Journal on Geomathematics 10.1 (2019): 1-31: (https://doi.org/10.1007/s13137-019-0123-9)
 
 For presentations, posters, etc.., we suggest acknowledging:
 * **FlowSieve** code from the Complex Flow Group at University of Rochester
