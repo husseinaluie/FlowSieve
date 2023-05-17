@@ -237,6 +237,12 @@ void filtering_helmholtz(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
+void LLC_filtering_helmholtz(
+        const dataset & source_data,
+        const std::vector<double> & scales,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 void apply_filter_at_point(
         std::vector<double*> & coarse_val,   
         const std::vector<const std::vector<double>*> & fields,
