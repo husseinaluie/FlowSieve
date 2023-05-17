@@ -273,8 +273,8 @@ void filtering_helmholtz(
     #endif
     // Get pot and tor velocities
     if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-    toroidal_vel_from_F(  u_lon_tor, u_lat_tor, F_toroidal,  longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
-    potential_vel_from_F( u_lon_pot, u_lat_pot, F_potential, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+    toroidal_vel_from_F(  u_lon_tor, u_lat_tor, F_toroidal,  source_data, mask );
+    potential_vel_from_F( u_lon_pot, u_lat_pot, F_potential, source_data, mask );
     if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute velocities from F"); }
 
     #if DEBUG >= 2
@@ -311,8 +311,8 @@ void filtering_helmholtz(
 
     // Also get some wind-based terms, if applicable
     if ( constants::COMP_WIND_FORCE ){ 
-        toroidal_vel_from_F(  tau_wind_x_tor, tau_wind_y_tor, wind_tau_Psi, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
-        potential_vel_from_F( tau_wind_x_pot, tau_wind_y_pot, wind_tau_Phi, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+        toroidal_vel_from_F(  tau_wind_x_tor, tau_wind_y_tor, wind_tau_Psi, source_data, mask );
+        potential_vel_from_F( tau_wind_x_pot, tau_wind_y_pot, wind_tau_Phi, source_data, mask );
 
         #pragma omp parallel \
         default( none ) \
@@ -887,8 +887,8 @@ void filtering_helmholtz(
 
         // Get pot and tor velocities
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        toroidal_vel_from_F( u_lon_tor, u_lat_tor, coarse_F_tor, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
-        potential_vel_from_F(u_lon_pot, u_lat_pot, coarse_F_pot, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+        toroidal_vel_from_F( u_lon_tor, u_lat_tor, coarse_F_tor, source_data, mask);
+        potential_vel_from_F(u_lon_pot, u_lat_pot, coarse_F_pot, source_data, mask);
 
         #pragma omp parallel \
         default( none ) \
@@ -1197,8 +1197,8 @@ void filtering_helmholtz(
         
         // Compute some wind-based terms, if applicable
         if ( constants::COMP_WIND_FORCE ){ 
-            toroidal_vel_from_F(  tau_wind_x_tor, tau_wind_y_tor, coarse_wind_tau_Psi, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
-            potential_vel_from_F( tau_wind_x_pot, tau_wind_y_pot, coarse_wind_tau_Phi, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+            toroidal_vel_from_F(  tau_wind_x_tor, tau_wind_y_tor, coarse_wind_tau_Psi, source_data, mask );
+            potential_vel_from_F( tau_wind_x_pot, tau_wind_y_pot, coarse_wind_tau_Phi, source_data, mask );
 
             #pragma omp parallel \
             default( none ) \
