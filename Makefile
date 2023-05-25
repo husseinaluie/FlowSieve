@@ -9,7 +9,7 @@ CFLAGS:=-DDEBUG=0 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
-DEBUG:=false
+DEBUG:=true
 EXTRA_OPT:=false
 USE_GPROF:=false
 
@@ -242,7 +242,8 @@ TOROID_TARGET_EXES := 	Case_Files/Helmholtz_projection.x \
 						Case_Files/compute_radial_velocity.x \
 						Case_Files/LLC_interpolator_simple.x \
 						Case_Files/LLC_testbed.x \
-						Case_Files/LLC_build_adjacency.x
+						Case_Files/LLC_build_adjacency.x \
+						Case_Files/LLC_map_between_grids.x
 TOROID_TARGET_OBJS := 	Case_Files/Helmholtz_projection.o \
 						Case_Files/Helmholtz_projection_SymTensor.o \
 						Case_Files/Helmholtz_projection_uiuj.o \
@@ -256,7 +257,8 @@ TOROID_TARGET_OBJS := 	Case_Files/Helmholtz_projection.o \
 						Case_Files/compute_radial_velocity.o \
 						Case_Files/LLC_interpolator_simple.o \
 						Case_Files/LLC_testbed.o \
-						Case_Files/LLC_build_adjacency.o
+						Case_Files/LLC_build_adjacency.o \
+						Case_Files/LLC_map_between_grids.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
