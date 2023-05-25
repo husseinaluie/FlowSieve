@@ -315,11 +315,11 @@ void dataset::build_adjacency(
             adjacency_d2dlat2_weights.at(pt_index).resize(num_neighbours+1, 0.);
             for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
 
-                // factor R*cos(lat) comes from converting proj-y deriv to lat deriv
+                // factor R*cos(lat) comes from converting proj-x deriv to lat deriv
                 adjacency_ddlon_weights.at(pt_index)[JJ] = LHS( 1, JJ ) * 
                     constants::R_earth * cos(pt_lat);
 
-                // factor R comes from converting proj-x deriv to lat deriv
+                // factor R comes from converting proj-y deriv to lat deriv
                 adjacency_ddlat_weights.at(pt_index)[JJ] = LHS( 2, JJ ) *
                     constants::R_earth;
 

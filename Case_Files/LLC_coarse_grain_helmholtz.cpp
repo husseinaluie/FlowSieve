@@ -114,9 +114,10 @@ int main(int argc, char *argv[]) {
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
                 Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
 
-    const std::string   &tor_field_var_name     = input.getCmdOption("--tor_field", "Psi",   asked_help, "Name of toroidal field (streamfunction) in input file."),
-                        &pot_field_var_name     = input.getCmdOption("--pot_field", "Phi",   asked_help, "Name of potential field (potential function) in input file."),
-                        &vel_field_var_name     = input.getCmdOption("--vel_field", "u_lat", asked_help, "Name of a velocity field in input file (used to get land information).");
+    const std::string   &tor_field_var_name     = input.getCmdOption("--tor_field",     "Psi",   asked_help, "Name of toroidal field (streamfunction) in input file."),
+                        &pot_field_var_name     = input.getCmdOption("--pot_field",     "Phi",   asked_help, "Name of potential field (potential function) in input file."),
+                        &dArea_field_var_name   = input.getCmdOption("--dArea_field",   "dA",    asked_help, "Name of cell areas in input file."),
+                        &vel_field_var_name     = input.getCmdOption("--vel_field",     "u_lat", asked_help, "Name of a velocity field in input file (used to get land information).");
 
     const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    
                                                                    "region_definitions.nc", 
@@ -174,8 +175,9 @@ int main(int argc, char *argv[]) {
     // Cell areas are trickier, so they will be passed in as an input.
     // ... but, for right now, just treat them as 1. everywhere
     //source_data.areas.resize( source_data.latitude.size(), 1. );
-    source_data.load_variable( "dA", vel_field_var_name, vel_input_fname, false, false);
-    source_data.areas = source_data.variables["dA"];
+    //source_data.load_variable( "dA", "dA", vel_input_fname, false, false);
+    //source_data.areas = source_data.variables["dA"];
+    read_LLC_latlon_from_file( source_data.areas, dArea_field_var_name, vel_input_fname );
 
     // Read in the toroidal and potential fields
     source_data.load_variable( "F_potential", pot_field_var_name, Helm_input_fname, false, true );
