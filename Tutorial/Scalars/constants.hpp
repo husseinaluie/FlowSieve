@@ -2,6 +2,7 @@
 #define CONSTANTS_HPP 1
 
 #include <map>
+#include <string>
 
 /*!
  * \param DEBUG
