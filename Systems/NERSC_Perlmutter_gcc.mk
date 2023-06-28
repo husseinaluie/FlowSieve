@@ -33,8 +33,11 @@ EXTRA_OPT_FLAGS:=
 ALGLIB_OPT_FLAGS:=-O3
 
 # Modules are automatically on lib dir
-NETCDF_INCS=-I/opt/cray/pe/netcdf-hdf5parallel/4.9.0.3/gnu/9.1/include -I/opt/cray/pe/hdf5-parallel/1.12.2.3/gnu/9.1/include
-NETCDF_LIBS=-L/opt/cray/pe/netcdf-hdf5parallel/4.9.0.3/gnu/9.1/lib -L/opt/cray/pe/hdf5-parallel/1.12.2.3/gnu/9.1/lib
+NETCDF_INCS=-I/opt/cray/pe/netcdf-hdf5parallel/4.9.0.3/gnu/9.1/include
+NETCDF_LIBS=-L/opt/cray/pe/netcdf-hdf5parallel/4.9.0.3/gnu/9.1/lib
 
-LIB_DIRS:=${NETCDF_LIBS}
-INC_DIRS:=${NETCDF_INCS}
+HDF5_INCS=-I/opt/cray/pe/hdf5-parallel/1.12.2.3/gnu/9.1/include
+HDF5_LIBS=-L/opt/cray/pe/hdf5-parallel/1.12.2.3/gnu/9.1/lib
+
+LIB_DIRS:=${NETCDF_LIBS} ${HDF5_LIBS}
+INC_DIRS:=${NETCDF_INCS} ${HDF5_INCS}
