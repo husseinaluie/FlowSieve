@@ -266,7 +266,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool NO_FULL_OUTPUTS = true;
+    const bool NO_FULL_OUTPUTS = false;
 
     /*!
      * \param CAST_TO_SINGLE
@@ -298,7 +298,7 @@ namespace constants
      * \brief Boolean indicating whether or not the postprocess routines should be applied
      * @ingroup constants
      */
-    const bool APPLY_POSTPROCESS = true;
+    const bool APPLY_POSTPROCESS = false;
 
     /*!
      * \param POSTPROCESS_DO_ZONAL_MEANS
