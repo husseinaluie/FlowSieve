@@ -46,18 +46,4 @@ To specify the number of processors, simply set the OMP_NUM_THREADS environment 
 
 ### Notes when compiling
 
-Make sure that the variables in `constants.hpp` are set appropraitely. These include:
-- `CARTESIAN = false`
-- `PERIODIC_X = true`
-- `PERIODIC_Y = false`
-- Since there are no 'land' areas in this tutorial, the choice of land treatment (set by `DEFORM_AROUND_LAND` and `FILTER_OVER_LAND`) has no effect.
-- The grid is uniform, and so `UNIFORM_LON_GRID` and `UNIFORM_LAT_GRID` should be set accordingly. However, these are strictly optimization flags, and d not impact the output.
-- `FILTER_OVER_LAND = true`
-- `EXTEND_DOMAIN_TO_POLES = false`
-- `FULL_LON_SPAN = true`
-- `MINIMAL_OUTPUT` and `NO_FULL_OUTPUTS` both to `true`. We focus on the post-process outputs in this tutorial.
-- `CAST_TO_SINGLE` and `CAST_TO_INT` simply modify the data type (i.e. precision) used to store the outputs, and can be set however you wish
-- `APPLY_POSTPROCESS = true`, this will generate the outputs used in this tutorial
-- `POSTPROCESS_DO_ZONAL_MEANS = true`, also produce zonal means in addition to area-means
-- `POSTPROCESS_DO_TIME_MEANS = false`, do not produce time-means (only one time-point)
-- `DO_OKUBOWEISS_ANALYSIS = false`, this will be handled in another tutorial
+When compiling, use the `constants.hpp` provided in this directory.

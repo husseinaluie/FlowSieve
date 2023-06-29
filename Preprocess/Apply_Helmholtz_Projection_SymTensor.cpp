@@ -243,8 +243,8 @@ void Apply_Helmholtz_Projection_SymTensor(
         }
     }
 
-    size_t lower_count = alglib::sparsegetlowercount( LHS_matr );
-    size_t upper_count = alglib::sparsegetuppercount( LHS_matr );
+    //size_t lower_count = alglib::sparsegetlowercount( LHS_matr );
+    //size_t upper_count = alglib::sparsegetuppercount( LHS_matr );
 
     alglib::sparseconverttocrs(LHS_matr);
 

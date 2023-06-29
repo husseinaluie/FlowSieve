@@ -363,7 +363,10 @@ void Apply_Helmholtz_Projection_uiuj(
     const size_t Npts = Nlat * Nlon;
 
     int Itime = 0, Idepth = 0, Ilat, Ilon;
-    size_t index, index_sub, iters_used;
+    size_t index, index_sub;
+    #if DEBUG >= 0
+        size_t iters_used = 0;
+    #endif
 
     // Fill in the land areas with zero velocity
     #pragma omp parallel default(none) shared( u_lon, u_lat, mask ) private( index )
@@ -593,7 +596,9 @@ void Apply_Helmholtz_Projection_uiuj(
             else if (report.terminationtype == 8) { terminate_count_other++; }
             else                                  { terminate_count_other++; }
 
+            #if DEBUG >= 0
             iters_used = linlsqrpeekiterationscount( state );
+            #endif
 
             #if DEBUG >= 2
             if ( (wRank == 0) and (Itime == 0) ) {

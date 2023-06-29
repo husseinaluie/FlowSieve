@@ -179,25 +179,27 @@ int main(int argc, char *argv[]) {
                 Nlon    = source_data.Nlon;
     size_t Ivar, index;
 
-    // Read in the region definitions and compute region areas
-    if ( check_file_existence( region_defs_fname ) ) {
-        // If the file exists, then read in from that
-        source_data.load_region_definitions( region_defs_fname, region_defs_dim_name, region_defs_var_name );
-    } else {
-        // Otherwise, just make a single region which is the entire domain
-        source_data.region_names.push_back("full_domain");
-        source_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
-                                    "full_domain", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
-                );
-        source_data.compute_region_areas();
+    if (constants::APPLY_POSTPROCESS) {
+        // Read in the region definitions and compute region areas
+        if ( check_file_existence( region_defs_fname ) ) {
+            // If the file exists, then read in from that
+            source_data.load_region_definitions( region_defs_fname, region_defs_dim_name, region_defs_var_name );
+        } else {
+            // Otherwise, just make a single region which is the entire domain
+            source_data.region_names.push_back("full_domain");
+            source_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
+                        "full_domain", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
+                    );
+            source_data.compute_region_areas();
+        }
     }
 
     //
     #if DEBUG >= 1
-    if (wRank == 0) { fprintf( stdout, "Setting up coarse fields.\n" ); fflush(stdout); }
+    if (wRank == 0) { fprintf( stdout, "Setting up %'zu coarse fields.\n", Nvars ); fflush(stdout); }
     #endif
     std::vector< std::vector<double> > coarse_fields(Nvars);
-    for (size_t field_ind = 0; field_ind < vars_to_filter.size(); field_ind++) {
+    for (size_t field_ind = 0; field_ind < Nvars; field_ind++) {
         coarse_fields.at(field_ind).resize( Npts );
     }
 

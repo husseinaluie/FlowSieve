@@ -163,8 +163,8 @@ void sparse_vel_from_PsiPhi_vortdiv(
             double weight_val = weight_err ? dAreas.at(index_sub) : 1.;
 
             double cos_lat_inv = 1. / cos(latitude.at(Ilat)),
-                   cos2_lat_inv = pow( cos_lat_inv, 2. ),
-                   tan_lat = tan( latitude.at(Ilat) );
+                   cos2_lat_inv = pow( cos_lat_inv, 2. );
+            tan_lat = tan( latitude.at(Ilat) );
 
             if ( ( Ilat == 0 ) and (Tikhov_Laplace == 0) ) {
                 // At the pole-most point, force to be zonally constant. This is to try and remove the null(Laplacian) component
@@ -283,7 +283,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
                 get_diff_vector(diff_vec, LB, latitude, "lat", Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon, mask, 1, constants::DiffOrd);
 
                 Ndiff = diff_vec.size();
-                tan_lat = tan( latitude.at(Ilat) );
+                //tan_lat = tan( latitude.at(Ilat) );
 
                 // If LB is unchanged, then we failed to build a stencil
                 if (LB != - 2 * Nlat) {
