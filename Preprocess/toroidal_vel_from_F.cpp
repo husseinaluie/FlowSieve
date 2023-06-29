@@ -58,11 +58,11 @@ void toroidal_vel_from_F(
 
                     spher_derivative_at_point(
                             lon_deriv_vals, deriv_fields, longitude, "lon", source_data,
-                            Itime, Idepth, index, index, mask);
+                            Itime, Idepth, Ilat, Ilon, mask);
 
                     spher_derivative_at_point(
                             lat_deriv_vals, deriv_fields, latitude, "lat", source_data,
-                            Itime, Idepth, index, index, mask);
+                            Itime, Idepth, Ilat, Ilon, mask);
                 } else {
                     spher_derivative_at_point(
                             lon_deriv_vals, deriv_fields, longitude, "lon", source_data,
