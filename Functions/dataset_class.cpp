@@ -457,6 +457,9 @@ void dataset::load_adjacency(
         } 
     }
 
+    /*
+     * These aren't actually used anywhere, so avoid wasting memory
+     *
     // projected x
     read_var_from_file( tmp_var,
                         "adjacency_proj_x", 
@@ -480,6 +483,7 @@ void dataset::load_adjacency(
             adjacency_projected_y[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
         } 
     }
+    */
 
     // distances
     read_var_from_file( tmp_var,
