@@ -63,16 +63,16 @@ void spher_derivative_at_point(
                     }
                     #if DEBUG >= 1
                     if (do_lat) {
-                        weight = source_data.adjacency_ddlat_weights.at(Ilat).at(II);
+                        weight = source_data.adjacency_ddlat_weights.at(index).at(II);
                     } else {
-                        weight = source_data.adjacency_ddlon_weights.at(Ilat).at(II);
+                        weight = source_data.adjacency_ddlon_weights.at(index).at(II);
                     }
                     val = fields[ii]->at( val_ind );
                     #else
                     if (do_lat) {
-                        weight = source_data.adjacency_ddlat_weights[Ilat][II];
+                        weight = source_data.adjacency_ddlat_weights[index][II];
                     } else {
-                        weight = source_data.adjacency_ddlon_weights[Ilat][II];
+                        weight = source_data.adjacency_ddlon_weights[index][II];
                     }
                     val = (*fields[ii])[ val_ind ];
                     #endif
