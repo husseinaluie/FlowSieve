@@ -111,6 +111,7 @@ int main(int argc, char *argv[]) {
                                                                 "vo",          
                                                                 asked_help,
                                                                 "Name of meridional (northward) velocity in netCDF input file"),
+                        &dArea_field_var_name   = input.getCmdOption("--dArea_field",   "dA",    asked_help, "Name of cell areas in input file."),
                         &tor_seed_name     = input.getCmdOption("--tor_seed",    
                                                                 "Psi_seed",    
                                                                 asked_help,
@@ -196,8 +197,7 @@ int main(int argc, char *argv[]) {
     // Compute the area of each 'cell' which will be necessary for integration
     //source_data.compute_cell_areas();
     // Cell areas are trickier, so they will be passed in as an input.
-    // ... but, for right now, just treat them as 1. everywhere
-    source_data.areas.resize( source_data.latitude.size(), 1. );
+    read_LLC_latlon_from_file( source_data.areas, dArea_field_var_name, input_fname );
 
     // Mask out the pole, if necessary (i.e. set lat = 90 to land)
     //mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
