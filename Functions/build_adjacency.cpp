@@ -68,6 +68,10 @@ void dataset::build_adjacency(
     bool near_pole, similar_angle;
     int Istencil, II, JJ, angle_ind;
 
+    int num_with_same_lat, num_with_same_lon;
+    double furthest_dist_on_same_lat, furthest_dist_on_same_lon;
+    size_t same_lat_neighbour_ind, same_lon_neighbour_ind;
+
     double max_neighbour_dist = -1, ref_angle, curr_angle;
     size_t furthest_neighbour_ind = 0 ;
 
@@ -90,7 +94,9 @@ void dataset::build_adjacency(
              Istencil, II, JJ, xi, yi, denom, denom_sign, stencil_count, ddx_coeffs, ddy_coeffs, \
              stencil_min_x, stencil_min_y, stencil_max_x, stencil_max_y, \
              LHS, report, alglib_info, LHS_vec, solve, LHS_list, \
-             max_neighbour_dist, furthest_neighbour_ind, similar_angle, ref_angle, curr_angle \
+             max_neighbour_dist, furthest_neighbour_ind, similar_angle, ref_angle, curr_angle, \
+             num_with_same_lat, num_with_same_lon, furthest_dist_on_same_lat, furthest_dist_on_same_lon, \
+             same_lat_neighbour_ind, same_lon_neighbour_ind \
            ) \
     firstprivate( num_pts, max_distance, stdout, alglib::xdefault, angle_per_neighbour )
     {
@@ -189,16 +195,90 @@ void dataset::build_adjacency(
 
                 if ( local_dist < neighbour_dist[furthest_neighbour_ind] ) {
 
-                    // Also check that there aren't other points with similar angles
                     similar_angle = false;
+
+                    // This point is closer than our farthest-away neighbour,
+                    // so we'll update to use this point.
+
+
+                    // But, we want to first check that we don't have more than
+                    // three neighbours with the same lat or lon coordinates after
+                    // doing this (this causes numerical stability issues in the 
+                    // derivatives).
+                    num_with_same_lat = 0;
+                    num_with_same_lon = 0;
+
+                    furthest_dist_on_same_lat = 0.;
+                    furthest_dist_on_same_lon = 0.;
+
+                    same_lat_neighbour_ind = 2 * num_neighbours;
+                    same_lon_neighbour_ind = 2 * num_neighbours;
+
                     for (II = 0; II < num_neighbours; II++) {
+
+                        // This neighbour hasn't been set yet, so don't compare with it
+                        if ( (neighbour_y[II] == 0) and ( neighbour_x[II] == 0 ) ) { continue; }
+
+                        // Checking for neighbours on same longitude
+                        if ( fabs( search_lon - longitude[ neighbour_ind[II] ] ) < 1e-4 * M_PI / 180 ) {
+                            num_with_same_lon++;
+                            if ( local_dist < neighbour_dist[II] ) {
+                                if ( neighbour_dist[II] > furthest_dist_on_same_lon ) {
+                                    same_lon_neighbour_ind = II;
+                                    furthest_dist_on_same_lon = neighbour_dist[II];
+                                }
+                            }
+                        }
+
+                        // Checking for neighbours on same latitude
+                        if ( fabs( search_lat - latitude[ neighbour_ind[II] ] ) < 1e-4 * M_PI / 180 ) {
+                            num_with_same_lat++;
+                            if ( local_dist < neighbour_dist[II] ) {
+                                if ( neighbour_dist[II] > furthest_dist_on_same_lat ) {
+                                    same_lat_neighbour_ind = II;
+                                    furthest_dist_on_same_lat = neighbour_dist[II];
+                                }
+                            }
+                        }
+
+                    }
+
+                    //if ( num_with_same_lat > (0.5*num_neighbours) ) {
+                    if ( num_with_same_lat > 2 ) {
+                        if ( same_lat_neighbour_ind < num_neighbours ) {
+                            furthest_neighbour_ind  = same_lat_neighbour_ind;
+                            similar_angle = false;
+                        } else {
+                            similar_angle = true;
+                        }
+                    //} else if ( num_with_same_lon > (0.5*num_neighbours) ) {
+                    } else if ( num_with_same_lon > 2 ) {
+                        if ( same_lon_neighbour_ind < num_neighbours ) {
+                            furthest_neighbour_ind  = same_lon_neighbour_ind;
+                            similar_angle = false;
+                        } else {
+                            similar_angle = true;
+                        }
+                    }
+
+
+                    // Also check that there aren't other points with similar angles
+                    // If there are, we'll replace those ones instead
+                    /*
+                    for (II = 0; II < num_neighbours; II++) {
+
+                        // Ths is already the point that we're considering replacing,
+                        // so no point in checking if they share an angle
                         if (II == furthest_neighbour_ind) { continue; }
+
+                        // This neighbour hasn't been set yet, so don't compare with it
+                        if ( (neighbour_y[II] == 0) and ( neighbour_x[II] == 0 ) ) { continue; }
+
                         ref_angle = atan2( neighbour_y[II], neighbour_x[II] );
                         curr_angle = atan2(proj_y, proj_x);
-                        if ( ( fabs( curr_angle - ref_angle ) < 5.*M_PI/180. )
-                             or ( fabs( curr_angle - ref_angle ) > 2*M_PI - 5.*M_PI/180. ) )
+                        if ( ( fabs( curr_angle - ref_angle ) < 0.6 * M_PI / (num_neighbours-1) )
+                             or ( fabs( curr_angle - ref_angle ) > M_PI * (2 - 0.6/(num_neighbours-1)) ) )
                                 {
-                            //similar_angle = true;
                             // there's another point at this 'angle', so we can only replace this one
                             // so call that the 'furthest' to be replaced
                             if ( local_dist < neighbour_dist[II] ) {
@@ -208,6 +288,7 @@ void dataset::build_adjacency(
                             }
                         }
                     }
+                    */
 
                     if ( not(similar_angle) ) {
                         neighbour_x[   furthest_neighbour_ind] = proj_x;
