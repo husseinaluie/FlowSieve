@@ -192,10 +192,24 @@ void LLC_filtering_helmholtz(
            local_lat, local_lon, local_dist;
     
     std::deque<size_t> points_to_test;
-    std::vector<bool> was_rejected(num_pts, false), was_accepted(num_pts, false);
+    std::vector<bool>   was_rejected(num_pts, false), 
+                        was_accepted(num_pts, false), 
+                        planned_for_testing(num_pts, false);
     // Want to use bitset directly, but does not accept runtime-specified size
     // so will use std::vector<bool>, which is a bitset under the hood
-    //std::bitset< num_pts > was_rejected, was_accepted;
+    // Note that each element is 1 bit, not byte (because of the 
+    // specialization of vector<bool>), so that, while e.g. LLC4320 requires
+    // ~1.8GB to store a single field at double precision, these bitsets 
+    // only require <30MB. So, having each thread / processor keep their own
+    // copy shouldn't be too onerous memory-wise
+
+    // Keep track of the kernel of the accepted points 
+    // when 1 - eps > kernel > eps
+    // If | new_centre - old_centre | < delta,
+    // then use the previous 'accepted' as 'planned_for_testing',
+    // but if the previous kernel value > 1 - eps, then don't actually re-evaluate it,
+    // just use kern = 1. This should substantially cut down on computation required for successive
+    // kernel evaluations.
 
     //
     //// Begin the main filtering loop
@@ -238,7 +252,7 @@ void LLC_filtering_helmholtz(
                 ) \
         private(Itime, Idepth, index, Ilatlon, F_tor_tmp, F_pot_tmp, filtered_vals, \
                 target_index, search_index, neighbour_index, kern_val, dArea, local_val, Ifield, \
-                was_rejected, was_accepted, points_to_test, target_lat, target_lon, kernel_normalization, \
+                was_rejected, was_accepted, planned_for_testing, points_to_test, target_lat, target_lon, kernel_normalization, \
                 local_lat, local_lon, local_dist \
                 )\
         firstprivate(perc, wRank, perc_count, Nlatlon, Ndepth, Ntime, Nfields )
@@ -251,12 +265,14 @@ void LLC_filtering_helmholtz(
 
             was_rejected.resize( num_pts );
             was_accepted.resize( num_pts );
+            planned_for_testing.resize( num_pts );
 
-            #pragma omp for collapse(1) schedule(guided)
+            #pragma omp for collapse(1) schedule(dynamic)
             for (target_index = 0; target_index < Nlatlon; target_index++ ) {
 
                 std::fill(was_rejected.begin(), was_rejected.end(), false);
                 std::fill(was_accepted.begin(), was_accepted.end(), false);
+                std::fill(planned_for_testing.begin(), planned_for_testing.end(), false);
 
                 target_lat = latitude.at(  target_index );
                 target_lon = longitude.at( target_index );
@@ -275,6 +291,7 @@ void LLC_filtering_helmholtz(
                 points_to_test.clear();
                 for (neighbour_index = 0; neighbour_index < num_neighbours; neighbour_index++ ) {
                     points_to_test.push_back( source_data.adjacency_indices.at(target_index)[neighbour_index] );
+                    planned_for_testing[ source_data.adjacency_indices.at(target_index)[neighbour_index] ] = true;
                 }
 
                 // So long as we still have points to test, keep testing!
@@ -295,6 +312,7 @@ void LLC_filtering_helmholtz(
                     // depth-first search to build the kernel.
                     search_index = points_to_test.front();
                     points_to_test.pop_front();
+                    planned_for_testing[ search_index ] = false;
 
                     local_lat = source_data.latitude.at(  search_index );
                     local_lon = source_data.longitude.at( search_index );
@@ -319,21 +337,18 @@ void LLC_filtering_helmholtz(
                             neighbour_index = source_data.adjacency_indices.at(search_index)[ii];
 
                             // but first check if that neighbour has been rejected already
-                            if (was_rejected[neighbour_index]) { continue; }
+                            if ( was_rejected[neighbour_index] ) { continue; }
 
                             // then check if that neighbour is already accepted
-                            if (was_accepted[neighbour_index]) { continue; }
+                            if ( was_accepted[neighbour_index] ) { continue; }
 
                             // then check if that neighbour is already on the search list
-                            if ( std::find( points_to_test.begin(),
-                                            points_to_test.end(),
-                                            neighbour_index )
-                                    != points_to_test.end()
-                               ) { continue; }
+                            if ( planned_for_testing[neighbour_index] ) { continue; }
 
                             // if it's not on any of those list already
                             // then add it to the 'points to test'
                             points_to_test.push_back( neighbour_index );
+                            planned_for_testing[neighbour_index] = true;
 
                         }
                     } else {
@@ -345,6 +360,8 @@ void LLC_filtering_helmholtz(
 
                 coarse_F_pot.at(target_index) = (kernel_normalization == 0) ? 0 : F_pot_tmp / kernel_normalization;
                 coarse_F_tor.at(target_index) = (kernel_normalization == 0) ? 0 : F_tor_tmp / kernel_normalization;
+                //coarse_F_pot.at(target_index) = F_pot_tmp;
+                //coarse_F_tor.at(target_index) = kernel_normalization;
 
             }  // end pragma parallel block
         }
