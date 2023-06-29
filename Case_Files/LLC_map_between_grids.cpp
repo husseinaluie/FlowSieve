@@ -160,7 +160,7 @@ int main(int argc, char *argv[]) {
 
     // Load the adjacency matrix and other adjacency-adjacent arrays
     source_data.load_adjacency( source_adjacency_fname );
-    //target_data.load_adjacency( target_adjacency_fname );
+    target_data.load_adjacency( target_adjacency_fname );
 
     // Make a random number generator
     std::random_device random_device; // obtain a random number from hardware
@@ -176,46 +176,56 @@ int main(int argc, char *argv[]) {
                   next_perc = perc_incr;
     double best_dist, local_dist;
 
-    best_index = 0;
-    for ( target_index = 0; target_index < Nlatlon_target; target_index++ ) {
+    #pragma omp parallel \
+    default(none) \
+    shared( source_data, target_data, nearest_source_to_target ) \
+    private( best_index, target_index, source_index, local_dist, best_dist, best_II, II ) \
+    firstprivate( Nlatlon_target, random_index, random_generator )
+    {
 
-        while ( target_index >= next_perc ) {
-            fprintf( stdout, "." );
-            next_perc += perc_incr;
-        }
-        
-        best_dist = distance(
-                source_data.longitude.at(best_index),
-                source_data.latitude.at(best_index),
-                target_data.longitude.at(target_index),
-                target_data.latitude.at(target_index)
-                );
+        best_index = 0;
+        #pragma omp for collapse(1) schedule(guided)
+        for ( target_index = 0; target_index < Nlatlon_target; target_index++ ) {
 
-        while (true) {
-            best_II = source_data.num_neighbours;
-            for ( II = 0; II < source_data.num_neighbours; II++ ) {
-
-                source_index = source_data.adjacency_indices.at(best_index).at(II);
-
-                local_dist = distance(
-                        source_data.longitude.at(source_index),
-                        source_data.latitude.at(source_index),
-                        target_data.longitude.at(target_index),
-                        target_data.latitude.at(target_index)
-                        );
-                if (local_dist < best_dist) {
-                    best_dist = local_dist;
-                    best_II = II;
-                }
+            /*
+            while ( target_index >= next_perc ) {
+                fprintf( stdout, "." );
+                next_perc += perc_incr;
             }
+            */
 
-            if ( best_II < source_data.num_neighbours ) {
-                // If we found a closer point, move to it, and repeat
-                best_index = source_data.adjacency_indices.at(best_index).at(best_II);
-            } else if ( best_dist > 100e3 ) {
-                // If we didn't find a closer point in the neighbours, but the current
-                // point is still too far away, then just jump to a new random starting point
-                best_index = random_index(random_generator);
+            best_dist = distance(
+                    source_data.longitude.at(best_index),
+                    source_data.latitude.at(best_index),
+                    target_data.longitude.at(target_index),
+                    target_data.latitude.at(target_index)
+                    );
+
+            while (true) {
+                best_II = source_data.num_neighbours;
+                for ( II = 0; II < source_data.num_neighbours; II++ ) {
+
+                    source_index = source_data.adjacency_indices.at(best_index).at(II);
+
+                    local_dist = distance(
+                            source_data.longitude.at(source_index),
+                            source_data.latitude.at(source_index),
+                            target_data.longitude.at(target_index),
+                            target_data.latitude.at(target_index)
+                            );
+                    if (local_dist < best_dist) {
+                        best_dist = local_dist;
+                        best_II = II;
+                    }
+                }
+
+                if ( best_II < source_data.num_neighbours ) {
+                    // If we found a closer point, move to it, and repeat
+                    best_index = source_data.adjacency_indices.at(best_index).at(best_II);
+                } else if ( best_dist > 100e3 ) {
+                    // If we didn't find a closer point in the neighbours, but the current
+                    // point is still too far away, then just jump to a new random starting point
+                    best_index = random_index(random_generator);
             } else {
                 // Otherwise, we've found the closest point. So break out of the loop now.
                 break;
@@ -224,6 +234,7 @@ int main(int argc, char *argv[]) {
         }
 
         nearest_source_to_target.at(target_index) = best_index;
+        }
     }
     fprintf( stdout, "\n" );
 
@@ -237,56 +248,12 @@ int main(int argc, char *argv[]) {
 
     initialize_output_file( target_data, vars_in_output, output_fname.c_str() );
 
-    /*
-    int retval, ncid;
-    retval = nc_put_att_double(ncid, NC_GLOBAL, "EarthRadius", NC_DOUBLE, 1, &constants::R_earth);
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-
-    // Record which files were used to create it
-    retval = nc_put_att_text(ncid, NC_GLOBAL, "source-file", 
-            source_adjacency_fname.length(), source_adjacency_fname.c_str());
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    retval = nc_put_att_text(ncid, NC_GLOBAL, "target-file",
-            target_adjacency_fname.length(), target_adjacency_fname.c_str());
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-
-    // Make a dimension
-    int dimid;
-    retval = nc_def_dim(ncid, "latlon",  Nlatlon_target, &dimid);
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-
-    // Declare the variable
-    int varid;
-    //retval = nc_def_var(ncid, "nearest_source_to_target",  NC_UINT64, 1, &dimid, &varid);
-    retval = nc_def_var(ncid, "nearest_source_to_target",  NC_DOUBLE, 1, &dimid, &varid);
-
-    // Write the variable
-    size_t start1d[1] = {0};
-    size_t count1d[1] = {Nlatlon_target};
-
-    std::vector<double> data_to_write(nearest_source_to_target.begin(), nearest_source_to_target.end());
-    retval = nc_put_vara_double(ncid, varid, start1d, count1d, &data_to_write[0]);
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    fprintf( stdout, "%d - %s\n", retval, nc_strerror(retval) );
-    //write_field_to_output( data_to_write, "nearest_source_to_target", starts, counts, output_fname.c_str() );
-    */
-
-    /*
-    size_t starts[3] = { (size_t) target_data.myStarts.at(0), 
-                         (size_t) target_data.myStarts.at(1), 
-                         0
-                       };
-    size_t counts[3] = { (size_t) target_data.myCounts.at(0), 
-                         (size_t) target_data.myCounts.at(1), 
-                         (size_t) Nlatlon_target
-                       };
-    */
     size_t starts[3] = {0,0,0};
     size_t counts[3] = {1,1,Nlatlon_target};
 
     std::vector<double> var_fine(Nlatlon_target);
-    double II_val, mx, my;
-    unsigned long long int II_index;
+    double II_val, mx, my, del_lon, del_lat, tmp_val;
+    unsigned long long int II_index, JJ;
     for ( int Ivar = 0; Ivar < Nvars; Ivar++ ) {
 
         fprintf( stdout, "\n" );
@@ -296,34 +263,50 @@ int main(int argc, char *argv[]) {
 
         std::fill( var_fine.begin(), var_fine.end(), 0. );
 
-        for ( target_index = 0; target_index < Nlatlon_target; target_index++ ) {
+        #pragma omp parallel \
+        default(none) \
+        shared( nearest_source_to_target, source_data, target_data, var_fine ) \
+        private( target_index, source_index, II, mx, my, II_index, II_val, del_lon, del_lat ) \
+        firstprivate( Nlatlon_target )
+        {
 
-            while ( target_index >= next_perc ) {
-                fprintf( stdout, "." );
-                next_perc += perc_incr;
+            #pragma omp for collapse(1) schedule(static)
+            for ( target_index = 0; target_index < Nlatlon_target; target_index++ ) {
+
+                /*
+                while ( target_index >= next_perc ) {
+                    fprintf( stdout, "." );
+                    next_perc += perc_incr;
+                }
+                */
+
+                source_index = nearest_source_to_target.at(target_index);
+
+                mx = 0;
+                my = 0;
+
+                for ( II = 0; II < source_data.num_neighbours + 1; II++ ) {
+                    II_index = source_data.adjacency_indices.at(source_index).at(II);
+
+                    II_val = source_data.variables.at("coarse_field").at(II_index);
+
+                    mx += source_data.adjacency_ddlon_weights.at(source_index).at(II) * II_val;
+                    my += source_data.adjacency_ddlat_weights.at(source_index).at(II) * II_val;
+                }
+
+                // Right now, only uses the linear parts of the spline
+                del_lon = target_data.longitude.at(target_index) - source_data.longitude.at(source_index);
+                del_lat = target_data.latitude.at(target_index) - source_data.latitude.at(source_index);
+                if (del_lon >   M_PI) { del_lon = 2 * M_PI - del_lon; }
+                if (del_lon < - M_PI) { del_lon = 2 * M_PI + del_lon; }
+
+                var_fine.at(target_index) = source_data.variables.at("coarse_field").at(source_index)  +  mx * del_lon  +  my * del_lat;
+
             }
-
-            source_index = nearest_source_to_target.at(target_index);
-            mx = 0;
-            my = 0;
-
-            for ( II = 0; II < source_data.num_neighbours + 1; II++ ) {
-                II_index = source_data.adjacency_indices.at(source_index).at(II);
-
-                II_val = source_data.variables.at("coarse_field").at(II_index);
-
-                mx += source_data.adjacency_ddlon_weights.at(source_index).at(II) * II_val;
-                my += source_data.adjacency_ddlat_weights.at(source_index).at(II) * II_val;
-            }
-
-            // Right now, only uses the linear parts of the spline
-            var_fine.at(target_index) = source_data.variables.at("coarse_field").at(source_index)
-                + mx * ( target_data.longitude.at(target_index) - source_data.longitude.at(source_index) )
-                + my * ( target_data.latitude.at(target_index) - source_data.latitude.at(source_index) ) ;
         }
+
         write_field_to_output( var_fine, vars_in_output.at(Ivar), starts, counts, output_fname, NULL );
     }
-
 
 
     // Done!
