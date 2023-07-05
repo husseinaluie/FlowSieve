@@ -38,7 +38,7 @@ void toroidal_vel_from_F(
     shared( latitude, longitude, mask, F, vel_lon, vel_lat, deriv_fields, source_data)\
     private(Itime, Idepth, Ilat, Ilon, index, local_lat, cos_lat, tmp_lon, tmp_lat, \
             dFdlon, dFdlat, lon_deriv_vals, lat_deriv_vals, is_pole) \
-    firstprivate( Nlon, Nlat, Ndepth, Ntime )
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
     {
 
         lon_deriv_vals.push_back(&dFdlon);

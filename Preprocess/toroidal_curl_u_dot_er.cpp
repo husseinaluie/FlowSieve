@@ -45,7 +45,7 @@ void toroidal_curl_u_dot_er(
             u_lon, u_lat, deriv_fields, seed )\
     private(Itime, Idepth, Ilat, Ilon, index, index_sub, tmp, is_pole, \
             local_lat, dulat_dlon, dulon_dlat, lon_deriv_vals, lat_deriv_vals ) \
-    firstprivate( Nlon, Nlat, Ndepth, Ntime )
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
     {
 
         lon_deriv_vals.push_back(NULL);
@@ -57,6 +57,7 @@ void toroidal_curl_u_dot_er(
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < Npts; ++index) {
 
+            tmp = 0.;
             if (mask.at(index)) { // Skip land areas
                 if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
                     Index1to4(index, Itime, Idepth, Ilat, Ilon,

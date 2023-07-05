@@ -107,7 +107,8 @@ void Apply_LLC_Helmholtz_Projection(
         #pragma omp parallel \
         default(none) \
         shared(Psi_seed, Phi_seed, seed_tor, seed_pot) \
-        private( index )
+        private( index ) \
+        firstprivate( Npts )
         {
             #pragma omp for collapse(1) schedule(static)
             for (index = 0; index < Npts; ++index) {
@@ -342,7 +343,7 @@ void Apply_LLC_Helmholtz_Projection(
                 default(none) \
                 shared( Psi_seed, Phi_seed, seed_tor, seed_pot, Itime, Idepth, stdout ) \
                 private( index, index_sub ) \
-                firstprivate( Ntime, Ndepth )
+                firstprivate( Ntime, Ndepth, Npts )
                 {
                     #pragma omp for collapse(1) schedule(static)
                     for (index = 0; index < Npts; ++index) {
@@ -369,7 +370,7 @@ void Apply_LLC_Helmholtz_Projection(
                     u_lon, u_lon_tor_seed, u_lon_pot_seed, u_lon_rem, \
                     u_lat, u_lat_tor_seed, u_lat_pot_seed, u_lat_rem ) \
             private( index, index_sub ) \
-            firstprivate( Ntime, Ndepth )
+            firstprivate( Ntime, Ndepth, Npts )
             {
                 #pragma omp for collapse(1) schedule(static)
                 for (index_sub = 0; index_sub < Npts; ++index_sub) {
@@ -401,7 +402,7 @@ void Apply_LLC_Helmholtz_Projection(
             #pragma omp parallel default(none) \
             shared( dAreas, latitude, Itime, Idepth, RHS_vector, div_term, vort_term, u_lon_rem, u_lat_rem ) \
             private( index, index_sub, is_pole ) \
-            firstprivate( Ndepth, Ntime, Npts, Tikhov_Laplace, weight_err, stdout )
+            firstprivate( Ndepth, Ntime, Npts, Tikhov_Laplace, weight_err, deriv_scale_factor, stdout )
             {
                 #pragma omp for collapse(1) schedule(static)
                 for (index_sub = 0; index_sub < Npts; ++index_sub) {
@@ -528,7 +529,7 @@ void Apply_LLC_Helmholtz_Projection(
                     Phi_seed, Psi_seed, \
                     Itime, Idepth ) \
             private( index, index_sub ) \
-            firstprivate( Ndepth, Ntime, single_seed )
+            firstprivate( Ndepth, Ntime, single_seed, Npts )
             {
                 #pragma omp for collapse(1) schedule(static)
                 for (index_sub = 0; index_sub < Npts; ++index_sub) {
@@ -682,7 +683,7 @@ void Apply_LLC_Helmholtz_Projection(
             reduction(+ : total_area, error2, tor_KE, pot_KE, proj_KE, orig_KE) \
             reduction( max : errorInf, velInf )\
             private( index, index_sub ) \
-            firstprivate( Ndepth, Ntime )
+            firstprivate( Ndepth, Ntime, Npts )
             {
                 #pragma omp for collapse(1) schedule(static)
                 for (index_sub = 0; index_sub < Npts; ++index_sub) {
