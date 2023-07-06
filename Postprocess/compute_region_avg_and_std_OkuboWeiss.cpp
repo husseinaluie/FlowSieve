@@ -59,7 +59,7 @@ void compute_region_avg_and_std_OkuboWeiss(
 
     #pragma omp parallel default(none)\
     private( Iregion, Itime, Idepth, Ilat, Ilon, IOkubo, index, area_index, int_index, dA )\
-    shared( source_data, OkuboWeiss, OkuboWeiss_bounds, stdout ) \
+    shared( source_data, OkuboWeiss, OkuboWeiss_bounds ) \
     firstprivate( Nlon, Nlat, Ndepth, Ntime, NOkubo, num_regions ) \
     reduction(vec_double_plus : area_sums)
     { 
@@ -124,7 +124,7 @@ void compute_region_avg_and_std_OkuboWeiss(
         #pragma omp parallel default(none)\
         private( Iregion, Itime, Idepth, Ilat, Ilon, IOkubo,\
                 index, area_index, int_index, dA )\
-        shared( source_data, postprocess_fields, OkuboWeiss, OkuboWeiss_bounds, stdout ) \
+        shared( source_data, postprocess_fields, OkuboWeiss, OkuboWeiss_bounds ) \
         firstprivate( Ifield, Nlon, Nlat, Ndepth, Ntime, NOkubo, num_regions ) \
         reduction(vec_double_plus : field_integrals)
         { 
