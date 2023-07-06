@@ -85,9 +85,16 @@ void compute_region_avg_and_std(
                 }
             }
         }
-        for (int_index = 0; int_index < field_integrals.size(); int_index++) {
-            reg_area = source_data.region_areas.at(int_index);
-            field_averages.at(Ifield).at(int_index) = (reg_area == 0) ? 0. : field_integrals.at(int_index) / reg_area;
+        #pragma omp parallel default(none) \
+        private( int_index, reg_area ) \
+        shared( field_integrals, field_averages, source_data ) \
+        firstprivate( Ifield )
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for (int_index = 0; int_index < field_integrals.size(); int_index++) {
+                reg_area = source_data.region_areas.at(int_index);
+                field_averages.at(Ifield).at(int_index) = (reg_area == 0) ? 0. : field_integrals.at(int_index) / reg_area;
+            }
         }
     }
 
