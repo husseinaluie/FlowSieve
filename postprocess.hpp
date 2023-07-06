@@ -65,8 +65,9 @@ void compute_region_avg_and_std_OkuboWeiss(
         const dataset & source_data,
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<double> & OkuboWeiss,
-        const std::vector<double> OkuboWeiss_bounds,
-        const int NOkubo
+        const std::vector<double> & OkuboWeiss_bounds,
+        const int NOkubo,
+        const MPI_Comm comm = MPI_COMM_WORLD
         );
 
 void compute_time_avg_std(
