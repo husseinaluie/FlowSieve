@@ -129,8 +129,9 @@ int main(int argc, char *argv[]) {
     const bool  COARSE_LAT_GRID_INCREASING = ( coarse_data.latitude[1]  > coarse_data.latitude[0]  ) ? true : false,
                 COARSE_LON_GRID_INCREASING = ( coarse_data.longitude[1] > coarse_data.longitude[0] ) ? true : false;
 
-    const bool  FINE_LAT_GRID_INCREASING = ( fine_data.latitude[1]  > fine_data.latitude[0]  ) ? true : false,
-                FINE_LON_GRID_INCREASING = ( fine_data.longitude[1] > fine_data.longitude[0] ) ? true : false;
+    // Unused
+    //const bool  FINE_LAT_GRID_INCREASING = ( fine_data.latitude[1]  > fine_data.latitude[0]  ) ? true : false,
+    //            FINE_LON_GRID_INCREASING = ( fine_data.longitude[1] > fine_data.longitude[0] ) ? true : false;
 
     // Apply some cleaning to the processor allotments if necessary. 
     coarse_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
@@ -219,7 +220,8 @@ int main(int argc, char *argv[]) {
         private( lat_lb, lon_lb, target_lat, target_lon, Itime, Idepth, II_fine, Ilat_fine, Ilon_fine, \
                  RIGHT, LEFT, BOT, TOP, LR_perc, TB_perc, BL_coarse, BR_coarse, TL_coarse, TR_coarse, \
                  BL_val, BR_val, TL_val, TR_val, L_interp, R_interp, interp_val ) \
-        firstprivate( Npts_fine, Nlon_fine, Nlat_fine, Nlon_coarse, Nlat_coarse, Ndepth, Ntime )
+        firstprivate( Npts_fine, Nlon_fine, Nlat_fine, Nlon_coarse, Nlat_coarse, Ndepth, Ntime, \
+                      COARSE_LAT_GRID_INCREASING, COARSE_LON_GRID_INCREASING )
         {
             #pragma omp for collapse(1) schedule(static)
             for (II_fine = 0; II_fine < Npts_fine; ++II_fine) {
