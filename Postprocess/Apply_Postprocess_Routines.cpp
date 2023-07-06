@@ -157,8 +157,7 @@ void Apply_Postprocess_Routines(
     //// If we have OkuboWeiss data, then also do processing along OW contours
     //
 
-    if (constants::DO_OKUBOWEISS_ANALYSIS) {
-        std::vector< double > OkuboWeiss_areas;
+    if (do_OkuboWeiss) {
 
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "  .. Applying Okubo-Weiss processing\n"); }
@@ -169,7 +168,7 @@ void Apply_Postprocess_Routines(
             field_averages_OW(num_fields, std::vector<double>(Ntime * Ndepth * N_Okubo * num_regions, 0.)), 
             field_std_devs_OW(num_fields, std::vector<double>(Ntime * Ndepth * N_Okubo * num_regions, 0.));
 
-        OkuboWeiss_areas.resize(Ntime * Ndepth * N_Okubo * num_regions, 0.);
+        std::vector< double > OkuboWeiss_areas( Ntime * Ndepth * N_Okubo * num_regions, 0. );
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         compute_region_avg_and_std_OkuboWeiss(
