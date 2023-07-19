@@ -54,6 +54,7 @@ void particles_evolve_trajectories(
 
     int left, right, bottom, top,
         num_times_recycled;
+    bool do_recycle;
 
     std::vector<double> vel_lon_sub( Nlat * Nlon ), 
                         vel_lat_sub( Nlat * Nlon );
@@ -76,7 +77,7 @@ void particles_evolve_trajectories(
             t_part, out_ind, step_iter, ref_ind, lon0, lat0, \
             dx_loc, dy_loc, dt, time_p, vel_lon_part, vel_lat_part, field_val,\
             test_val, lon_rng, lat_rng, lon_mid, lat_mid, \
-            num_times_recycled, \
+            num_times_recycled, do_recycle, \
             left, right, bottom, top) \
     firstprivate( Nparts, Nouts, Ntime, dlon, dlat, dt_target, particle_lifespan )
     {
@@ -206,13 +207,26 @@ void particles_evolve_trajectories(
 
                 // Finally, check if this particle is going to recycle
                 //      i.e. if it gets reset to a new random location
-                //      On average (ish) all of the particles will have recycled
-                //      within a period of particle_lifespan
                 // A non-positive lifespan means no recycling
                 if ( particle_lifespan > 0 ) {
-                    test_val = ((double) rand() / (RAND_MAX));
-                    if ( test_val * particle_lifespan < dt ) {
 
+                    do_recycle = false;
+                    if (constants::PARTICLE_RECYCLE_TYPE == constants::ParticleRecycleType::Stochastic) {
+                        // On average (ish) all of the particles will have recycled
+                        // within a period of particle_lifespan
+                        test_val = ((double) rand() / (RAND_MAX));
+                        if ( test_val * particle_lifespan < dt ) {
+                            do_recycle = true;
+                        }
+                    } else if (constants::PARTICLE_RECYCLE_TYPE == constants::ParticleRecycleType::FixedInterval) {
+                        // If it's a fixed-interval recycling, just check if we've 
+                        // passed the next recycle time
+                        if ( t_part >= (num_times_recycled+1)*particle_lifespan ) {
+                            do_recycle = true;
+                        }
+                    }
+
+                    if ( do_recycle ) {
                         num_times_recycled++;
 
                         // Get domain extent

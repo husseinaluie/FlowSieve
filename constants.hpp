@@ -266,7 +266,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool CAST_TO_SINGLE = true;
+    const bool CAST_TO_SINGLE = false;
 
     /*!
      * \param CAST_TO_INT
@@ -336,6 +336,14 @@ namespace constants
         case 4: const double KernPad =  2.5;
     }
     */
+
+    /*!
+     * \param PARTICLE_RECYCLE_TYPE
+     * \brief Variable indicating what recycling scheme should be used for particles
+     * @ingroup constants
+     */
+    enum ParticleRecycleType : int { FixedInterval, Stochastic };
+    const int PARTICLE_RECYCLE_TYPE = ParticleRecycleType::FixedInterval;
 
 
     /*!
