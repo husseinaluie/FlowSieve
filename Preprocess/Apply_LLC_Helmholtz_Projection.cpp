@@ -34,7 +34,7 @@ void Apply_LLC_Helmholtz_Projection(
                                 &longitude  = source_data.longitude,
                                 &dAreas     = source_data.areas;
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<bool> &mask = (constants::FILTER_OVER_LAND) ? source_data.reference_mask : source_data.mask;
 
     const std::vector<int>  &myCounts = source_data.myCounts,
                             &myStarts = source_data.myStarts;
@@ -74,6 +74,16 @@ void Apply_LLC_Helmholtz_Projection(
         }
     }
 
+    size_t num_land_points = 0;
+    if (constants::FILTER_OVER_LAND) {
+        for (index = 0; index < u_lon.size(); index++) {
+            if (not(mask.at(index))) { num_land_points++; }
+        }
+    }
+    #if DEBUG>=0
+    if (wRank == 0) { fprintf(stdout, " Identified %'zu land points.\n", num_land_points); }
+    #endif
+
     // Storage vectors
     std::vector<double> 
         full_Psi(        u_lon.size(), 0. ),
@@ -91,7 +101,7 @@ void Apply_LLC_Helmholtz_Projection(
     const size_t Nboxrows = ( Tikhov_Laplace > 0 ) ? 4 : 2;
     alglib::real_1d_array rhs;//, proj_vals;
     std::vector<double> 
-        RHS_vector( Nboxrows * Npts, 0. ),
+        RHS_vector( Nboxrows * Npts + 4*num_land_points, 0. ),
         Psi_seed(       Npts, 0. ),
         Phi_seed(       Npts, 0. ),
         work_arr(       Npts, 0. ),
@@ -121,17 +131,28 @@ void Apply_LLC_Helmholtz_Projection(
     const size_t num_neighbours = source_data.num_neighbours;
     // Get a magnitude for the derivatives, to help normalize the rows of the 
     //  Laplace entries to have similar magnitude to the others.
-    double deriv_ref_1 = 0, deriv_ref_2 = 0;
-    for ( size_t Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
-        deriv_ref_1 += std::fabs( source_data.adjacency_ddlat_weights.at(0).at(Ineighbour) );
-        deriv_ref_2 += std::fabs( source_data.adjacency_d2dlat2_weights.at(0).at(Ineighbour) );
+    long double deriv_ref_1 = 0, deriv_ref_2 = 0;
+    size_t Ineighbour;
+    #pragma omp parallel default(none) \
+    private( Ineighbour, index ) \
+    shared( source_data ) \
+    firstprivate( num_neighbours, Npts ) \
+    reduction( +:deriv_ref_1,deriv_ref_2 )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for (index = 0; index < Npts; ++index) {
+            for ( Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
+                deriv_ref_1 += std::fabs( source_data.adjacency_ddlat_weights.at(index).at(Ineighbour) ) / (Npts*num_neighbours);
+                deriv_ref_2 += std::fabs( source_data.adjacency_d2dlat2_weights.at(index).at(Ineighbour) ) / (Npts*num_neighbours);
+            }
+        }
     }
     //const double deriv_scale_factor = deriv_ref_2 / deriv_ref_1;
     const double deriv_scale_factor = deriv_ref_1;
     fprintf( stdout, "deriv-scale-factor: %g\n", deriv_scale_factor );
 
 
-    rhs.attach_to_ptr( Nboxrows * Npts, &RHS_vector[0] );
+    rhs.attach_to_ptr( Nboxrows * Npts + 4*num_land_points, &RHS_vector[0] );
 
     alglib::linlsqrstate state;
     alglib::linlsqrreport report;
@@ -157,17 +178,18 @@ void Apply_LLC_Helmholtz_Projection(
     }
     #endif
 
+    double val;
+    size_t column_skip, row_skip, land_counter = 0;
+
     alglib::sparsematrix LHS_matr;
-    alglib::sparsecreate(Nboxrows*Npts, 2*Npts, LHS_matr);
+    alglib::sparsecreate(Nboxrows*Npts + 4*num_land_points, 2*Npts, LHS_matr);
     for ( size_t Ipt = 0; Ipt < Npts; Ipt++ ) {
-        //fprintf( stdout, " - %'zu \n", Ipt );
 
         double  weight_val = weight_err ? dAreas.at(Ipt) : 1.,
                 cos_lat_inv = 1. / cos(latitude.at(Ipt)),
                 R_inv = 1. / constants::R_earth;
 
         for ( size_t Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
-            //fprintf( stdout, " - - %'zu \n", Ineighbour );
 
             size_t neighbour_ind = (Ineighbour < num_neighbours) ? 
                                     source_data.adjacency_indices.at(Ipt).at(Ineighbour) :
@@ -176,45 +198,101 @@ void Apply_LLC_Helmholtz_Projection(
             bool is_pole = std::fabs( std::fabs( latitude.at(Ipt) * 180.0 / M_PI ) - 90 ) < 0.001;
             if ( is_pole ) { continue; }
 
-            //
-            //// LON first derivative
-            //
+            if (not(mask.at(Ipt))) {
+                // Land doesn't always force zero velocity components. Sometimes it
+                // just forces the sum of the potential and toroidal to be zero.
+                // Here we force both of the potential and toroidal velocities
+                // to be zero individually.
 
-            double val  = source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour);
-            val *= weight_val * cos_lat_inv * R_inv;
-            //fprintf( stdout, " - - %g \n", val );
+                //
+                //// LON first derivative
+                //
 
-            // Psi part
-            size_t  column_skip = 0 * Npts + neighbour_ind,
+                val  = source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * cos_lat_inv * R_inv;
+                //if (Tikhov_Laplace < 0) { val *= deriv_scale_factor; }
+                if (Tikhov_Laplace < 0) { val *= -Tikhov_Laplace; }
+
+                // Psi part
+                column_skip = 0 * Npts + neighbour_ind;
+                row_skip    = Nboxrows*Npts + 0*num_land_points + land_counter;
+                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+
+                // Phi part
+                column_skip = 1 * Npts + neighbour_ind;
+                row_skip    = Nboxrows*Npts + 1*num_land_points + land_counter;
+                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+
+
+                //
+                //// LAT first derivative
+                //
+
+                val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * R_inv;
+                //if (Tikhov_Laplace < 0) { val *= deriv_scale_factor; }
+                if (Tikhov_Laplace < 0) { val *= -Tikhov_Laplace; }
+
+                // Psi part
+                column_skip = 0 * Npts + neighbour_ind;
+                row_skip    = Nboxrows*Npts + 2*num_land_points + land_counter;
+                alglib::sparseadd( LHS_matr, row_skip, column_skip, -val );
+
+                // Phi part
+                column_skip = 1 * Npts + neighbour_ind;
+                row_skip    = Nboxrows*Npts + 3*num_land_points + land_counter;
+                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+            }
+
+            if (Tikhov_Laplace >= 0) {
+                //
+                //// LON first derivative
+                //
+
+                val  = source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * cos_lat_inv * R_inv;
+
+                // Psi part
+                if (not(mask.at(Ipt))) {
+                    column_skip = 0 * Npts + neighbour_ind;
+                    row_skip    = 0 * Npts + Ipt;
+                } else {
+                    column_skip = 0 * Npts + neighbour_ind;
                     row_skip    = 1 * Npts + Ipt;
-            alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                }
+                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
 
-            // Phi part
-            column_skip = 1 * Npts + neighbour_ind,
-            row_skip    = 0 * Npts + Ipt;
-            alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
-
-
-            //
-            //// LAT first derivative
-            //
-
-            val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
-            val *= weight_val * R_inv;
-            //fprintf( stdout, " - - %g \n", val );
-
-            // Psi part
-            column_skip = 0 * Npts + neighbour_ind,
-            row_skip    = 0 * Npts + Ipt;
-            alglib::sparseadd( LHS_matr, row_skip, column_skip, -val );
-
-            // Phi part
-            column_skip = 1 * Npts + neighbour_ind,
-            row_skip    = 1 * Npts + Ipt;
-            alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                // Phi part
+                if (not(mask.at(Ipt))) {
+                    column_skip = 1 * Npts + neighbour_ind;
+                    row_skip    = 1 * Npts + Ipt;
+                } else {
+                    column_skip = 1 * Npts + neighbour_ind;
+                    row_skip    = 0 * Npts + Ipt;
+                }
+                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
 
 
-            if (Tikhov_Laplace > 0) {
+                //
+                //// LAT first derivative
+                //
+
+                val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * R_inv;
+
+                // Psi part
+                column_skip = 0 * Npts + neighbour_ind;
+                row_skip    = 0 * Npts + Ipt;
+                alglib::sparseadd( LHS_matr, row_skip, column_skip, -val );
+
+                // Phi part
+                column_skip = 1 * Npts + neighbour_ind;
+                row_skip    = 1 * Npts + Ipt;
+                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+            }
+
+
+            if (Tikhov_Laplace != 0) {
 
                 //
                 //// Second LON derivative
@@ -225,91 +303,96 @@ void Apply_LLC_Helmholtz_Projection(
                 //          the broader stencil is helpful. It's also more internally
                 //          consistent since later we take derivs( vel ) = deriv( deriv ( Helm ) )
 
+                /*
                 for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
                     val  =   source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour)
                            * source_data.adjacency_ddlon_weights.at(neighbour_ind).at(D2_ind);
                     val *= weight_val * pow(R_inv, 2.) * cos_lat_inv / cos(latitude.at(neighbour_ind));
-                    val *= Tikhov_Laplace / deriv_scale_factor;
+                    if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
 
                     column_skip = 0 * Npts + source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
-                    row_skip    = 2 * Npts + Ipt;
+                    row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
                     alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
 
                     column_skip = 1 * Npts + source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
-                    row_skip    = 3 * Npts + Ipt;
+                    row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
                     alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
                 }
+                */
 
-                /*
                 // Version using actual second derivative
                 val  = source_data.adjacency_d2dlon2_weights.at(Ipt).at(Ineighbour);
                 val *= weight_val * pow(cos_lat_inv * R_inv, 2.);
-                val *= Tikhov_Laplace / deriv_scale_factor;
+                if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
 
                 column_skip = 0 * Npts + neighbour_ind;
-                row_skip    = 2 * Npts + Ipt;
+                row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
                 alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
 
                 column_skip = 1 * Npts + neighbour_ind;
-                row_skip    = 3 * Npts + Ipt;
+                row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
                 alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
-                */
 
 
                 //
                 //// Second LAT derivative
                 //
+                /*
                 for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
                     val  =   source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour)
                            * source_data.adjacency_ddlat_weights.at(neighbour_ind).at(D2_ind);
                     val *= weight_val * pow(R_inv, 2.);
-                    val *= Tikhov_Laplace / deriv_scale_factor;
+                    if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
 
                     column_skip = 0 * Npts + source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
-                    row_skip    = 2 * Npts + Ipt;
+                    row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
                     alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
 
                     column_skip = 1 * Npts + source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
-                    row_skip    = 3 * Npts + Ipt;
+                    row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
                     alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
                 }
+                */
 
-                /*
                 // Version using actual second derivative
                 val  = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour);
                 val *= weight_val * pow(R_inv, 2.);
-                val *= Tikhov_Laplace / deriv_scale_factor;
+                if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
 
                 column_skip = 0 * Npts + neighbour_ind;
-                row_skip    = 2 * Npts + Ipt;
+                row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
                 alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
 
                 column_skip = 1 * Npts + neighbour_ind;
-                row_skip    = 3 * Npts + Ipt;
+                row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
                 alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
-                */
 
                 //
                 //// LAT first derivative
                 //
                 val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
                 val *= weight_val * pow(R_inv, 2.) * tan( latitude.at(Ipt) );
-                val *= Tikhov_Laplace / deriv_scale_factor;
+                if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
 
                 // Psi part
-                column_skip = 0 * Npts + neighbour_ind,
-                row_skip    = 2 * Npts + Ipt;
+                column_skip = 0 * Npts + neighbour_ind;
+                row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
                 alglib::sparseadd( LHS_matr, row_skip, column_skip, -val );
 
                 // Phi part
-                column_skip = 1 * Npts + neighbour_ind,
-                row_skip    = 3 * Npts + Ipt;
+                column_skip = 1 * Npts + neighbour_ind;
+                row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
                 alglib::sparseadd( LHS_matr, row_skip, column_skip, -val );
 
             }
 
         }
+        if (not(mask.at(Ipt))) {
+            // Increment land counter
+            land_counter++;
+        }
     }
+    fprintf(stdout, "  Land counter: %'zu\n", land_counter);
 
     alglib::sparseconverttocrs(LHS_matr);
 
@@ -319,7 +402,7 @@ void Apply_LLC_Helmholtz_Projection(
         fflush(stdout);
     }
     #endif
-    alglib::linlsqrcreate(Nboxrows*Npts, 2*Npts, state);
+    alglib::linlsqrcreate(Nboxrows*Npts + 4*num_land_points, 2*Npts, state);
     alglib::linlsqrsetcond(state, rel_tol, rel_tol, max_iters);
 
     // Counters to track termination types
@@ -410,8 +493,10 @@ void Apply_LLC_Helmholtz_Projection(
 
                     is_pole = std::fabs( std::fabs( latitude.at(index_sub) * 180.0 / M_PI ) - 90 ) < 0.001;
 
-                    RHS_vector.at( 0*Npts + index_sub) = u_lon_rem.at(index_sub);
-                    RHS_vector.at( 1*Npts + index_sub) = u_lat_rem.at(index_sub);
+                    if (Tikhov_Laplace >= 0) {
+                        RHS_vector.at( 0*Npts + index_sub) = u_lon_rem.at(index_sub);
+                        RHS_vector.at( 1*Npts + index_sub) = u_lat_rem.at(index_sub);
+                    }
 
                     if (Tikhov_Laplace > 0) {
                         if ( is_pole ) {
@@ -421,6 +506,9 @@ void Apply_LLC_Helmholtz_Projection(
                             RHS_vector.at( 2*Npts + index_sub) = vort_term.at(index_sub) * Tikhov_Laplace / deriv_scale_factor;
                             RHS_vector.at( 3*Npts + index_sub) = div_term.at( index_sub) * Tikhov_Laplace / deriv_scale_factor;
                         }
+                    } else if (Tikhov_Laplace < 0) {
+                        RHS_vector.at( 0*Npts + index_sub) = vort_term.at(index_sub);
+                        RHS_vector.at( 1*Npts + index_sub) = div_term.at( index_sub);
                     }
 
                     if ( weight_err ) {

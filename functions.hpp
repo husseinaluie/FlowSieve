@@ -134,8 +134,8 @@ class dataset {
                              ) const;
 
         // Functions / variables for working with LLC-type grids
-        //const size_t num_neighbours = 5;
-        const size_t num_neighbours = 7;
+        const size_t num_neighbours = 5;
+        //const size_t num_neighbours = 7;
         std::vector< std::vector< size_t > >    adjacency_indices;
         std::vector< std::vector< double > >    adjacency_projected_x,
                                                 adjacency_projected_y,

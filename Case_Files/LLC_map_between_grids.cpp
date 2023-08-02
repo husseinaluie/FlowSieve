@@ -175,22 +175,36 @@ int main(int argc, char *argv[]) {
                   perc_incr = (unsigned long long int) (0.05 * (double) Nlatlon_target),
                   next_perc = perc_incr;
     double best_dist, local_dist;
+    int thread_id;
+    const double    typical_spacing_target = sqrt( 4 * M_PI / Nlatlon_target ) * constants::R_earth,
+                    typical_spacing_source = sqrt( 4 * M_PI / Nlatlon_source ) * constants::R_earth;
+    const double    typical_spacing = std::fmax( typical_spacing_target, typical_spacing_source );
+    if (wRank == 0) {
+        fprintf( stdout, "Typical spacing is: %g km.\n", typical_spacing / 1e3 );
+        fflush(stdout);
+    }
 
     #pragma omp parallel \
     default(none) \
-    shared( source_data, target_data, nearest_source_to_target ) \
-    private( best_index, target_index, source_index, local_dist, best_dist, best_II, II ) \
-    firstprivate( Nlatlon_target, random_index, random_generator )
+    shared( source_data, target_data, nearest_source_to_target, stdout ) \
+    private( best_index, target_index, source_index, local_dist, best_dist, best_II, II, \
+             thread_id, next_perc ) \
+    firstprivate( Nlatlon_target, Nlatlon_source, random_index, random_generator, perc_incr, typical_spacing )
     {
 
+        thread_id = omp_get_thread_num();  // thread ID
         best_index = 0;
+        //best_index = random_index(random_generator);
+        next_perc = perc_incr;
         #pragma omp for collapse(1) schedule(guided)
         for ( target_index = 0; target_index < Nlatlon_target; target_index++ ) {
 
             /*
-            while ( target_index >= next_perc ) {
-                fprintf( stdout, "." );
-                next_perc += perc_incr;
+            if (thread_id == 0) {
+                while ( target_index >= next_perc ) {
+                    fprintf( stdout, "." );
+                    next_perc += perc_incr;
+                }
             }
             */
 
@@ -201,6 +215,20 @@ int main(int argc, char *argv[]) {
                     target_data.latitude.at(target_index)
                     );
 
+            for ( source_index = 1; source_index < Nlatlon_source; source_index++ ) {
+                local_dist = distance(
+                        source_data.longitude.at(source_index),
+                        source_data.latitude.at(source_index),
+                        target_data.longitude.at(target_index),
+                        target_data.latitude.at(target_index)
+                        );
+                if (local_dist < best_dist) {
+                    best_dist  = local_dist;
+                    best_index = source_index;
+                }
+            }
+
+            /*
             while (true) {
                 best_II = source_data.num_neighbours;
                 for ( II = 0; II < source_data.num_neighbours; II++ ) {
@@ -222,18 +250,18 @@ int main(int argc, char *argv[]) {
                 if ( best_II < source_data.num_neighbours ) {
                     // If we found a closer point, move to it, and repeat
                     best_index = source_data.adjacency_indices.at(best_index).at(best_II);
-                } else if ( best_dist > 100e3 ) {
+                } else if ( best_dist > 5 * typical_spacing ) {
                     // If we didn't find a closer point in the neighbours, but the current
                     // point is still too far away, then just jump to a new random starting point
                     best_index = random_index(random_generator);
-            } else {
-                // Otherwise, we've found the closest point. So break out of the loop now.
-                break;
+                } else {
+                    // Otherwise, we've found the closest point. So break out of the loop now.
+                    break;
+                }
             }
+            */
 
-        }
-
-        nearest_source_to_target.at(target_index) = best_index;
+            nearest_source_to_target.at(target_index) = best_index;
         }
     }
     fprintf( stdout, "\n" );
@@ -266,21 +294,28 @@ int main(int argc, char *argv[]) {
         #pragma omp parallel \
         default(none) \
         shared( nearest_source_to_target, source_data, target_data, var_fine ) \
-        private( target_index, source_index, II, mx, my, II_index, II_val, del_lon, del_lat ) \
-        firstprivate( Nlatlon_target )
+        private( target_index, source_index, II, mx, my, II_index, II_val, del_lon, del_lat, \
+                 thread_id, next_perc ) \
+        firstprivate( Nlatlon_target, perc_incr, stdout )
         {
 
+            thread_id = omp_get_thread_num();  // thread ID
             #pragma omp for collapse(1) schedule(static)
             for ( target_index = 0; target_index < Nlatlon_target; target_index++ ) {
 
                 /*
-                while ( target_index >= next_perc ) {
-                    fprintf( stdout, "." );
-                    next_perc += perc_incr;
+                if (thread_id == 0) {
+                    while ( target_index >= next_perc ) {
+                        fprintf( stdout, "." );
+                        next_perc += perc_incr;
+                    }
                 }
                 */
 
                 source_index = nearest_source_to_target.at(target_index);
+
+                // just nearest-neighbour
+                //var_fine.at(target_index) = source_data.variables.at("coarse_field").at(source_index);
 
                 mx = 0;
                 my = 0;

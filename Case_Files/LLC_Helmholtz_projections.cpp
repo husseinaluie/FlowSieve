@@ -190,6 +190,13 @@ int main(int argc, char *argv[]) {
     source_data.load_variable( "u_lon", zonal_vel_name, input_fname, true, true );
     source_data.load_variable( "u_lat", merid_vel_name, input_fname, true, true );
 
+    // If we're using FILTER_OVER_LAND, then the mask has been wiped out. Load in a mask that still includes land references
+    //      so that we have both. Will be used to get 'water-only' region areas.
+    if (constants::FILTER_OVER_LAND) { 
+        read_mask_from_file( source_data.reference_mask, zonal_vel_name, input_fname,
+               source_data.Nprocs_in_time, source_data.Nprocs_in_depth );
+    }
+
     // Get the MPI-local dimension sizes
     source_data.Ntime  = source_data.myCounts[0];
     source_data.Ndepth = source_data.myCounts[1];
@@ -198,9 +205,6 @@ int main(int argc, char *argv[]) {
     //source_data.compute_cell_areas();
     // Cell areas are trickier, so they will be passed in as an input.
     read_LLC_latlon_from_file( source_data.areas, dArea_field_var_name, input_fname );
-
-    // Mask out the pole, if necessary (i.e. set lat = 90 to land)
-    //mask_out_pole( source_data.latitude, source_data.mask, source_data.Ntime, source_data.Ndepth, source_data.Nlat, source_data.Nlon );
 
     // Read in the seed
     // If extending to poles, then assume that the seed is already on the extended grid
