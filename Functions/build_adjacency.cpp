@@ -159,7 +159,7 @@ void dataset::build_adjacency(
 
                 near_sided_project( proj_x, proj_y, search_lon, search_lat, pt_lon, pt_lat, 2e5 );
                 local_dist = distance( search_lon, search_lat, pt_lon, pt_lat );
-                if (local_dist < 1e-4) { continue; } // discard points that are erroneously close
+                //if (local_dist < 1e-4) { continue; } // discard points that are erroneously close
                                                      // I don't really know why this happens
                                                      // I think it's rounding errors in the 
                                                      // map projection operator?
@@ -243,7 +243,6 @@ void dataset::build_adjacency(
 
                     }
 
-                    //if ( num_with_same_lat > (0.5*num_neighbours) ) {
                     if ( num_with_same_lat > 2 ) {
                         if ( same_lat_neighbour_ind < num_neighbours ) {
                             furthest_neighbour_ind  = same_lat_neighbour_ind;
@@ -251,7 +250,6 @@ void dataset::build_adjacency(
                         } else {
                             similar_angle = true;
                         }
-                    //} else if ( num_with_same_lon > (0.5*num_neighbours) ) {
                     } else if ( num_with_same_lon > 2 ) {
                         if ( same_lon_neighbour_ind < num_neighbours ) {
                             furthest_neighbour_ind  = same_lon_neighbour_ind;
@@ -321,27 +319,14 @@ void dataset::build_adjacency(
             adjacency_distances.at(  pt_index)[num_neighbours] = 0.;
 
             LHS_vec.resize( (num_neighbours+1) * (num_neighbours+1), 0. );
-            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 0 ) = 1.;
-            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 1 ) = 0.;
-            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 2 ) = 0.;
-            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 3 ) = 0.;
-            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 4 ) = 0.;
-            LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 5 ) = 0.;
-            if (num_neighbours >= 6) {
-                LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 6 ) = 0.;
-            }
-            if (num_neighbours >= 7) {
-                LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 7 ) = 0.;
-            }
-            if (num_neighbours >= 8) {
-                LHS_vec.at(      num_neighbours    * (num_neighbours+1) + 8 ) = 0.;
-            }
-            for (Ineighbour = 0; Ineighbour < num_neighbours; Ineighbour++) {
+            for (Ineighbour = 0; Ineighbour < num_neighbours+1; Ineighbour++) {
 
-                adjacency_indices.at(pt_index)[Ineighbour] = neighbour_ind[Ineighbour];
-                adjacency_projected_x.at(pt_index)[Ineighbour] = neighbour_x[Ineighbour];
-                adjacency_projected_y.at(pt_index)[Ineighbour] = neighbour_y[Ineighbour];
-                adjacency_distances.at(pt_index)[Ineighbour] = neighbour_dist[Ineighbour];
+                if (Ineighbour < num_neighbours) {
+                    adjacency_indices.at(pt_index)[Ineighbour] = neighbour_ind[Ineighbour];
+                    adjacency_projected_x.at(pt_index)[Ineighbour] = neighbour_x[Ineighbour];
+                    adjacency_projected_y.at(pt_index)[Ineighbour] = neighbour_y[Ineighbour];
+                    adjacency_distances.at(pt_index)[Ineighbour] = neighbour_dist[Ineighbour];
+                }
 
                 // 1
                 LHS_vec.at( Ineighbour * (num_neighbours+1) + 0 ) = 1.;
