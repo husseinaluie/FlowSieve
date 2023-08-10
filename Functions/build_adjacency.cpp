@@ -243,14 +243,14 @@ void dataset::build_adjacency(
 
                     }
 
-                    if ( num_with_same_lat > 2 ) {
+                    if ( num_with_same_lat >= floor(num_neighbours / 2.) ) {
                         if ( same_lat_neighbour_ind < num_neighbours ) {
                             furthest_neighbour_ind  = same_lat_neighbour_ind;
                             similar_angle = false;
                         } else {
                             similar_angle = true;
                         }
-                    } else if ( num_with_same_lon > 2 ) {
+                    } else if ( num_with_same_lon >= floor(num_neighbours / 2.) ) {
                         if ( same_lon_neighbour_ind < num_neighbours ) {
                             furthest_neighbour_ind  = same_lon_neighbour_ind;
                             similar_angle = false;
@@ -344,12 +344,16 @@ void dataset::build_adjacency(
                     neighbour_x[Ineighbour] * neighbour_y[Ineighbour];
 
                 // x^2
-                LHS_vec.at( Ineighbour * (num_neighbours+1) + 4 ) = 
-                    neighbour_x[Ineighbour] * neighbour_x[Ineighbour];
+                if (num_neighbours >= 4) {
+                    LHS_vec.at( Ineighbour * (num_neighbours+1) + 4 ) = 
+                        neighbour_x[Ineighbour] * neighbour_x[Ineighbour];
+                }
                 
                 // y^2
-                LHS_vec.at( Ineighbour * (num_neighbours+1) + 5 ) = 
-                    neighbour_y[Ineighbour] * neighbour_y[Ineighbour];
+                if (num_neighbours >= 5) {
+                    LHS_vec.at( Ineighbour * (num_neighbours+1) + 5 ) = 
+                        neighbour_y[Ineighbour] * neighbour_y[Ineighbour];
+                }
                 
                 // x * y^2
                 if (num_neighbours >= 6) {
@@ -377,8 +381,10 @@ void dataset::build_adjacency(
             adjacency_ddlon_weights.at(pt_index).resize(num_neighbours+1, 0.);
             adjacency_ddlat_weights.at(pt_index).resize(num_neighbours+1, 0.);
 
-            adjacency_d2dlon2_weights.at(pt_index).resize(num_neighbours+1, 0.);
-            adjacency_d2dlat2_weights.at(pt_index).resize(num_neighbours+1, 0.);
+            if (num_neighbours >= 4) {
+                adjacency_d2dlon2_weights.at(pt_index).resize(num_neighbours+1, 0.);
+                adjacency_d2dlat2_weights.at(pt_index).resize(num_neighbours+1, 0.);
+            }
             for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
 
                 // factor R*cos(lat) comes from converting proj-x deriv to lat deriv
@@ -389,13 +395,15 @@ void dataset::build_adjacency(
                 adjacency_ddlat_weights.at(pt_index)[JJ] = LHS( 2, JJ ) *
                     constants::R_earth;
 
-                // second lon derivative
-                adjacency_d2dlon2_weights.at(pt_index)[JJ] = 0.5 * LHS( 4, JJ ) * 
-                    pow( constants::R_earth * cos(pt_lat), 2);
+                if (num_neighbours >= 4) {
+                    // second lon derivative
+                    adjacency_d2dlon2_weights.at(pt_index)[JJ] = 0.5 * LHS( 4, JJ ) * 
+                        pow( constants::R_earth * cos(pt_lat), 2);
 
-                // second lat derivative
-                adjacency_d2dlat2_weights.at(pt_index)[JJ] = 0.5 * LHS( 5, JJ ) * 
-                    pow( constants::R_earth, 2);
+                    // second lat derivative
+                    adjacency_d2dlat2_weights.at(pt_index)[JJ] = 0.5 * LHS( 5, JJ ) * 
+                        pow( constants::R_earth, 2);
+                }
 
             }
         }
