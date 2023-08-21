@@ -205,6 +205,21 @@ void dataset::compute_region_areas() {
 }
 
 
+void dataset::prepare_for_coarsened_grids(
+        const std::string filename,
+        const MPI_Comm comm
+        ){
+
+
+    read_var_from_file( coarse_map_lat, "latitude", filename);
+    read_var_from_file( coarse_map_lon, "longitude", filename);
+
+    convert_coordinates( coarse_map_lon, coarse_map_lat );
+
+    // also do the areas of the coarsened map grid
+    coarse_map_areas.resize( coarse_map_lat.size() * coarse_map_lon.size() );
+    compute_areas( coarse_map_areas, coarse_map_lat, coarse_map_lon );
+}
 
 
 void dataset::gather_variable_across_depth( const std::vector<double> & var,
@@ -352,3 +367,7 @@ void dataset::index1to4_global( const size_t index,
 
     Index1to4( index, Itime, Idepth, Ilat, Ilon, Ntime_global, Ndepth_global, Nlat, Nlon );
 }
+
+
+
+

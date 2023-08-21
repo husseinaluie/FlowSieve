@@ -97,7 +97,7 @@ void Apply_Postprocess_Routines(
     //
 
     #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "  .. computing the average and std. dev. in each region\n"); }
+    if (wRank == 0) { fprintf(stdout, "\n\n  .. computing the average and std. dev. in each region\n"); }
     fflush(stdout);
     #endif
 
@@ -127,7 +127,7 @@ void Apply_Postprocess_Routines(
 
     if (constants::POSTPROCESS_DO_ZONAL_MEANS) {
         #if DEBUG >= 1
-        if (wRank == 0) { fprintf(stdout, "  .. computing the zonal average and std. dev.\n"); }
+        if (wRank == 0) { fprintf(stdout, "\n\n  .. computing the zonal average and std. dev.\n"); }
         fflush(stdout);
         #endif
 
@@ -140,7 +140,7 @@ void Apply_Postprocess_Routines(
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_zonal_means");  }
 
         #if DEBUG >= 1
-        if (wRank == 0) { fprintf(stdout, "  .. writing region averages and deviations\n"); }
+        if (wRank == 0) { fprintf(stdout, "  .. writing zonal averages\n"); }
         fflush(stdout);
         #endif
 
@@ -160,7 +160,7 @@ void Apply_Postprocess_Routines(
     if (do_OkuboWeiss) {
 
         #if DEBUG >= 1
-        if (wRank == 0) { fprintf(stdout, "  .. Applying Okubo-Weiss processing\n"); }
+        if (wRank == 0) { fprintf(stdout, "\n\n  .. Applying Okubo-Weiss processing\n"); }
         fflush(stdout);
         #endif
 
@@ -191,6 +191,34 @@ void Apply_Postprocess_Routines(
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_writing");  }
     }
 
+    //
+    //// If we're doing coarsened maps, do those now
+    //
+    if (source_data.coarse_map_lat.size() > 1) {
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "\n\n  .. computing coarsened maps\n"); }
+        fflush(stdout);
+        #endif
+
+        std::vector< std::vector< double > > 
+            coarsened_maps(num_fields, std::vector<double>(Ntime * Ndepth * source_data.coarse_map_lat.size() * source_data.coarse_map_lon.size(), 0.));
+
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+        compute_coarsened_map( coarsened_maps, source_data, postprocess_fields );
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_coarse_maps");  }
+
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf(stdout, "  .. writing coarsened maps\n"); }
+        fflush(stdout);
+        #endif
+
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+        write_coarsened_maps(
+                coarsened_maps, vars_to_process, filename, Stime, Sdepth, Ntime, Ndepth, 
+                source_data.coarse_map_lat.size(), source_data.coarse_map_lon.size(), num_fields
+                );
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_writing");  }
+    }
 
     //
     //// Time averages

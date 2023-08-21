@@ -26,9 +26,9 @@ void compute_region_avg_and_std_OkuboWeiss(
         const MPI_Comm comm
         ) {
 
-    fprintf( stdout, " %zu, %zu, %g, %g, %zu\n ", OkuboWeiss.size(), 
-            OkuboWeiss_bounds.size(), OkuboWeiss_bounds.front(), OkuboWeiss_bounds.back(), source_data.areas.size() );
-    fflush( stdout );
+    //fprintf( stdout, " %zu, %zu, %g, %g, %zu\n ", OkuboWeiss.size(), 
+    //        OkuboWeiss_bounds.size(), OkuboWeiss_bounds.front(), OkuboWeiss_bounds.back(), source_data.areas.size() );
+    //fflush( stdout );
 
     const int   Ntime   = source_data.Ntime,
                 Ndepth  = source_data.Ndepth,
@@ -54,8 +54,8 @@ void compute_region_avg_and_std_OkuboWeiss(
 
     std::vector<double> area_sums( Ntime * Ndepth * NOkubo * num_regions, 0. );
 
-    fprintf( stdout, "%d, %d, %d, %d, %d, %d - %'zu\n", 
-             Ntime, Ndepth, Nlat, Nlon, NOkubo, num_regions, area_sums.size());
+    //fprintf( stdout, "%d, %d, %d, %d, %d, %d - %'zu\n", 
+    //         Ntime, Ndepth, Nlat, Nlon, NOkubo, num_regions, area_sums.size());
 
     #pragma omp parallel default(none)\
     private( Iregion, Itime, Idepth, Ilat, Ilon, IOkubo, index, area_index, int_index, dA )\

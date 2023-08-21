@@ -120,6 +120,42 @@ void initialize_postprocess_file(
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     }
 
+    // Coarsened-grid dimensions and variables
+    int coarse_lat_dimid, coarse_lon_dimid, coarse_lat_varid, coarse_lon_varid;
+    if ( source_data.coarse_map_lat.size() > 1 ) {
+
+        // latitude
+        retval = nc_def_dim(ncid, "coarse_latitude",  
+                                  source_data.coarse_map_lat.size(),
+                                  &coarse_lat_dimid);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+        retval = nc_def_var(ncid, "coarse_latitude",  NC_DOUBLE,  1, 
+                                  &coarse_lat_dimid,   &coarse_lat_varid);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+        count[0]  = source_data.coarse_map_lat.size();
+        retval = nc_put_vara_double(ncid, coarse_lat_varid,   start, count,
+                &(source_data.coarse_map_lat[0]));
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+
+        // longitude
+        retval = nc_def_dim(ncid, "coarse_longitude",  
+                                  source_data.coarse_map_lon.size(),
+                                  &coarse_lon_dimid);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+        retval = nc_def_var(ncid, "coarse_longitude",  NC_DOUBLE,  1, 
+                                  &coarse_lon_dimid,   &coarse_lon_varid);
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+        count[0]  = source_data.coarse_map_lon.size();
+        retval = nc_put_vara_double(ncid, coarse_lon_varid,   start, count,
+                &(source_data.coarse_map_lon[0]));
+        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    }
+
     // We're also going to store the region areas
     int area_dims[3];
     area_dims[0] = time_dimid;
@@ -160,6 +196,17 @@ void initialize_postprocess_file(
             for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
                 add_var_to_file( int_vars.at(varInd)+"_time_average", dim_names_time_ave, ndims_time_ave, buffer);
                 //add_var_to_file(int_vars.at(varInd)+"_time_std_dev", dim_names_time_ave, ndims_time_ave, buffer);
+            }
+        }
+
+        // coarsened maps
+        if ( source_data.coarse_map_lat.size() > 1 ) {
+            const char* dim_names_coarse_map[] = {"time", "depth", 
+                "coarse_latitude", "coarse_longitude"};
+            const int ndims_coarse_map = 4;
+            for (size_t varInd = 0; varInd < int_vars.size(); ++varInd) {
+                add_var_to_file( int_vars.at(varInd)+"_coarsened_map", 
+                        dim_names_coarse_map, ndims_coarse_map, buffer);
             }
         }
 

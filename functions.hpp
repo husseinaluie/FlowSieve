@@ -60,6 +60,9 @@ class dataset {
         std::map< std::string, std::vector<bool> > regions;
         std::vector<double> region_areas, region_areas_water_only;
 
+        // The vectors for the coarse lat/lon maps
+        std::vector<double> coarse_map_lat, coarse_map_lon, coarse_map_areas;
+
         // Store mask data (i.e. land vs water)
         std::vector<bool> mask, reference_mask, mask_DEPTH;
 
@@ -97,6 +100,10 @@ class dataset {
                                         const std::string var_name, 
                                         const MPI_Comm = MPI_COMM_WORLD );
         void compute_region_areas();
+
+        // Prepare for grid-coarsening outputs
+        void prepare_for_coarsened_grids(   const std::string filename,
+                                            const MPI_Comm = MPI_COMM_WORLD );
 
         // Check the processors divions between dimensions
         void check_processor_divisions( const int Nprocs_in_time_input, 
