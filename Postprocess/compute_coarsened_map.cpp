@@ -92,8 +92,9 @@ void compute_coarsened_map(
 
                                     index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
-                                    //coarsened_maps.at(Ifield).at( coarse_index ) = postprocess_fields.at(Ifield)->at(index) * dA / dA_coarse;
-                                    coarsened_maps.at(Ifield).at( coarse_index ) = postprocess_fields.at(Ifield)->at(index);
+                                    coarsened_maps.at(Ifield).at( coarse_index ) = (dA_coarse > 0) ? 
+                                                                                        postprocess_fields.at(Ifield)->at(index) * dA / dA_coarse
+                                                                                        : 0.;
                                 }
                             }
                         }
