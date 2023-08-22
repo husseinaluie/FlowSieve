@@ -9,21 +9,11 @@
 #include <omp.h>
 #include <cassert>
 
-//#include "../ALGLIB/stdafx.h"
-//#include "../ALGLIB/interpolation.h"
-
 #include "../netcdf_io.hpp"
 #include "../functions.hpp"
 #include "../constants.hpp"
 #include "../preprocess.hpp"
 #include "../differentiation_tools.hpp"
-
-// Pragma-magic to allow reduction over vector operator
-//      thanks to: https://stackoverflow.com/questions/43168661/openmp-and-reduction-on-stdvector
-#pragma omp declare reduction(vec_double_plus : std::vector<double> : \
-                              std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<double>())) \
-                    initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
-
 
 int main(int argc, char *argv[]) {
     
@@ -56,6 +46,7 @@ int main(int argc, char *argv[]) {
 
     // first argument is the flag, second argument is default value (for when flag is not present)
     const std::string   &input_fname    = input.getCmdOption("--input_file",    "input.nc"),
+                        &adjacency_fname  = input.getCmdOption("--adjacency_file", "adjacency.nc" ),
                         &output_fname   = input.getCmdOption("--output_file",   "output.nc");
 
     const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
@@ -106,11 +97,8 @@ int main(int argc, char *argv[]) {
         convert_coordinates( source_data.longitude, source_data.latitude );
     }
 
-    // Build the adjacency matrix and other adjacency-adjacent arrays
-    source_data.build_adjacency();
-
-    // Write the adjacency
-    source_data.write_adjacency( "adjacency.nc" );
+    // Read in adjacency data
+    source_data.load_adjacency( adjacency_fname );
 
     // Read in field to get size info
     source_data.load_variable( "to_interp", vars_to_interp.at(0), input_fname, true, true );
@@ -123,8 +111,6 @@ int main(int argc, char *argv[]) {
     const size_t    Npts  = source_data.latitude.size();
     size_t starts[4] = { source_data.myStarts.at(0), source_data.myStarts.at(1), 0    };
     size_t counts[4] = { source_data.myCounts.at(0), source_data.myCounts.at(1), Npts };
-
-    const size_t num_neighbours = source_data.num_neighbours;
 
     std::vector<double> lat_deriv(Npts, 0.), lon_deriv(Npts, 0.);
 
@@ -143,11 +129,9 @@ int main(int argc, char *argv[]) {
         size_t index, II;
         double weight, value;
         #pragma omp parallel default(none)\
-        private( index, value, weight, II, \
-                lon_deriv_val, lat_deriv_val, lon_deriv_vals, lat_deriv_vals ) \
-        shared( source_data, deriv_fields ) \
-        firstprivate( Npts, num_neighbours, stdout )\
-        reduction( vec_double_plus : lat_deriv, lon_deriv )
+        private( index, II, lon_deriv_val, lat_deriv_val, lon_deriv_vals, lat_deriv_vals ) \
+        shared( source_data, deriv_fields, lat_deriv, lon_deriv ) \
+        firstprivate( Npts )
         {
             lon_deriv_vals.clear();
             lon_deriv_vals.push_back(&lon_deriv_val);
@@ -158,35 +142,16 @@ int main(int argc, char *argv[]) {
             #pragma omp for collapse(1) schedule(static)
             for ( index = 0; index < Npts; index++ ) {
 
-                //fprintf( stdout, "%'zu - start lon deriv\n", index );
                 spher_derivative_at_point(
                         lon_deriv_vals, deriv_fields, source_data.longitude, "lon", source_data,
                         0, 0, index, index, source_data.mask
                         );
-                //fprintf( stdout, "%'zu - start lat deriv\n", index );
                 spher_derivative_at_point(
                         lat_deriv_vals, deriv_fields, source_data.latitude, "lat", source_data,
                         0, 0, index, index, source_data.mask
                         );
-                //fprintf( stdout, "%'zu - done derivs\n", index );
                 lon_deriv.at(index) = lon_deriv_val;
                 lat_deriv.at(index) = lat_deriv_val;
-
-                /*
-                for ( II = 0; II < num_neighbours+1; II++ ) {
-                    if (II < num_neighbours) {
-                        value = source_data.variables["to_interp"].at(source_data.adjacency_indices.at(index).at(II));
-                    } else {
-                        value = source_data.variables["to_interp"].at(index);
-                    }
-
-                    weight = source_data.adjacency_ddlat_weights.at(index).at(II);
-                    lat_deriv.at(index) += value * weight;
-
-                    weight = source_data.adjacency_ddlon_weights.at(index).at(II);
-                    lon_deriv.at(index) += value * weight;
-                }
-                */
             }
 
         }
