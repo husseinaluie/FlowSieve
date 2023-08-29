@@ -99,7 +99,11 @@ int main(int argc, char *argv[]) {
                         &region_defs_var_name = input.getCmdOption("--region_definitions_var",     
                                                                    "region_definition",     
                                                                    asked_help,
-                                                                   "Name of the variable in the regions file that provides the region definitions.");
+                                                                   "Name of the variable in the regions file that provides the region definitions."),
+                        &coarse_map_grid_fname = input.getCmdOption("--coarse_map_grid",     
+                                                                   "none",     
+                                                                   asked_help,
+                                                                   "netCDF file containing user-specified lat/lon grid for coarsened maps." );
 
     // Also read in the fields to be filtered from commandline
     //   e.g. --variables "rho salinity p" (names must match with input netcdf file)
@@ -144,6 +148,11 @@ int main(int argc, char *argv[]) {
 
     // Apply some cleaning to the processor allotments if necessary. 
     source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
+
+    // Load in the coarsened grid, if applicable
+    if ( not( coarse_map_grid_fname == "none" ) ) {
+        source_data.prepare_for_coarsened_grids( coarse_map_grid_fname );
+    }
      
     // Convert to radians, if appropriate
     if ( latlon_in_degrees == "true" ) { convert_coordinates( source_data.longitude, source_data.latitude ); }
