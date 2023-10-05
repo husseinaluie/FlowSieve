@@ -31,6 +31,10 @@ void compute_zonal_avg_and_std(
     size_t index, area_index, int_index;
     double dA;
 
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf( stdout, "Computing zonal areas\n" ); }
+    #endif
+
     // First, get the zonal areas
     std::vector<double> zonal_areas( Ntime * Ndepth * Nlat, 0. );
     for (Itime = 0; Itime < Ntime; ++Itime) {
@@ -55,6 +59,10 @@ void compute_zonal_avg_and_std(
         }
     }
 
+
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf( stdout, "Computing zonal sums\n" ); }
+    #endif
 
     #pragma omp parallel default(none)\
     private( Ifield, Ilat, Ilon, Itime, Idepth, index, int_index, area_index, dA )\
@@ -90,6 +98,10 @@ void compute_zonal_avg_and_std(
             }
         }
     }
+
+    #if DEBUG >= 2
+    if (wRank == 0) { fprintf( stdout, "Normalizing to zonal means\n" ); }
+    #endif
 
     // Finally, normalize by zonal area
     for (Itime = 0; Itime < Ntime; ++Itime) {

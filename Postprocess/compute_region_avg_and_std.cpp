@@ -55,7 +55,7 @@ void compute_region_avg_and_std(
         #pragma omp parallel default(none)\
         private(Ilat, Ilon, index, dA, area_index, increment, int_index, \
                 Idepth, Itime, Iregion )\
-        shared( source_data, Ifield, postprocess_fields) \
+        shared( source_data, Ifield, postprocess_fields, stderr) \
         firstprivate( Nlon, Nlat, Ndepth, Ntime, num_regions ) \
         reduction(vec_double_plus : field_integrals)
         { 
@@ -73,6 +73,10 @@ void compute_region_avg_and_std(
                                     area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
                                     dA = source_data.areas.at(area_index);
                                     increment = postprocess_fields.at(Ifield)->at(index) * dA;
+                                    if ( postprocess_fields.at(Ifield)->at(index) == constants::fill_value ) {
+                                        //fprintf( stderr, "A fill value was not masked out!\n" );
+                                        increment = 0;
+                                    }
 
                                     if ( source_data.regions.at( source_data.region_names.at(Iregion) ).at(area_index) )
                                     {

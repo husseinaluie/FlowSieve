@@ -133,10 +133,12 @@ void Apply_Postprocess_Routines(
 
         std::vector< std::vector< double > >
             zonal_averages(num_fields, std::vector<double>(Ntime * Ndepth * Nlat, 0.)), 
-            zonal_std_devs(num_fields, std::vector<double>(Ntime * Ndepth * Nlat, 0.));
+            zonal_std_devs(num_fields, std::vector<double>(Ntime * Ndepth * Nlat, 0.)),
+            zonal_medians(num_fields, std::vector<double>(Ntime * Ndepth * Nlat, 0.));
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         compute_zonal_avg_and_std( zonal_averages, zonal_std_devs, source_data, postprocess_fields );
+        compute_zonal_median( zonal_medians, source_data, postprocess_fields );
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_zonal_means");  }
 
         #if DEBUG >= 1
@@ -146,7 +148,7 @@ void Apply_Postprocess_Routines(
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         write_zonal_avg_and_std(
-            zonal_averages, zonal_std_devs, vars_to_process, filename,
+            zonal_averages, zonal_std_devs, zonal_medians, vars_to_process, filename,
             Stime, Sdepth, Ntime, Ndepth, Nlat, num_fields
             );
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_writing");  }
