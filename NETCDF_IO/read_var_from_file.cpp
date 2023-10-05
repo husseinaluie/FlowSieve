@@ -253,6 +253,7 @@ void read_var_from_file(
     #endif
 
     // Masked if equal to fill value
+    size_t num_zeros = 0;
     for (size_t II = 0; II < var.size(); II++) {
         if ( var.at(II) == fill_val ) {
             if (constants::FILTER_OVER_LAND) {
@@ -274,6 +275,8 @@ void read_var_from_file(
             if (scale  != 1.) { var.at(II) = var.at(II) * scale; }
             if (offset != 0.) { var.at(II) = var.at(II) + offset; }
         }
+
+        if (var.at(II) == 0) { num_zeros++; }
     }
 
     var_max = var_max * scale + offset;
@@ -291,6 +294,7 @@ void read_var_from_file(
     if (wRank == 0) { 
         fprintf(stdout, "  var_max = %g\n", var_max);
         fprintf(stdout, "  var_min = %g\n", var_min);
+        fprintf(stdout, "  num zeros = %zu\n", num_zeros);
         fprintf(stdout, "\n\n"); 
     }
     #endif
