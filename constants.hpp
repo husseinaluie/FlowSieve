@@ -316,7 +316,9 @@ namespace constants
      *  4 = tanh        ( 1 - tanh( (x - 1) / (0.1) )  )
      * @ingroup constants
      */
-    const int KERNEL_OPT = 4;
+    //const int KERNEL_OPT = 4;
+    enum KernelType : int { TopHat, HyperGaussian, Gaussian, Sinc, SmoothHat, HighOrder };
+    const int KERNEL_OPT = KernelType::SmoothHat;
 
     /*!
      * \param KernPad
@@ -329,11 +331,12 @@ namespace constants
     const double KernPad = 2.5;
     /*
     switch (KERNEL_OPT) {
-        case 0: const double KernPad =  1.1;
-        case 1: const double KernPad =  2.5;  // exp(-2.5^4) ~1e-17
-        case 2: const double KernPad =  5.;   // exp(-5^2)   ~1e-11
-        case 3: const double KernPad = -1.;
-        case 4: const double KernPad =  2.5;
+        case TopHat: const double KernPad =  1.1;
+        case HyperGaussian: const double KernPad =  2.5;  // exp(-2.5^4) ~1e-17
+        case Gaussian: const double KernPad =  5.;   // exp(-5^2)   ~1e-11
+        case Sinc: const double KernPad = -1.;
+        case SmoothHat: const double KernPad =  2.5;
+        case HighOrder: const double KernPad =  2.5;
     }
     */
 
@@ -358,13 +361,17 @@ namespace constants
         { "coarse_u_lat",       "Coarse-grained meridional velocity." },
         { "coarse_KE",          "Kinetic energy of coarse-grained velocity" },
         { "fine_KE",            "Small-scale kinetic energy ( filter(KE(u)) - KE(filter(u)) )" },
+        { "Fine_KE_mod",        "Modified small-scale kinetic energy ( KE(u) - KE(filter(u)) )" },
         { "enstrophy",          "Enstrophy of coarse-grained velocity" },
         { "Pi",                 "Non-linear energy transfer from large-scales to small-scales" },
         { "Z",                  "Non-linear enstrophy transfer from large-scales to small-scales" },
         { "OkuboWeiss",         "Okubo-Weiss parameter ( positive -> strain dominated, negative -> vortex dominated )" },
         { "div_Jtransport",     "divergence of energy transport term" },
         { "coarse_vort_r",      "Radial (z) vorticity of coarse-grained velocity." },
-        { "coarse_vel_div",     "Divergence of the coarse-grained velocity" }
+        { "coarse_vel_div",     "Divergence of the coarse-grained velocity" },
+        { "u_lon",              "Zonal (eastward) velocity" },
+        { "u_lat",              "Meridional (westward) velocity" },
+        { "velocity_divergence","2D divergence of (u_lon,u_lat)" }
     };
 
     /*!
@@ -385,7 +392,10 @@ namespace constants
         { "OkuboWeiss",         "1 / (s^2)" },
         { "div_Jtransport",     "Watt / (m^3)" },
         { "coarse_vort_r",      "1 / s" },
-        { "coarse_vel_div",     "1 / s" }
+        { "coarse_vel_div",     "1 / s" },
+        { "u_lon",              "m / s" },
+        { "u_lat",              "m / s" },
+        { "velocity_divergence","1 / s" }
     };
 
 

@@ -21,6 +21,8 @@
  */
 void compute_local_kernel(
         std::vector<double> & local_kernel,
+        std::vector<double> & local_dl_kernel,
+        std::vector<double> & local_dll_kernel,
         const double scale,
         const dataset & source_data,
         const int Ilat,
@@ -44,6 +46,9 @@ void compute_local_kernel(
     const double    lat_at_ilat = latitude.at(Ilat),
                     lon_at_ilon = longitude.at(Ilon);
     double lat_at_curr;
+
+    const bool do_dl  = (local_dl_kernel.size() > 0),
+               do_dll = (local_dll_kernel.size() > 0);
 
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
@@ -74,8 +79,11 @@ void compute_local_kernel(
                                 longitude.at(curr_lon), lat_at_curr);
             }
             kern = kernel(dist, scale);
-
             local_kernel.at(index) = kern;
+
+            // Also get the first and second ell-derivatives of the kernel
+            if (do_dl) { local_dl_kernel.at(index)  = kernel(dist, scale, 1); }
+            if (do_dll) { local_dll_kernel.at(index) = kernel(dist, scale, 2); }
 
         }
     }

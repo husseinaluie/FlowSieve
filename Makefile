@@ -111,7 +111,14 @@ $(TOROIDAL_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 
-# Get list of toroidal projection files
+# Get list of direct filtering files
+DIRECT_FILTER_CPPS := $(wildcard  Functions/DirectFilter/*.cpp)
+DIRECT_FILTER_OBJS := $(addprefix Functions/DirectFilter/,$(notdir $(DIRECT_FILTER_CPPS:.cpp=.o)))
+
+$(DIRECT_FILTER_OBJS): %.o : %.cpp constants.hpp
+	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS)
+
+# Get list of Helmholtz filtering files
 HELMHOLTZ_CPPS := $(wildcard  Functions/Helmholtz/*.cpp)
 HELMHOLTZ_OBJS := $(addprefix Functions/Helmholtz/,$(notdir $(HELMHOLTZ_CPPS:.cpp=.o)))
 
@@ -204,7 +211,7 @@ CORE_TARGET_OBJS := Case_Files/coarse_grain.o \
 $(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-$(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} %.o
+$(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${DIRECT_FILTER_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 
@@ -241,7 +248,8 @@ TOROID_TARGET_EXES := 	Case_Files/toroidal_projection.x \
 						Case_Files/refine_Helmholtz_seed.x \
 						Case_Files/Pi_helm_breakdown.x \
 						Case_Files/thermal_wind.x \
-						Case_Files/compute_radial_velocity.x
+						Case_Files/compute_radial_velocity.x \
+						Case_Files/Johnson_decomp.x
 TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
 						Case_Files/potential_projection.o \
 						Case_Files/Helmholtz_projection.o \
@@ -254,7 +262,8 @@ TOROID_TARGET_OBJS := 	Case_Files/toroidal_projection.o \
 						Case_Files/refine_Helmholtz_seed.o \
 						Case_Files/Pi_helm_breakdown.o \
 						Case_Files/thermal_wind.o \
-						Case_Files/compute_radial_velocity.o
+						Case_Files/compute_radial_velocity.o \
+						Case_Files/Johnson_decomp.o
 
 $(TOROID_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 

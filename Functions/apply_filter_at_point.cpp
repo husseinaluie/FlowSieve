@@ -24,6 +24,10 @@
  */
 void apply_filter_at_point(
         std::vector<double*> & coarse_vals,
+        std::vector<double*> & dl_coarse_vals,
+        std::vector<double*> & dll_coarse_vals,
+        double & dl_kernel_val,
+        double & dll_kernel_val,
         const std::vector<const std::vector<double>*> & fields,
         const dataset & source_data,
         const int Itime,
@@ -35,6 +39,8 @@ void apply_filter_at_point(
         const double scale,
         const std::vector<bool> & use_mask,
         const std::vector<double> & local_kernel,
+        const std::vector<double> & local_dl_kernel,
+        const std::vector<double> & local_dll_kernel,
         const std::vector<double> * weight
         ) {
 
@@ -52,16 +58,23 @@ void apply_filter_at_point(
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
-    double kern, area, loc_val, loc_weight;
+    double kern, dl_kern, dll_kern, area, loc_val, loc_weight;
     size_t index, kernel_index;
 
-    double  kA_sum   = 0.;
-    std::vector<double> tmp_vals(Nfields);
+    double  kA_sum   = 0.,
+            kpA_sum  = 0.,
+            kppA_sum = 0;
+    std::vector<double> tmp_vals(Nfields, 0.),
+                        tmp_dl_vals(Nfields, 0.),
+                        tmp_dll_vals(Nfields, 0.);
 
     int curr_lon, curr_lat, LON_lb, LON_ub;
 
     double lat_at_curr;
     const double lat_at_ilat = latitude.at(Ilat);
+
+    const bool do_dl  = ( dl_coarse_vals.size() > 0),
+               do_dll = ( dll_coarse_vals.size() > 0);
 
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
@@ -88,28 +101,41 @@ void apply_filter_at_point(
             }
             #if DEBUG >= 1
             kern = local_kernel.at(kernel_index);
+            if (do_dl) { dl_kern  = local_dl_kernel.at(kernel_index); }
+            if (do_dll) { dll_kern = local_dll_kernel.at(kernel_index); }
             area = dAreas.at(kernel_index);
             bool is_water = mask.at(index);
             #else
             kern = local_kernel[kernel_index];
+            if (do_dl) { dl_kern  = local_dl_kernel[kernel_index]; }
+            if (do_dll) { dll_kern = local_dll_kernel[kernel_index]; }
             area = dAreas[kernel_index];
             bool is_water = mask[index];
             #endif
             loc_weight = kern * area;
 
+            if (weight != NULL) { loc_weight *= weight->at(index); }
+
             // If cell is water, or if we're not deforming around land, then include the cell area in the denominator
-            if ( not(constants::DEFORM_AROUND_LAND) or is_water ) { kA_sum += loc_weight; }
+            if ( not(constants::DEFORM_AROUND_LAND) or is_water ) { 
+                kA_sum   += loc_weight; 
+                kpA_sum  += dl_kern * area; 
+                kppA_sum += dll_kern * area; 
+            }
 
             // If we are not using the mask, or if we are on a water cell, include the value in the numerator
-            if (weight != NULL) { loc_weight *= weight->at(index); }
             if ( is_water ) {
                 for (size_t II = 0; II < Nfields; ++II) {
                     #if DEBUG >= 1
                     loc_val = fields.at(II)->at(index);
-                    tmp_vals.at(II) += loc_val * loc_weight;
+                    tmp_vals.at(II)     += loc_val * loc_weight;
+                    if (do_dl) { tmp_dl_vals.at(II)  += loc_val * dl_kern * area; }
+                    if (do_dl) { tmp_dll_vals.at(II) += loc_val * dll_kern * area; }
                     #else
                     loc_val = fields[II]->at(index);
-                    tmp_vals[II] += loc_val * loc_weight;
+                    tmp_vals[II]     += loc_val * loc_weight;
+                    if (do_dl) { tmp_dl_vals[II]  += loc_val * dl_kern * area; }
+                    if (do_dl) { tmp_dll_vals[II] += loc_val * dll_kern * area; }
                     #endif
                 }
             }
@@ -118,6 +144,17 @@ void apply_filter_at_point(
 
     // On the off chance that the kernel was null (size zero), just return zero
     for (size_t II = 0; II < Nfields; ++II) {
-        if (coarse_vals.at(II) != NULL) { *(coarse_vals.at(II)) = (kA_sum == 0) ? 0. : tmp_vals.at(II) / kA_sum; }
+        if (coarse_vals.at(II) != NULL) { 
+            *(coarse_vals.at(II)) = (kA_sum == 0) ? 0. : tmp_vals.at(II) / kA_sum; 
+        }
+        if ((do_dl) and (dl_coarse_vals.at(II) != NULL)) { 
+            *(dl_coarse_vals.at(II)) = (kpA_sum == 0) ? 0. : tmp_dl_vals.at(II) / kpA_sum; 
+        }
+        if ((do_dll) and (dll_coarse_vals.at(II) != NULL)) { 
+            *(dll_coarse_vals.at(II)) = (kppA_sum == 0) ? 0. : tmp_dll_vals.at(II) / kppA_sum; 
+        }
+
     }
+    if (do_dl)  { dl_kernel_val  = (kA_sum == 0) ? 0. : kpA_sum / kA_sum;  }
+    if (do_dll) { dll_kernel_val = (kA_sum == 0) ? 0. : kppA_sum / kA_sum; }
 }

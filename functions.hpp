@@ -161,6 +161,8 @@ double distance(const double lon1,     const double lat1,
 
 void compute_local_kernel(
         std::vector<double> & local_kernel,
+        std::vector<double> & local_dl_kernel,
+        std::vector<double> & local_dl2_kernel,
         const double scale,
         const dataset & source_data,
         const int Ilat,     const int Ilon,
@@ -230,7 +232,11 @@ void filtering_helmholtz(
         );
 
 void apply_filter_at_point(
-        std::vector<double*> & coarse_val,   
+        std::vector<double*> & coarse_vals,   
+        std::vector<double*> & dl_coarse_vals,
+        std::vector<double*> & dll_coarse_vals,
+        double & dl_kernel_val,
+        double & dll_kernel_val,
         const std::vector<const std::vector<double>*> & fields,
         const dataset & source_data,
         const int Itime,  const int Idepth, const int Ilat, const int Ilon,
@@ -239,10 +245,12 @@ void apply_filter_at_point(
         const double scale,
         const std::vector<bool> & use_mask,
         const std::vector<double> & local_kernel,
+        const std::vector<double> & local_dl_kernel,
+        const std::vector<double> & local_dll_kernel,
         const std::vector<double> * weight = NULL
         );
 
-double kernel(const double distance, const double scale);
+double kernel(const double distance, const double scale, const int deriv_order = 0);
 
 double kernel_alpha(void);
 
@@ -252,6 +260,9 @@ void compute_vorticity_at_point(
         double & vort_lat_tmp,
         double & div_tmp,
         double & OkuboWeiss_tmp,
+        double & cyclonic_energy,
+        double & anticyclonic_energy,
+        double & strain_energy,
         const dataset & source_data,
         const std::vector<double> & u_r, 
         const std::vector<double> & u_lon, 
@@ -264,6 +275,9 @@ void compute_vorticity(
         std::vector<double> & vort_lat,
         std::vector<double> & vel_div,
         std::vector<double> & OkuboWeiss,
+        std::vector<double> & cyclonic_energy,
+        std::vector<double> & anticyclonic_energy,
+        std::vector<double> & strain_energy,
         const dataset & source_data,
         const std::vector<double> & u_r, 
         const std::vector<double> & u_lon, 
@@ -416,6 +430,30 @@ void compute_spatial_average(
         const int Nlat,
         const int Nlon,
         const std::vector<bool> & mask);
+
+void compute_KE_spectra_and_slopes( 
+        std::vector<double> & u_spectrum_tot, 
+        std::vector<double> & u_spectrum_tor, 
+        std::vector<double> & u_spectrum_pot,
+        std::vector<double> & v_spectrum_tot, 
+        std::vector<double> & v_spectrum_tor, 
+        std::vector<double> & v_spectrum_pot,
+        std::vector<double> & spec_slope_tot, 
+        std::vector<double> & spec_slope_tor, 
+        std::vector<double> & spec_slope_pot,
+        const std::vector<double> & u_lon_tot, 
+        const std::vector<double> & u_lon_tor, 
+        const std::vector<double> & u_lon_pot,
+        const std::vector<double> & u_lat_tot, 
+        const std::vector<double> & u_lat_tor, 
+        const std::vector<double> & u_lat_pot,
+        const std::vector<double> & dl_coarse_Phi, 
+        const std::vector<double> & dl_coarse_Psi,
+        const std::vector<double> & dll_coarse_Phi, 
+        const std::vector<double> & dll_coarse_Psi,
+        const dataset & source_data,
+        const double filter_scale
+        );
 
 void get_lat_bounds(
         int & LAT_lb,

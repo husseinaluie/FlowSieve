@@ -27,6 +27,9 @@ void compute_vorticity_at_point(
         double & vort_lat_tmp,
         double & div_tmp,
         double & OkuboWeiss_tmp,
+        double & cyclonic_energy,
+        double & anticyclonic_energy,
+        double & strain_energy,
         const dataset & source_data,
         const std::vector<double> & u_r,
         const std::vector<double> & u_lon,
@@ -126,9 +129,28 @@ void compute_vorticity_at_point(
         //
         //// Now the Okubo-Weiss parameter
         //
-        const double    s_n = ( cos_lat * ulon_lon - ulat_lat ) / constants::R_earth,
-                        s_s = ( cos_lat * ulat_lon + ulon_lat ) / constants::R_earth;
+        const double    sec_lat = 1. / cos_lat,
+                        S_11 = (sec_lat * ulon_lon - tan_lat * u_lat_loc) / constants::R_earth,
+                        S_22 = ulat_lat / constants::R_earth,
+                        S_12 = 0.5 * ( sec_lat * ulat_lon + tan_lat * u_lon_loc + ulon_lat ) / constants::R_earth;
+
+        const double    s_n = ( S_11 - S_22 ),
+                        s_s = 2 * S_12;
+
+        //const double    s_n = ( cos_lat * ulon_lon - ulat_lat ) / constants::R_earth,
+        //                s_s = ( cos_lat * ulat_lon + ulon_lat ) / constants::R_earth;
         OkuboWeiss_tmp = pow(s_n, 2) + pow(s_s, 2) - pow(vort_r_tmp, 2);
+
+
+        // Johnson-decomposed Energy
+        if ( vort_r_tmp * lat >= 0 ) {
+            cyclonic_energy = pow(vort_r_tmp, 2);
+            anticyclonic_energy = 0.;
+        } else {
+            cyclonic_energy = 0.;
+            anticyclonic_energy = pow(vort_r_tmp, 2);
+        }
+        strain_energy = pow( S_11, 2) + 2 * pow( S_12, 2) + pow( S_22, 2 );
 
     }
 }
