@@ -36,15 +36,12 @@ void compute_coarsened_map(
     int Ifield, Itime, Idepth, Ilat, Ilon, Ilat_coarse, Ilon_coarse,
         lat_LB, lat_UB, lon_LB, lon_UB;
     size_t coarse_index, index;
+    bool is_water;
 
     std::vector<double> coarsened_areas( postprocess_fields[0]->size(), 0. );
-    #if DEBUG >= 1
-    if (wRank == 0) { fprintf(stdout, "  Computing coarsened areas\n"); }
-    fflush(stdout);
-    #endif
 
     #pragma omp parallel default(none)\
-    private(Ilat, Ilon, index, coarse_index, dA, \
+    private(Ilat, Ilon, index, coarse_index, dA, is_water, \
             Idepth, Itime, lat_LB, lat_UB, lon_LB, lon_UB )\
     shared( source_data, latitude, longitude, coarse_latitude, coarse_longitude, coarsened_areas ) \
     firstprivate( Nlon, Nlat, Ndepth, Ntime, Nlat_coarse, Nlon_coarse )
@@ -75,9 +72,14 @@ void compute_coarsened_map(
 
                         for ( Ilat = lat_LB; Ilat < lat_UB; Ilat++ ) {
                             for ( Ilon = lon_LB; Ilon < lon_UB; Ilon++ ) {
-                                index = Index(0, 0, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
-                                dA = source_data.areas.at(index);
-                                coarsened_areas.at(coarse_index) += dA;
+                                index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                                is_water = source_data.mask.at(index);
+
+                                if (is_water) {
+                                    index = Index(0, 0, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                                    dA = source_data.areas.at(index);
+                                    coarsened_areas.at(coarse_index) += dA;
+                                }
                             }
                         }
                     }
@@ -102,7 +104,7 @@ void compute_coarsened_map(
         #endif
 
         #pragma omp parallel default(none)\
-        private(Ilat, Ilon, index, coarse_index, dA, dA_coarse, increment, \
+        private(Ilat, Ilon, index, coarse_index, dA, dA_coarse, increment, is_water, \
                 Idepth, Itime, lat_LB, lat_UB, lon_LB, lon_UB )\
         shared( source_data, Ifield, coarsened_maps, postprocess_fields, latitude, longitude, \
                 coarse_latitude, coarse_longitude, coarsened_areas ) \
@@ -135,14 +137,19 @@ void compute_coarsened_map(
 
                             for ( Ilat = lat_LB; Ilat < lat_UB; Ilat++ ) {
                                 for ( Ilon = lon_LB; Ilon < lon_UB; Ilon++ ) {
-                                    index = Index(0, 0, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
-                                    dA = source_data.areas.at(index);
-
                                     index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                                    is_water = source_data.mask.at(index);
 
-                                    increment = (dA_coarse > 0) ? (postprocess_fields.at(Ifield)->at(index) * dA / dA_coarse) : 0.;
+                                    if (is_water) {
+                                        index = Index(0, 0, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                                        dA = source_data.areas.at(index);
 
-                                    coarsened_maps.at(Ifield).at( coarse_index ) += increment;
+                                        index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+
+                                        increment = (dA_coarse > 0) ? (postprocess_fields.at(Ifield)->at(index) * dA / dA_coarse) : 0.;
+
+                                        coarsened_maps.at(Ifield).at( coarse_index ) += increment;
+                                    }
                                 }
                             }
                         }
