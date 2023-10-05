@@ -33,6 +33,15 @@ void extend_mask_to_poles(
     int Itime, Idepth, Ilat, Ilon;
     size_t extended_index, index;
 
+    /*
+    #if DEBUG >= 2
+    fprintf( stdout, "    Original mask size: %'zu, vs extended size: %'zu\n",
+                mask_to_extend.size(), extended_mask.size() );
+    fprintf( stdout, "    Orininal lat (%'zu) vs extended lat (%'zu) and shifted start (%d)\n",
+                     Nlat, extended_latitude.size(), Ilat_start );
+    #endif
+    */
+
     // Copy from the original mask into a padded one
     #pragma omp parallel \
     default(none) \
