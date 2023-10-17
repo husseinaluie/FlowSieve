@@ -144,11 +144,11 @@ void compute_vorticity_at_point(
 
         // Johnson-decomposed Energy
         if ( vort_r_tmp * lat >= 0 ) {
-            cyclonic_energy = pow(vort_r_tmp, 2);
+            cyclonic_energy = 2 * pow(0.5 * vort_r_tmp, 2);
             anticyclonic_energy = 0.;
         } else {
             cyclonic_energy = 0.;
-            anticyclonic_energy = pow(vort_r_tmp, 2);
+            anticyclonic_energy = 2 * pow(0.5 * vort_r_tmp, 2);
         }
         strain_energy = pow( S_11, 2) + 2 * pow( S_12, 2) + pow( S_22, 2 );
 
