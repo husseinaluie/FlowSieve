@@ -78,6 +78,9 @@ void dataset::load_variable(
 
     // Add a new entry to the variables dictionary with an empty array
     variables.insert( std::pair< std::string, std::vector<double> >( var_name, std::vector<double>() ) );
+    
+    const int force_split_dim = -1;
+    const double land_fill_value = 0;
 
     // Now read in from the file and store in the variables dictionary
     read_var_from_file( variables.at( var_name ), var_name_in_file, filename, 
@@ -85,11 +88,13 @@ void dataset::load_variable(
                         load_counts ? &myCounts : NULL, 
                         load_counts ? &myStarts : NULL, 
                         Nprocs_in_time, Nprocs_in_depth,
-                        do_splits );
+                        do_splits, force_split_dim, land_fill_value, 
+                        (Nprocs_in_quadrature == 1) ? MPI_COMM_WORLD : MPI_subcomm_samequadrature );
 };
 
 void dataset::check_processor_divisions(    const int Nprocs_in_time_input, 
                                             const int Nprocs_in_depth_input, 
+                                            const int Nprocs_in_quad_input, 
                                             const MPI_Comm ) {
 
     assert( (full_Ntime > 0) and (full_Ndepth > 0) and (Nlon > 0) and (Nlat > 0) ); // Must read in dimensions before checking processor divisions.
@@ -100,39 +105,71 @@ void dataset::check_processor_divisions(    const int Nprocs_in_time_input,
 
     // Apply some cleaning to the processor allotments if necessary. 
     Nprocs_in_time  = ( full_Ntime  == 1 ) ? 1 : 
-                      ( full_Ndepth == 1 ) ? wSize : 
+                      ( full_Ndepth == 1 ) ? wSize / Nprocs_in_quad_input : 
                                              Nprocs_in_time_input;
     Nprocs_in_depth = ( full_Ndepth == 1 ) ? 1 : 
-                      ( full_Ntime  == 1 ) ? wSize : 
+                      ( full_Ntime  == 1 ) ? wSize / Nprocs_in_quad_input : 
                                              Nprocs_in_depth_input;
+    Nprocs_in_quadrature = ( full_Ntime * full_Ndepth == 1 ) ? wSize : Nprocs_in_quad_input;
 
     #if DEBUG >= 0
     if (Nprocs_in_time != Nprocs_in_time_input) { 
-        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in time to %'d from %'d\n", Nprocs_in_time, Nprocs_in_time_input); }
+        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in time to %'d from %'d\n", 
+                Nprocs_in_time, Nprocs_in_time_input); }
     }
     if (Nprocs_in_depth != Nprocs_in_depth_input) { 
-        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in depth to %'d from %'d\n", Nprocs_in_depth, Nprocs_in_depth_input); }
+        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in depth to %'d from %'d\n", 
+                Nprocs_in_depth, Nprocs_in_depth_input); }
+    }
+    if (Nprocs_in_quadrature != Nprocs_in_quad_input) { 
+        if (wRank == 0) { fprintf(stdout, " WARNING!! Changing number of processors in quadrature to %'d from %'d\n", 
+                Nprocs_in_quadrature, Nprocs_in_quad_input); }
     }
     if (wRank == 0) { fprintf(stdout, " Nproc(time, depth) = (%'d, %'d)\n\n", Nprocs_in_time, Nprocs_in_depth); }
     #endif
 
-    assert( Nprocs_in_time * Nprocs_in_depth == wSize );
+    assert( Nprocs_in_time * Nprocs_in_depth * Nprocs_in_quadrature == wSize );
 
     // Now that processor divisions have been tested, also create the sub-communicator items
     int color, key;
 
     // communicator for ranks with the same times
-    color = wRank / Nprocs_in_depth;
-    key   = wRank % Nprocs_in_depth;
+    color = (wRank % (Nprocs_in_depth*Nprocs_in_time)) / Nprocs_in_depth;
+    key   = (wRank % (Nprocs_in_depth*Nprocs_in_time)) % Nprocs_in_depth;
     MPI_Comm_split( MPI_Comm_Global, color, key, &MPI_subcomm_sametimes); 
     #if DEBUG >= 2
-    fprintf( stdout, "Processor %d has time-color %d and depth-color %d.\n", wRank, color, key );
+    fprintf( stdout, "Processor %d has time color %d and rank %d.\n", wRank, color, key );
     #endif
 
     // communicator for ranks with the same depths
-    color = wRank % Nprocs_in_depth;
-    key   = wRank / Nprocs_in_depth;
+    color = (wRank % (Nprocs_in_depth*Nprocs_in_time)) % Nprocs_in_depth;
+    key   = (wRank % (Nprocs_in_depth*Nprocs_in_time)) / Nprocs_in_depth;
     MPI_Comm_split( MPI_Comm_Global, color, key, &MPI_subcomm_samedepths); 
+    #if DEBUG >= 2
+    fprintf( stdout, "Processor %d has depth color %d and rank %d.\n", wRank, color, key );
+    #endif
+
+
+    // If we have processors for quadrature, we also need to split the communicator
+    // there was well. In particular, we want processors to have the same colour
+    // if they correspond to the same times and depths
+    color = wRank % ( Nprocs_in_time * Nprocs_in_depth );
+    key   = wRank / ( Nprocs_in_time * Nprocs_in_depth );
+    MPI_Comm_split( MPI_Comm_Global, color, key, &MPI_subcomm_sametimedepths); 
+    #if DEBUG >= 2
+    fprintf( stdout, "Processor %d has time-depth color %d and rank %d.\n", wRank, color, key );
+    #endif
+
+    
+    color = wRank / ( Nprocs_in_time * Nprocs_in_depth );
+    key   = wRank % ( Nprocs_in_time * Nprocs_in_depth );
+    MPI_Comm_split( MPI_Comm_Global, color, key, &MPI_subcomm_samequadrature); 
+    #if DEBUG >= 2
+    if (Nprocs_in_quadrature > 1) {
+        fprintf( stdout, "Processor %d has quadrature color %d and rank %d.\n", wRank, color, key );
+    }
+    #endif
+
 }
 
 

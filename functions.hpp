@@ -30,7 +30,7 @@ class dataset {
         //
 
         // Storage for processor assignments
-        int Nprocs_in_time, Nprocs_in_depth;
+        int Nprocs_in_time, Nprocs_in_depth, Nprocs_in_quadrature = 1;
 
         // Vectors to store the dimension variables
         std::vector<double> time, depth, latitude, longitude;
@@ -39,8 +39,10 @@ class dataset {
 
         // MPI Communicator Objects
         MPI_Comm MPI_Comm_Global = MPI_COMM_WORLD;
-        MPI_Comm MPI_subcomm_sametimes;
-        MPI_Comm MPI_subcomm_samedepths;
+        MPI_Comm MPI_subcomm_sametimes,
+                 MPI_subcomm_samedepths,
+                 MPI_subcomm_sametimedepths,
+                 MPI_subcomm_samequadrature = MPI_COMM_WORLD;
 
         // Store cell areas
         std::vector<double> areas;
@@ -108,6 +110,7 @@ class dataset {
         // Check the processors divions between dimensions
         void check_processor_divisions( const int Nprocs_in_time_input, 
                                         const int Nprocs_in_depth_input, 
+                                        const int Nprocs_in_quad_input = 1, 
                                         const MPI_Comm = MPI_COMM_WORLD );
 
         // Function to gather a variable across all depths (i.e. reconstruct depth profile)

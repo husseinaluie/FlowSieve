@@ -90,9 +90,11 @@ int main(int argc, char *argv[]) {
     const std::string &latlon_in_degrees  = input.getCmdOption("--is_degrees",   "true", asked_help);
 
     const std::string   &Nprocs_in_time_string  = input.getCmdOption("--Nprocs_in_time",  "1", asked_help),
-                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1", asked_help);
+                        &Nprocs_in_depth_string = input.getCmdOption("--Nprocs_in_depth", "1", asked_help),
+                        &Nprocs_in_quad_string  = input.getCmdOption("--Nprocs_in_quadrature", "1", asked_help);
     const int   Nprocs_in_time_input  = stoi(Nprocs_in_time_string),
-                Nprocs_in_depth_input = stoi(Nprocs_in_depth_string);
+                Nprocs_in_depth_input = stoi(Nprocs_in_depth_string),
+                Nprocs_in_quad_input  = stoi(Nprocs_in_quad_string);
 
     const std::string   &region_defs_fname    = input.getCmdOption("--region_definitions_file",    
                                                                    "region_definitions.nc", 
@@ -120,8 +122,8 @@ int main(int argc, char *argv[]) {
     const std::string   &filter_scale_string  = input.getCmdOption("--filter_scale",  "1e4", asked_help);
     const double   filter_scale  = stod(filter_scale_string);
 
-    const std::string   &num_integration_steps_string  = input.getCmdOption("--integration_steps",  "2", asked_help);
-    const int num_integration_steps = stoi(num_integration_steps_string);
+    const std::string   &num_integration_steps_string  = input.getCmdOption("--integration_steps",  "-1", asked_help);
+    // this value will be fixed a bit later
 
     if (asked_help) { return 0; }
 
@@ -157,7 +159,12 @@ int main(int argc, char *argv[]) {
                               );
 
     // Apply some cleaning to the processor allotments if necessary. 
-    source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
+    //   and then get the size/rank in quadrature-space
+    source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input, Nprocs_in_quad_input );
+
+    int MPI_quad_Rank=-1, MPI_quad_Size=-1;
+    MPI_Comm_rank( source_data.MPI_subcomm_sametimedepths, &MPI_quad_Rank );
+    MPI_Comm_size( source_data.MPI_subcomm_sametimedepths, &MPI_quad_Size );
 
     // Load in the coarsened grid, if applicable
     if ( not( coarse_map_grid_fname == "none" ) ) {
@@ -191,6 +198,35 @@ int main(int argc, char *argv[]) {
                 Nlon    = source_data.Nlon;
     size_t Ivar, index;
 
+    // Set the number of quadrature steps
+    const int input_quad_steps = stoi(num_integration_steps_string);
+    const double Delta = constants::R_earth * M_PI / Nlat;
+    int computed_steps = std::max( 20 * sqrt( filter_scale / Delta ), 11.);
+
+    // This guarantees that the number of quadrature steps
+    // 1) is odd (required for Kronrod quadrature)
+    // 2) is an integer multiple of the number of quadrature MPI ranks
+    if ( source_data.Nprocs_in_quadrature > 1 ) {
+        if (input_quad_steps < 3) { 
+            assert( (source_data.Nprocs_in_quadrature % 2 == 1) && 
+                    "If auto-computing number of quadrature steps, must use an odd number of quadrature MPI tasks." );
+        }
+        computed_steps += source_data.Nprocs_in_quadrature - (computed_steps % source_data.Nprocs_in_quadrature);
+        computed_steps += (1 - (computed_steps%2)) * source_data.Nprocs_in_quadrature;
+
+    } else {
+        computed_steps += (computed_steps % 2) + 1;
+    }
+
+    const int num_integration_steps = (input_quad_steps >= 3) ? input_quad_steps : computed_steps;
+    if ( ( num_integration_steps < 3 ) or ( num_integration_steps % 2 == 0 ) ) {
+        fprintf( stderr, "Number of integration steps must be an odd number >= 3. Halting now.\n" );
+        return -1;
+    }
+    if (wRank == 0) { 
+        fprintf(stdout, "The ell-integral will be evaluated over %'d quadrature points.\n", num_integration_steps); 
+    }
+
     // Get mask : read in velocity to get the mask, and extend to the poles if needed
     source_data.load_variable( "sample_velocity", vel_field_var_name, vel_input_fname, true, true);
     const std::vector<bool> &mask = source_data.mask;
@@ -199,7 +235,8 @@ int main(int argc, char *argv[]) {
     //      so that we have both. Will be used to get 'water-only' region areas.
     if (constants::FILTER_OVER_LAND) { 
         read_mask_from_file( source_data.reference_mask, vel_field_var_name, vel_input_fname,
-               source_data.Nprocs_in_time, source_data.Nprocs_in_depth );
+               source_data.Nprocs_in_time, source_data.Nprocs_in_depth, 
+               true, -1, 0, source_data.MPI_subcomm_samequadrature );
     }
 
     if ( constants::EXTEND_DOMAIN_TO_POLES ) {
@@ -291,11 +328,11 @@ int main(int argc, char *argv[]) {
     //
     std::vector< double > 
             strain_energy(Npts, 0.), KE_strain(Npts,0.),
+            strain_energy_kronrod(Npts, 0.), current_strain(Npts,0.),
             cyclonic_energy(Npts, 0.), KE_cyclonic(Npts,0.),
+            cyclonic_energy_kronrod(Npts, 0.), current_cyclonic(Npts,0.),
             anticyclonic_energy(Npts, 0.), KE_anticyclonic(Npts,0.),
-            prev_strain(Npts, 0.), current_strain(Npts,0.),
-            prev_cyclonic(Npts, 0.), current_cyclonic(Npts,0.),
-            prev_anticyclonic(Npts, 0.), current_anticyclonic(Npts,0.),
+            anticyclonic_energy_kronrod(Npts, 0.), current_anticyclonic(Npts,0.),
             u_lon_tor(Npts,0), u_lon_pot(Npts, 0), u_lon_tot(Npts, 0),
             u_lat_tor(Npts,0), u_lat_pot(Npts, 0), u_lat_tot(Npts, 0);
     std::vector<double> null_vector(0);
@@ -321,22 +358,40 @@ int main(int argc, char *argv[]) {
     #endif
 
     //
-    //// Get the Gauss-Legendre quadrature weights and nodes
+    //// Get the Quadrature weights and nodes
     //
-    alglib::real_1d_array weights_array, nodes_array;
-    std::vector<double> quad_weights(num_integration_steps, 0),
-                        quad_nodes(num_integration_steps, 0);
-    weights_array.attach_to_ptr( num_integration_steps, &quad_weights[0] );
-    nodes_array.attach_to_ptr( num_integration_steps, &quad_nodes[0] );
+    alglib::real_1d_array weights_array, kronrod_weights_array, nodes_array;
+    std::vector<double> quad_weights(   num_integration_steps, 0.),
+                        kronrod_weights(num_integration_steps, 0.),
+                        quad_nodes(     num_integration_steps, 0.);
+    weights_array.attach_to_ptr(         num_integration_steps, &quad_weights[0] );
+    kronrod_weights_array.attach_to_ptr( num_integration_steps, &kronrod_weights[0] );
+    nodes_array.attach_to_ptr(           num_integration_steps, &quad_nodes[0] );
 
     alglib::ae_int_t info;
     //alglib::gqgenerategausslegendre( num_integration_steps, info, nodes_array, weights_array );
-    alglib::gqgenerategaussjacobi( num_integration_steps, 0, 1, info, nodes_array, weights_array );
+    //alglib::gqgenerategaussjacobi( num_integration_steps, 0, 1, info, nodes_array, weights_array );
+    alglib::gkqgenerategaussjacobi( num_integration_steps, 0, 1, info, 
+            nodes_array, kronrod_weights_array, weights_array );
+
+    // Check the info error code
+    if (info == -5) {
+        fprintf( stderr, "Quadrature weights error (-5). This should never have happened.\n" );
+    } else if (info == -4) {
+        fprintf( stderr, "Quadrature weights error (-4). This should never have happened.\n" );
+    } else if (info == -3) {
+        fprintf( stderr, "Quadrature weights error (-3). Solver did NOT converge on weights/nodes.\n" );
+    } else if (info == -1) {
+        fprintf( stderr, "Quadrature weights error (-1). Invalid number of integration nodes.\n" );
+    } else if (info == +2) {
+        fprintf( stderr, "Quadrature weights error (-1). Invalid number of integration nodes.\n" );
+    }
+
     for (size_t II = 0; II < num_integration_steps; ++II ) {
         // Adjust the weights and nodes to [0,ell] instead of [-1,1]
         nodes_array[II]   = (filter_scale/2.) * (1 + nodes_array[II]);
         weights_array[II] = (filter_scale/2.) * weights_array[II];
-        //if (wRank == 0) { fprintf( stdout, "%g -> %g\n", nodes_array[II], weights_array[II] ); }
+        kronrod_weights_array[II] = (filter_scale/2.) * kronrod_weights_array[II];
     }
     
 
@@ -344,13 +399,16 @@ int main(int argc, char *argv[]) {
     //// Apply filtering
     //
     double prev_scale = 0., scale_delta, scale_l2_d2;
-    for (size_t ell_ind = 0; ell_ind < num_integration_steps; ell_ind++) {
+    for (size_t ell_ind = MPI_quad_Rank; ell_ind < num_integration_steps; ell_ind += MPI_quad_Size) {
 
+        // Trapezoidal
         //scale_delta = filter_scale * ((double)ell_ind) / (num_integration_steps - 1.0);
+
+        // Quadrature (Gauss-Legendre and Gauss-Jacobi)
         scale_delta = nodes_array[ell_ind];
 
-        #if DEBUG >= 0
-        if (wRank == 0) { fprintf( stdout, "First filter scale %'g km.\n", scale_delta / 1e3 ); }
+        #if DEBUG >= 2
+        fprintf( stdout, "First filter scale %'g km.\n", scale_delta / 1e3 );
         #endif
 
         filter_fields.clear();
@@ -449,8 +507,8 @@ int main(int argc, char *argv[]) {
         // And now we need to filter those scalar fields, using scale
         scale_l2_d2 = sqrt( pow(filter_scale,2) - pow(scale_delta,2) );
 
-        #if DEBUG >= 0
-        if (wRank == 0) { fprintf( stdout, "secondary filtering at scale %'g km.\n", scale_l2_d2 / 1e3 ); }
+        #if DEBUG >= 2
+        fprintf( stdout, "  -  secondary scale = %'g km.\n", scale_l2_d2 / 1e3 );
         #endif
 
         filter_fields.clear();
@@ -535,56 +593,110 @@ int main(int argc, char *argv[]) {
         //double current_weight = 2 * scale_delta * weights_array[ell_ind];
 
         // Gauss-Jacobi
-        double current_weight = 2 * (filter_scale / 2.) * weights_array[ell_ind];
-
-        // Trapezoidal
-        //double current_weight = 2 * ( scale_delta - prev_scale ); 
+        // The ell/2 factor comes from unit conversions. Gauss-Jacobi automatically includes
+        // the scale_delta factor from our choice of alpha-beta.
+        double current_weight = 2 * (filter_scale / 2.) * weights_array[ell_ind],
+               kronrod_weight = 2 * (filter_scale / 2.) * kronrod_weights_array[ell_ind];
         if ( true ) {
             #pragma omp parallel \
             default( none ) \
-            shared( mask, strain_energy, current_strain, prev_strain, \
-                    cyclonic_energy, current_cyclonic, prev_cyclonic, \
-                    anticyclonic_energy, current_anticyclonic, prev_anticyclonic ) \
+            shared( mask, strain_energy, strain_energy_kronrod, current_strain, \
+                    cyclonic_energy, cyclonic_energy_kronrod, current_cyclonic, \
+                    anticyclonic_energy, anticyclonic_energy_kronrod, current_anticyclonic ) \
             private( index ) \
-            firstprivate( current_weight, scale_delta, prev_scale )
+            firstprivate( current_weight, kronrod_weight )
             {
                 #pragma omp for collapse(1) schedule(static)
                 for (index = 0; index < strain_energy.size(); ++index) {
                     if ( mask.at(index) ) {
+                        // Gauss-Legendre and Gauss-Jacobi
                         strain_energy.at(index)       += current_weight * current_strain.at(index);
                         cyclonic_energy.at(index)     += current_weight * current_cyclonic.at(index);
                         anticyclonic_energy.at(index) += current_weight * current_anticyclonic.at(index);
-                        /*
-                        strain_energy.at(index)       += current_weight * 
-                                                         0.5 * (  scale_delta * current_strain.at(index) 
-                                                                + prev_scale * prev_strain.at(index) );
-                        cyclonic_energy.at(index)     += current_weight * 
-                                                         0.5 * (  scale_delta * current_cyclonic.at(index) 
-                                                                + prev_scale * prev_cyclonic.at(index) );
-                        anticyclonic_energy.at(index) += current_weight * 
-                                                         0.5 * (  scale_delta * current_anticyclonic.at(index) 
-                                                                + prev_scale * prev_anticyclonic.at(index) );
-                        */
+
+                        strain_energy_kronrod.at(index)       += kronrod_weight * current_strain.at(index);
+                        cyclonic_energy_kronrod.at(index)     += kronrod_weight * current_cyclonic.at(index);
+                        anticyclonic_energy_kronrod.at(index) += kronrod_weight * current_anticyclonic.at(index);
                     }
                 }
             }
         }
-        /*
-        std::swap( current_strain, prev_strain );
-        std::swap( current_cyclonic, prev_cyclonic );
-        std::swap( current_anticyclonic, prev_anticyclonic );
-        */
         prev_scale = scale_delta;
 
 
     } // end ell loop
 
-    
+    // Now MPI-reduce across all of the processors that split up the quadrature work
+    if ( MPI_quad_Size > 1 ) {
+        MPI_Allreduce( MPI_IN_PLACE, &(strain_energy[0]),
+                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+        MPI_Allreduce( MPI_IN_PLACE, &(cyclonic_energy[0]),
+                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+        MPI_Allreduce( MPI_IN_PLACE, &(anticyclonic_energy[0]),
+                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+
+        MPI_Allreduce( MPI_IN_PLACE, &(strain_energy_kronrod[0]),
+                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+        MPI_Allreduce( MPI_IN_PLACE, &(cyclonic_energy_kronrod[0]),
+                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+        MPI_Allreduce( MPI_IN_PLACE, &(anticyclonic_energy_kronrod[0]),
+                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+    }
+
+    // Compute the error between kronrod and GJ quadratures
+    double area_sum=0, strain_error=0, cyclonic_error=0, anticyclonic_error=0, dA,
+           strain_ref=0, cyclonic_ref=0, anticyclonic_ref=0;
+    #pragma omp parallel \
+    default( none ) \
+    shared( mask, u_lon_tor, source_data, strain_energy, strain_energy_kronrod, \
+            cyclonic_energy, cyclonic_energy_kronrod, anticyclonic_energy, \
+            anticyclonic_energy_kronrod ) \
+    private( index, dA ) \
+    reduction( +:strain_error,cyclonic_error,anticyclonic_error,area_sum,strain_ref,cyclonic_ref,anticyclonic_ref )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for (index = 0; index < u_lon_tor.size(); ++index) {
+            if ( mask.at(index) ) {
+                dA = source_data.areas.at(index);
+                area_sum += dA;
+                strain_error += dA * pow( strain_energy_kronrod.at(index) - strain_energy.at(index) , 2);
+                cyclonic_error += dA * pow( cyclonic_energy_kronrod.at(index) - cyclonic_energy.at(index) , 2);
+                anticyclonic_error += dA * pow( anticyclonic_energy_kronrod.at(index) - anticyclonic_energy.at(index) , 2);
+
+                strain_ref += dA * pow( strain_energy_kronrod.at(index), 2);
+                cyclonic_ref += dA * pow( cyclonic_energy_kronrod.at(index), 2);
+                anticyclonic_ref += dA * pow( anticyclonic_energy_kronrod.at(index), 2);
+            }
+        }
+    }
+    strain_error = sqrt( strain_error / area_sum );
+    cyclonic_error = sqrt( cyclonic_error / area_sum );
+    anticyclonic_error = sqrt( anticyclonic_error / area_sum );
+
+    strain_ref = sqrt( strain_ref / area_sum );
+    cyclonic_ref = sqrt( cyclonic_ref / area_sum );
+    anticyclonic_ref = sqrt( anticyclonic_ref / area_sum );
+
+    if (wRank == 0) {
+        fprintf( stdout, "\n=== Convergence Metrics ===\n" );
+        fprintf( stdout, "Type        : Reference   , Error\n");
+        fprintf( stdout, "Strain      : %.6e, %.6e\n", strain_ref, strain_error);
+        fprintf( stdout, "Cyclonic    : %.6e, %.6e\n", cyclonic_ref, cyclonic_error);
+        fprintf( stdout, "Anticyclonic: %.6e, %.6e\n", anticyclonic_ref, anticyclonic_error);
+        fprintf( stdout, "=== ===\n\n" );
+    }
+
     // Create output file
     std::vector<std::string> output_names;
     output_names.push_back( "strain_KE" );
     output_names.push_back( "cyclonic_KE" );
     output_names.push_back( "anticyclonic_KE" );
+    
+    if (not(constants::MINIMAL_OUTPUT)) {
+        output_names.push_back( "strain_KE_QuadCompare" );
+        output_names.push_back( "cyclonic_KE_QuadCompare" );
+        output_names.push_back( "anticyclonic_KE_QuadCompare" );
+    }
 
     if (not(constants::NO_FULL_OUTPUTS)) {
         char fname [50];
@@ -606,9 +718,15 @@ int main(int argc, char *argv[]) {
         }
         size_t counts[ndims] = { size_t(Ntime),          size_t(Ndepth),         size_t(Nlat),           size_t(Nlon)           };
 
-        write_field_to_output( strain_energy, "strain_KE", starts, counts, fname, &source_data.mask );
-        write_field_to_output( cyclonic_energy, "cyclonic_KE", starts, counts, fname, &source_data.mask );
-        write_field_to_output( anticyclonic_energy, "anticyclonic_KE", starts, counts, fname, &source_data.mask );
+        write_field_to_output( strain_energy_kronrod, "strain_KE", starts, counts, fname, &source_data.mask );
+        write_field_to_output( cyclonic_energy_kronrod, "cyclonic_KE", starts, counts, fname, &source_data.mask );
+        write_field_to_output( anticyclonic_energy_kronrod, "anticyclonic_KE", starts, counts, fname, &source_data.mask );
+
+        if (not(constants::MINIMAL_OUTPUT)) {
+            write_field_to_output( strain_energy, "strain_KE_QuadCompare", starts, counts, fname, &source_data.mask );
+            write_field_to_output( cyclonic_energy, "cyclonic_KE_QuadCompare", starts, counts, fname, &source_data.mask );
+            write_field_to_output( anticyclonic_energy, "anticyclonic_KE_QuadCompare", starts, counts, fname, &source_data.mask );
+        }
     }
 
 
@@ -621,9 +739,9 @@ int main(int argc, char *argv[]) {
         std::vector<const std::vector<double>*> postprocess_fields;
         std::vector<std::string> postprocess_names;
 
-        postprocess_fields.push_back( &strain_energy );
-        postprocess_fields.push_back( &cyclonic_energy );
-        postprocess_fields.push_back( &anticyclonic_energy );
+        postprocess_fields.push_back( &strain_energy_kronrod );
+        postprocess_fields.push_back( &cyclonic_energy_kronrod );
+        postprocess_fields.push_back( &anticyclonic_energy_kronrod );
         postprocess_names.push_back( "strain_KE" );
         postprocess_names.push_back( "cyclonic_KE" );
         postprocess_names.push_back( "anticyclonic_KE" );
