@@ -83,7 +83,7 @@ void filtering_helmholtz(
 
     int LAT_lb, LAT_ub;
 
-    std::vector<double> local_kernel(Nlat * Nlon, 0.), 
+    std::vector<double> local_kernel( Nlat * Nlon, 0.), 
                         local_dl_kernel( Nlat*Nlon, 0. ),
                         local_dll_kernel( Nlat*Nlon, 0. );
 
@@ -619,10 +619,12 @@ void filtering_helmholtz(
     postprocess_fields_pot.push_back( &KE_pot_fine );
     postprocess_fields_tot.push_back( &KE_tot_fine );
 
+    /*
     postprocess_names.push_back( "Fine_KE_mod" );
     postprocess_fields_tor.push_back( &KE_tor_fine_mod );
     postprocess_fields_pot.push_back( &KE_pot_fine_mod );
     postprocess_fields_tot.push_back( &KE_tot_fine_mod );
+    */
 
     // KE spectra
     postprocess_names.push_back( "u_lon_spectrum" );
@@ -641,10 +643,12 @@ void filtering_helmholtz(
     postprocess_fields_pot.push_back( &spec_slope_pot );
     postprocess_fields_tot.push_back( &spec_slope_tot );
 
+    /*
     postprocess_names.push_back( "div_J_transport" );
     postprocess_fields_tor.push_back( &div_J_tor );
     postprocess_fields_pot.push_back( &div_J_pot );
     postprocess_fields_tot.push_back( &div_J_tot );
+    */
 
     postprocess_names.push_back( "enstrophy" );
     postprocess_fields_tor.push_back( &Enst_tor );
@@ -702,12 +706,12 @@ void filtering_helmholtz(
         postprocess_fields_tot.push_back( &coarse_tau_wind_dot_u_tot );
     }
 
-    postprocess_names.push_back( "cycloncic_KE" );
+    postprocess_names.push_back( "cyclonic_KE" );
     postprocess_fields_tor.push_back( &KE_tor_cyclonic );
     postprocess_fields_pot.push_back( &KE_pot_cyclonic );
     postprocess_fields_tot.push_back( &KE_tot_cyclonic );
 
-    postprocess_names.push_back( "anticycloncic_KE" );
+    postprocess_names.push_back( "anticyclonic_KE" );
     postprocess_fields_tor.push_back( &KE_tor_anticyclonic );
     postprocess_fields_pot.push_back( &KE_pot_anticyclonic );
     postprocess_fields_tot.push_back( &KE_tot_anticyclonic );
@@ -886,6 +890,8 @@ void filtering_helmholtz(
                 }
                 // And set prev_Ilat before we forget
                 prev_Ilat = Ilat;
+
+                //fprintf( stdout, "Finished computing local kernel (tid %d of %d).\n", thread_id, num_threads );
 
                 #if DEBUG >= 0
                 if ( (thread_id == 0) and (wRank == 0) ) {
