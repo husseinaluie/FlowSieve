@@ -75,6 +75,15 @@ double kernel(
                             (4*D*D-2) * pow(dDdell,2) - 2 * D * d2Ddell2 ) ;
                 }
                 break;
+        case constants::KernelType::JohnsonGaussian: 
+                if ( deriv_order == 0 ) {
+                    kern = exp( -pow( D, 2)/8 );
+                } else if (deriv_order == 1 ) {
+                    kern = exp( -pow( D, 2)/8 ) * (-2*D/8) * dDdell;
+                } else if (deriv_order == 2 ) {
+                    kern = 0.;
+                }
+                break;
         case constants::KernelType::Sinc: 
                 // likely to be discontinued
                 if ( deriv_order == 0 ) {
