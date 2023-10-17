@@ -144,7 +144,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool EXTEND_DOMAIN_TO_POLES = true;
+    const bool EXTEND_DOMAIN_TO_POLES = false;
 
     /*!
      * \param CARTESIAN
@@ -317,8 +317,9 @@ namespace constants
      * @ingroup constants
      */
     //const int KERNEL_OPT = 4;
-    enum KernelType : int { TopHat, HyperGaussian, Gaussian, Sinc, SmoothHat, HighOrder };
-    const int KERNEL_OPT = KernelType::SmoothHat;
+    enum KernelType : int { TopHat, HyperGaussian, Gaussian, JohnsonGaussian, 
+                            Sinc, SmoothHat, HighOrder };
+    const int KERNEL_OPT = KernelType::HighOrder;
 
     /*!
      * \param KernPad
@@ -328,17 +329,14 @@ namespace constants
      *
      * @ingroup constants
      */
-    const double KernPad = 2.5;
-    /*
-    switch (KERNEL_OPT) {
-        case TopHat: const double KernPad =  1.1;
-        case HyperGaussian: const double KernPad =  2.5;  // exp(-2.5^4) ~1e-17
-        case Gaussian: const double KernPad =  5.;   // exp(-5^2)   ~1e-11
-        case Sinc: const double KernPad = -1.;
-        case SmoothHat: const double KernPad =  2.5;
-        case HighOrder: const double KernPad =  2.5;
-    }
-    */
+    const double KernPad = ( KERNEL_OPT == KernelType::TopHat ) ? 1.1 :
+                           ( KERNEL_OPT == KernelType::HyperGaussian ) ? 2.5 :
+                           ( KERNEL_OPT == KernelType::Gaussian ) ? 5. :
+                           ( KERNEL_OPT == KernelType::JohnsonGaussian ) ? 15. :
+                           ( KERNEL_OPT == KernelType::Sinc ) ? -1 :
+                           ( KERNEL_OPT == KernelType::SmoothHat ) ? 2.5 :
+                           ( KERNEL_OPT == KernelType::HighOrder ) ? 2.5 :
+                           -1;
 
     /*!
      * \param PARTICLE_RECYCLE_TYPE
