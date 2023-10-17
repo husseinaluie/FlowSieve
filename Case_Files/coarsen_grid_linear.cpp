@@ -184,12 +184,20 @@ int main(int argc, char *argv[]) {
                          (size_t) coarse_data.Nlat, 
                          (size_t) coarse_data.Nlon };
 
+    #if DEBUG >= 1
+    if (wRank == 0) {
+        fprintf( stdout, " (%zu,%zu,%zu,%zu) -> (%zu,%zu,%zu,%zu)\n", starts[0], starts[1], starts[2], starts[3],
+                                                                      counts[0], counts[1], counts[2], counts[3]);
+    }
+    #endif
+
     // Compute the area of each 'cell' which will be necessary for creating the output file
     if (wRank == 0) { fprintf( stdout, "Computing cell areas.\n" ); }
     coarse_data.compute_cell_areas();
 
     // Initialize file and write out coarsened fields
     if (wRank == 0) { fprintf( stdout, "Preparing output file\n" ); }
+    vars_in_output.push_back("mask");
     initialize_output_file( coarse_data, vars_in_output, output_fname.c_str() );
 
     #if DEBUG >= 1
@@ -200,29 +208,34 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Now coarsen the velocity fields
-    const size_t    Npts_coarse = Ntime * Ndepth * Nlat_coarse * Nlon_coarse;
+    const size_t    Npts_coarse = Ntime * Ndepth * ((size_t) Nlat_coarse) * ((size_t) Nlon_coarse);
+    const size_t    Npts_fine   = Ntime * Ndepth * ((size_t) Nlat_fine)   * ((size_t) Nlon_fine);
+
     std::vector<double> var_coarse(Npts_coarse);
     std::vector<bool> mask_coarse(Npts_coarse, false);
 
     // Next, the coarse velocities
     int cnt, land_cnt, Itime, Idepth, LEFT, RIGHT, BOT, TOP, Ilat_fine, Ilon_fine, Ilat_coarse, Ilon_coarse;
     double target_lat, target_lon, interp_val;
-    size_t II_fine, II_coarse;
+    size_t II_fine, II_coarse, coarse_mask_count;
 
     for ( int Ivar = 0; Ivar < Nvars; Ivar++ ) {
 
         fine_data.load_variable( "fine_field", vars_to_refine.at(Ivar), fine_fname, true, true );
-
+    
         std::fill( var_coarse.begin(), var_coarse.end(), 0. );
         std::fill( mask_coarse.begin(), mask_coarse.end(), false );
 
+        coarse_mask_count = 0;
+
         #pragma omp parallel \
         default(none) \
-        shared( coarse_data, fine_data, var_coarse, mask_coarse, vars_to_refine, stdout ) \
+        shared( coarse_data, fine_data, var_coarse, mask_coarse, vars_to_refine, stdout, stderr ) \
         private( target_lat, target_lon, Itime, Idepth, II_coarse, Ilat_coarse, Ilon_coarse, \
                  RIGHT, LEFT, BOT, TOP, II_fine, Ilat_fine, Ilon_fine, cnt, interp_val, land_cnt ) \
         firstprivate( Npts_coarse, Nlon_coarse, Nlat_coarse, Nlon_fine, Nlat_fine, Ntime, Ndepth, \
-                      COARSE_LAT_GRID_INCREASING, COARSE_LON_GRID_INCREASING, FINE_LAT_GRID_INCREASING, FINE_LON_GRID_INCREASING )
+                      COARSE_LAT_GRID_INCREASING, COARSE_LON_GRID_INCREASING, FINE_LAT_GRID_INCREASING, FINE_LON_GRID_INCREASING ) \
+        reduction( + : coarse_mask_count )
         {
             #pragma omp for collapse(1) schedule(guided)
             for (II_coarse = 0; II_coarse < Npts_coarse; ++II_coarse) {
@@ -351,37 +364,47 @@ int main(int argc, char *argv[]) {
                             cnt++;
                         } else {
                             land_cnt++;
-                            if ( not(constants::DEFORM_AROUND_LAND) ) {
-                                cnt++;
-                            }
                         }
                     }
                 }
 
-                /*
-                // And drop into the coarse grid
-                var_coarse.at(II_coarse) = ( cnt == 0 ) ? ( constants::FILTER_OVER_LAND ? 0 : constants::fill_value )
-                                             : ( interp_val / cnt );
+                if ( (cnt == 0) and (land_cnt == 0) ) {
+                    fprintf( stderr, "No points in fine-grid correspond to coarse grid (%d, %d)\n", Ilat_coarse, Ilon_coarse );
+                }
 
-                // If half or more of the points were land, then the new cell is also land
-                mask_coarse.at(II_coarse) = ( cnt == 0 ) ? false : ( double(land_cnt) / double(cnt) < 0.5 );
-                */
-
-                if (cnt == 0) {
+                if ( (cnt == 0) or (cnt < land_cnt) ) {
                     mask_coarse.at(II_coarse) = false;
                     var_coarse.at(II_coarse) = constants::FILTER_OVER_LAND ? 0 : constants::fill_value;
                 } else {
-                    mask_coarse.at(II_coarse) = (double(land_cnt) / double(cnt)) < 0.5;
+                    mask_coarse.at(II_coarse) = true;
                     var_coarse.at(II_coarse) = interp_val / cnt;
                 }
+                if (not(mask_coarse.at(II_coarse))) { coarse_mask_count++; }
 
                 #if DEBUG >= 3
-                fprintf( stdout, " %'zu : [ %d, %d, %d, %d ] : %g, %d : %g \n", II_coarse, LEFT, BOT, TOP, RIGHT, interp_val, cnt, var_coarse.at(II_coarse) );
+                fprintf( stdout, " %'zu : [ %d, %d, %d, %d ] : %g, %d, %d : %g %s \n", 
+                        II_coarse, LEFT, BOT, TOP, RIGHT, interp_val, cnt, land_cnt, var_coarse.at(II_coarse), mask_coarse.at(II_coarse) ? "Water" : "Land" );
                 #endif
             }
         }
+        #if DEBUG >= 1
+        if (wRank == 0) { fprintf( stdout, "Coarse var has %'zu masked values.\n", coarse_mask_count ); }
+        coarse_mask_count = 0;
+        for (II_coarse = 0; II_coarse < Npts_coarse; ++II_coarse) {
+            if ( var_coarse.at(II_coarse) == 0. ) { coarse_mask_count++; }
+        }
+        if (wRank == 0) { fprintf( stdout, "Coarse var has %'zu zero values.\n", coarse_mask_count ); }
+        #endif
         write_field_to_output( var_coarse, vars_in_output.at(Ivar), starts, counts, output_fname, &mask_coarse );
     }
+
+    coarse_mask_count = 0;
+    for (II_coarse = 0; II_coarse < Npts_coarse; ++II_coarse) {
+        var_coarse.at(II_coarse) = mask_coarse.at(II_coarse) ? 1. : 0.;
+        if ( mask_coarse.at(II_coarse) ) { coarse_mask_count++; }
+    }
+    write_field_to_output( var_coarse, "mask", starts, counts, output_fname, NULL );
+    if (wRank == 0) { fprintf( stdout, "Coarse mask has %'zu water values.\n", coarse_mask_count ); }
 
     if (wRank == 0) {fprintf( stdout, "Storing seed count to file\n" ); }
     add_attr_to_file( "seed_count", full_Ntime, output_fname.c_str() );
