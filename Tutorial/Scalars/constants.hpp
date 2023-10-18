@@ -337,6 +337,13 @@ namespace constants
     }
     */
 
+    /*!
+     * \param PARTICLE_RECYCLE_TYPE
+     * \brief Variable indicating what recycling scheme should be used for particles
+     * @ingroup constants
+     */
+    enum ParticleRecycleType : int { FixedInterval, Stochastic };
+    const int PARTICLE_RECYCLE_TYPE = ParticleRecycleType::FixedInterval;
 
     /*!
      * \param variable_descriptions
