@@ -659,12 +659,12 @@ int main(int argc, char *argv[]) {
             if ( mask.at(index) ) {
                 dA = source_data.areas.at(index);
                 area_sum += dA;
-                strain_error += dA * pow( strain_energy_kronrod.at(index) - strain_energy.at(index) , 2);
-                cyclonic_error += dA * pow( cyclonic_energy_kronrod.at(index) - cyclonic_energy.at(index) , 2);
+                strain_error       += dA * pow( strain_energy_kronrod.at(index) - strain_energy.at(index) , 2);
+                cyclonic_error     += dA * pow( cyclonic_energy_kronrod.at(index) - cyclonic_energy.at(index) , 2);
                 anticyclonic_error += dA * pow( anticyclonic_energy_kronrod.at(index) - anticyclonic_energy.at(index) , 2);
 
-                strain_ref += dA * pow( strain_energy_kronrod.at(index), 2);
-                cyclonic_ref += dA * pow( cyclonic_energy_kronrod.at(index), 2);
+                strain_ref       += dA * pow( strain_energy_kronrod.at(index), 2);
+                cyclonic_ref     += dA * pow( cyclonic_energy_kronrod.at(index), 2);
                 anticyclonic_ref += dA * pow( anticyclonic_energy_kronrod.at(index), 2);
             }
         }
@@ -678,11 +678,15 @@ int main(int argc, char *argv[]) {
     anticyclonic_ref = sqrt( anticyclonic_ref / area_sum );
 
     if (wRank == 0) {
-        fprintf( stdout, "\n=== Convergence Metrics ===\n" );
-        fprintf( stdout, "Type        : Reference   , Error\n");
-        fprintf( stdout, "Strain      : %.6e, %.6e\n", strain_ref, strain_error);
-        fprintf( stdout, "Cyclonic    : %.6e, %.6e\n", cyclonic_ref, cyclonic_error);
-        fprintf( stdout, "Anticyclonic: %.6e, %.6e\n", anticyclonic_ref, anticyclonic_error);
+        fprintf( stdout, "\n=== Convergence Metrics (L2 Kronrod) === (%d iterations, ell = %.4e km )\n",
+              num_integration_steps, filter_scale );
+        fprintf( stdout, "Type        : Reference     , Error         , Ratio\n");
+        fprintf( stdout, "Strain      : %.8e, %.8e, %.8e\n", 
+                strain_ref, strain_error, strain_error / strain_ref);
+        fprintf( stdout, "Cyclonic    : %.8e, %.8e, %.8e\n", 
+                cyclonic_ref, cyclonic_error, cyclonic_error / cyclonic_ref);
+        fprintf( stdout, "Anticyclonic: %.8e, %.8e, %.8e\n", 
+                anticyclonic_ref, anticyclonic_error, anticyclonic_error / anticyclonic_ref);
         fprintf( stdout, "=== ===\n\n" );
     }
 
