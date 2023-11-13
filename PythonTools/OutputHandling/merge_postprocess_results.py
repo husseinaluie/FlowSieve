@@ -29,6 +29,11 @@ parser.add_argument('--exclude_zonal_means', dest='copy_zonal_means', action='st
         help="Pass '--exclude_zonal_means' to have zonal means ignored when merging postprocessing files.")
 parser.set_defaults(copy_zonal_means=True)
 
+# Pass --exclude_coarse_maps to exclude coarsened maps
+parser.add_argument('--exclude_coarse_maps', dest='copy_coarse_maps', action='store_false',
+        help="Pass '--exclude_coarse_maps' to have coarsened_maps ignored when merging postprocessing files.")
+parser.set_defaults(copy_coarse_maps=True)
+
 # Now actually parse in command-line flags
 args = parser.parse_args()
 
@@ -50,6 +55,10 @@ if DO_NOT_COPY_OKUBOWEISS:
 DO_NOT_COPY_ZONAL_MEANS = not( args.copy_zonal_means )
 if DO_NOT_COPY_ZONAL_MEANS:
     print("  Will not merge zonal means.")
+
+DO_NOT_COPY_COARSE_MAPS = not( args.copy_coarse_maps )
+if DO_NOT_COPY_COARSE_MAPS:
+    print("  Will not merge coarsened maps.")
 
 
 
@@ -119,6 +128,10 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
             if ( (DO_NOT_COPY_ZONAL_MEANS ) and ('zonal_average' in varname) ):
                 continue
 
+            # Don't include time averages
+            if ( (DO_NOT_COPY_COARSE_MAPS ) and ('coarsened_map' in varname) ):
+                continue
+
             # Extract the dimensions (in order) for varname
             var_dims = all_vars[varname].dimensions
 
@@ -164,6 +177,10 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
 
         # Don't include time averages
         if ( (DO_NOT_COPY_ZONAL_MEANS ) and ('zonal_average' in varname) ):
+            continue
+
+        # Don't include time averages
+        if ( (DO_NOT_COPY_COARSE_MAPS ) and ('coarsened_map' in varname) ):
             continue
 
         if print_level >= 2:
