@@ -50,6 +50,30 @@ void Apply_Postprocess_Routines(
     int Ilat, Ilon, Itime, Idepth;
     size_t index, area_index;
 
+    double denom;
+
+    //
+    //// If spectral slope is in the list, we need to flag the index for it and the spectra
+    //
+    int spectral_slope_index = -1, u_spectrum_index = -1, v_spectrum_index = -1;
+    for ( int Ivar = 0; Ivar < num_fields; Ivar++ ) {
+        if ( vars_to_process.at(Ivar) == "u_lon_spectrum" ) {
+            u_spectrum_index = Ivar;
+        } else if ( vars_to_process.at(Ivar) == "u_lat_spectrum" ) {
+            v_spectrum_index = Ivar;
+        } else if ( vars_to_process.at(Ivar) == "KE_spectral_slope" ) {
+            spectral_slope_index = Ivar;
+        }
+    }
+    const bool doing_spectral_slope = ( (spectral_slope_index>=0) 
+                                        and (u_spectrum_index>=0)
+                                        and (v_spectrum_index>=0)
+                                        ) ;
+
+    // Apply spectrum-weight to spectral slope if appropriate
+    //  we'll need to divide by the spectrum average for each kind of average afterwards
+    // THIS IS DONE IN THE FILTERING CODE BLOCK
+
     //
     //// Start by initializing the postprocess file
     //
@@ -109,6 +133,16 @@ void Apply_Postprocess_Routines(
     compute_region_avg_and_std( field_averages, field_std_devs, source_data, postprocess_fields );
     if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_area_means");  }
 
+    if (doing_spectral_slope) {
+        for (index = 0; index < field_averages[0].size(); index++) {
+            denom =    field_averages[u_spectrum_index].at(index) 
+                     + field_averages[v_spectrum_index].at(index) ;
+            
+            field_averages[spectral_slope_index][index] = 
+                (denom == 0) ? 0. : field_averages[spectral_slope_index][index] / denom;
+        }
+    }
+
     #if DEBUG >= 1
     if (wRank == 0) { fprintf(stdout, "  .. writing region averages and deviations\n"); }
     fflush(stdout);
@@ -140,6 +174,23 @@ void Apply_Postprocess_Routines(
         compute_zonal_avg_and_std( zonal_averages, zonal_std_devs, source_data, postprocess_fields );
         compute_zonal_median( zonal_medians, source_data, postprocess_fields );
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_zonal_means");  }
+
+        if (doing_spectral_slope) {
+            #pragma omp parallel default(none) \
+            private(index, denom) \
+            shared( zonal_averages ) \
+            firstprivate( u_spectrum_index, v_spectrum_index, spectral_slope_index )
+            {
+                #pragma omp for schedule(static)
+                for (index = 0; index < zonal_averages[0].size(); index++) {
+                    denom =    zonal_averages[u_spectrum_index].at(index) 
+                             + zonal_averages[v_spectrum_index].at(index) ;
+            
+                    zonal_averages[spectral_slope_index][index] = 
+                        (denom == 0) ? 0. : zonal_averages[spectral_slope_index][index] / denom;
+                }
+            }
+        }
 
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "  .. writing zonal averages\n"); }
@@ -207,6 +258,23 @@ void Apply_Postprocess_Routines(
 
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         compute_coarsened_map( coarsened_maps, source_data, postprocess_fields );
+
+        if (doing_spectral_slope) {
+            #pragma omp parallel default(none) \
+            private(index, denom) \
+            shared( coarsened_maps ) \
+            firstprivate( u_spectrum_index, v_spectrum_index, spectral_slope_index )
+            {
+                #pragma omp for schedule(static)
+                for (index = 0; index < coarsened_maps[0].size(); index++) {
+                    denom =    coarsened_maps[u_spectrum_index].at(index) 
+                             + coarsened_maps[v_spectrum_index].at(index) ;
+            
+                    coarsened_maps[spectral_slope_index][index] = 
+                        (denom == 0) ? 0. : coarsened_maps[spectral_slope_index][index] / denom;
+                }
+            }
+        }
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "postprocess_coarse_maps");  }
 
         #if DEBUG >= 1

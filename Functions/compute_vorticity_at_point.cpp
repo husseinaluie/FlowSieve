@@ -29,7 +29,8 @@ void compute_vorticity_at_point(
         double & OkuboWeiss_tmp,
         double & cyclonic_energy,
         double & anticyclonic_energy,
-        double & strain_energy,
+        double & divergent_strain_energy,
+        double & traceless_strain_energy,
         const dataset & source_data,
         const std::vector<double> & u_r,
         const std::vector<double> & u_lon,
@@ -150,7 +151,8 @@ void compute_vorticity_at_point(
             cyclonic_energy = 0.;
             anticyclonic_energy = 2 * pow(0.5 * vort_r_tmp, 2);
         }
-        strain_energy = pow( S_11, 2) + 2 * pow( S_12, 2) + pow( S_22, 2 );
+        divergent_strain_energy = pow( S_11, 2) + pow( S_22, 2 );
+        traceless_strain_energy = 2 * pow( S_12, 2);
 
     }
 }

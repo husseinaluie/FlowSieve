@@ -30,6 +30,9 @@ void compute_Pi(
         const std::vector<double> & uyuy,
         const std::vector<double> & uyuz,
         const std::vector<double> & uzuz,
+        const std::vector<double> * ux_in_tau,
+        const std::vector<double> * uy_in_tau,
+        const std::vector<double> * uz_in_tau,
         const MPI_Comm comm
         ) {
 
@@ -55,7 +58,14 @@ void compute_Pi(
     //   note: the pointers aren't constant, but the things
     //         to which they are pointing are
     double ui_loc, uj_loc, uiuj_loc;
-    const std::vector<double> *uiuj, *ui, *uj;
+    const std::vector<double> *uiuj, *ui, *uj, *ui_in_tau, *uj_in_tau;
+
+    //const std::vector<double> *ux_in_tau = ( ux_for_tau == NULL ) ? &ux[0] : ux_for_tau;
+    //const std::vector<double> *uy_in_tau = ( uy_for_tau == NULL ) ? &uy[0] : uy_for_tau;
+    //const std::vector<double> *uz_in_tau = ( uz_for_tau == NULL ) ? &uz[0] : uz_for_tau;
+    if ( ux_in_tau == NULL ) { ux_in_tau = &ux; }
+    if ( uy_in_tau == NULL ) { uy_in_tau = &uy; }
+    if ( uz_in_tau == NULL ) { uz_in_tau = &uz; }
 
     // Set up the derivatives to pass through the differentiation functions
     std::vector<double*> x_deriv_vals, y_deriv_vals, z_deriv_vals;
@@ -77,6 +87,9 @@ void compute_Pi(
             ui = ( ii == 0 ) ? &ux : ( ii == 1 ) ? &uy : &uz;
             uj = ( jj == 0 ) ? &ux : ( jj == 1 ) ? &uy : &uz;
 
+            ui_in_tau = ( ii == 0 ) ? ux_in_tau : ( ii == 1 ) ? uy_in_tau : uz_in_tau;
+            uj_in_tau = ( jj == 0 ) ? ux_in_tau : ( jj == 1 ) ? uy_in_tau : uz_in_tau;
+
             deriv_fields[0] = ui;
             deriv_fields[1] = uj;
 
@@ -88,7 +101,7 @@ void compute_Pi(
             // Compute tau_ij 
             #pragma omp parallel \
             default(none) \
-            shared(tau_ij, mask, ui, uj, uiuj, source_data) \
+            shared(tau_ij, mask, ui_in_tau, uj_in_tau, uiuj, source_data) \
             private(index, uiuj_loc, ui_loc, uj_loc) \
             firstprivate( Npts )
             {
@@ -96,8 +109,8 @@ void compute_Pi(
                 for (index = 0; index < Npts; index++) {
 
                     if ( constants::FILTER_OVER_LAND or mask.at(index) ) {
-                        ui_loc   = ui->at(  index);
-                        uj_loc   = uj->at(  index);
+                        ui_loc   = ui_in_tau->at(  index);
+                        uj_loc   = uj_in_tau->at(  index);
                         uiuj_loc = uiuj->at(index);
 
                         tau_ij.at(index) = uiuj_loc - ui_loc * uj_loc;

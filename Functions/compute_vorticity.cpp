@@ -27,7 +27,8 @@ void compute_vorticity(
         std::vector<double> & OkuboWeiss,
         std::vector<double> & cyclonic_energy,
         std::vector<double> & anticyclonic_energy,
-        std::vector<double> & strain_energy,
+        std::vector<double> & divergent_strain_energy,
+        std::vector<double> & traceless_strain_energy,
         const dataset & source_data,
         const std::vector<double> & u_r,
         const std::vector<double> & u_lon,
@@ -43,7 +44,8 @@ void compute_vorticity(
                 Nlon    = source_data.Nlon;
 
     double vort_r_tmp, vort_lon_tmp, vort_lat_tmp, div_tmp, OkuboWeiss_tmp,
-           cyclonic_energy_tmp, anticyclonic_energy_tmp, strain_energy_tmp;
+           cyclonic_energy_tmp, anticyclonic_energy_tmp, 
+           divergent_strain_energy_tmp, traceless_strain_energy_tmp;
     int Itime, Idepth, Ilat, Ilon;
     size_t index; 
     const size_t Npts = u_lon.size();
@@ -60,7 +62,8 @@ void compute_vorticity(
 
     const bool  do_cyclonic_energy = cyclonic_energy.size() > 0,
                 do_anticyclonic_energy = anticyclonic_energy.size() > 0,
-                do_strain_energy = strain_energy.size() > 0;
+                do_divergent_strain_energy = divergent_strain_energy.size() > 0,
+                do_traceless_strain_energy = traceless_strain_energy.size() > 0;
 
     #if DEBUG >= 2
     int wRank, wSize;
@@ -75,10 +78,12 @@ void compute_vorticity(
     default(none) \
     shared( source_data, mask, u_r, u_lon, u_lat, \
             vort_r, vort_lon, vort_lat, vel_div, OkuboWeiss, \
-            cyclonic_energy, anticyclonic_energy, strain_energy ) \
+            cyclonic_energy, anticyclonic_energy, \
+            divergent_strain_energy, traceless_strain_energy ) \
     private( Itime, Idepth, Ilat, Ilon, index, vort_r_tmp, vort_lon_tmp, vort_lat_tmp, \
              div_tmp, OkuboWeiss_tmp, cyclonic_energy_tmp, \
-            anticyclonic_energy_tmp, strain_energy_tmp )\
+            anticyclonic_energy_tmp, \
+            divergent_strain_energy_tmp, traceless_strain_energy_tmp )\
     firstprivate( Npts, Nlon, Nlat, Ndepth, Ntime, do_vort_r, do_vort_lon, do_vort_lat, do_vel_div,\
                   do_OkuboWeiss )
     {
@@ -100,7 +105,8 @@ void compute_vorticity(
 
                 compute_vorticity_at_point(
                         vort_r_tmp, vort_lon_tmp, vort_lat_tmp, div_tmp, OkuboWeiss_tmp, 
-                        cyclonic_energy_tmp, anticyclonic_energy_tmp, strain_energy_tmp,
+                        cyclonic_energy_tmp, anticyclonic_energy_tmp, 
+                        divergent_strain_energy_tmp, traceless_strain_energy_tmp,
                         source_data, u_r, u_lon, u_lat,        
                         Itime, Idepth, Ilat, Ilon);
             }
@@ -115,7 +121,8 @@ void compute_vorticity(
 
             if (do_cyclonic_energy) { cyclonic_energy.at(index) = cyclonic_energy_tmp; }
             if (do_anticyclonic_energy) { anticyclonic_energy.at(index) = anticyclonic_energy_tmp; }
-            if (do_strain_energy) { strain_energy.at(index) = strain_energy_tmp; }
+            if (do_divergent_strain_energy) { divergent_strain_energy.at(index) = divergent_strain_energy_tmp; }
+            if (do_traceless_strain_energy) { traceless_strain_energy.at(index) = traceless_strain_energy_tmp; }
 
 
         } // end index loop

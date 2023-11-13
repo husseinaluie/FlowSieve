@@ -206,6 +206,8 @@ int main(int argc, char *argv[]) {
     // This guarantees that the number of quadrature steps
     // 1) is odd (required for Kronrod quadrature)
     // 2) is an integer multiple of the number of quadrature MPI ranks
+    // while
+    // 3) not decreasing the number of steps
     if ( source_data.Nprocs_in_quadrature > 1 ) {
         if (input_quad_steps < 3) { 
             assert( (source_data.Nprocs_in_quadrature % 2 == 1) && 
@@ -327,12 +329,14 @@ int main(int argc, char *argv[]) {
 
     //
     std::vector< double > 
-            strain_energy(Npts, 0.), KE_strain(Npts,0.),
-            strain_energy_kronrod(Npts, 0.), current_strain(Npts,0.),
-            cyclonic_energy(Npts, 0.), KE_cyclonic(Npts,0.),
-            cyclonic_energy_kronrod(Npts, 0.), current_cyclonic(Npts,0.),
-            anticyclonic_energy(Npts, 0.), KE_anticyclonic(Npts,0.),
-            anticyclonic_energy_kronrod(Npts, 0.), current_anticyclonic(Npts,0.),
+            divergent_strain_energy_kronrod(Npts, 0.),  current_divergent_strain(Npts,0.),
+            traceless_strain_energy_kronrod(Npts, 0.),  current_traceless_strain(Npts,0.),
+            cyclonic_energy_kronrod(Npts, 0.),          current_cyclonic(Npts,0.),
+            anticyclonic_energy_kronrod(Npts, 0.),      current_anticyclonic(Npts,0.),
+            divergent_strain_energy(Npts, 0.),          KE_divergent_strain(Npts,0.),
+            traceless_strain_energy(Npts, 0.),          KE_traceless_strain(Npts,0.),
+            cyclonic_energy(Npts, 0.),                  KE_cyclonic(Npts,0.),
+            anticyclonic_energy(Npts, 0.),              KE_anticyclonic(Npts,0.),
             u_lon_tor(Npts,0), u_lon_pot(Npts, 0), u_lon_tot(Npts, 0),
             u_lat_tor(Npts,0), u_lat_pot(Npts, 0), u_lat_tot(Npts, 0);
     std::vector<double> null_vector(0);
@@ -398,6 +402,8 @@ int main(int argc, char *argv[]) {
     //
     //// Apply filtering
     //
+    int perc_base = 5, perc = 0, perc_count = 0;
+    int thread_id = omp_get_thread_num();  // thread ID
     double prev_scale = 0., scale_delta, scale_l2_d2;
     for (size_t ell_ind = MPI_quad_Rank; ell_ind < num_integration_steps; ell_ind += MPI_quad_Size) {
 
@@ -409,6 +415,17 @@ int main(int argc, char *argv[]) {
 
         #if DEBUG >= 2
         fprintf( stdout, "First filter scale %'g km.\n", scale_delta / 1e3 );
+        #elif DEBUG >= 0
+        if ( (thread_id == 0) and (wRank == 0) ) {
+            // Every perc_base percent, print a dot, but only the first thread
+            while ( ((double)(ell_ind + 1) / (num_integration_steps)) * 100 >= perc ) {
+                perc_count++;
+                if (perc_count % 5 == 0) { fprintf(stdout, "|"); }
+                else                     { fprintf(stdout, "."); }
+                fflush(stdout);
+                perc += perc_base;
+            }
+        }
         #endif
 
         filter_fields.clear();
@@ -501,7 +518,7 @@ int main(int argc, char *argv[]) {
         std::vector<double> zero_array( Npts, 0 );
         compute_vorticity(
                 null_vector, null_vector, null_vector, null_vector, null_vector, 
-                KE_cyclonic, KE_anticyclonic, KE_strain,
+                KE_cyclonic, KE_anticyclonic, KE_divergent_strain, KE_traceless_strain,
                 source_data, zero_array, u_lon_tot, u_lat_tot);
     
         // And now we need to filter those scalar fields, using scale
@@ -512,13 +529,15 @@ int main(int argc, char *argv[]) {
         #endif
 
         filter_fields.clear();
-        filter_fields.push_back( &KE_strain );
+        filter_fields.push_back( &KE_divergent_strain );
+        filter_fields.push_back( &KE_traceless_strain );
         filter_fields.push_back( &KE_cyclonic );
         filter_fields.push_back( &KE_anticyclonic );
 
         #pragma omp parallel \
         default(none) \
-        shared( source_data, filter_fields, stdout, current_strain, KE_strain, \
+        shared( source_data, filter_fields, stdout, \
+                current_divergent_strain, KE_divergent_strain, current_traceless_strain, KE_traceless_strain, \
                 current_cyclonic, KE_cyclonic, current_anticyclonic, KE_anticyclonic, \
                 null_vector \
               ) \
@@ -529,12 +548,12 @@ int main(int argc, char *argv[]) {
         {
 
             filter_values_doubles.clear();
-            filter_values_doubles.resize( 3 );
+            filter_values_doubles.resize( 4 );
 
             null_ptrs_vector.clear();
             filter_values_ptrs.clear();
-            filter_values_ptrs.resize( 3 );
-            for ( Ivar = 0; Ivar < 3; Ivar++ ) { filter_values_ptrs.at(Ivar) = &(filter_values_doubles.at(Ivar)); }
+            filter_values_ptrs.resize( 4 );
+            for ( Ivar = 0; Ivar < 4; Ivar++ ) { filter_values_ptrs.at(Ivar) = &(filter_values_doubles.at(Ivar)); }
 
             #pragma omp for collapse(1) schedule(dynamic)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -564,7 +583,8 @@ int main(int argc, char *argv[]) {
                             index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                             if ( not(constants::FILTER_OVER_LAND) and not(source_data.mask.at(index)) ) {
-                                current_strain.at(index) = constants::fill_value;
+                                current_divergent_strain.at(index) = constants::fill_value;
+                                current_traceless_strain.at(index) = constants::fill_value;
                                 current_cyclonic.at(index) = constants::fill_value;
                                 current_anticyclonic.at(index) = constants::fill_value;
                             } else{
@@ -575,9 +595,10 @@ int main(int argc, char *argv[]) {
                                                         LAT_lb, LAT_ub, scale_l2_d2, std::vector<bool>(3,false), 
                                                         local_kernel, null_vector, null_vector );
 
-                                current_strain.at(index) = filter_values_doubles[0];
-                                current_cyclonic.at(index) = filter_values_doubles[1];
-                                current_anticyclonic.at(index) = filter_values_doubles[2];
+                                current_divergent_strain.at(index) = filter_values_doubles[0];
+                                current_traceless_strain.at(index) = filter_values_doubles[1];
+                                current_cyclonic.at(index) = filter_values_doubles[2];
+                                current_anticyclonic.at(index) = filter_values_doubles[3];
                             }
                         }
                     }
@@ -600,23 +621,27 @@ int main(int argc, char *argv[]) {
         if ( true ) {
             #pragma omp parallel \
             default( none ) \
-            shared( mask, strain_energy, strain_energy_kronrod, current_strain, \
+            shared( mask, \
+                    divergent_strain_energy, divergent_strain_energy_kronrod, current_divergent_strain, \
+                    traceless_strain_energy, traceless_strain_energy_kronrod, current_traceless_strain, \
                     cyclonic_energy, cyclonic_energy_kronrod, current_cyclonic, \
                     anticyclonic_energy, anticyclonic_energy_kronrod, current_anticyclonic ) \
             private( index ) \
             firstprivate( current_weight, kronrod_weight )
             {
                 #pragma omp for collapse(1) schedule(static)
-                for (index = 0; index < strain_energy.size(); ++index) {
+                for (index = 0; index < traceless_strain_energy.size(); ++index) {
                     if ( mask.at(index) ) {
                         // Gauss-Legendre and Gauss-Jacobi
-                        strain_energy.at(index)       += current_weight * current_strain.at(index);
-                        cyclonic_energy.at(index)     += current_weight * current_cyclonic.at(index);
-                        anticyclonic_energy.at(index) += current_weight * current_anticyclonic.at(index);
+                        divergent_strain_energy.at(index) += current_weight * current_divergent_strain.at(index);
+                        traceless_strain_energy.at(index) += current_weight * current_traceless_strain.at(index);
+                        cyclonic_energy.at(index)         += current_weight * current_cyclonic.at(index);
+                        anticyclonic_energy.at(index)     += current_weight * current_anticyclonic.at(index);
 
-                        strain_energy_kronrod.at(index)       += kronrod_weight * current_strain.at(index);
-                        cyclonic_energy_kronrod.at(index)     += kronrod_weight * current_cyclonic.at(index);
-                        anticyclonic_energy_kronrod.at(index) += kronrod_weight * current_anticyclonic.at(index);
+                        divergent_strain_energy_kronrod.at(index) += kronrod_weight * current_divergent_strain.at(index);
+                        traceless_strain_energy_kronrod.at(index) += kronrod_weight * current_traceless_strain.at(index);
+                        cyclonic_energy_kronrod.at(index)         += kronrod_weight * current_cyclonic.at(index);
+                        anticyclonic_energy_kronrod.at(index)     += kronrod_weight * current_anticyclonic.at(index);
                     }
                 }
             }
@@ -627,53 +652,69 @@ int main(int argc, char *argv[]) {
     } // end ell loop
 
     // Now MPI-reduce across all of the processors that split up the quadrature work
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf(stdout, "Reducing along MPI sub-communicator\n"); }
+    #endif
     if ( MPI_quad_Size > 1 ) {
-        MPI_Allreduce( MPI_IN_PLACE, &(strain_energy[0]),
-                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+        MPI_Allreduce( MPI_IN_PLACE, &(divergent_strain_energy[0]),
+                      traceless_strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+        MPI_Allreduce( MPI_IN_PLACE, &(traceless_strain_energy[0]),
+                      traceless_strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
         MPI_Allreduce( MPI_IN_PLACE, &(cyclonic_energy[0]),
-                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+                      traceless_strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
         MPI_Allreduce( MPI_IN_PLACE, &(anticyclonic_energy[0]),
-                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+                      traceless_strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
 
-        MPI_Allreduce( MPI_IN_PLACE, &(strain_energy_kronrod[0]),
-                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+        MPI_Allreduce( MPI_IN_PLACE, &(divergent_strain_energy_kronrod[0]),
+                      traceless_strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+        MPI_Allreduce( MPI_IN_PLACE, &(traceless_strain_energy_kronrod[0]),
+                      traceless_strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
         MPI_Allreduce( MPI_IN_PLACE, &(cyclonic_energy_kronrod[0]),
-                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+                      traceless_strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
         MPI_Allreduce( MPI_IN_PLACE, &(anticyclonic_energy_kronrod[0]),
-                      strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
+                      traceless_strain_energy.size(), MPI_DOUBLE, MPI_SUM, source_data.MPI_subcomm_sametimedepths);
     }
 
     // Compute the error between kronrod and GJ quadratures
-    double area_sum=0, strain_error=0, cyclonic_error=0, anticyclonic_error=0, dA,
-           strain_ref=0, cyclonic_ref=0, anticyclonic_ref=0;
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf(stdout, "Computing kronrod convergent metrics.\n"); }
+    #endif
+    double area_sum=0, divergent_strain_error = 0, traceless_strain_error=0, cyclonic_error=0, anticyclonic_error=0, dA,
+           divergent_strain_ref = 0, traceless_strain_ref=0, cyclonic_ref=0, anticyclonic_ref=0;
     #pragma omp parallel \
     default( none ) \
-    shared( mask, u_lon_tor, source_data, strain_energy, strain_energy_kronrod, \
+    shared( mask, source_data, divergent_strain_energy, divergent_strain_energy_kronrod, \
+            traceless_strain_energy, traceless_strain_energy_kronrod, \
             cyclonic_energy, cyclonic_energy_kronrod, anticyclonic_energy, \
             anticyclonic_energy_kronrod ) \
+    firstprivate(Nlat, Nlon) \
     private( index, dA ) \
-    reduction( +:strain_error,cyclonic_error,anticyclonic_error,area_sum,strain_ref,cyclonic_ref,anticyclonic_ref )
+    reduction( +:divergent_strain_error,traceless_strain_error,cyclonic_error,anticyclonic_error,area_sum,divergent_strain_ref,traceless_strain_ref,cyclonic_ref,anticyclonic_ref )
     {
         #pragma omp for collapse(1) schedule(static)
-        for (index = 0; index < u_lon_tor.size(); ++index) {
+        for (index = 0; index < divergent_strain_energy.size(); ++index) {
             if ( mask.at(index) ) {
-                dA = source_data.areas.at(index);
+                dA = source_data.areas.at(index % (Nlat*Nlon) );
                 area_sum += dA;
-                strain_error       += dA * pow( strain_energy_kronrod.at(index) - strain_energy.at(index) , 2);
-                cyclonic_error     += dA * pow( cyclonic_energy_kronrod.at(index) - cyclonic_energy.at(index) , 2);
-                anticyclonic_error += dA * pow( anticyclonic_energy_kronrod.at(index) - anticyclonic_energy.at(index) , 2);
+                divergent_strain_error += dA * pow( divergent_strain_energy_kronrod.at(index) - divergent_strain_energy.at(index) , 2);
+                traceless_strain_error += dA * pow( traceless_strain_energy_kronrod.at(index) - traceless_strain_energy.at(index) , 2);
+                cyclonic_error         += dA * pow( cyclonic_energy_kronrod.at(index) - cyclonic_energy.at(index) , 2);
+                anticyclonic_error     += dA * pow( anticyclonic_energy_kronrod.at(index) - anticyclonic_energy.at(index) , 2);
 
-                strain_ref       += dA * pow( strain_energy_kronrod.at(index), 2);
-                cyclonic_ref     += dA * pow( cyclonic_energy_kronrod.at(index), 2);
-                anticyclonic_ref += dA * pow( anticyclonic_energy_kronrod.at(index), 2);
+                divergent_strain_ref += dA * pow( divergent_strain_energy_kronrod.at(index), 2);
+                traceless_strain_ref += dA * pow( traceless_strain_energy_kronrod.at(index), 2);
+                cyclonic_ref         += dA * pow( cyclonic_energy_kronrod.at(index), 2);
+                anticyclonic_ref     += dA * pow( anticyclonic_energy_kronrod.at(index), 2);
             }
         }
     }
-    strain_error = sqrt( strain_error / area_sum );
+    divergent_strain_error = sqrt( divergent_strain_error / area_sum );
+    traceless_strain_error = sqrt( traceless_strain_error / area_sum );
     cyclonic_error = sqrt( cyclonic_error / area_sum );
     anticyclonic_error = sqrt( anticyclonic_error / area_sum );
 
-    strain_ref = sqrt( strain_ref / area_sum );
+    divergent_strain_ref = sqrt( divergent_strain_ref / area_sum );
+    traceless_strain_ref = sqrt( traceless_strain_ref / area_sum );
     cyclonic_ref = sqrt( cyclonic_ref / area_sum );
     anticyclonic_ref = sqrt( anticyclonic_ref / area_sum );
 
@@ -681,8 +722,10 @@ int main(int argc, char *argv[]) {
         fprintf( stdout, "\n=== Convergence Metrics (L2 Kronrod) === (%d iterations, ell = %.4e km )\n",
               num_integration_steps, filter_scale );
         fprintf( stdout, "Type        : Reference     , Error         , Ratio\n");
-        fprintf( stdout, "Strain      : %.8e, %.8e, %.8e\n", 
-                strain_ref, strain_error, strain_error / strain_ref);
+        fprintf( stdout, "Div Strain  : %.8e, %.8e, %.8e\n", 
+                divergent_strain_ref, divergent_strain_error, divergent_strain_error / divergent_strain_ref);
+        fprintf( stdout, "NoTr Strain : %.8e, %.8e, %.8e\n", 
+                traceless_strain_ref, traceless_strain_error, traceless_strain_error / traceless_strain_ref);
         fprintf( stdout, "Cyclonic    : %.8e, %.8e, %.8e\n", 
                 cyclonic_ref, cyclonic_error, cyclonic_error / cyclonic_ref);
         fprintf( stdout, "Anticyclonic: %.8e, %.8e, %.8e\n", 
@@ -692,12 +735,14 @@ int main(int argc, char *argv[]) {
 
     // Create output file
     std::vector<std::string> output_names;
-    output_names.push_back( "strain_KE" );
+    output_names.push_back( "divergent_strain_KE" );
+    output_names.push_back( "traceless_strain_KE" );
     output_names.push_back( "cyclonic_KE" );
     output_names.push_back( "anticyclonic_KE" );
     
     if (not(constants::MINIMAL_OUTPUT)) {
-        output_names.push_back( "strain_KE_QuadCompare" );
+        output_names.push_back( "divergent_strain_KE_QuadCompare" );
+        output_names.push_back( "traceless_strain_KE_QuadCompare" );
         output_names.push_back( "cyclonic_KE_QuadCompare" );
         output_names.push_back( "anticyclonic_KE_QuadCompare" );
     }
@@ -722,12 +767,14 @@ int main(int argc, char *argv[]) {
         }
         size_t counts[ndims] = { size_t(Ntime),          size_t(Ndepth),         size_t(Nlat),           size_t(Nlon)           };
 
-        write_field_to_output( strain_energy_kronrod, "strain_KE", starts, counts, fname, &source_data.mask );
+        write_field_to_output( divergent_strain_energy_kronrod, "divergent_strain_KE", starts, counts, fname, &source_data.mask );
+        write_field_to_output( traceless_strain_energy_kronrod, "traceless_strain_KE", starts, counts, fname, &source_data.mask );
         write_field_to_output( cyclonic_energy_kronrod, "cyclonic_KE", starts, counts, fname, &source_data.mask );
         write_field_to_output( anticyclonic_energy_kronrod, "anticyclonic_KE", starts, counts, fname, &source_data.mask );
 
         if (not(constants::MINIMAL_OUTPUT)) {
-            write_field_to_output( strain_energy, "strain_KE_QuadCompare", starts, counts, fname, &source_data.mask );
+            write_field_to_output( divergent_strain_energy, "divergent_strain_KE_QuadCompare", starts, counts, fname, &source_data.mask );
+            write_field_to_output( traceless_strain_energy, "traceless_strain_KE_QuadCompare", starts, counts, fname, &source_data.mask );
             write_field_to_output( cyclonic_energy, "cyclonic_KE_QuadCompare", starts, counts, fname, &source_data.mask );
             write_field_to_output( anticyclonic_energy, "anticyclonic_KE_QuadCompare", starts, counts, fname, &source_data.mask );
         }
@@ -743,10 +790,12 @@ int main(int argc, char *argv[]) {
         std::vector<const std::vector<double>*> postprocess_fields;
         std::vector<std::string> postprocess_names;
 
-        postprocess_fields.push_back( &strain_energy_kronrod );
+        postprocess_fields.push_back( &divergent_strain_energy_kronrod );
+        postprocess_fields.push_back( &traceless_strain_energy_kronrod );
         postprocess_fields.push_back( &cyclonic_energy_kronrod );
         postprocess_fields.push_back( &anticyclonic_energy_kronrod );
-        postprocess_names.push_back( "strain_KE" );
+        postprocess_names.push_back( "divergent_strain_KE" );
+        postprocess_names.push_back( "traceless_strain_KE" );
         postprocess_names.push_back( "cyclonic_KE" );
         postprocess_names.push_back( "anticyclonic_KE" );
 

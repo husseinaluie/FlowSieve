@@ -265,7 +265,8 @@ void compute_vorticity_at_point(
         double & OkuboWeiss_tmp,
         double & cyclonic_energy,
         double & anticyclonic_energy,
-        double & strain_energy,
+        double & divergent_strain_energy,
+        double & traceless_strain_energy,
         const dataset & source_data,
         const std::vector<double> & u_r, 
         const std::vector<double> & u_lon, 
@@ -280,7 +281,8 @@ void compute_vorticity(
         std::vector<double> & OkuboWeiss,
         std::vector<double> & cyclonic_energy,
         std::vector<double> & anticyclonic_energy,
-        std::vector<double> & strain_energy,
+        std::vector<double> & divergent_strain_energy,
+        std::vector<double> & traceless_strain_energy,
         const dataset & source_data,
         const std::vector<double> & u_r, 
         const std::vector<double> & u_lon, 
@@ -313,6 +315,9 @@ void compute_Pi(
         const std::vector<double> & uyuy, 
         const std::vector<double> & uyuz, 
         const std::vector<double> & uzuz,
+        const std::vector<double> * ux_in_tau = NULL,   
+        const std::vector<double> * uy_in_tau = NULL,   
+        const std::vector<double> * uz_in_tau = NULL,
         const MPI_Comm comm = MPI_COMM_WORLD);
 
 void compute_Pi_shift_deriv(

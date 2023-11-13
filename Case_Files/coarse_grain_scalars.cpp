@@ -145,6 +145,8 @@ int main(int argc, char *argv[]) {
     const bool one_snapshot = (     ( (time_dim_name  == "DNE") or (time_dim_name  == "DOES_NOT_EXIST") )
                                 and ( (depth_dim_name == "DNE") or (depth_dim_name == "DOES_NOT_EXIST") )
                               );
+    std::vector<double> null_vector(0);
+    std::vector<double*> null_ptr_vector(0);
 
     // Apply some cleaning to the processor allotments if necessary. 
     source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
@@ -156,6 +158,13 @@ int main(int argc, char *argv[]) {
      
     // Convert to radians, if appropriate
     if ( latlon_in_degrees == "true" ) { convert_coordinates( source_data.longitude, source_data.latitude ); }
+
+    // If we're using FILTER_OVER_LAND, then the mask has been wiped out. Load in a mask that still includes land references
+    //      so that we have both. Will be used to get 'water-only' region areas.
+    if (constants::FILTER_OVER_LAND) { 
+        read_mask_from_file( source_data.reference_mask, vars_to_filter.at(0), input_fname,
+               source_data.Nprocs_in_time, source_data.Nprocs_in_depth );
+    }
 
     // Compute the area of each 'cell' which will be necessary for integration
     #if DEBUG >= 2
@@ -205,9 +214,11 @@ int main(int argc, char *argv[]) {
     #if DEBUG >= 1
     if (wRank == 0) { fprintf( stdout, "Setting up %'zu coarse fields.\n", Nvars ); fflush(stdout); }
     #endif
-    std::vector< std::vector<double> > coarse_fields(Nvars);
+    std::vector< std::vector<double> > coarse_fields(Nvars), dl_coarse_fields(Nvars), dll_coarse_fields(Nvars);
     for (size_t field_ind = 0; field_ind < Nvars; field_ind++) {
         coarse_fields.at(field_ind).resize( Npts );
+        dl_coarse_fields.at(field_ind).resize( Npts );
+        dll_coarse_fields.at(field_ind).resize( Npts );
     }
 
     //
@@ -216,8 +227,12 @@ int main(int argc, char *argv[]) {
     #if DEBUG >= 1
     if (wRank == 0) { fprintf( stdout, "Setting up filtering values.\n" ); fflush(stdout); }
     #endif
-    std::vector<double > filter_values_doubles, local_kernel(Nlat * Nlon, 0.);
-    std::vector<double*> filter_values_ptrs;
+    double dl_kernel_val, dll_kernel_val;
+    std::vector<double > filter_values_doubles, filter_dl_values_doubles, filter_dll_values_doubles, 
+        local_kernel(Nlat * Nlon, 0.),
+        local_dl_kernel(Nlat * Nlon, 0.),
+        local_dll_kernel(Nlat * Nlon, 0.);
+    std::vector<double*> filter_values_ptrs, filter_dl_values_ptrs, filter_dll_values_ptrs;
     std::vector<const std::vector<double>*> filter_fields;
     for (size_t field_ind = 0; field_ind < vars_to_filter.size(); field_ind++) {
         filter_fields.push_back( &source_data.variables.at(vars_to_filter.at(field_ind)) );
@@ -231,19 +246,59 @@ int main(int argc, char *argv[]) {
     for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
         postprocess_fields.push_back( &coarse_fields.at(Ivar) );
         postprocess_names.push_back( vars_to_filter.at(Ivar) );
+
+        // first ell-derivative of field
+        postprocess_fields.push_back( &dl_coarse_fields.at(Ivar) );
+        postprocess_names.push_back( "dl_" + vars_to_filter.at(Ivar) );
+
+        // second ell-derivative of field
+        postprocess_fields.push_back( &dll_coarse_fields.at(Ivar) );
+        postprocess_names.push_back( "dll_" + vars_to_filter.at(Ivar) );
+
+        // Also get some relevant indices for PE<->KE conversions
         if ( compute_PEKE_conv == "true" ) {
             if (vars_to_filter.at(Ivar) == "rho") { rho_ind = Ivar; }
             if (vars_to_filter.at(Ivar) == "wo" ) { wo_ind = Ivar; }
         }
     }
-    std::vector<double> barrho_barwo(  0 );
+    std::vector<double> barrho_barwo(  0 ), dl_barrho_barwo;
     if ( compute_PEKE_conv == "true" ) {
         postprocess_names.push_back( "barrho_barwo" );
         barrho_barwo.resize( filter_fields[0]->size() );
         postprocess_fields.push_back( &barrho_barwo );
+        
+        // first ell derivative of bar(rho)*bar(wo)
+        postprocess_names.push_back( "dl_barrho_barwo" );
+        dl_barrho_barwo.resize( filter_fields[0]->size() );
+        postprocess_fields.push_back( &dl_barrho_barwo );
         assert( rho_ind >= 0 );
         assert( wo_ind >= 0 );
     }
+
+    #if DEBUG >= 2
+    for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
+        size_t num_land = 0, num_fill = 0, num_missed = 0;
+        #pragma omp parallel \
+        default(none) shared( source_data, filter_fields, Ivar ) private( index ) \
+        reduction( + : num_land, num_fill, num_missed ) 
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for (index = 0; index < Npts; index++) {
+                if ( not(source_data.mask.at(index)) ) {
+                    num_land++;
+                }
+                if ( filter_fields.at(Ivar)->at(index) == constants::fill_value ) {
+                    num_fill++;
+                    if ( source_data.mask.at(index) ) {
+                        num_missed++;
+                        source_data.mask.at(index) = false;
+                    }
+                }
+            }
+        }
+        fprintf( stdout, " Var %zu has %'zu masked values and %'zu fill-values. %'zu were missed.\n", Ivar, num_land, num_fill, num_missed );
+    }
+    #endif
 
     //
     //// Apply filtering
@@ -258,20 +313,37 @@ int main(int argc, char *argv[]) {
 
         #pragma omp parallel \
         default(none) \
-        shared( source_data, filter_fields, coarse_fields, scale, stdout, \
-              barrho_barwo, rho_ind, wo_ind, compute_PEKE_conv ) \
-        private( filter_values_doubles, filter_values_ptrs, \
+        shared( source_data, filter_fields, coarse_fields, dl_coarse_fields, dll_coarse_fields, \
+                scale, stdout, barrho_barwo, dl_barrho_barwo, rho_ind, wo_ind, compute_PEKE_conv ) \
+        private( filter_values_doubles, filter_dl_values_doubles, filter_dll_values_doubles, \
+                 filter_values_ptrs, filter_dl_values_ptrs, filter_dll_values_ptrs, \
+                 dl_kernel_val, dll_kernel_val, \
                  Itime, Idepth, Ilat, Ilon, Ivar, index, \
-                 LAT_lb, LAT_ub ) \
-        firstprivate( local_kernel, Nlon, Nlat, Ndepth, Ntime, Nvars )
+                 LAT_lb, LAT_ub, null_vector ) \
+        firstprivate( local_kernel, local_dl_kernel, local_dll_kernel, \
+                      Nlon, Nlat, Ndepth, Ntime, Nvars )
         {
 
             filter_values_doubles.clear();
+            filter_dl_values_doubles.clear();
+            filter_dll_values_doubles.clear();
+
             filter_values_doubles.resize( Nvars );
+            filter_dl_values_doubles.resize( Nvars );
+            filter_dll_values_doubles.resize( Nvars );
 
             filter_values_ptrs.clear();
+            filter_dl_values_ptrs.clear();
+            filter_dll_values_ptrs.clear();
+
             filter_values_ptrs.resize( Nvars );
-            for ( Ivar = 0; Ivar < Nvars; Ivar++ ) { filter_values_ptrs.at(Ivar) = &(filter_values_doubles.at(Ivar)); }
+            filter_dl_values_ptrs.resize( Nvars );
+            filter_dll_values_ptrs.resize( Nvars );
+            for ( Ivar = 0; Ivar < Nvars; Ivar++ ) { 
+                filter_values_ptrs.at(Ivar) = &(filter_values_doubles.at(Ivar)); 
+                filter_dl_values_ptrs.at(Ivar) = &(filter_dl_values_doubles.at(Ivar)); 
+                filter_dll_values_ptrs.at(Ivar) = &(filter_dll_values_doubles.at(Ivar)); 
+            }
 
             #pragma omp for collapse(1) schedule(dynamic)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
@@ -281,7 +353,9 @@ int main(int argc, char *argv[]) {
                 // then we can just compute it once and translate it at each lon index
                 if ( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) {
                     std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                    compute_local_kernel( local_kernel, scale, source_data, Ilat, 0, LAT_lb, LAT_ub );
+                    compute_local_kernel( 
+                            local_kernel, local_dl_kernel, local_dll_kernel, 
+                            scale, source_data, Ilat, 0, LAT_lb, LAT_ub );
                 }
 
                 for (Ilon = 0; Ilon < Nlon; Ilon++) {
@@ -289,7 +363,9 @@ int main(int argc, char *argv[]) {
                     if ( not( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) ) {
                         // If we couldn't precompute the kernel earlier, then do it now
                         std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                        compute_local_kernel( local_kernel, scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
+                        compute_local_kernel( 
+                                local_kernel, local_dl_kernel, local_dll_kernel,
+                                scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
                     }
 
                     for (Itime = 0; Itime < Ntime; Itime++) {
@@ -298,23 +374,78 @@ int main(int argc, char *argv[]) {
                             // Convert our four-index to a one-index
                             index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
-                            // Apply the filter at the point
-                            apply_filter_at_point(  filter_values_ptrs, filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
-                                                    LAT_lb, LAT_ub, scale, std::vector<bool>(Nvars,false), local_kernel );
+                            if ( not(constants::FILTER_OVER_LAND) and not(source_data.mask.at(index)) ) {
+                                for ( Ivar = 0; Ivar < Nvars; Ivar++ ) { 
+                                    coarse_fields.at(Ivar).at(index) = constants::fill_value; 
+                                }
+                                if ( compute_PEKE_conv == "true" ) {
+                                    barrho_barwo.at(index) = constants::fill_value;
+                                }
+                            } else{
+                                // Apply the filter at the point
+                                apply_filter_at_point(  
+                                        filter_values_ptrs, filter_dl_values_ptrs, filter_dll_values_ptrs,
+                                        dl_kernel_val, dll_kernel_val,
+                                        filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
+                                        LAT_lb, LAT_ub, scale, std::vector<bool>(Nvars,false), 
+                                        local_kernel, local_dl_kernel, local_dll_kernel );
 
-                            // Store the filtered values in the appropriate arrays
-                            for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
-                                coarse_fields.at(Ivar).at(index) = filter_values_doubles.at(Ivar);
-                            }
+                                // Store the filtered values in the appropriate arrays
+                                for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
+                                    coarse_fields.at(Ivar).at(index) = filter_values_doubles.at(Ivar);
 
-                            if ( compute_PEKE_conv == "true" ) {
-                                barrho_barwo.at(index) = coarse_fields.at(rho_ind).at(index) * coarse_fields.at(wo_ind).at(index);
+                                    // The ell-derivative of the filtered field
+                                    dl_coarse_fields.at(Ivar).at(index) = 
+                                        (   filter_dl_values_doubles.at(Ivar)
+                                          - filter_values_doubles.at(Ivar) ) 
+                                        * dl_kernel_val;
+                                    
+                                    // The second ell-derivative of the filtered field
+                                    dll_coarse_fields.at(Ivar).at(index) = 
+                                        (   filter_dll_values_doubles.at(Ivar)
+                                          - filter_values_doubles.at(Ivar) ) 
+                                        * dll_kernel_val
+                                        - 2 * (   filter_dl_values_doubles.at(Ivar)
+                                          - filter_values_doubles.at(Ivar) ) 
+                                        * pow(dl_kernel_val, 2);
+                                }
+
+                                if ( compute_PEKE_conv == "true" ) {
+                                    barrho_barwo.at(index) = coarse_fields.at(rho_ind).at(index) * coarse_fields.at(wo_ind).at(index);
+                                    dl_barrho_barwo.at(index) = 
+                                        coarse_fields.at(rho_ind).at(index) * dl_coarse_fields.at(wo_ind).at(index);
+                                        + dl_coarse_fields.at(rho_ind).at(index) * coarse_fields.at(wo_ind).at(index);
+                                }
                             }
                         }
                     }
                 }
             }
         }
+
+        #if DEBUG >= 2
+        for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
+            size_t num_land = 0, num_fill = 0, num_missed = 0;
+            #pragma omp parallel \
+            default(none) shared( source_data, coarse_fields, Ivar ) private( index ) \
+            reduction( + : num_land, num_fill, num_missed ) 
+            {
+                #pragma omp for collapse(1) schedule(static)
+                for (index = 0; index < Npts; index++) {
+                    if ( not(source_data.mask.at(index)) ) {
+                        num_land++;
+                    }
+                    if ( coarse_fields.at(Ivar).at(index) == constants::fill_value ) {
+                        num_fill++;
+                        if ( source_data.mask.at(index) ) {
+                            num_missed++;
+                        }
+                    }
+                }
+            }
+            fprintf( stdout, " Var %zu has %'zu masked values and %'zu fill-values. %'zu were missed.\n", Ivar, num_land, num_fill, num_missed );
+        }
+        #endif
 
         //
         //// Create output file
@@ -348,6 +479,21 @@ int main(int argc, char *argv[]) {
         //
         //// on-line postprocessing, if desired
         //
+        #if DEBUG >= 2
+        size_t num_land = 0;
+        #pragma omp parallel \
+        default(none) shared( source_data ) private( index ) \
+        reduction( + : num_land ) 
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for (index = 0; index < Npts; index++) {
+                if ( not(source_data.mask.at(index)) ) {
+                    num_land++;
+                }
+            }
+        }
+        fprintf( stdout, "Detected %'zu land points in the mask.\n", num_land );
+        #endif
 
         if (constants::APPLY_POSTPROCESS) {
             MPI_Barrier(MPI_COMM_WORLD);
@@ -357,7 +503,6 @@ int main(int argc, char *argv[]) {
             fflush(stdout);
             #endif
 
-            std::vector<double> null_vector(0);
             Apply_Postprocess_Routines(
                     source_data, postprocess_fields, postprocess_names, null_vector,
                     scale, timing_records);
