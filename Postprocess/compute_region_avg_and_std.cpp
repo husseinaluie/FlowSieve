@@ -45,42 +45,40 @@ void compute_region_avg_and_std(
     #if DEBUG >= 1
     if (wRank == 0) { fprintf(stdout, "  Computing region means\n"); }
     #endif
-    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-        #if DEBUG >= 2
-        if (wRank == 0) { fprintf(stdout, "    processing field %d of %d means\n", Ifield + 1, num_fields); }
-        #endif
 
-        std::vector<double> field_integrals(Ntime*Ndepth*num_regions,0.);
+    std::vector<double> field_integrals(Ntime*Ndepth*num_regions*num_fields,0.);
 
-        #pragma omp parallel default(none)\
-        private(Ilat, Ilon, index, dA, area_index, increment, int_index, \
-                Idepth, Itime, Iregion )\
-        shared( source_data, Ifield, postprocess_fields, stderr) \
-        firstprivate( Nlon, Nlat, Ndepth, Ntime, num_regions ) \
-        reduction(vec_double_plus : field_integrals)
-        { 
-            #pragma omp for collapse(5) schedule(static)
-            for (Iregion = 0; Iregion < num_regions; ++Iregion) {
-                for (Itime = 0; Itime < Ntime; ++Itime) {
-                    for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
-                        for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                            for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                                int_index = Index(0, Itime, Idepth, Iregion, 1, Ntime, Ndepth, num_regions);
-                                index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+    #pragma omp parallel default(none)\
+    private(Ilat, Ilon, index, dA, area_index, increment, int_index, \
+            Idepth, Itime, Iregion, Ifield, reg_area )\
+    shared( source_data, postprocess_fields, stderr ) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, num_regions, num_fields ) \
+    reduction(vec_double_plus : field_integrals)
+    { 
+        #pragma omp for collapse(5) schedule(static)
+        for (Iregion = 0; Iregion < num_regions; ++Iregion) {
+            for (Itime = 0; Itime < Ntime; ++Itime) {
+                for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
+                    for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                        for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
-                                if ( constants::FILTER_OVER_LAND or source_data.mask.at(index) ) { // Skip land areas
+                            if ( constants::FILTER_OVER_LAND or source_data.mask.at(index) ) { // Skip land areas
 
-                                    area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
-                                    dA = source_data.areas.at(area_index);
-                                    increment = postprocess_fields.at(Ifield)->at(index) * dA;
-                                    if ( postprocess_fields.at(Ifield)->at(index) == constants::fill_value ) {
-                                        //fprintf( stderr, "A fill value was not masked out!\n" );
-                                        increment = 0;
-                                    }
+                                area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
+                                dA = source_data.areas.at(area_index);
 
-                                    if ( source_data.regions.at( source_data.region_names.at(Iregion) ).at(area_index) )
-                                    {
-                                        field_integrals.at(int_index) += increment;
+                                if ( source_data.regions.at( source_data.region_names.at(Iregion) ).at(area_index) )
+                                {
+                                    int_index = Index(0, Itime, Idepth, Iregion, 1, Ntime, Ndepth, num_regions);
+                                    reg_area = source_data.region_areas.at(int_index);
+                                    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
+                                        increment = postprocess_fields.at(Ifield)->at(index) * dA;
+                                        if ( postprocess_fields.at(Ifield)->at(index) == constants::fill_value ) {
+                                            increment = 0;
+                                        }
+                                        int_index = Index(Ifield, Itime, Idepth, Iregion, num_fields, Ntime, Ndepth, num_regions);
+                                        field_integrals.at(int_index) += (reg_area == 0) ? 0. : increment / reg_area;
                                     }
                                 }
                             }
@@ -89,15 +87,15 @@ void compute_region_avg_and_std(
                 }
             }
         }
-        #pragma omp parallel default(none) \
-        private( int_index, reg_area ) \
-        shared( field_integrals, field_averages, source_data ) \
-        firstprivate( Ifield )
-        {
-            #pragma omp for collapse(1) schedule(static)
-            for (int_index = 0; int_index < field_integrals.size(); int_index++) {
-                reg_area = source_data.region_areas.at(int_index);
-                field_averages.at(Ifield).at(int_index) = (reg_area == 0) ? 0. : field_integrals.at(int_index) / reg_area;
+    }
+    #pragma omp parallel default(none) \
+    private( int_index, Ifield ) \
+    shared( field_integrals, field_averages )
+    {
+        #pragma omp for collapse(2) schedule(static)
+        for (Ifield = 0; Ifield < num_fields; ++Ifield) {
+            for (int_index = 0; int_index < Ntime*Ndepth*num_regions; int_index++) {
+                field_averages.at(Ifield).at(int_index)  = field_integrals.at(Ifield*Ntime*Ndepth*num_regions + int_index);
             }
         }
     }
@@ -110,40 +108,40 @@ void compute_region_avg_and_std(
     #if DEBUG >= 1
     if (wRank == 0) { fprintf(stdout, "  Computing region standard deviations\n"); }
     #endif
-    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-        #if DEBUG >= 2
-        if (wRank == 0) { fprintf(stdout, "    processing field %d of %d std devs\n", Ifield + 1, num_fields); }
-        #endif
 
-        std::vector<double> field_integrals(Ntime*Ndepth*num_regions,0.);
+    std::fill( field_integrals.begin(), field_integrals.end(), 0. );
 
-        #pragma omp parallel default(none)\
-        private(Ilat, Ilon, index, dA, area_index, increment, int_index, \
-                Idepth, Itime, Iregion )\
-        shared( source_data, Ifield, postprocess_fields, field_averages ) \
-        firstprivate( Nlon, Nlat, Ndepth, Ntime, num_regions ) \
-        reduction(vec_double_plus : field_integrals)
-        { 
-            #pragma omp for collapse(5) schedule(static)
-            for (Iregion = 0; Iregion < num_regions; ++Iregion) {
-                for (Itime = 0; Itime < Ntime; ++Itime) {
-                    for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
-                        for (Ilat = 0; Ilat < Nlat; ++Ilat) {
-                            for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                                int_index = Index(0, Itime, Idepth, Iregion, 1, Ntime, Ndepth, num_regions);
-                                index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+    #pragma omp parallel default(none)\
+    private(Ilat, Ilon, index, dA, area_index, increment, int_index, \
+            Idepth, Itime, Iregion, Ifield, reg_area )\
+    shared( source_data, postprocess_fields, field_averages ) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, num_regions, num_fields ) \
+    reduction(vec_double_plus : field_integrals)
+    { 
+        #pragma omp for collapse(5) schedule(static)
+        for (Iregion = 0; Iregion < num_regions; ++Iregion) {
+            for (Itime = 0; Itime < Ntime; ++Itime) {
+                for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
+                    for (Ilat = 0; Ilat < Nlat; ++Ilat) {
+                        for (Ilon = 0; Ilon < Nlon; ++Ilon) {
+                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
-                                if ( constants::FILTER_OVER_LAND or source_data.mask.at(index) ) { // Skip land areas
+                            if ( constants::FILTER_OVER_LAND or source_data.mask.at(index) ) { // Skip land areas
 
-                                    area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
-                                    dA = source_data.areas.at(area_index);
-                                    increment = pow(     field_averages.at(Ifield).at(int_index)
-                                                       - postprocess_fields.at(Ifield)->at(index),
-                                                    2.) * dA;
+                                area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
+                                dA = source_data.areas.at(area_index);
 
-                                    if ( source_data.regions.at( source_data.region_names.at(Iregion) ).at(area_index) )
-                                    {
-                                        field_integrals.at(int_index) += increment;
+                                if ( source_data.regions.at( source_data.region_names.at(Iregion) ).at(area_index) )
+                                {
+                                    int_index = Index(0, Itime, Idepth, Iregion, 1, Ntime, Ndepth, num_regions);
+                                    reg_area = source_data.region_areas.at(int_index);
+                                    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
+                                        increment = pow(     field_averages.at(Ifield).at(int_index)
+                                                           - postprocess_fields.at(Ifield)->at(index),
+                                                        2.) * dA;
+
+                                        field_integrals.at(Ifield*Ntime*Ndepth*num_regions + int_index) += 
+                                            (reg_area == 0) ? 0. : increment / reg_area;
                                     }
                                 }
                             }
@@ -152,9 +150,17 @@ void compute_region_avg_and_std(
                 }
             }
         }
-        for (int_index = 0; int_index < field_integrals.size(); int_index++) {
-            reg_area = source_data.region_areas.at(int_index);
-            field_std_devs.at(Ifield).at(int_index) = (reg_area == 0) ? 0. : sqrt( field_integrals.at(int_index) / reg_area );
+    }
+
+    #pragma omp parallel default(none) \
+    private( int_index, Ifield ) \
+    shared( field_integrals, field_std_devs )
+    {
+        #pragma omp for collapse(2) schedule(static)
+        for (Ifield = 0; Ifield < num_fields; ++Ifield) {
+            for (int_index = 0; int_index < Ntime*Ndepth*num_regions; int_index++) {
+                field_std_devs.at(Ifield).at(int_index)  = sqrt( field_integrals.at(Ifield*Ntime*Ndepth*num_regions + int_index) );
+            }
         }
     }
 
