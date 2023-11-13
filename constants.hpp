@@ -144,7 +144,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool EXTEND_DOMAIN_TO_POLES = false;
+    const bool EXTEND_DOMAIN_TO_POLES = true;
 
     /*!
      * \param CARTESIAN
@@ -319,7 +319,7 @@ namespace constants
     //const int KERNEL_OPT = 4;
     enum KernelType : int { TopHat, HyperGaussian, Gaussian, JohnsonGaussian, 
                             Sinc, SmoothHat, HighOrder };
-    const int KERNEL_OPT = KernelType::HighOrder;
+    const int KERNEL_OPT = KernelType::Gaussian;
 
     /*!
      * \param KernPad
@@ -354,14 +354,20 @@ namespace constants
      * @ingroup constants
      */
     const std::map< std::string, std::string > variable_descriptions = {
+        { "F",                  "Coarse-grained Helmholtz scalar (full = u_r, tor = Psi, pot = Phi)." },
         { "coarse_u_r",         "Coarse-grained vertical/radial velocity." },
         { "coarse_u_lon",       "Coarse-grained zonal velocity." },
         { "coarse_u_lat",       "Coarse-grained meridional velocity." },
+        { "u_lon_spectrum",     "Power spectrum density of zonal velocity." },
+        { "u_lat_spectrum",     "Power spectrum density of meridional velocity." },
+        { "KE_spectral_slope",  "Log-log slope of KE power spectrum." },
         { "coarse_KE",          "Kinetic energy of coarse-grained velocity" },
         { "fine_KE",            "Small-scale kinetic energy ( filter(KE(u)) - KE(filter(u)) )" },
         { "Fine_KE_mod",        "Modified small-scale kinetic energy ( KE(u) - KE(filter(u)) )" },
         { "enstrophy",          "Enstrophy of coarse-grained velocity" },
         { "Pi",                 "Non-linear energy transfer from large-scales to small-scales" },
+        { "Pi_Dversus",         "As Pi, but large-scale strain is potential-only." },
+        { "Pi_Vversus",         "As Pi, but large-scale strain is toroidal-only." },
         { "Z",                  "Non-linear enstrophy transfer from large-scales to small-scales" },
         { "OkuboWeiss",         "Okubo-Weiss parameter ( positive -> strain dominated, negative -> vortex dominated )" },
         { "div_Jtransport",     "divergence of energy transport term" },
@@ -382,10 +388,15 @@ namespace constants
         { "coarse_u_r",         "m / s" },
         { "coarse_u_lon",       "m / s" },
         { "coarse_u_lat",       "m / s" },
+        { "u_lon_spectrum",     "J / (m^3) / m" },
+        { "u_lat_spectrum",     "J / (m^3) / m" },
+        { "KE_spectral_slope",  "1" },
         { "coarse_KE",          "J / (m^3)" },
         { "fine_KE",            "J / (m^3)" },
         { "enstrophy",          "J / (m^5)" },
         { "Pi",                 "Watt / (m^3)" },
+        { "Pi_Dversus",         "Watt / (m^3)" },
+        { "Pi_Vversus",         "Watt / (m^3)" },
         { "Z",                  "Watt / (m^5)" },
         { "OkuboWeiss",         "1 / (s^2)" },
         { "div_Jtransport",     "Watt / (m^3)" },
@@ -403,7 +414,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const std::string spatial_average_description       = "The lat/lon average computed over each defined region (see region dimension).";
+    const std::string spatial_average_description = "The lat/lon average computed over each defined region (see region dimension).";
 
     /*!
      * \param zonal_average_description
@@ -411,7 +422,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const std::string zonal_average_description         = "The zonal (longitudinal) average computed at each latitude.";
+    const std::string zonal_average_description = "The zonal (longitudinal) average computed at each latitude.";
 
     /*!
      * \param time_average_description
@@ -419,7 +430,15 @@ namespace constants
      *
      * @ingroup constants
      */
-    const std::string time_average_description          = "Time average over the entire provided dataset.";
+    const std::string time_average_description = "Time average over the entire provided dataset.";
+
+    /*!
+     * \param coarsened_map_description
+     * \brief Human-friendly text that is added to all coarsened_map variables in postprocessing outputs
+     *
+     * @ingroup constants
+     */
+    const std::string coarsened_map_description = "Full space-time map averaged onto a coarser lat/lon grid.";
 
     /*!
      * \param OkuboWeiss_average_description
