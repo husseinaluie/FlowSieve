@@ -87,6 +87,10 @@ void initialize_postprocess_file(
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     }
 
+    std::string degrees_north = "degrees_north", degrees_east = "degrees_east";
+    nc_put_att_text( ncid, lat_varid, "units", degrees_north.size(), degrees_north.c_str() );
+    nc_put_att_text( ncid, lon_varid, "units", degrees_east.size(),  degrees_east.c_str() );
+
     if (not(constants::CARTESIAN)) {
         const double rad_to_degree = 180. / M_PI;
         retval = nc_put_att_double(ncid, lon_varid, "scale_factor", NC_DOUBLE, 1, &rad_to_degree);
@@ -154,6 +158,9 @@ void initialize_postprocess_file(
         retval = nc_put_vara_double(ncid, coarse_lon_varid,   start, count,
                 &(source_data.coarse_map_lon[0]));
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+        nc_put_att_text( ncid, coarse_lat_varid, "units", degrees_north.size(), degrees_north.c_str() );
+        nc_put_att_text( ncid, coarse_lon_varid, "units", degrees_east.size(),  degrees_east.c_str() );
     }
 
     // We're also going to store the region areas

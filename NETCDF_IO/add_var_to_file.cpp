@@ -64,37 +64,39 @@ void add_var_to_file(
     //    Now add various meta-data statements to the file for clarity (if available)
     ////
     
-    // First, check 'type' (i.e. time average, spatial average, toroidal potential, etc)
+    // First, check 'type' (i.e. time average, spatial average, etc)
     std::string substring = var_name;
 
     const size_t    time_avg_index  = var_name.find("_time_average"),
                     Okubo_avg_index = var_name.find("_OkuboWeiss_average"),
                     area_avg_index  = var_name.find("_area_average"),
+                    coarse_map_index  = var_name.find("_coarsened_map"),
                     zonal_avg_index = var_name.find("_zonal_average");
     if ( time_avg_index != std::string::npos ) {
         nc_put_att_text( ncid, var_id, "variable_type", 
                          constants::time_average_description.size(), 
                          constants::time_average_description.c_str() );
         substring = var_name.substr( 0, time_avg_index );
-
     } else if ( Okubo_avg_index != std::string::npos ) {
         nc_put_att_text( ncid, var_id, "variable_type", 
                          constants::OkuboWeiss_average_description.size(), 
                          constants::OkuboWeiss_average_description.c_str() );
         substring = var_name.substr( 0, Okubo_avg_index );
-
     } else if ( area_avg_index != std::string::npos ) {
         nc_put_att_text( ncid, var_id, "variable_type", 
                          constants::spatial_average_description.size(),    
                          constants::spatial_average_description.c_str() );
         substring = var_name.substr( 0, area_avg_index );
-
     } else if ( zonal_avg_index != std::string::npos ) {
         nc_put_att_text( ncid, var_id, "variable_type", 
                          constants::zonal_average_description.size(),    
                          constants::zonal_average_description.c_str() );
         substring = var_name.substr( 0, zonal_avg_index );
-
+    } else if ( coarse_map_index != std::string::npos ) {
+        nc_put_att_text( ncid, var_id, "variable_type", 
+                         constants::coarsened_map_description.size(),    
+                         constants::coarsened_map_description.c_str() );
+        substring = var_name.substr( 0, coarse_map_index );
     }
 
     // Next, check if we have a long-form description and add that
