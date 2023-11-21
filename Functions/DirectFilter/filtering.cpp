@@ -70,7 +70,9 @@ void filtering(
 
     int LAT_lb, LAT_ub;
 
-    std::vector<double> local_kernel(Nlat * Nlon);
+    std::vector<double> local_kernel(Nlat * Nlon, 0.),
+                        local_dl_kernel( Nlat*Nlon, 0. ),
+                        local_dll_kernel( Nlat*Nlon, 0. );
 
     std::vector<double> u_x(num_pts), u_y(num_pts), u_z(num_pts);
     std::vector<double> coarse_u_r(num_pts), coarse_u_lon(num_pts), coarse_u_lat(num_pts);
@@ -111,8 +113,10 @@ void filtering(
     const double kern_alpha = kernel_alpha();
 
     // Now prepare to filter
-    double scale,
-           u_x_tmp,     u_y_tmp,   u_z_tmp,
+    double scale, dl_kernel_val, dll_kernel_val,
+           u_x_tmp,     dl_u_x_tmp, dll_u_x_tmp,
+           u_y_tmp,     dl_u_y_tmp, dll_u_y_tmp,
+           u_z_tmp,     dl_u_z_tmp, dll_u_z_tmp,
            u_r_tmp,     u_lon_tmp, u_lat_tmp,
            u_x_tilde,   u_y_tilde, u_z_tilde;
 
@@ -148,6 +152,7 @@ void filtering(
     postprocess_fields.push_back(&filtered_KE);
 
     std::vector<double> null_vector(0);
+    std::vector<double*> null_ptr_vector(0);
 
     std::vector<double> fine_vort_r, fine_vort_lat, fine_vort_lon,
         coarse_vort_r, coarse_vort_lon, coarse_vort_lat,
@@ -196,7 +201,7 @@ void filtering(
 
 
     double uxux_tmp, uxuy_tmp, uxuz_tmp, uyuy_tmp, uyuz_tmp, uzuz_tmp, vort_ux_tmp, vort_uy_tmp, vort_uz_tmp;
-    double KE_tmp;
+    double KE_tmp, dl_KE_tmp, dll_KE_tmp;
     std::vector<double> coarse_uxux, coarse_uxuy, coarse_uxuz,
         coarse_uyuy, coarse_uyuz, coarse_uzuz, 
         coarse_vort_ux, coarse_vort_uy, coarse_vort_uz,
@@ -305,18 +310,19 @@ void filtering(
 
         // We'll need vorticity, so go ahead and compute it
         compute_vorticity( coarse_vort_r, coarse_vort_lon, coarse_vort_lat, div, OkuboWeiss,
-                null_vector, null_vector, null_vector,
+                null_vector, null_vector, null_vector, null_vector,
                 source_data, full_u_r, full_u_lon, full_u_lat );
 
         compute_vorticity( full_vort_r, null_vector, null_vector, null_vector, null_vector,
-                null_vector, null_vector, null_vector,
+                null_vector, null_vector, null_vector, null_vector,
                 source_data, full_u_r, full_u_lon, full_u_lat );
 
     int perc_base = 5;
     int perc, perc_count=0;
 
     // Set up filtering vectors
-    std::vector<double*> filtered_vals, tilde_vals;
+    std::vector<double*> filtered_vals, tilde_vals, dl_filter_vals, dll_filter_vals, 
+        dl_kernel_vals, dll_kernel_vals;
     std::vector<bool> filt_use_mask;
     std::vector<const std::vector<double>*> filter_fields;
 
@@ -390,27 +396,45 @@ void filtering(
                 fine_rho, fine_p, PEtoKE,\
                 fine_u_r, fine_u_lon, fine_u_lat, perc_base)\
         private(Itime, Idepth, Ilat, Ilon, index, \
-                u_x_tmp, u_y_tmp, u_z_tmp,\
+                u_x_tmp, dl_u_x_tmp, dll_u_x_tmp, \
+                u_y_tmp, dl_u_y_tmp, dll_u_y_tmp, \
+                u_z_tmp, dl_u_z_tmp, dll_u_z_tmp, \
                 u_x_tilde, u_y_tilde, u_z_tilde,\
                 u_r_tmp, u_lat_tmp, u_lon_tmp,\
                 uxux_tmp, uxuy_tmp, uxuz_tmp,\
                 uyuy_tmp, uyuz_tmp, uzuz_tmp,\
                 vort_ux_tmp, vort_uy_tmp, vort_uz_tmp,\
-                KE_tmp, rho_tmp, p_tmp,\
-                LAT_lb, LAT_ub, tid, filtered_vals, tilde_vals ) \
-        firstprivate(perc, wRank, local_kernel, perc_count,\
-                     Nlon, Nlat, Ndepth, Ntime )
+                KE_tmp, dl_KE_tmp, dll_KE_tmp, rho_tmp, p_tmp,\
+                LAT_lb, LAT_ub, tid, filtered_vals, tilde_vals, \
+                dl_filter_vals, dll_filter_vals, dl_kernel_val, dll_kernel_val, \
+                null_vector, null_ptr_vector ) \
+        firstprivate(perc, wRank, local_kernel, local_dl_kernel, local_dll_kernel, \
+                     perc_count, Nlon, Nlat, Ndepth, Ntime )
         {
 
             tid = omp_get_thread_num();
 
             filtered_vals.clear();
 
+            // u_x
             filtered_vals.push_back(&u_x_tmp);
-            filtered_vals.push_back(&u_y_tmp);
-            filtered_vals.push_back(&u_z_tmp);
+            dl_filter_vals.push_back(&dl_u_x_tmp);
+            dll_filter_vals.push_back(&dll_u_x_tmp);
 
+            // u_y
+            filtered_vals.push_back(&u_y_tmp);
+            dl_filter_vals.push_back(&dl_u_y_tmp);
+            dll_filter_vals.push_back(&dll_u_y_tmp);
+
+            // u_z
+            filtered_vals.push_back(&u_z_tmp);
+            dl_filter_vals.push_back(&dl_u_z_tmp);
+            dll_filter_vals.push_back(&dll_u_z_tmp);
+
+            // KE
             filtered_vals.push_back(&KE_tmp);
+            dl_filter_vals.push_back(&dl_KE_tmp);
+            dll_filter_vals.push_back(&dll_KE_tmp);
 
             if (constants::COMP_BC_TRANSFERS) {
                 filtered_vals.push_back(&rho_tmp);
@@ -446,7 +470,8 @@ void filtering(
                     //#endif
                     if ( (constants::DO_TIMING) and (tid == 0) ) { clock_on = MPI_Wtime(); }
                     std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                    compute_local_kernel( local_kernel, scale, source_data, Ilat, 0, LAT_lb, LAT_ub );
+                    compute_local_kernel( local_kernel, local_dl_kernel, local_dll_kernel, 
+                            scale, source_data, Ilat, 0, LAT_lb, LAT_ub );
                     if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_outer"); }
                     //#if DEBUG >= 3
                     //if (wRank == 0) { fprintf(stdout, "  done\n"); }
@@ -478,7 +503,8 @@ void filtering(
                     if ( not( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) ) {
                         // If we couldn't precompute the kernel earlier, then do it now
                         std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                        compute_local_kernel( local_kernel, scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
+                        compute_local_kernel( local_kernel, local_dl_kernel, local_dll_kernel,
+                                scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
                         if ( (constants::DO_TIMING) and (tid == 0) ) { timing_records.add_to_record(MPI_Wtime() - clock_on, "kernel_precomputation_inner"); }
                     }
 
@@ -493,8 +519,12 @@ void filtering(
                                 // Apply the filter at the point
                                 if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
 
-                                apply_filter_at_point(  filtered_vals, filter_fields, source_data, Itime, Idepth, Ilat, Ilon,
-                                                        LAT_lb, LAT_ub, scale, filt_use_mask, local_kernel );
+                                apply_filter_at_point(  
+                                        filtered_vals, dl_filter_vals, dll_filter_vals,
+                                        dl_kernel_val, dll_kernel_val, 
+                                        filter_fields, source_data, Itime, Idepth, Ilat, Ilon,
+                                        LAT_lb, LAT_ub, scale, filt_use_mask, 
+                                        local_kernel, local_dl_kernel, local_dll_kernel );
 
                                 // Convert the filtered fields back to spherical
                                 vel_Cart_to_Spher_at_point(
@@ -579,8 +609,12 @@ void filtering(
                                     //
                                     // If we have rho, then also compute tilde fields
                                     //
-                                    apply_filter_at_point(  tilde_vals, filter_fields, source_data, Itime, Idepth, Ilat, Ilon,
-                                                            LAT_lb, LAT_ub, scale, filt_use_mask, local_kernel, &full_rho );
+                                    apply_filter_at_point(  
+                                            tilde_vals, null_ptr_vector, null_ptr_vector, 
+                                            dl_kernel_val, dll_kernel_val, 
+                                            filter_fields, source_data, Itime, Idepth, Ilat, Ilon,
+                                            LAT_lb, LAT_ub, scale, filt_use_mask, 
+                                            local_kernel, null_vector, null_vector, &full_rho );
 
                                     vel_Cart_to_Spher_at_point(
                                             u_r_tmp,    u_lon_tmp, u_lat_tmp,
@@ -645,12 +679,12 @@ void filtering(
             #endif
             if (not(constants::MINIMAL_OUTPUT)) {
                 compute_vorticity(fine_vort_r, fine_vort_lon, fine_vort_lat, div, OkuboWeiss,
-                        null_vector, null_vector, null_vector,
+                        null_vector, null_vector, null_vector, null_vector,
                         source_data, fine_u_r, fine_u_lon, fine_u_lat );
             }
 
             compute_vorticity(coarse_vort_r, coarse_vort_lon, coarse_vort_lat, div, OkuboWeiss,
-                    null_vector, null_vector, null_vector,
+                    null_vector, null_vector, null_vector, null_vector,
                     source_data, coarse_u_r, coarse_u_lon, coarse_u_lat );
 
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_vorticity"); }
@@ -697,7 +731,7 @@ void filtering(
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
 
             compute_vorticity(tilde_vort_r, tilde_vort_lon, tilde_vort_lat, div, OkuboWeiss,
-                    null_vector, null_vector, null_vector,
+                    null_vector, null_vector, null_vector, null_vector,
                     source_data, tilde_u_r, tilde_u_lon, tilde_u_lat );
 
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute_Lambda"); }
