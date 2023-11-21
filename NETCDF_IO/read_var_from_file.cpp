@@ -150,8 +150,11 @@ void read_var_from_file(
                 else if ( II == 1 ) { Nprocs_in_dim = Nprocs_in_depth; }
                 else                { Nprocs_in_dim = 0; assert(false); }  // II <= 1 so won't happen
 
+                assert( (count[II] >= Nprocs_in_dim) && "Too many processors have been assigned to dimension." );
+
                 my_count = ( (int)count[II] ) / Nprocs_in_dim;
                 overflow = (int)( count[II] - my_count * Nprocs_in_dim );
+
 
                 Index1to4( wRank, Itime_proc,      Idepth_proc,     Ilat_proc, Ilon_proc,
                                   Nprocs_in_time,  Nprocs_in_depth, 1,         1          );
