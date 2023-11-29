@@ -90,11 +90,12 @@ void compute_region_avg_and_std(
     }
     #pragma omp parallel default(none) \
     private( int_index, Ifield ) \
-    shared( field_integrals, field_averages )
+    shared( field_integrals, field_averages ) \
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, num_regions, num_fields )
     {
         #pragma omp for collapse(2) schedule(static)
         for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-            for (int_index = 0; int_index < Ntime*Ndepth*num_regions; int_index++) {
+            for (int_index = 0; int_index < (size_t) Ntime*Ndepth*num_regions; int_index++) {
                 field_averages.at(Ifield).at(int_index)  = field_integrals.at(Ifield*Ntime*Ndepth*num_regions + int_index);
             }
         }
@@ -154,11 +155,12 @@ void compute_region_avg_and_std(
 
     #pragma omp parallel default(none) \
     private( int_index, Ifield ) \
-    shared( field_integrals, field_std_devs )
+    shared( field_integrals, field_std_devs ) \
+    firstprivate( Ndepth, Ntime, num_regions, num_fields ) 
     {
         #pragma omp for collapse(2) schedule(static)
         for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-            for (int_index = 0; int_index < Ntime*Ndepth*num_regions; int_index++) {
+            for (int_index = 0; int_index < (size_t) Ntime*Ndepth*num_regions; int_index++) {
                 field_std_devs.at(Ifield).at(int_index)  = sqrt( field_integrals.at(Ifield*Ntime*Ndepth*num_regions + int_index) );
             }
         }

@@ -85,7 +85,8 @@ void compute_vorticity(
             anticyclonic_energy_tmp, \
             divergent_strain_energy_tmp, traceless_strain_energy_tmp )\
     firstprivate( Npts, Nlon, Nlat, Ndepth, Ntime, do_vort_r, do_vort_lon, do_vort_lat, do_vel_div,\
-                  do_OkuboWeiss )
+                  do_OkuboWeiss, do_cyclonic_energy, do_anticyclonic_energy, \
+                  do_divergent_strain_energy, do_traceless_strain_energy )
     {
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < Npts; index++) {
