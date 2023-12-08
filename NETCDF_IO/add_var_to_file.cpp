@@ -9,7 +9,8 @@ void add_var_to_file(
         const std::string var_name,
         const char ** dim_list,
         const int num_dims,
-        const char * filename
+        const char * filename,
+        const int NC_datatype
         ) {
 
     static_assert( 
