@@ -5,7 +5,7 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=0 $(CFLAGS)
+CFLAGS:=-DDEBUG=2 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
@@ -209,8 +209,8 @@ $(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} %.o
 
 
 # Helmholtz
-HELM_TARGET_EXES := Case_Files/coarse_grain_helmholtz.x Case_Files/LLC_coarse_grain_helmholtz.x
-HELM_TARGET_OBJS := Case_Files/coarse_grain_helmholtz.o Case_Files/LLC_coarse_grain_helmholtz.o
+HELM_TARGET_EXES := Case_Files/coarse_grain_helmholtz.x Case_Files/LLC_coarse_grain_helmholtz.x Case_Files/LLC_coarse_grain_scalars.x
+HELM_TARGET_OBJS := Case_Files/coarse_grain_helmholtz.o Case_Files/LLC_coarse_grain_helmholtz.o Case_Files/LLC_coarse_grain_scalars.o
 
 $(HELM_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
