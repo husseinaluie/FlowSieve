@@ -195,8 +195,8 @@ void Apply_LLC_Helmholtz_Projection(
                                     source_data.adjacency_indices.at(Ipt).at(Ineighbour) :
                                     Ipt;
 
-            bool is_pole = std::fabs( std::fabs( latitude.at(Ipt) * 180.0 / M_PI ) - 90 ) < 0.001;
-            if ( is_pole ) { continue; }
+            bool is_pole = std::fabs( std::fabs( latitude.at(Ipt) * 180.0 / M_PI ) - 90 ) < 1e-6;
+            if ( is_pole ) { fprintf(stdout, "SKIPPING POLE POINT!\n"); continue; }
 
             if (not(mask.at(Ipt))) {
                 // Land doesn't always force zero velocity components. Sometimes it
@@ -255,7 +255,8 @@ void Apply_LLC_Helmholtz_Projection(
                 // Psi part
                 if (not(mask.at(Ipt))) {
                     column_skip = 0 * Npts + neighbour_ind;
-                    row_skip    = 0 * Npts + Ipt;
+                    //row_skip    = 0 * Npts + Ipt;
+                    row_skip    = 1 * Npts + Ipt;
                 } else {
                     column_skip = 0 * Npts + neighbour_ind;
                     row_skip    = 1 * Npts + Ipt;
@@ -265,7 +266,8 @@ void Apply_LLC_Helmholtz_Projection(
                 // Phi part
                 if (not(mask.at(Ipt))) {
                     column_skip = 1 * Npts + neighbour_ind;
-                    row_skip    = 1 * Npts + Ipt;
+                    //row_skip    = 1 * Npts + Ipt;
+                    row_skip    = 0 * Npts + Ipt;
                 } else {
                     column_skip = 1 * Npts + neighbour_ind;
                     row_skip    = 0 * Npts + Ipt;
@@ -318,8 +320,8 @@ void Apply_LLC_Helmholtz_Projection(
                     alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
                 }
 
-                /*
                 // Version using actual second derivative
+                /*
                 val  = source_data.adjacency_d2dlon2_weights.at(Ipt).at(Ineighbour);
                 val *= weight_val * pow(cos_lat_inv * R_inv, 2.);
                 if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
@@ -352,8 +354,8 @@ void Apply_LLC_Helmholtz_Projection(
                     alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
                 }
 
-                /*
                 // Version using actual second derivative
+                /*
                 val  = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour);
                 val *= weight_val * pow(R_inv, 2.);
                 if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
@@ -491,7 +493,7 @@ void Apply_LLC_Helmholtz_Projection(
                 for (index_sub = 0; index_sub < Npts; ++index_sub) {
                     index = index_sub + Npts*(Itime*Ndepth + Idepth);
 
-                    is_pole = std::fabs( std::fabs( latitude.at(index_sub) * 180.0 / M_PI ) - 90 ) < 0.001;
+                    is_pole = std::fabs( std::fabs( latitude.at(index_sub) * 180.0 / M_PI ) - 90 ) < 1e-6;
 
                     if (Tikhov_Laplace >= 0) {
                         RHS_vector.at( 0*Npts + index_sub) = u_lon_rem.at(index_sub);
@@ -500,6 +502,7 @@ void Apply_LLC_Helmholtz_Projection(
 
                     if (Tikhov_Laplace > 0) {
                         if ( is_pole ) {
+                            fprintf(stdout, "SKIPPING POLE\n");
                             RHS_vector.at( 2*Npts + index_sub) = 0.;
                             RHS_vector.at( 3*Npts + index_sub) = 0.;
                         } else {
