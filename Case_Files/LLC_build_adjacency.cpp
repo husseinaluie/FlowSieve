@@ -96,6 +96,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Build the adjacency matrix and other adjacency-adjacent arrays
+    source_data.load_adjacency_indices("adjacency_test.nc");
+
+    // Build the adjacency matrix and other adjacency-adjacent arrays
     source_data.build_adjacency();
 
     // Write the adjacency

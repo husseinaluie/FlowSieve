@@ -135,8 +135,9 @@ class dataset {
 
         // Functions / variables for working with LLC-type grids
         //const size_t num_neighbours = 3;
-        const size_t num_neighbours = 5;
+        //const size_t num_neighbours = 5;
         //const size_t num_neighbours = 7;
+        const size_t num_neighbours = 8;
         std::vector< std::vector< size_t > >    adjacency_indices;
         std::vector< std::vector< double > >    adjacency_projected_x,
                                                 adjacency_projected_y,
@@ -150,6 +151,8 @@ class dataset {
                               const MPI_Comm comm = MPI_COMM_WORLD );
         void load_adjacency(  const std::string filename, 
                               const MPI_Comm comm = MPI_COMM_WORLD );
+        void load_adjacency_indices(  const std::string filename, 
+                                      const MPI_Comm comm = MPI_COMM_WORLD );
 
 };
 

@@ -36,7 +36,6 @@ void dataset::build_adjacency(
     size_t pt_index, search_index, Ineighbour;
     const size_t num_pts = longitude.size();
 
-    adjacency_indices.resize( num_pts );
     adjacency_projected_x.resize( num_pts );
     adjacency_projected_y.resize( num_pts );
     adjacency_distances.resize( num_pts );
@@ -47,16 +46,6 @@ void dataset::build_adjacency(
     adjacency_d2dlon2_weights.resize( num_pts );
     adjacency_d2dlat2_weights.resize( num_pts );
 
-    // Be a litlle sneaky. We want to make this search faster if possible.
-    // To do that, it would be helpful to have a coarse estimate of how far apart points
-    // are. 
-    // Note: surface area of a sphere is 4 * pi * R^2
-    //       surface area / number of points ~ area per grid point
-    //       sqrt( area per grid point ) ~ side length of grid, i.e. spacing between points
-    // Is this perfect? Nope. But it'll get us in the ballpark
-    const double    typical_spacing = sqrt( 4 * M_PI / num_pts ) * constants::R_earth,
-                    max_distance = 10 * typical_spacing,
-                    angle_per_neighbour = 360. / num_neighbours;
 
     std::vector<double> neighbour_x, neighbour_y, neighbour_dist;
     std::vector<size_t> neighbour_ind;
@@ -68,12 +57,6 @@ void dataset::build_adjacency(
     bool near_pole, similar_angle;
     int Istencil, II, JJ, angle_ind;
 
-    int num_with_same_lat, num_with_same_lon;
-    double furthest_dist_on_same_lat, furthest_dist_on_same_lon;
-    size_t same_lat_neighbour_ind, same_lon_neighbour_ind;
-
-    double max_neighbour_dist = -1, ref_angle, curr_angle;
-    size_t furthest_neighbour_ind = 0 ;
 
     std::vector< double > xi, yi, ddx_coeffs, ddy_coeffs;
 
@@ -88,17 +71,14 @@ void dataset::build_adjacency(
     default(none) \
     shared( longitude, latitude, adjacency_indices, adjacency_projected_x, adjacency_projected_y, \
             adjacency_distances, adjacency_ddlon_weights, adjacency_ddlat_weights ) \
-    private( pt_index, search_index, pt_lon, pt_lat, search_lon, search_lat, angle_ind, \
+    private( pt_index, pt_lon, pt_lat, search_lon, search_lat, \
              proj_x, proj_y, proj_theta, near_pole, poleward_lat, del_lon_lim, local_dist, \
              Ineighbour, neighbour_x, neighbour_y, neighbour_dist, neighbour_ind, stencil_set, \
              Istencil, II, JJ, xi, yi, denom, denom_sign, stencil_count, ddx_coeffs, ddy_coeffs, \
              stencil_min_x, stencil_min_y, stencil_max_x, stencil_max_y, \
-             LHS, report, alglib_info, LHS_vec, solve, LHS_list, \
-             max_neighbour_dist, furthest_neighbour_ind, similar_angle, ref_angle, curr_angle, \
-             num_with_same_lat, num_with_same_lon, furthest_dist_on_same_lat, furthest_dist_on_same_lon, \
-             same_lat_neighbour_ind, same_lon_neighbour_ind \
+             LHS, report, alglib_info, LHS_vec, solve, LHS_list, search_index \
            ) \
-    firstprivate( num_pts, max_distance, stdout, alglib::xdefault, angle_per_neighbour )
+    firstprivate( num_pts, stdout, alglib::xdefault )
     {
         LHS_vec.resize( (num_neighbours+1)*(num_neighbours+1), 0. );
         LHS.setlength( num_neighbours+1, num_neighbours+1 );
@@ -107,10 +87,6 @@ void dataset::build_adjacency(
         #pragma omp for collapse(1) schedule(guided)
         for ( pt_index = 0; pt_index < num_pts; pt_index++ ) {
 
-            //fprintf( stdout, "Starting point %'zu\n", pt_index );
-
-            search_index = 0;
-
             neighbour_x.clear();
             neighbour_y.clear();
             neighbour_dist.clear();
@@ -118,11 +94,8 @@ void dataset::build_adjacency(
 
             neighbour_x.resize( num_neighbours, 0. );
             neighbour_y.resize( num_neighbours, 0. );
-            neighbour_dist.resize( num_neighbours, 1e100 );
+            neighbour_dist.resize( num_neighbours, 0 );
             neighbour_ind.resize( num_neighbours, 0 );
-
-            max_neighbour_dist = 1e100;
-            furthest_neighbour_ind = 0;
 
             #if DEBUG > 0
             pt_lon = longitude.at( pt_index );
@@ -132,9 +105,9 @@ void dataset::build_adjacency(
             pt_lat = latitude[  pt_index ];
             #endif
 
-            for ( search_index = 0; search_index < num_pts; search_index++ ) {
+            for ( Ineighbour = 0; Ineighbour < num_neighbours+1; Ineighbour++ ) {
 
-                if ( pt_index == search_index ) { continue; }
+                search_index = adjacency_indices.at(pt_index)[Ineighbour];
 
                 #if DEBUG > 0
                 search_lon = longitude.at( search_index );
@@ -144,176 +117,24 @@ void dataset::build_adjacency(
                 search_lat = latitude[  search_index ];
                 #endif
 
-                // First, a lazy pruning by latitude to avoid excessive distance calculations
-                if ( fabs( pt_lat - search_lat ) >= (max_distance / constants::R_earth) ) {
-                    continue;
-                }
-
-                // Next, a slightly less lazy pruning by longitude
-                poleward_lat = fabs(pt_lat) + (max_distance / constants::R_earth);
-                near_pole = poleward_lat >= (M_PI * 89.8 / 180);
-                del_lon_lim = std::fmin( M_PI, max_distance / ( cos(poleward_lat) * constants::R_earth ) );
-                if (not( (near_pole) or ( cos( pt_lon - search_lon ) > cos(del_lon_lim) ) ) ) {
-                    continue;
-                }
-
-                near_sided_project( proj_x, proj_y, search_lon, search_lat, pt_lon, pt_lat, 2e5 );
                 local_dist = distance( search_lon, search_lat, pt_lon, pt_lat );
-                //if (local_dist < 1e-4) { continue; } // discard points that are erroneously close
-                                                     // I don't really know why this happens
-                                                     // I think it's rounding errors in the 
-                                                     // map projection operator?
+                near_sided_project( proj_x, proj_y, search_lon, search_lat, pt_lon, pt_lat, 2e5 );
 
-                /*
-                // We're dividing angles up into 360 / num_neighbours = 45 degree segments
-                proj_theta = std::fmax( 0, std::fmin( 360-1e-10, (M_PI + atan2( proj_y, proj_x )) * 180. / M_PI ));
-                if      ( proj_theta <=  15. ) { angle_ind = 0; }
-                else if ( proj_theta <=  75. ) { angle_ind = 1; }
-                else if ( proj_theta <= 105. ) { angle_ind = 2; }
-                else if ( proj_theta <= 165. ) { angle_ind = 3; }
-                else if ( proj_theta <= 195. ) { angle_ind = 4; }
-                else if ( proj_theta <= 255. ) { angle_ind = 5; }
-                else if ( proj_theta <= 285. ) { angle_ind = 6; }
-                else if ( proj_theta <= 345. ) { angle_ind = 7; }
-                else                           { angle_ind = 0; }
-                //proj_theta = (proj_theta - 0.5 * angle_per_neighbour);
-                //proj_theta += (proj_theta < 0) ? 360. : 0;
-                //angle_ind = (int) std::fmax( 0, std::fmin( num_neighbours-1, round( proj_theta / angle_per_neighbour ) ) );
-                //angle_ind = proj_theta / (int)( angle_per_neighbour );
-                #if DEBUG >= 1
-                if ( angle_ind < 0 ) { fprintf(stdout, "%d\n", angle_ind); assert(false); }
-                if ( angle_ind >= num_neighbours ) { fprintf(stdout, "%d\n", angle_ind); assert(false); }
-                #endif
-
-                if ( local_dist < neighbour_dist.at(angle_ind) ) {
-                    neighbour_x[   angle_ind] = proj_x;
-                    neighbour_y[   angle_ind] = proj_y;
-                    neighbour_ind[ angle_ind] = search_index;
-                    neighbour_dist[angle_ind] = local_dist;
-                }
-                */
-
-                if ( local_dist < neighbour_dist[furthest_neighbour_ind] ) {
-
-                    similar_angle = false;
-
-                    // This point is closer than our farthest-away neighbour,
-                    // so we'll update to use this point.
-
-
-                    // But, we want to first check that we don't have more than
-                    // three neighbours with the same lat or lon coordinates after
-                    // doing this (this causes numerical stability issues in the 
-                    // derivatives).
-                    num_with_same_lat = 0;
-                    num_with_same_lon = 0;
-
-                    furthest_dist_on_same_lat = 0.;
-                    furthest_dist_on_same_lon = 0.;
-
-                    same_lat_neighbour_ind = 2 * num_neighbours;
-                    same_lon_neighbour_ind = 2 * num_neighbours;
-
-                    for (II = 0; II < num_neighbours; II++) {
-
-                        // This neighbour hasn't been set yet, so don't compare with it
-                        if ( (neighbour_y[II] == 0) and ( neighbour_x[II] == 0 ) ) { continue; }
-
-                        // Checking for neighbours on same longitude
-                        if ( fabs( search_lon - longitude[ neighbour_ind[II] ] ) < 1e-4 * M_PI / 180 ) {
-                            num_with_same_lon++;
-                            if ( local_dist < neighbour_dist[II] ) {
-                                if ( neighbour_dist[II] > furthest_dist_on_same_lon ) {
-                                    same_lon_neighbour_ind = II;
-                                    furthest_dist_on_same_lon = neighbour_dist[II];
-                                }
-                            }
-                        }
-
-                        // Checking for neighbours on same latitude
-                        if ( fabs( search_lat - latitude[ neighbour_ind[II] ] ) < 1e-4 * M_PI / 180 ) {
-                            num_with_same_lat++;
-                            if ( local_dist < neighbour_dist[II] ) {
-                                if ( neighbour_dist[II] > furthest_dist_on_same_lat ) {
-                                    same_lat_neighbour_ind = II;
-                                    furthest_dist_on_same_lat = neighbour_dist[II];
-                                }
-                            }
-                        }
-
-                    }
-
-                    if ( num_with_same_lat >= floor(num_neighbours / 2.) ) {
-                        if ( same_lat_neighbour_ind < num_neighbours ) {
-                            furthest_neighbour_ind  = same_lat_neighbour_ind;
-                            similar_angle = false;
-                        } else {
-                            similar_angle = true;
-                        }
-                    } else if ( num_with_same_lon >= floor(num_neighbours / 2.) ) {
-                        if ( same_lon_neighbour_ind < num_neighbours ) {
-                            furthest_neighbour_ind  = same_lon_neighbour_ind;
-                            similar_angle = false;
-                        } else {
-                            similar_angle = true;
-                        }
-                    }
-
-
-                    // Also check that there aren't other points with similar angles
-                    // If there are, we'll replace those ones instead
-                    /*
-                    for (II = 0; II < num_neighbours; II++) {
-
-                        // Ths is already the point that we're considering replacing,
-                        // so no point in checking if they share an angle
-                        if (II == furthest_neighbour_ind) { continue; }
-
-                        // This neighbour hasn't been set yet, so don't compare with it
-                        if ( (neighbour_y[II] == 0) and ( neighbour_x[II] == 0 ) ) { continue; }
-
-                        ref_angle = atan2( neighbour_y[II], neighbour_x[II] );
-                        curr_angle = atan2(proj_y, proj_x);
-                        if ( ( fabs( curr_angle - ref_angle ) < 0.6 * M_PI / (num_neighbours-1) )
-                             or ( fabs( curr_angle - ref_angle ) > M_PI * (2 - 0.6/(num_neighbours-1)) ) )
-                                {
-                            // there's another point at this 'angle', so we can only replace this one
-                            // so call that the 'furthest' to be replaced
-                            if ( local_dist < neighbour_dist[II] ) {
-                                furthest_neighbour_ind = II;
-                            } else {
-                                similar_angle = true;
-                            }
-                        }
-                    }
-                    */
-
-                    if ( not(similar_angle) ) {
-                        neighbour_x[   furthest_neighbour_ind] = proj_x;
-                        neighbour_y[   furthest_neighbour_ind] = proj_y;
-                        neighbour_ind[ furthest_neighbour_ind] = search_index;
-                        neighbour_dist[furthest_neighbour_ind] = local_dist;
-                        max_neighbour_dist = neighbour_dist[0];
-                        furthest_neighbour_ind = 0;
-                        for (II = 1; II < num_neighbours; II++) {
-                            if (neighbour_dist[II] > max_neighbour_dist) {
-                                furthest_neighbour_ind = II;
-                                max_neighbour_dist = neighbour_dist[II];
-                            }
-                        }
-                    }
-                }
+                neighbour_x[   Ineighbour] = proj_x;
+                neighbour_y[   Ineighbour] = proj_y;
+                neighbour_ind[ Ineighbour] = search_index;
+                neighbour_dist[Ineighbour] = local_dist;
             }
 
             // Now that we've searched all of the points to the adjacent ones, 
             // store the adjacent values and move on.
-            adjacency_indices.at(    pt_index).resize(num_neighbours+1, 0);
+            //adjacency_indices.at(    pt_index).resize(num_neighbours+1, 0);
             adjacency_projected_x.at(pt_index).resize(num_neighbours+1, 0.);
             adjacency_projected_y.at(pt_index).resize(num_neighbours+1, 0.);
             adjacency_distances.at(  pt_index).resize(num_neighbours+1, 0.);
 
             // the last 'neighbour' is the point itself
-            adjacency_indices.at(    pt_index)[num_neighbours] = pt_index;
+            //adjacency_indices.at(    pt_index)[num_neighbours] = pt_index;
             adjacency_projected_x.at(pt_index)[num_neighbours] = 0.;
             adjacency_projected_y.at(pt_index)[num_neighbours] = 0.;
             adjacency_distances.at(  pt_index)[num_neighbours] = 0.;
@@ -322,11 +143,14 @@ void dataset::build_adjacency(
             for (Ineighbour = 0; Ineighbour < num_neighbours+1; Ineighbour++) {
 
                 if (Ineighbour < num_neighbours) {
-                    adjacency_indices.at(pt_index)[Ineighbour] = neighbour_ind[Ineighbour];
+                    //adjacency_indices.at(pt_index)[Ineighbour] = neighbour_ind[Ineighbour];
                     adjacency_projected_x.at(pt_index)[Ineighbour] = neighbour_x[Ineighbour];
                     adjacency_projected_y.at(pt_index)[Ineighbour] = neighbour_y[Ineighbour];
                     adjacency_distances.at(pt_index)[Ineighbour] = neighbour_dist[Ineighbour];
                 }
+            }
+            /*
+            for (Ineighbour = 0; Ineighbour < num_neighbours+1; Ineighbour++) {
 
                 // 1
                 LHS_vec.at( Ineighbour * (num_neighbours+1) + 0 ) = 1.;
@@ -374,6 +198,20 @@ void dataset::build_adjacency(
                 }
 
             }
+            */
+            for (Ineighbour = 0; Ineighbour < num_neighbours+1; Ineighbour++) {
+                double dx = neighbour_x[Ineighbour], dy = neighbour_y[Ineighbour];
+
+                LHS( Ineighbour, 0 ) = 1;
+                LHS( Ineighbour, 1 ) = dx;
+                LHS( Ineighbour, 2 ) = dy;
+                LHS( Ineighbour, 3 ) = (1./2) * dx*dx;
+                LHS( Ineighbour, 4 ) = (1./2) * 2. * dx*dy;
+                LHS( Ineighbour, 5 ) = (1./2) * dy*dy;
+                LHS( Ineighbour, 6 ) = (1./6) * dx*dx*dx;
+                LHS( Ineighbour, 7 ) = (1./6) * 3. * dx*dx*dy;
+                LHS( Ineighbour, 8 ) = (1./6) * dy*dy*dy;
+            }
 
 
             alglib::rmatrixinverse( LHS, alglib_info, report );
@@ -387,22 +225,27 @@ void dataset::build_adjacency(
             }
             for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
 
-                // factor R*cos(lat) comes from converting proj-x deriv to lat deriv
-                adjacency_ddlon_weights.at(pt_index)[JJ] = LHS( 1, JJ ) * 
-                    constants::R_earth * cos(pt_lat);
+                // factor R*cos(lat) comes from converting proj-x deriv to lon deriv
+                adjacency_ddlon_weights.at(pt_index)[JJ] = 
+                    LHS( 1, JJ ) * constants::R_earth * cos(pt_lat);
 
                 // factor R comes from converting proj-y deriv to lat deriv
-                adjacency_ddlat_weights.at(pt_index)[JJ] = LHS( 2, JJ ) *
-                    constants::R_earth;
+                adjacency_ddlat_weights.at(pt_index)[JJ] = 
+                    LHS( 2, JJ ) * constants::R_earth;
 
                 if (num_neighbours >= 4) {
                     // second lon derivative
-                    adjacency_d2dlon2_weights.at(pt_index)[JJ] = 0.5 * LHS( 4, JJ ) * 
-                        pow( constants::R_earth * cos(pt_lat), 2);
+                    //adjacency_d2dlon2_weights.at(pt_index)[JJ] = 2 * LHS( 4, JJ ) * 
+                    //    pow( constants::R_earth * cos(pt_lat), 2);
+                    adjacency_d2dlon2_weights.at(pt_index)[JJ] = 
+                          LHS( 3, JJ ) * pow( constants::R_earth * cos(pt_lat), 2)
+                        + LHS( 2, JJ ) * constants::R_earth * sin(pt_lat) * cos(pt_lat);
 
                     // second lat derivative
-                    adjacency_d2dlat2_weights.at(pt_index)[JJ] = 0.5 * LHS( 5, JJ ) * 
-                        pow( constants::R_earth, 2);
+                    //adjacency_d2dlat2_weights.at(pt_index)[JJ] = 2 * LHS( 5, JJ ) * 
+                    //    pow( constants::R_earth, 2);
+                    adjacency_d2dlat2_weights.at(pt_index)[JJ] = 
+                        LHS( 5, JJ ) * pow( constants::R_earth, 2);
                 }
 
             }

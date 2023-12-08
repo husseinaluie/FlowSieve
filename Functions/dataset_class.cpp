@@ -92,7 +92,9 @@ void dataset::check_processor_divisions(    const int Nprocs_in_time_input,
                                             const int Nprocs_in_depth_input, 
                                             const MPI_Comm ) {
 
-    assert( (full_Ntime > 0) and (full_Ndepth > 0) and (Nlon > 0) and (Nlat > 0) ); // Must read in dimensions before checking processor divisions.
+    if (constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+        assert( (full_Ntime > 0) and (full_Ndepth > 0) and (Nlon > 0) and (Nlat > 0) ); // Must read in dimensions before checking processor divisions.
+    }
 
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
@@ -433,6 +435,29 @@ void dataset::write_adjacency(
     write_field_to_output( var_to_write, "adjacency_d2dlat2_weights", 
             starts, counts, filename.c_str() );
 
+}
+
+void dataset::load_adjacency_indices(
+        const std::string filename,
+        const MPI_Comm comm
+        ) {
+
+    std::vector<double> tmp_var;
+
+    const size_t Npts = longitude.size(),
+                 Nneighbours = num_neighbours;
+
+    // Indices
+    read_var_from_file( tmp_var, 
+                        "adjacency_indices", 
+                        filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
+    adjacency_indices.resize(Npts);
+    for ( size_t II = 0; II < Npts; II++ ) { 
+        adjacency_indices.at(II).resize(Nneighbours+1);
+        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
+            adjacency_indices[II][JJ] = (size_t) round(tmp_var.at(II*(Nneighbours+1) + JJ));
+        } 
+    }
 }
 
 void dataset::load_adjacency(
