@@ -72,7 +72,8 @@ void compute_KE_spectra_and_slopes(
             u_lon_tor, u_lat_tor, u_lon_tor_tmp, u_lat_tor_tmp,\
             u_lon_pot, u_lat_pot, u_lon_pot_tmp, u_lat_pot_tmp,  \
             u_lon_tot, u_lat_tot, u_lon_tot_tmp, u_lat_tot_tmp ) \
-    private( index )
+    private( index ) \
+    firstprivate( num_pts )
     {
     #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < num_pts; ++index) {
@@ -125,7 +126,8 @@ void compute_KE_spectra_and_slopes(
             u_lon_tor, u_lat_tor, u_lon_tor_tmp, u_lat_tor_tmp,\
             u_lon_pot, u_lat_pot, u_lon_pot_tmp, u_lat_pot_tmp,  \
             u_lon_tot, u_lat_tot, u_lon_tot_tmp, u_lat_tot_tmp ) \
-    private( index, numer, denom )
+    private( index, numer, denom ) \
+    firstprivate( num_pts, filter_scale )
     {
     #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < num_pts; ++index) {

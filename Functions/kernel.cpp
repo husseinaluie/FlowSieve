@@ -43,7 +43,7 @@ double kernel(
         const int deriv_order
         ) {
    
-    double kern;
+    double kern = 0.;
     const double D        = ( scale > 0 ) ? ( dist / ( scale / 2. ) )   : ( dist == 0 ) ? 1. : 0.,
                  dDdell   = ( scale > 0 ) ? ( -2 * dist / pow(scale,2) ) : 0.,
                  d2Ddell2 = ( scale > 0 ) ? (  4 * dist / pow(scale,3) ) : 0.;

@@ -58,7 +58,7 @@ void apply_filter_at_point(
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
-    double kern, dl_kern, dll_kern, area, loc_val, loc_weight;
+    double kern, dl_kern = 0., dll_kern = 0., area, loc_val, loc_weight;
     size_t index, kernel_index;
 
     double  kA_sum   = 0.,
