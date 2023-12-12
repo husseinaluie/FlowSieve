@@ -43,7 +43,7 @@ void read_mask_from_file(
     MPI_Comm_size( comm, &wSize );
 
     // Open the NETCDF file
-    const int str_len = 100;
+    const int str_len = 250;
     int FLAG = NC_NETCDF4 | NC_MPIIO;
     int ncid=0, retval;
     char buffer [str_len];

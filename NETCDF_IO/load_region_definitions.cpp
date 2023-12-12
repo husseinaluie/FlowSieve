@@ -21,7 +21,7 @@ void dataset::load_region_definitions(
     assert( Nlat * Nlon < 4 * pow(512,3) ); // Grid is too large. IO scripts will need to be modified to handle large fields.
 
     // Open the NETCDF file
-    const int str_len = 100;
+    const int str_len = 250;
     int FLAG = NC_NETCDF4 | NC_MPIIO;
     int ncid=0, retval;
     char buffer [str_len];
