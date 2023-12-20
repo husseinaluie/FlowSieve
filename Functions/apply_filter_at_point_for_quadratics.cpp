@@ -81,6 +81,11 @@ void apply_filter_at_point_for_quadratics(
     uyuz_tmp = 0.;
     uzuz_tmp = 0.;
 
+    vort_ux_tmp = 0.;
+    vort_uy_tmp = 0.;
+    vort_uz_tmp = 0.;
+
+
     int    curr_lon, curr_lat, LON_lb, LON_ub;
     double lat_at_curr;
     const double lat_at_ilat = latitude.at(Ilat);
