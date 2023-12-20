@@ -143,7 +143,7 @@ void Apply_LLC_Helmholtz_Projection(
         for (index = 0; index < Npts; ++index) {
             for ( Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
                 deriv_ref_1 += std::fabs( source_data.adjacency_ddlat_weights.at(index).at(Ineighbour) ) / (Npts*num_neighbours);
-                deriv_ref_2 += std::fabs( source_data.adjacency_d2dlat2_weights.at(index).at(Ineighbour) ) / (Npts*num_neighbours);
+                //deriv_ref_2 += std::fabs( source_data.adjacency_d2dlat2_weights.at(index).at(Ineighbour) ) / (Npts*num_neighbours);
             }
         }
     }
@@ -523,6 +523,7 @@ void Apply_LLC_Helmholtz_Projection(
                         }
                     }
 
+
                     //fprintf( stdout, " %'zu : %.3g %.3g %.3g %.3g\n", index, 
                     //        RHS_vector.at( 0*Npts + index_sub), 
                     //        RHS_vector.at( 1*Npts + index_sub), 
@@ -530,6 +531,33 @@ void Apply_LLC_Helmholtz_Projection(
                     //        RHS_vector.at( 3*Npts + index_sub) );
                 }
             }
+
+            fprintf( stdout, "Also adding the seed info over land, %zu\n", Nboxrows );
+            land_counter = 0;
+            for (index_sub = 0; index_sub < Npts; ++index_sub) {
+                if (not(mask.at(index_sub))) {
+                    double weight_val = weight_err ? dAreas.at(index_sub) : 1.;
+
+                    row_skip    = Nboxrows*Npts + 0*num_land_points + land_counter;
+                    //RHS_vector.at( row_skip ) = -dPsi_dlon;
+                    RHS_vector.at( row_skip ) = -u_lat_tor_seed[index_sub] * weight_val;
+
+                    row_skip    = Nboxrows*Npts + 1*num_land_points + land_counter;
+                    //RHS_vector.at( row_skip ) = -dPhi_dlon;
+                    RHS_vector.at( row_skip ) = -u_lon_pot_seed[index_sub] * weight_val;
+
+                    row_skip    = Nboxrows*Npts + 2*num_land_points + land_counter;
+                    //RHS_vector.at( row_skip ) = -dPsi_dlat;
+                    RHS_vector.at( row_skip ) = -u_lon_tor_seed[index_sub] * weight_val;
+
+                    row_skip    = Nboxrows*Npts + 3*num_land_points + land_counter;
+                    //RHS_vector.at( row_skip ) = -dPhi_dlat;
+                    RHS_vector.at( row_skip ) = -u_lat_pot_seed[index_sub] * weight_val;
+
+                    land_counter++;
+                }
+            }
+            fprintf( stdout, "%zu land points\n", land_counter );
 
             //
             //// Now apply the least-squares solver
