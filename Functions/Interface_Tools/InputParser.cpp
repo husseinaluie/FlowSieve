@@ -155,6 +155,9 @@ void InputParser::getListofStrings(
     //using namespace std;
     const std::string raw_input_string = getCmdOption( argname, "", help, description );
     if (help) { return; }
+    if ( raw_input_string.size() <= 0) {
+        fprintf( stderr, "The input to %s is empty! Halting.\n", argname.c_str() );
+    }
     assert( raw_input_string.size() > 0 );
 
     std::istringstream iss( raw_input_string );
