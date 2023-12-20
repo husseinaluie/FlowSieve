@@ -215,6 +215,7 @@ int main(int argc, char *argv[]) {
                     target_data.latitude.at(target_index)
                     );
 
+            /*
             for ( source_index = 1; source_index < Nlatlon_source; source_index++ ) {
                 local_dist = distance(
                         source_data.longitude.at(source_index),
@@ -227,8 +228,8 @@ int main(int argc, char *argv[]) {
                     best_index = source_index;
                 }
             }
+            */
 
-            /*
             while (true) {
                 best_II = source_data.num_neighbours;
                 for ( II = 0; II < source_data.num_neighbours; II++ ) {
@@ -250,7 +251,7 @@ int main(int argc, char *argv[]) {
                 if ( best_II < source_data.num_neighbours ) {
                     // If we found a closer point, move to it, and repeat
                     best_index = source_data.adjacency_indices.at(best_index).at(best_II);
-                } else if ( best_dist > 5 * typical_spacing ) {
+                } else if ( best_dist > 10 * typical_spacing ) {
                     // If we didn't find a closer point in the neighbours, but the current
                     // point is still too far away, then just jump to a new random starting point
                     best_index = random_index(random_generator);
@@ -259,7 +260,6 @@ int main(int argc, char *argv[]) {
                     break;
                 }
             }
-            */
 
             nearest_source_to_target.at(target_index) = best_index;
         }
