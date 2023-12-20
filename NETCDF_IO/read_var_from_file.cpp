@@ -183,7 +183,9 @@ void read_var_from_file(
     var.resize(num_pts);
 
     // Now read in the data
-    if (num_pts < 4 * pow(512,3)) {
+    //const size_t MAX_PTS_PER_READ = 4 * pow(512,3);
+    const size_t MAX_PTS_PER_READ = 2 * pow(512,3);
+    if (num_pts < MAX_PTS_PER_READ) {
         retval = nc_get_vara_double(ncid, var_id, start, count, &var[0]);
         if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
     } else {
@@ -192,32 +194,103 @@ void read_var_from_file(
         #endif
         // We can't read in more than 4 * 512^3 at a time, so break into chunks 
         //   right now we assume that splitting the first dimension is sufficient
-        const unsigned int num_chunks = ceil( num_pts / ( 4 * pow(512,3) ) );
-
-        size_t target = 0;
-        const size_t full_time_count = count[0];
-        size_t curr_count, pts_per_slice = 1;
-
-
-        for (int Idim = 1; Idim < num_dims; ++Idim) {
-            pts_per_slice *= count[Idim];
+        //   Surprise! Just splitting the first dimension is no longer sufficient.
+        //   Time to expand this feature.
+        //
+        //   So, figure out what dimensions we need to split in
+        unsigned int num_chunks_time, num_chunks_depth, num_chunks_dim3;
+        if ( ( num_pts / count[0] ) < MAX_PTS_PER_READ  ) {
+            // If splitting in just time is good enough
+            num_chunks_time = std::min( count[0], 1 + (size_t)ceil( num_pts / MAX_PTS_PER_READ ) );
+            num_chunks_depth = 1;
+            num_chunks_dim3 = 1;
+        } else if ( ( num_dims > 1 ) and ( num_pts / (count[0]*count[1]) ) < MAX_PTS_PER_READ ) {
+            // If splitting in just time and depth is good enough
+            num_chunks_time = count[0];
+            num_chunks_depth = std::min( count[1], 1 + (size_t) ceil( (num_pts / num_chunks_time) / MAX_PTS_PER_READ ) );
+            num_chunks_dim3 = 1;
+        } else if ( num_dims > 2 ) {
+            // Otherwise, split in 'lat' too
+            num_chunks_time = count[0];
+            num_chunks_depth = count[1];
+            num_chunks_dim3 = std::min( count[2], 1 + (size_t) ceil( (num_pts / (num_chunks_time*num_chunks_depth)) / MAX_PTS_PER_READ ) );
+        } else {
+            fprintf( stderr, "This data is too large to be read with current implementations.\n" );
+            assert(false);
         }
 
-        for (unsigned int Ichunk = 0; Ichunk < num_chunks; ++Ichunk) {
+        #if DEBUG >= 2
+        fprintf( stdout, "Using %d, %d, %d chunks in time, depth, and dim3.\n", num_chunks_time, num_chunks_depth, num_chunks_dim3 );
+        #endif
 
-            curr_count = floor( full_time_count / num_chunks );
-            if (Ichunk < ( full_time_count % num_chunks ) ) {
-                curr_count++;
+        size_t pts_per_slice, target = 0;
+        size_t start_chunk[num_dims], count_chunk[num_dims];
+        size_t curr_time_count, curr_depth_count, curr_dim3_count;
+        start_chunk[0] = 0;
+        for (unsigned int Ichunk_time = 0; Ichunk_time < num_chunks_time; ++Ichunk_time) {
+            curr_time_count = (count[0] / num_chunks_time) + ( (Ichunk_time < (count[0] % num_chunks_time)) ? 1 : 0 );
+            pts_per_slice = curr_time_count;
+            count_chunk[0] = curr_time_count;
+
+            if (num_dims > 1) { start_chunk[1] = 0; }
+
+            for (unsigned int Ichunk_depth = 0; Ichunk_depth < num_chunks_depth; ++Ichunk_depth) {
+                if ( num_dims > 1) {
+                    curr_depth_count = (count[1] / num_chunks_depth) + ( (Ichunk_depth < (count[1] % num_chunks_depth)) ? 1 : 0 );
+                    pts_per_slice *= curr_depth_count;
+                    count_chunk[1] = curr_depth_count;
+                }
+
+                if (num_dims > 2) { start_chunk[2] = 0; }
+                if (num_dims > 3) { start_chunk[3] = 0; }
+
+                for (unsigned int Ichunk_dim3 = 0; Ichunk_dim3 < num_chunks_dim3; ++Ichunk_dim3) {
+                    if ( num_dims > 2 ) {
+                        curr_dim3_count = (count[2] / num_chunks_dim3) + ( (Ichunk_dim3 < (count[2] % num_chunks_dim3)) ? 1 : 0 );
+                        pts_per_slice *= curr_dim3_count;
+                        count_chunk[2] = curr_dim3_count;
+                    }
+
+                    if (num_dims > 3) {
+                        pts_per_slice *= count[3];
+                        count_chunk[3] = count[3];
+                    }
+                    
+                    #if DEBUG>=2
+                    if (num_dims > 2) {
+                        fprintf( stdout, "Loading chunk (%d, %d, %d) with starts (%zu, %zu, %zu) and counts (%zu, %zu, %zu) [%zu points total, with target %zu].\n", 
+                            Ichunk_time, Ichunk_depth, Ichunk_dim3, 
+                            start_chunk[0], start_chunk[1], start_chunk[2],
+                            count_chunk[0], count_chunk[1], count_chunk[2], 
+                            pts_per_slice, target );
+                    } else if (num_dims > 1) {
+                        fprintf( stdout, "Loading chunk (%d, %d) with starts (%zu, %zu) and counts (%zu, %zu) [%zu points total, with target %zu].\n", 
+                            Ichunk_time, Ichunk_depth,
+                            start_chunk[0], start_chunk[1],
+                            count_chunk[0], count_chunk[1],
+                            pts_per_slice, target );
+                    } else {
+                        fprintf( stdout, "Loading chunk %d with start %zu and counts %zu [%zu points total, with target %zu].\n", 
+                            Ichunk_time,
+                            start_chunk[0],
+                            count_chunk[0],
+                            pts_per_slice, target );
+                    }
+                    #endif
+
+                    // do reading
+                    retval = nc_get_vara_double(ncid, var_id, start_chunk, count_chunk, &var[target]);
+                    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+                    target += pts_per_slice;
+
+                    
+                    if (num_dims > 2) { start_chunk[2] += curr_dim3_count; }
+                }
+
+                if (num_dims > 1) { start_chunk[1] += curr_depth_count; }
             }
 
-            count[0] = curr_count;
-
-            retval = nc_get_vara_double(ncid, var_id, start, count, &var[target]);
-            if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
-
-            start[0] += curr_count;
-            target += curr_count * pts_per_slice;
-
+            start_chunk[0] += curr_time_count;
         }
     }
     
