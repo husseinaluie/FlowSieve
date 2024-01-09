@@ -296,7 +296,6 @@ void read_var_from_file(
     
     // Determine masking, if desired
     double fill_val = 1e100;  // backup value
-    double var_max = -1e10, var_min = 1e10;
     size_t num_land = 0, num_water = 0, num_unmasked = 0;
 
     if (mask != NULL) { mask->resize(var.size()); }
@@ -308,6 +307,7 @@ void read_var_from_file(
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  fill value = %'g\n", fill_val); }
     #endif
+    double var_max = -std::fabs(fill_val), var_min = std::fabs(fill_val);
 
     // Apply scale factor if appropriate
     double scale = 1.;
