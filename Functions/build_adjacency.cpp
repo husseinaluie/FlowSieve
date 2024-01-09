@@ -55,7 +55,7 @@ void dataset::build_adjacency(
            proj_x, proj_y, proj_theta, local_dist, denom, denom_sign, stencil_count,
            stencil_min_x, stencil_min_y, stencil_max_x, stencil_max_y;
     bool near_pole, similar_angle;
-    int Istencil, II, JJ, angle_ind;
+    int Istencil, II, JJ, KK, angle_ind;
 
 
     std::vector< double > xi, yi, ddx_coeffs, ddy_coeffs;
@@ -67,6 +67,9 @@ void dataset::build_adjacency(
     alglib::ae_int_t alglib_info;
     bool solve;
 
+    const int num_rows = 6; // number of terms used in SVD decomp
+    //const int num_rows = 8; // number of terms used in SVD decomp
+
     #pragma omp parallel \
     default(none) \
     shared( longitude, latitude, adjacency_indices, adjacency_projected_x, adjacency_projected_y, \
@@ -74,18 +77,18 @@ void dataset::build_adjacency(
     private( pt_index, pt_lon, pt_lat, search_lon, search_lat, \
              proj_x, proj_y, proj_theta, near_pole, poleward_lat, del_lon_lim, local_dist, \
              Ineighbour, neighbour_x, neighbour_y, neighbour_dist, neighbour_ind, stencil_set, \
-             Istencil, II, JJ, xi, yi, denom, denom_sign, stencil_count, ddx_coeffs, ddy_coeffs, \
+             Istencil, II, JJ, KK, xi, yi, denom, denom_sign, stencil_count, ddx_coeffs, ddy_coeffs, \
              stencil_min_x, stencil_min_y, stencil_max_x, stencil_max_y, \
              LHS, report, alglib_info, solve, LHS_list, search_index, \
              svd_U, svd_S, svd_VT \
            ) \
-    firstprivate( num_pts, stdout, alglib::xdefault )
+    firstprivate( num_pts, stdout, alglib::xdefault, num_rows )
     {
-        LHS.setlength( 9, 3 );
+        LHS.setlength( 9, num_rows );
 
         svd_U.setlength(9,9);
         svd_S.setlength(9);
-        svd_VT.setlength(3,3);
+        svd_VT.setlength(num_rows,num_rows);
 
         #pragma omp for collapse(1) schedule(guided)
         for ( pt_index = 0; pt_index < num_pts; pt_index++ ) {
@@ -121,7 +124,12 @@ void dataset::build_adjacency(
                 #endif
 
                 local_dist = distance( search_lon, search_lat, pt_lon, pt_lat );
-                near_sided_project( proj_x, proj_y, search_lon, search_lat, pt_lon, pt_lat, 2e5 );
+                //near_sided_project( proj_x, proj_y, search_lon, search_lat, pt_lon, pt_lat, 2e5 );
+                //xs = np.cos( lats ) * np.sin( lons - lon )
+                //ys = ( np.cos( lat ) * np.sin( lats ) - np.sin( lat ) * np.cos( lats ) * np.cos( lons - lon ) )
+
+                proj_x = cos( search_lat ) * sin( search_lon - pt_lon );
+                proj_y = cos( pt_lat ) * sin( search_lat ) - sin( pt_lat ) * cos( search_lat ) * cos( search_lon - pt_lon );
 
                 neighbour_x[   Ineighbour] = proj_x;
                 neighbour_y[   Ineighbour] = proj_y;
@@ -154,9 +162,16 @@ void dataset::build_adjacency(
                 LHS( Ineighbour, 0 ) = 1;
                 LHS( Ineighbour, 1 ) = dx;
                 LHS( Ineighbour, 2 ) = dy;
+
+                LHS( Ineighbour, 3 ) = dx*dx / 2.;
+                LHS( Ineighbour, 4 ) = dx*dy;
+                LHS( Ineighbour, 5 ) = dy*dy / 2.;
+
+                //LHS( Ineighbour, 6 ) = dx*dx*dy / 2.;
+                //LHS( Ineighbour, 7 ) = dx*dy*dy / 2.;
             }
 
-            alglib::rmatrixsvd( LHS, 9, 3, 2, 2, 2, svd_S, svd_U, svd_VT );
+            alglib::rmatrixsvd( LHS, 9, num_rows, 2, 2, 2, svd_S, svd_U, svd_VT );
             // LHS = U * S * VT
             // LHS is m x n
             // U is m x m
@@ -165,10 +180,10 @@ void dataset::build_adjacency(
             //
             // inv(LHS) = V * S^-1 * UT
 
-            // First, scale the top three rows of UT by the elements of S^-1
-            //  this is equivalent to scaling the first three columns of U
+            // First, scale the top six rows of UT by the elements of S^-1
+            //  this is equivalent to scaling the first six columns of U
             for ( JJ = 0; JJ < 9; JJ++ ) {
-                for ( II = 0; II < 3; II++ ) {
+                for ( II = 0; II < num_rows; II++ ) {
                     svd_U(JJ,II) = svd_U(JJ,II) / svd_S(II);
                 }
             }
@@ -179,21 +194,13 @@ void dataset::build_adjacency(
 
             for ( JJ = 0; JJ < num_neighbours+1; JJ++ ) {
 
-                // factor R*cos(lat) comes from converting proj-x deriv to lon deriv
-                II = 1;
-                adjacency_ddlon_weights.at(pt_index)[JJ] = 
-                    (   svd_VT(0,II) * svd_U(JJ,0) 
-                      + svd_VT(1,II) * svd_U(JJ,1) 
-                      + svd_VT(2,II) * svd_U(JJ,2) 
-                    ) * cos(pt_lat);
-
-                // factor R comes from converting proj-y deriv to lat deriv
-                II = 2;
-                adjacency_ddlat_weights.at(pt_index)[JJ] = 
-                    (   svd_VT(0,II) * svd_U(JJ,0) 
-                      + svd_VT(1,II) * svd_U(JJ,1) 
-                      + svd_VT(2,II) * svd_U(JJ,2) 
-                    );
+                // lon deriv: factor cos(lat) comes from converting proj-x deriv to lon deriv
+                adjacency_ddlon_weights.at(pt_index)[JJ] = 0;
+                adjacency_ddlat_weights.at(pt_index)[JJ] = 0;
+                for ( KK = 0; KK < num_rows; KK++ ) {
+                    adjacency_ddlon_weights.at(pt_index)[JJ] += svd_VT(KK,1) * svd_U(JJ,KK) * cos(pt_lat);
+                    adjacency_ddlat_weights.at(pt_index)[JJ] += svd_VT(KK,2) * svd_U(JJ,KK);
+                }
             }
 
             // These are just hold-overs from an older time
