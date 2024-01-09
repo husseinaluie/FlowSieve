@@ -55,8 +55,9 @@ int main(int argc, char *argv[]) {
     }
 
     // first argument is the flag, second argument is default value (for when flag is not present)
-    const std::string   &input_fname    = input.getCmdOption("--input_file",    "input.nc"),
-                        &output_fname   = input.getCmdOption("--output_file",   "adjacency.nc");
+    const std::string   &input_fname    = input.getCmdOption("--input_file",            "input.nc"),
+                        &output_fname   = input.getCmdOption("--output_file",           "adjacency.nc"),
+                        &adj_map_fname  = input.getCmdOption("--adjacency_map_file",    "adjacency_map.nc");
 
     const std::string   &time_dim_name      = input.getCmdOption("--time",        "time"),
                         &depth_dim_name     = input.getCmdOption("--depth",       "depth"),
@@ -96,7 +97,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Build the adjacency matrix and other adjacency-adjacent arrays
-    source_data.load_adjacency_indices("adjacency_test.nc");
+    source_data.load_adjacency_indices( adj_map_fname );
 
     // Build the adjacency matrix and other adjacency-adjacent arrays
     source_data.build_adjacency();
