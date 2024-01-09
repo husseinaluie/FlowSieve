@@ -7,12 +7,12 @@
 #include <vector>
 #include <omp.h>
 #include <math.h>
-#include <cassert>
-#include "../ALGLIB/stdafx.h"
-#include "../ALGLIB/linalg.h"
-#include "../ALGLIB/solvers.h"
+#include <Eigen/Sparse>
+#include <Eigen/SparseQR>
+//#include <Eigen/SPQRSupport>
 
-void Apply_LLC_Helmholtz_Projection(
+
+void Apply_LLC_Helmholtz_Projection_Eigen(
         const std::string output_fname,
         dataset & source_data,
         const std::vector<double> & seed_tor,
@@ -25,8 +25,6 @@ void Apply_LLC_Helmholtz_Projection(
         const double Tikhov_Laplace,
         const MPI_Comm comm
         ) {
-
-    try {
 
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
@@ -102,7 +100,6 @@ void Apply_LLC_Helmholtz_Projection(
 
     // alglib variables
     const size_t Nboxrows = ( Tikhov_Laplace > 0 ) ? 4 : 2;
-    alglib::real_1d_array rhs;//, proj_vals;
     std::vector<double> 
         RHS_vector( Nboxrows * Npts + 4*num_land_points, 0. ),
         Psi_seed(       Npts, 0. ),
@@ -154,16 +151,6 @@ void Apply_LLC_Helmholtz_Projection(
     const double deriv_scale_factor = deriv_ref_1;
     fprintf( stdout, "deriv-scale-factor: %g\n", deriv_scale_factor );
 
-
-    rhs.attach_to_ptr( Nboxrows * Npts + 4*num_land_points, &RHS_vector[0] );
-
-    alglib::linlsqrstate state;
-    alglib::linlsqrreport report;
-
-    alglib::real_1d_array F_alglib;
-
-    double *F_array;
-
     //
     //// Build the LHS part of the problem
     //      Ordering is: [  u_from_psi      u_from_phi   ] *  [ psi ]   =    [  u   ]
@@ -184,8 +171,9 @@ void Apply_LLC_Helmholtz_Projection(
     double val;
     size_t column_skip, row_skip, land_counter = 0;
 
-    alglib::sparsematrix LHS_matr;
-    alglib::sparsecreate(Nboxrows*Npts + 4*num_land_points, 2*Npts, LHS_matr);
+    double *F_array;
+    Eigen::SparseMatrix<double> LHS_matr(Nboxrows*Npts + 4*num_land_points, 2*Npts);
+    LHS_matr.reserve(Eigen::VectorXi::Constant(2*Npts,18));
     for ( size_t Ipt = 0; Ipt < Npts; Ipt++ ) {
 
         double  weight_val = weight_err ? dAreas.at(Ipt) : 1.,
@@ -201,7 +189,7 @@ void Apply_LLC_Helmholtz_Projection(
             bool is_pole = std::fabs( std::fabs( latitude.at(Ipt) * 180.0 / M_PI ) - 90 ) < 1e-6;
             if ( is_pole ) { fprintf(stdout, "SKIPPING POLE POINT!\n"); continue; }
 
-            if (not(mask.at(Ipt)) ) {
+            if (not(mask.at(Ipt))) {
                 // Land doesn't always force zero velocity components. Sometimes it
                 // just forces the sum of the potential and toroidal to be zero.
                 // Here we force both of the potential and toroidal velocities
@@ -219,12 +207,12 @@ void Apply_LLC_Helmholtz_Projection(
                 // Psi part
                 column_skip = 0 * Npts + neighbour_ind;
                 row_skip    = Nboxrows*Npts + 0*num_land_points + land_counter;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
 
                 // Phi part
                 column_skip = 1 * Npts + neighbour_ind;
                 row_skip    = Nboxrows*Npts + 1*num_land_points + land_counter;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
 
 
                 //
@@ -239,12 +227,12 @@ void Apply_LLC_Helmholtz_Projection(
                 // Psi part
                 column_skip = 0 * Npts + neighbour_ind;
                 row_skip    = Nboxrows*Npts + 2*num_land_points + land_counter;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, -val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += -val;
 
                 // Phi part
                 column_skip = 1 * Npts + neighbour_ind;
                 row_skip    = Nboxrows*Npts + 3*num_land_points + land_counter;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
             }
 
             if (Tikhov_Laplace >= 0) {
@@ -264,7 +252,7 @@ void Apply_LLC_Helmholtz_Projection(
                     column_skip = 0 * Npts + neighbour_ind;
                     row_skip    = 1 * Npts + Ipt;
                 }
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
 
                 // Phi part
                 if (not(mask.at(Ipt))) {
@@ -275,7 +263,7 @@ void Apply_LLC_Helmholtz_Projection(
                     column_skip = 1 * Npts + neighbour_ind;
                     row_skip    = 0 * Npts + Ipt;
                 }
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
 
 
                 //
@@ -288,12 +276,12 @@ void Apply_LLC_Helmholtz_Projection(
                 // Psi part
                 column_skip = 0 * Npts + neighbour_ind;
                 row_skip    = 0 * Npts + Ipt;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, -val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += -val;
 
                 // Phi part
                 column_skip = 1 * Npts + neighbour_ind;
                 row_skip    = 1 * Npts + Ipt;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
             }
 
 
@@ -308,6 +296,7 @@ void Apply_LLC_Helmholtz_Projection(
                 //          the broader stencil is helpful. It's also more internally
                 //          consistent since later we take derivs( vel ) = deriv( deriv ( Helm ) )
 
+                /*
                 for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
                     val  =   source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour)
                            * source_data.adjacency_ddlon_weights.at(neighbour_ind).at(D2_ind);
@@ -316,32 +305,32 @@ void Apply_LLC_Helmholtz_Projection(
 
                     column_skip = 0 * Npts + source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
                     row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
-                    alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                    LHS_matr.coeffRef( row_skip, column_skip ) += val;
 
                     column_skip = 1 * Npts + source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
                     row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
-                    alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                    LHS_matr.coeffRef( row_skip, column_skip ) += val;
                 }
+                */
 
                 // Version using actual second derivative
-                /*
                 val  = source_data.adjacency_d2dlon2_weights.at(Ipt).at(Ineighbour);
                 val *= weight_val * pow(cos_lat_inv * R_inv, 2.);
                 if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
 
                 column_skip = 0 * Npts + neighbour_ind;
                 row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
 
                 column_skip = 1 * Npts + neighbour_ind;
                 row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
-                */
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
 
 
                 //
                 //// Second LAT derivative
                 //
+                /*
                 for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
                     val  =   source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour)
                            * source_data.adjacency_ddlat_weights.at(neighbour_ind).at(D2_ind);
@@ -350,27 +339,26 @@ void Apply_LLC_Helmholtz_Projection(
 
                     column_skip = 0 * Npts + source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
                     row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
-                    alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                    LHS_matr.coeffRef( row_skip, column_skip ) += val;
 
                     column_skip = 1 * Npts + source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
                     row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
-                    alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                    LHS_matr.coeffRef( row_skip, column_skip ) += val;
                 }
+                */
 
                 // Version using actual second derivative
-                /*
                 val  = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour);
                 val *= weight_val * pow(R_inv, 2.);
                 if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
 
                 column_skip = 0 * Npts + neighbour_ind;
                 row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
 
                 column_skip = 1 * Npts + neighbour_ind;
                 row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
-                */
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
 
                 //
                 //// LAT first derivative
@@ -382,12 +370,12 @@ void Apply_LLC_Helmholtz_Projection(
                 // Psi part
                 column_skip = 0 * Npts + neighbour_ind;
                 row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, -val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += -val;
 
                 // Phi part
                 column_skip = 1 * Npts + neighbour_ind;
                 row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
-                alglib::sparseadd( LHS_matr, row_skip, column_skip, -val );
+                LHS_matr.coeffRef( row_skip, column_skip ) += -val;
 
             }
 
@@ -399,7 +387,7 @@ void Apply_LLC_Helmholtz_Projection(
     }
     fprintf(stdout, "  Land counter: %'zu\n", land_counter);
 
-    alglib::sparseconverttocrs(LHS_matr);
+    LHS_matr.makeCompressed();
 
     #if DEBUG >= 1
     if (wRank == 0) {
@@ -407,8 +395,6 @@ void Apply_LLC_Helmholtz_Projection(
         fflush(stdout);
     }
     #endif
-    alglib::linlsqrcreate(Nboxrows*Npts + 4*num_land_points, 2*Npts, state);
-    alglib::linlsqrsetcond(state, rel_tol, rel_tol, max_iters);
 
     // Counters to track termination types
     int terminate_count_abs_tol = 0,
@@ -525,20 +511,13 @@ void Apply_LLC_Helmholtz_Projection(
                             RHS_vector.at( 3*Npts + index_sub) *= dAreas.at(index_sub);
                         }
                     }
-
-
-                    //fprintf( stdout, " %'zu : %.3g %.3g %.3g %.3g\n", index, 
-                    //        RHS_vector.at( 0*Npts + index_sub), 
-                    //        RHS_vector.at( 1*Npts + index_sub), 
-                    //        RHS_vector.at( 2*Npts + index_sub), 
-                    //        RHS_vector.at( 3*Npts + index_sub) );
                 }
             }
 
             fprintf( stdout, "Also adding the seed info over land, %zu\n", Nboxrows );
             land_counter = 0;
             for (index_sub = 0; index_sub < Npts; ++index_sub) {
-                if ( not(mask.at(index_sub)) ) {
+                if (not(mask.at(index_sub))) {
                     double weight_val = weight_err ? dAreas.at(index_sub) : 1.;
 
                     row_skip    = Nboxrows*Npts + 0*num_land_points + land_counter;
@@ -561,6 +540,8 @@ void Apply_LLC_Helmholtz_Projection(
                 }
             }
             fprintf( stdout, "%zu land points\n", land_counter );
+            Eigen::VectorXd RHS   = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
+            //Eigen::VectorXd Guess = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
 
             //
             //// Now apply the least-squares solver
@@ -571,39 +552,21 @@ void Apply_LLC_Helmholtz_Projection(
                 fflush(stdout);
             }
             #endif
-            alglib::linlsqrsolvesparse(state, LHS_matr, rhs);
-            alglib::linlsqrresults(state, F_alglib, report);
+            Eigen::SparseQR< Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int> > solver;
+            //Eigen::SPQR< Eigen::SparseMatrix<double> > solver;
+            solver.compute( LHS_matr );
+            if ( solver.info() != Eigen::Success ) {
+                // decomposition failed
+                fprintf( stderr, "Eigen decomposition failed.\n" );
+                return;
+            }
 
-            /*    Rep     -   optimization report:
-                * Rep.TerminationType completetion code:
-                    *  1    ||Rk||<=EpsB*||B||
-                    *  4    ||A^T*Rk||/(||A||*||Rk||)<=EpsA
-                    *  5    MaxIts steps was taken
-                    *  7    rounding errors prevent further progress,
-                            X contains best point found so far.
-                            (sometimes returned on singular systems)
-                    *  8    user requested termination via calling
-                            linlsqrrequesttermination()
-                * Rep.IterationsCount contains iterations count
-                * NMV countains number of matrix-vector calculations
-            */
-
-            #if DEBUG >= 1
-            if      (report.terminationtype == 1) { fprintf(stdout, "Termination type: absolulte tolerance reached.\n"); }
-            else if (report.terminationtype == 4) { fprintf(stdout, "Termination type: relative tolerance reached.\n"); }
-            else if (report.terminationtype == 5) { fprintf(stdout, "Termination type: maximum number of iterations reached.\n"); }
-            else if (report.terminationtype == 7) { fprintf(stdout, "Termination type: round-off errors prevent further progress.\n"); }
-            else if (report.terminationtype == 8) { fprintf(stdout, "Termination type: user requested (?)\n"); }
-            else                                  { fprintf(stdout, "Termination type: unknown\n"); }
-            #endif
-            if      (report.terminationtype == 1) { terminate_count_abs_tol++; }
-            else if (report.terminationtype == 4) { terminate_count_rel_tol++; }
-            else if (report.terminationtype == 5) { terminate_count_max_iter++; }
-            else if (report.terminationtype == 7) { terminate_count_rounding++; }
-            else if (report.terminationtype == 8) { terminate_count_other++; }
-            else                                  { terminate_count_other++; }
-
-            iters_used = linlsqrpeekiterationscount( state );
+            Eigen::VectorXd F_Eigen = solver.solve( RHS );
+            if ( solver.info() != Eigen::Success ) {
+                // solving failed
+                fprintf( stderr, "Eigen solving failed.\n" );
+                return;
+            }
 
             #if DEBUG >= 2
             if ( wRank == 0 ) {
@@ -613,9 +576,8 @@ void Apply_LLC_Helmholtz_Projection(
             #endif
 
             // Extract the solution and add the seed back in
-            F_array = F_alglib.getcontent();
-            std::vector<double> Psi_vector(F_array,        F_array +     Npts),
-                                Phi_vector(F_array + Npts, F_array + 2 * Npts);
+            std::vector<double> Psi_vector(F_Eigen.data(),        F_Eigen.data() +     Npts),
+                                Phi_vector(F_Eigen.data() + Npts, F_Eigen.data() + 2 * Npts);
             for (size_t ii = 0; ii < Npts; ++ii) {
                 Psi_vector.at(ii) += Psi_seed.at(ii);
                 Phi_vector.at(ii) += Phi_seed.at(ii);
@@ -885,10 +847,5 @@ void Apply_LLC_Helmholtz_Projection(
     write_field_to_output( projection_KE, "projection_KE", starts_error, counts_error, output_fname.c_str() );
     write_field_to_output( toroidal_KE,   "toroidal_KE",   starts_error, counts_error, output_fname.c_str() );
     write_field_to_output( potential_KE,  "potential_KE",  starts_error, counts_error, output_fname.c_str() );
-
-    } catch(alglib::ap_error alglib_exception) {
-        fprintf(stderr, "ALGLIB exception with message '%s'\n", alglib_exception.msg.c_str());
-        assert(false);
-    }
 
 }

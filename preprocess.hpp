@@ -102,6 +102,20 @@ void Apply_LLC_Helmholtz_Projection(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
+void Apply_LLC_Helmholtz_Projection_Eigen(
+        const std::string output_fname,
+        dataset & source_data,
+        const std::vector<double> & seed_tor,
+        const std::vector<double> & seed_pot,
+        const bool single_seed,
+        const double rel_tol,
+        const int max_iters,
+        const bool weight_err,
+        const bool use_mask,
+        const double Tikhov_Laplace,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
 void Apply_Helmholtz_Projection_uiuj(
         const std::string output_fname,
         dataset & source_data,
