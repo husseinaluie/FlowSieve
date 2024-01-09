@@ -508,7 +508,6 @@ void dataset::load_adjacency(
             adjacency_projected_y[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
         } 
     }
-    */
 
     // distances
     read_var_from_file( tmp_var,
@@ -521,6 +520,7 @@ void dataset::load_adjacency(
             adjacency_distances[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
         } 
     }
+    */
 
     // 1st lon deriv weights
     read_var_from_file( tmp_var,
@@ -546,8 +546,8 @@ void dataset::load_adjacency(
         } 
     }
 
+    /* Also not used, so don't load
     // 2nd lon deriv weights
-    /*
     read_var_from_file( tmp_var,
                         "adjacency_d2dlon2_weights", 
                         filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
