@@ -316,7 +316,10 @@ namespace constants
      *  4 = tanh        ( 1 - tanh( (x - 1) / (0.1) )  )
      * @ingroup constants
      */
-    const int KERNEL_OPT = 4;
+    //const int KERNEL_OPT = 4;
+    enum KernelType : int { TopHat, HyperGaussian, Gaussian, JohnsonGaussian, 
+                            Sinc, SmoothHat, HighOrder };
+    const int KERNEL_OPT = KernelType::SmoothHat;
 
     /*!
      * \param KernPad
@@ -326,16 +329,14 @@ namespace constants
      *
      * @ingroup constants
      */
-    const double KernPad = 2.5;
-    /*
-    switch (KERNEL_OPT) {
-        case 0: const double KernPad =  1.1;
-        case 1: const double KernPad =  2.5;  // exp(-2.5^4) ~1e-17
-        case 2: const double KernPad =  5.;   // exp(-5^2)   ~1e-11
-        case 3: const double KernPad = -1.;
-        case 4: const double KernPad =  2.5;
-    }
-    */
+    const double KernPad = ( KERNEL_OPT == KernelType::TopHat ) ? 1.1 :
+                           ( KERNEL_OPT == KernelType::HyperGaussian ) ? 2.5 :
+                           ( KERNEL_OPT == KernelType::Gaussian ) ? 5. :
+                           ( KERNEL_OPT == KernelType::JohnsonGaussian ) ? 15. :
+                           ( KERNEL_OPT == KernelType::Sinc ) ? -1 :
+                           ( KERNEL_OPT == KernelType::SmoothHat ) ? 2.5 :
+                           ( KERNEL_OPT == KernelType::HighOrder ) ? 2.5 :
+                           -1;
 
     /*!
      * \param PARTICLE_RECYCLE_TYPE
@@ -345,6 +346,7 @@ namespace constants
     enum ParticleRecycleType : int { FixedInterval, Stochastic };
     const int PARTICLE_RECYCLE_TYPE = ParticleRecycleType::FixedInterval;
 
+
     /*!
      * \param variable_descriptions
      * \brief A dictionary of variable descriptions to provide details in netcdf outputs
@@ -352,18 +354,28 @@ namespace constants
      * @ingroup constants
      */
     const std::map< std::string, std::string > variable_descriptions = {
+        { "F",                  "Coarse-grained Helmholtz scalar (full = u_r, tor = Psi, pot = Phi)." },
         { "coarse_u_r",         "Coarse-grained vertical/radial velocity." },
         { "coarse_u_lon",       "Coarse-grained zonal velocity." },
         { "coarse_u_lat",       "Coarse-grained meridional velocity." },
+        { "u_lon_spectrum",     "Power spectrum density of zonal velocity." },
+        { "u_lat_spectrum",     "Power spectrum density of meridional velocity." },
+        { "KE_spectral_slope",  "Log-log slope of KE power spectrum." },
         { "coarse_KE",          "Kinetic energy of coarse-grained velocity" },
         { "fine_KE",            "Small-scale kinetic energy ( filter(KE(u)) - KE(filter(u)) )" },
+        { "Fine_KE_mod",        "Modified small-scale kinetic energy ( KE(u) - KE(filter(u)) )" },
         { "enstrophy",          "Enstrophy of coarse-grained velocity" },
         { "Pi",                 "Non-linear energy transfer from large-scales to small-scales" },
+        { "Pi_Dversus",         "As Pi, but large-scale strain is potential-only." },
+        { "Pi_Vversus",         "As Pi, but large-scale strain is toroidal-only." },
         { "Z",                  "Non-linear enstrophy transfer from large-scales to small-scales" },
         { "OkuboWeiss",         "Okubo-Weiss parameter ( positive -> strain dominated, negative -> vortex dominated )" },
         { "div_Jtransport",     "divergence of energy transport term" },
         { "coarse_vort_r",      "Radial (z) vorticity of coarse-grained velocity." },
-        { "coarse_vel_div",     "Divergence of the coarse-grained velocity" }
+        { "coarse_vel_div",     "Divergence of the coarse-grained velocity" },
+        { "u_lon",              "Zonal (eastward) velocity" },
+        { "u_lat",              "Meridional (westward) velocity" },
+        { "velocity_divergence","2D divergence of (u_lon,u_lat)" }
     };
 
     /*!
@@ -376,15 +388,23 @@ namespace constants
         { "coarse_u_r",         "m / s" },
         { "coarse_u_lon",       "m / s" },
         { "coarse_u_lat",       "m / s" },
+        { "u_lon_spectrum",     "J / (m^3) / m" },
+        { "u_lat_spectrum",     "J / (m^3) / m" },
+        { "KE_spectral_slope",  "1" },
         { "coarse_KE",          "J / (m^3)" },
         { "fine_KE",            "J / (m^3)" },
         { "enstrophy",          "J / (m^5)" },
         { "Pi",                 "Watt / (m^3)" },
+        { "Pi_Dversus",         "Watt / (m^3)" },
+        { "Pi_Vversus",         "Watt / (m^3)" },
         { "Z",                  "Watt / (m^5)" },
         { "OkuboWeiss",         "1 / (s^2)" },
         { "div_Jtransport",     "Watt / (m^3)" },
         { "coarse_vort_r",      "1 / s" },
-        { "coarse_vel_div",     "1 / s" }
+        { "coarse_vel_div",     "1 / s" },
+        { "u_lon",              "m / s" },
+        { "u_lat",              "m / s" },
+        { "velocity_divergence","1 / s" }
     };
 
 
@@ -394,7 +414,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const std::string spatial_average_description       = "The lat/lon average computed over each defined region (see region dimension).";
+    const std::string spatial_average_description = "The lat/lon average computed over each defined region (see region dimension).";
 
     /*!
      * \param zonal_average_description
@@ -402,7 +422,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const std::string zonal_average_description         = "The zonal (longitudinal) average computed at each latitude.";
+    const std::string zonal_average_description = "The zonal (longitudinal) average computed at each latitude.";
 
     /*!
      * \param time_average_description
@@ -410,7 +430,15 @@ namespace constants
      *
      * @ingroup constants
      */
-    const std::string time_average_description          = "Time average over the entire provided dataset.";
+    const std::string time_average_description = "Time average over the entire provided dataset.";
+
+    /*!
+     * \param coarsened_map_description
+     * \brief Human-friendly text that is added to all coarsened_map variables in postprocessing outputs
+     *
+     * @ingroup constants
+     */
+    const std::string coarsened_map_description = "Full space-time map averaged onto a coarser lat/lon grid.";
 
     /*!
      * \param OkuboWeiss_average_description
