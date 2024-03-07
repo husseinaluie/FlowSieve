@@ -59,6 +59,7 @@ void depth_integrate(
                         depth_integral.at(index) = 0.;
                         for ( Iz = 1; Iz < Ndepth; ++Iz ) {
                             index       = Index( Itime, Iz,   Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+                            index_below = Index( Itime, Iz-1, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
                             depth_integral.at(index) = depth_integral.at( index_below ) + 
                                 ( depth.at(Iz-1) - depth.at(Iz) ) 
                                 * ( 0.5 * ( field_to_integrate.at( index ) + field_to_integrate.at( index_below ) ) );
