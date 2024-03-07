@@ -4,6 +4,7 @@
 #include "../functions.hpp"
 #include <cassert>
 #include <math.h>
+#include <fenv.h>
 
 /*!
  *  \brief Read a specific variable from a specific file.
@@ -44,26 +45,32 @@ void read_var_from_file(
 
     assert( check_file_existence( filename.c_str() ) );
 
-    int wRank, wSize, Nprocs_in_dim, Iproc_in_dim;
+    int wRank, wSize, Nprocs_in_dim=1, Iproc_in_dim=0;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
 
     // Open the NETCDF file
-    const int str_len = 250;
-    int FLAG = NC_NETCDF4 | NC_MPIIO;
-    int ncid=0, retval;
-    char buffer [str_len];
-    snprintf(buffer, str_len, filename.c_str());
+    int FLAG = NC_NOWRITE; //NC_NETCDF4 | NC_MPIIO;
+    int ncid=0, retval=NC_NOERR;
 
     #if DEBUG >= 1
     if (wRank == 0) {
-        fprintf(stdout, "Attempting to read %s from %s\n", var_name.c_str(), buffer);
+        fprintf(stdout, "Attempting to read %s from %s\n", var_name.c_str(), filename.c_str());
         fflush(stdout);
     }
     #endif
 
-    retval = nc_open_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
+    // Some netcdf functions [in some netcdf versions] cause floating-point errors
+    //  so, we need to disable floating point exceptions when we try to open files.
+    //  We'll store the fp exception settings to restore them afterwards.
+    fedisableexcept( FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW );
+    retval = nc_open_par(filename.c_str(), FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    fprintf( stdout, "%d\n", __LINE__ );
+
+    // Now we can restore fp-exception handling, after clearing out any that were raised
+    feclearexcept( FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW ); // erase whatever exceptions were raised
+    feenableexcept( FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW ); // re-enable exceptions
 
     // Check if netcdf-4 format
     int input_nc_format;
@@ -84,14 +91,11 @@ void read_var_from_file(
     #endif
     assert( input_nc_format == NC_FORMAT_NETCDF4 ); // input file must be netCDF-4 format. Use `nccopy -k netCDF-4 input.nc output.nc` to change file version
 
-    char varname [str_len];
-    snprintf(varname, str_len, var_name.c_str());
-
     int var_id, num_dims;
-    int dim_ids[NC_MAX_VAR_DIMS];
+    int dim_ids[NC_MAX_VAR_DIMS] = {};
 
     // Get the ID for the variable
-    retval = nc_inq_varid(ncid, varname, &var_id );
+    retval = nc_inq_varid(ncid, var_name.c_str(), &var_id );
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // This should return an error if the variable doesn't exist
