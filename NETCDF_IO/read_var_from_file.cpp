@@ -62,11 +62,9 @@ void read_var_from_file(
 
     // Some netcdf functions [in some netcdf versions] cause floating-point errors
     //  so, we need to disable floating point exceptions when we try to open files.
-    //  We'll store the fp exception settings to restore them afterwards.
     fedisableexcept( FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW );
     retval = nc_open_par(filename.c_str(), FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
-    fprintf( stdout, "%d\n", __LINE__ );
 
     // Now we can restore fp-exception handling, after clearing out any that were raised
     feclearexcept( FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW ); // erase whatever exceptions were raised
@@ -154,7 +152,7 @@ void read_var_from_file(
                 else if ( II == 1 ) { Nprocs_in_dim = Nprocs_in_depth; }
                 else                { Nprocs_in_dim = 0; assert(false); }  // II <= 1 so won't happen
 
-                assert( (count[II] >= Nprocs_in_dim) && "Too many processors have been assigned to dimension." );
+                assert( (count[II] >= (size_t)Nprocs_in_dim) && "Too many processors have been assigned to dimension." );
 
                 my_count = ( (int)count[II] ) / Nprocs_in_dim;
                 overflow = (int)( count[II] - my_count * Nprocs_in_dim );
