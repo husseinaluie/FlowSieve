@@ -39,8 +39,6 @@ int main(int argc, char *argv[]) {
             "Please update constants.hpp accordingly.");
 
     // Enable all floating point exceptions but FE_INEXACT
-    //feenableexcept( FE_ALL_EXCEPT & ~FE_INEXACT & ~FE_UNDERFLOW );
-    //fprintf( stdout, " %d : %d \n", FE_ALL_EXCEPT, FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW | FE_INEXACT | FE_UNDERFLOW );
     feenableexcept( FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW );
 
     // Specify the number of OpenMP threads

@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
             );
 
     // Enable all floating point exceptions but FE_INEXACT
-    //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
+    feenableexcept( FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW );
 
     // Specify the number of OpenMP threads
     //   and initialize the MPI world
