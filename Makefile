@@ -152,6 +152,7 @@ clean:
 	rm -f *.o 
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
+	rm -f Functions/DirectFilter/*.o
 	rm -f Functions/Differentiation_Tools/*.o 
 	rm -f Functions/Helmholtz/*.o 
 	rm -f Functions/SW_Tools/*.o 
@@ -166,6 +167,7 @@ hardclean:
 	rm -f *.[o,x] 
 	rm -f NETCDF_IO/*.o 
 	rm -f Functions/*.o 
+	rm -f Functions/DirectFilter/*.o
 	rm -f Functions/Differentiation_Tools/*.o 
 	rm -f Functions/Helmholtz/*.o 
 	rm -f Functions/SW_Tools/*.o 
@@ -209,7 +211,7 @@ CORE_TARGET_OBJS := Case_Files/coarse_grain.o \
 $(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-$(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${DIRECT_FILTER_OBJS} %.o
+$(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} ${ALGLIB_OBJS} ${DIRECT_FILTER_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 
