@@ -207,7 +207,7 @@ int main(int argc, char *argv[]) {
     // Compute the area of each 'cell' which will be necessary for integration
     //source_data.compute_cell_areas();
     // Cell areas are trickier, so they will be passed in as an input.
-    read_LLC_latlon_from_file( source_data.areas, dArea_field_var_name, input_fname );
+    read_LLC_latlon_from_file( source_data.areas, dArea_field_var_name, adjacency_fname );
 
     // Read in the seed
     // If extending to poles, then assume that the seed is already on the extended grid
@@ -233,11 +233,14 @@ int main(int argc, char *argv[]) {
 
     // Apply to projection routine
     //Apply_LLC_Helmholtz_Projection( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
-    //        tolerance, max_iterations, use_area_weight, use_mask, Tikhov_Laplace, filter_scale );
-    Apply_LLC_Helmholtz_Projection_AMGCL( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
-            tolerance, max_iterations, use_area_weight, use_mask, Tikhov_Laplace, filter_scale );
+    //Apply_LLC_Helmholtz_Projection_AMGCL( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
     //Apply_LLC_Helmholtz_Projection_Eigen( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
-    //        tolerance, max_iterations, use_area_weight, use_mask, Tikhov_Laplace );
+    //Apply_LLC_Helmholtz_Projection_Eigen_vels( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
+    //Apply_LLC_Helmholtz_Projection_Eigen_vels_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
+    //Apply_LLC_Helmholtz_Projection_Eigen_both( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
+    //Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
+    Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
+            tolerance, max_iterations, use_area_weight, use_mask, Tikhov_Laplace );
 
     // Done!
     #if DEBUG >= 0
