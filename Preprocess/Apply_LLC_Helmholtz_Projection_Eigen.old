@@ -7,10 +7,10 @@
 #include <vector>
 #include <omp.h>
 #include <math.h>
-//#include <eigen3/Eigen/Sparse>
-//#include <eigen3/Eigen/IterativeLinearSolvers>
 #include <Eigen/Sparse>
 #include <Eigen/IterativeLinearSolvers>
+//#include <Eigen/SparseQR>
+//#include <Eigen/SPQRSupport>
 
 
 void Apply_LLC_Helmholtz_Projection_Eigen(
@@ -100,11 +100,9 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
         u_lat_pot_seed(  Npts, 0. );
 
     // alglib variables
-    assert( Tikhov_Laplace < 0 );
     const size_t Nboxrows = ( Tikhov_Laplace > 0 ) ? 4 : 2;
     std::vector<double> 
-        //RHS_vector( Npts + 2*num_land_points, 0. ),
-        RHS_vector( Npts + constants::ADJACENCY_SIZE*num_land_points, 0. ),
+        RHS_vector( Nboxrows * Npts + 4*num_land_points, 0. ),
         Psi_seed(       Npts, 0. ),
         Phi_seed(       Npts, 0. ),
         work_arr(       Npts, 0. ),
@@ -174,21 +172,21 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
     double val;
     size_t column_skip, row_skip, land_counter = 0;
 
-    const bool USE_TRUE_2ND_DERIV = false;
     double *F_array;
     typedef Eigen::Triplet<double> T;
     const int pts_per_1st_deriv = (constants::ADJACENCY_SIZE + 1),
-              pts_per_2nd_deriv = pow(constants::ADJACENCY_SIZE + 1, USE_TRUE_2ND_DERIV ? 1 : 2);
-    //std::vector<T> Aij_triplets( Npts * (2 * pts_per_2nd_deriv + pts_per_1st_deriv) + 2 * num_land_points * pts_per_1st_deriv );
-    std::vector<T> Aij_triplets( Npts * (2 * pts_per_2nd_deriv + pts_per_1st_deriv) 
-                                  + 2 * num_land_points * constants::ADJACENCY_SIZE );
+              pts_per_2nd_deriv = pow(constants::ADJACENCY_SIZE + 1, 1);
+              //pts_per_2nd_deriv = pow(constants::ADJACENCY_SIZE + 1, 2);
+    std::vector<T> Aij_triplets(   ( Tikhov_Laplace >= 0 ? 2 : 0 ) * Npts * 2 * pts_per_1st_deriv 
+                                 + ( Tikhov_Laplace != 0 ? 2 : 0 ) * Npts * 2 * pts_per_2nd_deriv 
+                                 + 4 * num_land_points * pts_per_1st_deriv );
     size_t Itriplet, Ipt, neighbour_ind;
     double weight_val, cos_lat_inv, R_inv;
-    bool is_pole, all_land_neighbours;
+    bool is_pole;
     #pragma omp parallel default(none) \
-    shared( mask, dAreas, latitude, source_data, Aij_triplets ) \
+    shared( dAreas, latitude, source_data, Aij_triplets ) \
     private( Ipt, Ineighbour, neighbour_ind, Itriplet, row_skip, column_skip, is_pole, val, \
-             weight_val, cos_lat_inv, R_inv, all_land_neighbours ) \
+             weight_val, cos_lat_inv, R_inv ) \
     firstprivate( Npts, weight_err, num_neighbours, Tikhov_Laplace, \
                   stdout, deriv_scale_factor, pts_per_1st_deriv, pts_per_2nd_deriv )
     { 
@@ -199,104 +197,106 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
             cos_lat_inv = 1. / cos(latitude.at(Ipt));
             R_inv = 1. / constants::R_earth;
 
-            if ( not(mask[Ipt]) ) {
-                // If it's land, instead of solving the Lapacian, just do the
-                // equal-to-neighbours bit
-
-                // Check that all neighbours are land
-                all_land_neighbours = true;
-                for ( Ineighbour = 0; Ineighbour < num_neighbours; Ineighbour++ ) {
-                    neighbour_ind = source_data.adjacency_indices.at(Ipt).at(Ineighbour);
-                    if ( mask[neighbour_ind] ) { all_land_neighbours = false; }
-                }
-
-                if ( all_land_neighbours ) {
-                    // all neighbours are land, so just take the first
-                    neighbour_ind = source_data.adjacency_indices.at(Ipt).at(0);
-                    column_skip = neighbour_ind;
-                    row_skip    = Ipt;
-                    if ( USE_TRUE_2ND_DERIV ) {
-                        Itriplet = Ipt * pts_per_2nd_deriv + 0;
-                    } else {
-                        Itriplet = Ipt * pts_per_2nd_deriv + 0*(num_neighbours+1) + 0;
-                    }
-                    Aij_triplets[Itriplet  ] = T( row_skip, Ipt,            weight_val * Tikhov_Laplace );
-                    Aij_triplets[Itriplet+1] = T( row_skip, neighbour_ind, -weight_val * Tikhov_Laplace );
-                    continue;
-                }
-            }
-
             for ( Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
 
                 neighbour_ind = (Ineighbour < num_neighbours) ? 
                                         source_data.adjacency_indices.at(Ipt).at(Ineighbour) :
                                         Ipt;
 
+
                 is_pole = std::fabs( std::fabs( latitude.at(Ipt) * 180.0 / M_PI ) - 90 ) < 1e-6;
                 if ( is_pole ) { fprintf(stdout, "SKIPPING POLE POINT!\n"); continue; }
 
-                //
-                //// Second LON derivative
-                //
+                if (Tikhov_Laplace >= 0) {
+                    //
+                    //// LON first derivative
+                    //
 
-                if ( USE_TRUE_2ND_DERIV ) {
+                    val  = source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour);
+                    val *= weight_val * cos_lat_inv * R_inv;
+
+                    // Psi part
+                    column_skip = 0 * Npts + neighbour_ind;
+                    row_skip    = 1 * Npts + Ipt;
+                    Itriplet = row_skip * 2 * pts_per_1st_deriv + Ineighbour;
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+
+                    // Phi part
+                    column_skip = 1 * Npts + neighbour_ind;
+                    row_skip    = 0 * Npts + Ipt;
+                    Itriplet = row_skip * 2 * pts_per_1st_deriv  + Ineighbour;
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+
+
+                    //
+                    //// LAT first derivative
+                    //
+
+                    val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
+                    val *= weight_val * R_inv;
+
+                    // Psi part
+                    column_skip = 0 * Npts + neighbour_ind;
+                    row_skip    = 0 * Npts + Ipt;
+                    Itriplet = (row_skip * 2 + 1) * pts_per_1st_deriv + Ineighbour;
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, -val );
+
+                    // Phi part
+                    column_skip = 1 * Npts + neighbour_ind;
+                    row_skip    = 1 * Npts + Ipt;
+                    Itriplet = (row_skip * 2 + 1) * pts_per_1st_deriv + Ineighbour;
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                }
+    
+                if (Tikhov_Laplace != 0) {
+    
+                    //
+                    //// Second LON derivative
+                    //
+    
                     val  = source_data.adjacency_d2dlon2_weights.at(Ipt).at(Ineighbour);
                     val *= weight_val * pow(cos_lat_inv * R_inv, 2.);
-
-                    column_skip = neighbour_ind;
-                    row_skip    = Ipt;
-                    Itriplet = Ipt * pts_per_2nd_deriv + Ineighbour;
-                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
-                } else {
-                    for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
-                        val  =   source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour)
-                               * source_data.adjacency_ddlon_weights.at(neighbour_ind).at(D2_ind);
-                        val *= weight_val * pow(R_inv, 2.) * cos_lat_inv / cos(latitude.at(neighbour_ind));
-
-                        column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
-                        row_skip    = Ipt;
-                        Itriplet = Ipt * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
-                        Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                    if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
+    
+                    column_skip = 0 * Npts + neighbour_ind;
+                    if (Tikhov_Laplace > 0) {
+                        row_skip = 2 * Npts + Ipt;
+                        Itriplet = 2 * Npts * 2 * pts_per_1st_deriv
+                                    + Ipt * 2 * pts_per_2nd_deriv  
+                                    + Ineighbour;
+                    } else {
+                        row_skip = 0 * Npts + Ipt;
+                        Itriplet = Ipt * 2 * pts_per_2nd_deriv  
+                                    + Ineighbour;
                     }
-                }
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
     
-                //
-                //// Second LAT derivative
-                //
+                    column_skip = 1 * Npts + neighbour_ind;
+                    row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
+                    Itriplet = row_skip * 2 * pts_per_2nd_deriv  + Ineighbour; // FIX
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
     
-                if ( USE_TRUE_2ND_DERIV ) {
-                    val = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour);
+    
+                    //
+                    //// First and Second LAT derivative
+                    //
+    
+                    val  = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour) 
+                            - source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour) * tan( latitude.at(Ipt) );
                     val *= weight_val * pow(R_inv, 2.);
-
-                    column_skip = neighbour_ind;
-                    row_skip    = Ipt;
-                    Itriplet    = (Npts + Ipt) * pts_per_2nd_deriv + Ineighbour;
+                    if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
+    
+                    column_skip = 0 * Npts + neighbour_ind;
+                    row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
+                    Itriplet = (row_skip * 2 + 1) * pts_per_2nd_deriv + Ineighbour; // FIX
                     Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
-                } else {
-                    for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
-                        val  =   source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour)
-                               * source_data.adjacency_ddlat_weights.at(neighbour_ind).at(D2_ind);
-                        val *= weight_val * pow(R_inv, 2.);
+    
+                    column_skip = 1 * Npts + neighbour_ind;
+                    row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
+                    Itriplet = (row_skip * 2 + 1) * pts_per_2nd_deriv + Ineighbour; // FIX
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
 
-                        column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
-                        row_skip    = Ipt;
-                        Itriplet = (Npts + Ipt) * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
-                        Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
-                    }
                 }
-
-                //
-                //// First LAT derivative
-                //
-    
-                val = - source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour) * tan( latitude.at(Ipt) );
-                val *= weight_val * pow(R_inv, 2.);
-    
-                column_skip = neighbour_ind;
-                row_skip    = Ipt;
-                Itriplet    = 2 * Npts * pts_per_2nd_deriv + Ipt * pts_per_1st_deriv + Ineighbour;
-                Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
-
             }
         }
     }
@@ -306,10 +306,9 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
     #pragma omp parallel default(none) \
     shared( source_data, Aij_triplets, mask, dAreas, latitude ) \
     private( count, Iland, Ipt, Ineighbour, row, column, val, \
-             weight_val, cos_lat_inv, R_inv, neighbour_ind, Itriplet, \
-             all_land_neighbours ) \
+             weight_val, cos_lat_inv, R_inv, neighbour_ind, Itriplet ) \
     firstprivate( num_land_points, Npts, num_neighbours, weight_err,\
-                  Tikhov_Laplace )
+                  Tikhov_Laplace, Nboxrows )
     {
         count = 0;
         #pragma omp for collapse(1) schedule(guided)
@@ -322,22 +321,33 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
                         cos_lat_inv = 1. / cos(latitude.at(Ipt));
                         R_inv = 1. / constants::R_earth;
 
-                        // Check that all neighbours are land
-                        all_land_neighbours = true;
-                        for ( Ineighbour = 0; Ineighbour < num_neighbours; Ineighbour++ ) {
-                            neighbour_ind = source_data.adjacency_indices.at(Ipt).at(Ineighbour);
-                            if ( mask[neighbour_ind] ) { all_land_neighbours = false; }
-                        }
-                        if ( not(all_land_neighbours) ) { continue; }
+                        for ( Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
 
-                        // If they are, enforce equality between all neighbours (and centre)
-                        for ( Ineighbour = 0; Ineighbour < num_neighbours; Ineighbour++ ) {
-                            neighbour_ind = source_data.adjacency_indices.at(Ipt).at(Ineighbour);
-                            row = Npts + Iland * constants::ADJACENCY_SIZE + Ineighbour;
-                            Itriplet = Npts * (2 * pts_per_2nd_deriv + pts_per_1st_deriv) 
-                                        + 2 * (Iland * constants::ADJACENCY_SIZE + Ineighbour);
-                            Aij_triplets[Itriplet  ] = T( row, Ipt,            weight_val * Tikhov_Laplace );
-                            Aij_triplets[Itriplet+1] = T( row, neighbour_ind, -weight_val * Tikhov_Laplace );
+                            neighbour_ind = (Ineighbour < num_neighbours) ? 
+                                source_data.adjacency_indices.at(Ipt).at(Ineighbour) :
+                                Ipt;
+
+                            // LON first deriv
+                            val  = source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour);
+                            val *= weight_val * cos_lat_inv * R_inv;
+                            if (Tikhov_Laplace < 0) { val *= -Tikhov_Laplace; }
+
+                            row = Nboxrows * Npts + 4 * Iland;
+                            column = neighbour_ind;
+                            Itriplet = (Nboxrows*Npts + Iland*4) * (num_neighbours + 1) + Ineighbour;
+                            Aij_triplets[Itriplet] = T( row,     column,        val );
+                            Itriplet = (Nboxrows*Npts + Iland*4 + 1) * (num_neighbours + 1) + Ineighbour;
+                            Aij_triplets[Itriplet] = T( row + 1, column + Npts, val );
+
+                            // LAT first deriv
+                            val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
+                            val *= weight_val * R_inv;
+                            if (Tikhov_Laplace < 0) { val *= -Tikhov_Laplace; }
+
+                            Itriplet = (Nboxrows*Npts + Iland*4 + 2) * (num_neighbours + 1) + Ineighbour;
+                            Aij_triplets[Itriplet] = T( row + 2, column,        val );
+                            Itriplet = (Nboxrows*Npts + Iland*4 + 3) * (num_neighbours + 1) + Ineighbour;
+                            Aij_triplets[Itriplet] = T( row + 3, column + Npts, val );
                         }
                     }
                     count++;
@@ -350,10 +360,193 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
 
 
 
-    //Eigen::SparseMatrix<double> LHS_matr( Npts + 2*num_land_points, Npts );
-    Eigen::SparseMatrix<double> LHS_matr( Npts + constants::ADJACENCY_SIZE*num_land_points, Npts );
+    Eigen::SparseMatrix<double> LHS_matr( Nboxrows*Npts + 4*num_land_points, 2*Npts );
     LHS_matr.setFromTriplets( Aij_triplets.begin(), Aij_triplets.end() );
 
+
+    /*
+    Eigen::SparseMatrix<double> LHS_matr(Nboxrows*Npts + 4*num_land_points, 2*Npts);
+    LHS_matr.reserve(Eigen::VectorXi::Constant( Nboxrows*Npts + 4*num_land_points,
+                                                2 * (constants::ADJACENCY_SIZE + 1)));
+    for ( size_t Ipt = 0; Ipt < Npts; Ipt++ ) {
+
+        double  weight_val = weight_err ? dAreas.at(Ipt) : 1.,
+                cos_lat_inv = 1. / cos(latitude.at(Ipt)),
+                R_inv = 1. / constants::R_earth;
+
+        for ( size_t Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
+
+            size_t neighbour_ind = (Ineighbour < num_neighbours) ? 
+                                    source_data.adjacency_indices.at(Ipt).at(Ineighbour) :
+                                    Ipt;
+
+            bool is_pole = std::fabs( std::fabs( latitude.at(Ipt) * 180.0 / M_PI ) - 90 ) < 1e-6;
+            if ( is_pole ) { fprintf(stdout, "SKIPPING POLE POINT!\n"); continue; }
+
+            if (not(mask.at(Ipt))) {
+                // Land doesn't always force zero velocity components. Sometimes it
+                // just forces the sum of the potential and toroidal to be zero.
+                // Here we force both of the potential and toroidal velocities
+                // to be zero individually.
+
+                //
+                //// LON first derivative
+                //
+
+                val  = source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * cos_lat_inv * R_inv;
+                //if (Tikhov_Laplace < 0) { val *= deriv_scale_factor; }
+                if (Tikhov_Laplace < 0) { val *= -Tikhov_Laplace; }
+
+                // Psi part
+                column_skip = 0 * Npts + neighbour_ind;
+                row_skip    = Nboxrows*Npts + 0*num_land_points + land_counter;
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
+
+                // Phi part
+                column_skip = 1 * Npts + neighbour_ind;
+                row_skip    = Nboxrows*Npts + 1*num_land_points + land_counter;
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
+
+
+                //
+                //// LAT first derivative
+                //
+
+                val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * R_inv;
+                //if (Tikhov_Laplace < 0) { val *= deriv_scale_factor; }
+                if (Tikhov_Laplace < 0) { val *= -Tikhov_Laplace; }
+
+                // Psi part
+                column_skip = 0 * Npts + neighbour_ind;
+                row_skip    = Nboxrows*Npts + 2*num_land_points + land_counter;
+                LHS_matr.coeffRef( row_skip, column_skip ) += -val;
+
+                // Phi part
+                column_skip = 1 * Npts + neighbour_ind;
+                row_skip    = Nboxrows*Npts + 3*num_land_points + land_counter;
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
+            }
+
+            if (Tikhov_Laplace >= 0) {
+                //
+                //// LON first derivative
+                //
+
+                val  = source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * cos_lat_inv * R_inv;
+
+                // Psi part
+                if (not(mask.at(Ipt))) {
+                    column_skip = 0 * Npts + neighbour_ind;
+                    //row_skip    = 0 * Npts + Ipt;
+                    row_skip    = 1 * Npts + Ipt;
+                } else {
+                    column_skip = 0 * Npts + neighbour_ind;
+                    row_skip    = 1 * Npts + Ipt;
+                }
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
+
+                // Phi part
+                if (not(mask.at(Ipt))) {
+                    column_skip = 1 * Npts + neighbour_ind;
+                    //row_skip    = 1 * Npts + Ipt;
+                    row_skip    = 0 * Npts + Ipt;
+                } else {
+                    column_skip = 1 * Npts + neighbour_ind;
+                    row_skip    = 0 * Npts + Ipt;
+                }
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
+
+
+                //
+                //// LAT first derivative
+                //
+
+                val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * R_inv;
+
+                // Psi part
+                column_skip = 0 * Npts + neighbour_ind;
+                row_skip    = 0 * Npts + Ipt;
+                LHS_matr.coeffRef( row_skip, column_skip ) += -val;
+
+                // Phi part
+                column_skip = 1 * Npts + neighbour_ind;
+                row_skip    = 1 * Npts + Ipt;
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
+            }
+
+
+            if (Tikhov_Laplace != 0) {
+
+                //
+                //// Second LON derivative
+                //
+                //  NOTE:   We're doing this as the first derivative of the first
+                //          derivative. Typically, this is not great, since it
+                //          tends to have a higher error. However, in our case
+                //          the broader stencil is helpful. It's also more internally
+                //          consistent since later we take derivs( vel ) = deriv( deriv ( Helm ) )
+
+                // Version using actual second derivative
+                val  = source_data.adjacency_d2dlon2_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * pow(cos_lat_inv * R_inv, 2.);
+                if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
+
+                column_skip = 0 * Npts + neighbour_ind;
+                row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
+
+                column_skip = 1 * Npts + neighbour_ind;
+                row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
+
+
+                //
+                //// Second LAT derivative
+                //
+
+                // Version using actual second derivative
+                val  = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * pow(R_inv, 2.);
+                if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
+
+                column_skip = 0 * Npts + neighbour_ind;
+                row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
+
+                column_skip = 1 * Npts + neighbour_ind;
+                row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
+                LHS_matr.coeffRef( row_skip, column_skip ) += val;
+
+                //
+                //// LAT first derivative
+                //
+                val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
+                val *= weight_val * pow(R_inv, 2.) * tan( latitude.at(Ipt) );
+                if (Tikhov_Laplace > 0) { val *= Tikhov_Laplace / deriv_scale_factor; }
+
+                // Psi part
+                column_skip = 0 * Npts + neighbour_ind;
+                row_skip    = (Tikhov_Laplace > 0) ? 2 * Npts + Ipt : 0 * Npts + Ipt;
+                LHS_matr.coeffRef( row_skip, column_skip ) += -val;
+
+                // Phi part
+                column_skip = 1 * Npts + neighbour_ind;
+                row_skip    = (Tikhov_Laplace > 0) ? 3 * Npts + Ipt : 1 * Npts + Ipt;
+                LHS_matr.coeffRef( row_skip, column_skip ) += -val;
+
+            }
+
+        }
+        if (not(mask.at(Ipt))) {
+            // Increment land counter
+            land_counter++;
+        }
+    }
+    */
     fprintf(stdout, "  Land counter: %'zu\n", land_counter);
 
     #if DEBUG >= 1
@@ -418,7 +611,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
             fflush(stdout);
             #endif
             #pragma omp parallel default(none) \
-            shared( Itime, Idepth, stdout, \
+            shared( Itime, Idepth, RHS_vector, stdout, \
                     u_lon, u_lon_tor_seed, u_lon_pot_seed, u_lon_rem, \
                     u_lat, u_lat_tor_seed, u_lat_pot_seed, u_lat_rem ) \
             private( index, index_sub ) \
@@ -451,14 +644,44 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
             //
             
             double is_pole;
-            std::fill( RHS_vector.begin(), RHS_vector.end(), 0. );
             #pragma omp parallel default(none) \
-            shared( dAreas, RHS_vector, vort_term ) \
-            private( index_sub ) firstprivate( weight_err, Npts )
+            shared( dAreas, latitude, Itime, Idepth, RHS_vector, div_term, vort_term, u_lon_rem, u_lat_rem ) \
+            private( index, index_sub, is_pole ) \
+            firstprivate( Ndepth, Ntime, Npts, Tikhov_Laplace, weight_err, deriv_scale_factor, stdout )
             {
                 #pragma omp for collapse(1) schedule(static)
                 for (index_sub = 0; index_sub < Npts; ++index_sub) {
-                    RHS_vector.at( index_sub) = vort_term.at(index_sub) * ( weight_err ? dAreas.at(index_sub) : 1. );
+                    index = index_sub + Npts*(Itime*Ndepth + Idepth);
+
+                    is_pole = std::fabs( std::fabs( latitude.at(index_sub) * 180.0 / M_PI ) - 90 ) < 1e-6;
+
+                    if (Tikhov_Laplace >= 0) {
+                        RHS_vector.at( 0*Npts + index_sub) = u_lon_rem.at(index_sub);
+                        RHS_vector.at( 1*Npts + index_sub) = u_lat_rem.at(index_sub);
+                    }
+
+                    if (Tikhov_Laplace > 0) {
+                        if ( is_pole ) {
+                            fprintf(stdout, "SKIPPING POLE\n");
+                            RHS_vector.at( 2*Npts + index_sub) = 0.;
+                            RHS_vector.at( 3*Npts + index_sub) = 0.;
+                        } else {
+                            RHS_vector.at( 2*Npts + index_sub) = vort_term.at(index_sub) * Tikhov_Laplace / deriv_scale_factor;
+                            RHS_vector.at( 3*Npts + index_sub) = div_term.at( index_sub) * Tikhov_Laplace / deriv_scale_factor;
+                        }
+                    } else if (Tikhov_Laplace < 0) {
+                        RHS_vector.at( 0*Npts + index_sub) = vort_term.at(index_sub);
+                        RHS_vector.at( 1*Npts + index_sub) = div_term.at( index_sub);
+                    }
+
+                    if ( weight_err ) {
+                        RHS_vector.at( 0*Npts + index_sub) *= dAreas.at(index_sub);
+                        RHS_vector.at( 1*Npts + index_sub) *= dAreas.at(index_sub);
+                        if (Tikhov_Laplace > 0) {
+                            RHS_vector.at( 2*Npts + index_sub) *= dAreas.at(index_sub);
+                            RHS_vector.at( 3*Npts + index_sub) *= dAreas.at(index_sub);
+                        }
+                    }
                 }
             }
 
@@ -490,18 +713,37 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
             }
             fprintf( stdout, "%zu land points\n", land_counter );
             */
-            Eigen::VectorXd RHS = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
+            Eigen::VectorXd RHS   = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
+            //Eigen::VectorXd Guess = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
 
             //
             //// Now apply the least-squares solver
             //
             #if DEBUG >= 2
             if ( wRank == 0 ) {
-                fprintf(stdout, "Solving the least squares problem for Psi.\n");
+                fprintf(stdout, "Solving the least squares problem.\n");
                 fflush(stdout);
             }
             #endif
+            /*
+            Eigen::SparseQR< Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int> > solver;
+            //Eigen::SPQR< Eigen::SparseMatrix<double> > solver;
+            solver.compute( LHS_matr );
+            if ( solver.info() != Eigen::Success ) {
+                // decomposition failed
+                fprintf( stderr, "Eigen decomposition failed.\n" );
+                return;
+            }
+            */
+
             Eigen::VectorXd F_Eigen = solver.solve( RHS );
+            /*
+            if ( solver.info() != Eigen::Success ) {
+                // solving failed
+                fprintf( stderr, "Eigen solving failed.\n" );
+                return;
+            }
+            */
             #if DEBUG >= 2
             if ( wRank == 0 ) {
                 fprintf( stdout, "    Solver converged after %ld iterations to error %g.\n", 
@@ -509,41 +751,10 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
                 fflush(stdout);
             }
             #endif
-            std::vector<double> Psi_vector(F_Eigen.data(), F_Eigen.data() + Npts);
 
-            //
-            //// And repeat for divergence!
-            //
-            std::fill( RHS_vector.begin(), RHS_vector.end(), 0. );
-            #pragma omp parallel default(none) \
-            shared( dAreas, RHS_vector, div_term ) \
-            private( index_sub ) firstprivate( weight_err, Npts )
-            {
-                #pragma omp for collapse(1) schedule(static)
-                for (index_sub = 0; index_sub < Npts; ++index_sub) {
-                    RHS_vector.at( index_sub) = div_term.at(index_sub) * ( weight_err ? dAreas.at(index_sub) : 1. );
-                }
-            }
-            RHS = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
-
-            #if DEBUG >= 2
-            if ( wRank == 0 ) {
-                fprintf(stdout, "Solving the least squares problem for Phi.\n");
-                fflush(stdout);
-            }
-            #endif
-            F_Eigen = solver.solve( RHS );
-            #if DEBUG >= 2
-            if ( wRank == 0 ) {
-                fprintf( stdout, "    Solver converged after %ld iterations to error %g.\n", 
-                        solver.iterations(), solver.error() );
-                fflush(stdout);
-            }
-            #endif
-            std::vector<double> Phi_vector(F_Eigen.data(), F_Eigen.data() + Npts);
-            
-
-            // Add the seed back in
+            // Extract the solution and add the seed back in
+            std::vector<double> Psi_vector(F_Eigen.data(),        F_Eigen.data() +     Npts),
+                                Phi_vector(F_Eigen.data() + Npts, F_Eigen.data() + 2 * Npts);
             for (size_t ii = 0; ii < Npts; ++ii) {
                 Psi_vector.at(ii) += Psi_seed.at(ii);
                 Phi_vector.at(ii) += Phi_seed.at(ii);
@@ -558,6 +769,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
             #endif
 
             std::vector<double> u_lon_tor(Npts, 0.), u_lat_tor(Npts, 0.), u_lon_pot(Npts, 0.), u_lat_pot(Npts, 0.);
+            //alglib::sparsemv( LHS_matr, F_alglib, proj_vals );
             toroidal_vel_from_F(  u_lon_tor, u_lat_tor, Psi_vector, source_data, use_mask ? mask : unmask);
             potential_vel_from_F( u_lon_pot, u_lat_pot, Phi_vector, source_data, use_mask ? mask : unmask);
 

@@ -5,15 +5,16 @@
 #include "../differentiation_tools.hpp"
 #include <algorithm>
 #include <vector>
+#include <deque>
 #include <omp.h>
 #include <math.h>
-//#include <eigen3/Eigen/Sparse>
-//#include <eigen3/Eigen/IterativeLinearSolvers>
-#include <Eigen/Sparse>
-#include <Eigen/IterativeLinearSolvers>
+#include <cassert>
+#include "../ALGLIB/stdafx.h"
+#include "../ALGLIB/linalg.h"
+#include "../ALGLIB/solvers.h"
 
 
-void Apply_LLC_Helmholtz_Projection_Eigen(
+void Apply_LLC_Helmholtz_Projection_ALGLIB_PsiPhi_DeltaLand(
         const std::string output_fname,
         dataset & source_data,
         const std::vector<double> & seed_tor,
@@ -30,6 +31,8 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
     int wRank, wSize;
     MPI_Comm_rank( comm, &wRank );
     MPI_Comm_size( comm, &wSize );
+
+    srand( time(NULL) );
 
     // Create some tidy names for variables
     const std::vector<double>   &latitude   = source_data.latitude,
@@ -54,9 +57,10 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
                 Ndepth  = myCounts.at(1);
 
     const size_t Npts = latitude.size();
+    const size_t num_neighbours = source_data.num_neighbours;
 
     int Itime=0, Idepth=0;
-    size_t index, index_sub, iters_used = 0;
+    size_t Ipt, index, neighbour_ind, index_sub, iters_used = 0;
 
     // Fill in the land areas with zero velocity
     #pragma omp parallel default(none) shared( u_lon, u_lat, mask, stderr, wRank ) private( index )
@@ -76,15 +80,93 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
         }
     }
 
-    size_t num_land_points = 0;
-    if (constants::FILTER_OVER_LAND) {
-        for (index = 0; index < u_lon.size(); index++) {
-            if (not(mask.at(index))) { num_land_points++; }
+    // Identify which points have land-only neighbours
+    std::vector<short int> all_land_neighbours(Npts, 0); // 1 = yes, 0 = no
+    size_t num_coastal = 0;
+    for (Ipt = 0; Ipt < Npts; Ipt++) {
+        all_land_neighbours[Ipt] = 1;
+        if (mask[Ipt]) { all_land_neighbours[Ipt] = 0; }
+        for (neighbour_ind = 0; neighbour_ind < num_neighbours; neighbour_ind++ ) {
+            if ( mask[source_data.adjacency_indices.at(Ipt)[neighbour_ind] ] ) {
+                all_land_neighbours[Ipt] = 0;
+            }
+        }
+        if ( ( all_land_neighbours[Ipt] == 0 ) and ( not(mask[Ipt]) ) ) {
+            num_coastal++;
         }
     }
-    #if DEBUG>=0
-    if (wRank == 0) { fprintf(stdout, " Identified %'zu land points.\n", num_land_points); }
-    #endif
+
+
+    // We're going to eliminate land from the solver by hard-enforcing that all points
+    // over land have constants Phi,Psi
+    // Here, we compute the contiguous land blocks
+    std::vector<size_t> pt_maps_to( Npts, Npts ); // size Npts, starting value Npts
+    std::deque<size_t> points_to_test;
+    size_t num_mapped_points = 0, num_mapped_onto = 0, num_mapped_coastal = 0, Ineighbour, Itest;
+    for (Ipt = 0; Ipt < Npts; Ipt++) {
+        //if (all_land_neighbours[Ipt] == 0) { 
+            // Water+coast points map to themselves
+        if (mask[Ipt]) { 
+            // Water points map to themselves
+            pt_maps_to[Ipt] = Ipt; 
+        } else {
+            // Check if we've already mapped this point
+            if (pt_maps_to[Ipt] == Npts) {
+                // Begin a depth-first search through the adjacency
+                // matrix, mapping all land-only neighbours to this one
+                // This point will become the representative for this 'island'
+                points_to_test.clear();
+                pt_maps_to[Ipt] = Ipt; 
+                num_mapped_onto++;
+                for (neighbour_ind = 0; neighbour_ind < num_neighbours; neighbour_ind++ ) {
+                    points_to_test.push_back( source_data.adjacency_indices.at(Ipt)[neighbour_ind] );
+                }
+                // So long as we still have points to test, keep testing!
+                while ( points_to_test.size() > 0 ) {
+                    Itest = points_to_test.front();
+                    points_to_test.pop_front();
+                    if ( pt_maps_to[Itest] < Npts ) { continue; } // already mapped, skip
+                    //else if ( all_land_neighbours[Itest] == 0) { continue; } // water/coast, so skip
+                    else if (mask[Itest]) { continue; } // water, so skip
+                    else {
+                        // Otherwise, map it to Ipt, and add its neighbours to the test list
+                        pt_maps_to[Itest] = Ipt;
+                        num_mapped_points++;
+                        for (neighbour_ind = 0; neighbour_ind < num_neighbours; neighbour_ind++ ) {
+                            Ineighbour = source_data.adjacency_indices.at(Itest)[neighbour_ind];
+                            if ( pt_maps_to[Ineighbour] == Npts ) {
+                                // Only add the neighbour if we haven't already looked at it
+                                points_to_test.push_back( Ineighbour );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    fprintf( stdout, "Mapping %'zu land points onto %'zu 'islands' (contiguous land masses). %'zu points are coastal.\n",
+          num_mapped_points+num_mapped_onto, num_mapped_onto, num_coastal );
+    const size_t Npts_mapped = Npts - num_mapped_points,
+          Ncol = Npts - num_mapped_points - 1,
+          Nrow = Npts - (num_mapped_points+num_mapped_onto) + num_coastal - ( 1 - all_land_neighbours[0] );
+
+
+    std::vector<size_t> num_mapped_before( Npts, 0 );
+    std::vector<size_t> num_mapped_before_noncoastal( Npts, 0 );
+    size_t counter = 0, noncoastal_counter = 0;
+    for (Ipt = 1; Ipt < Npts; Ipt++) {
+        if ( pt_maps_to[Ipt-1] != (Ipt-1) ) { counter++; }
+        num_mapped_before[Ipt] = counter;
+
+        if ( ( pt_maps_to[Ipt-1] != (Ipt-1) ) and ( all_land_neighbours[Ipt-1] == 1) ) { 
+            noncoastal_counter++; 
+        }
+        num_mapped_before_noncoastal[Ipt] = noncoastal_counter;
+    }
+    fprintf( stdout, "%'zu, %'zu\n", 
+          (Npts-1) - num_mapped_before_noncoastal[Npts-1],
+          (Npts-1) - num_mapped_before[Npts-1]
+          );
 
     // Storage vectors
     std::vector<double> 
@@ -99,22 +181,28 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
         u_lon_pot_seed(  Npts, 0. ),
         u_lat_pot_seed(  Npts, 0. );
 
-    // alglib variables
-    assert( Tikhov_Laplace < 0 );
-    const size_t Nboxrows = ( Tikhov_Laplace > 0 ) ? 4 : 2;
     std::vector<double> 
-        //RHS_vector( Npts + 2*num_land_points, 0. ),
-        RHS_vector( Npts + constants::ADJACENCY_SIZE*num_land_points, 0. ),
-        Psi_seed(       Npts, 0. ),
-        Phi_seed(       Npts, 0. ),
-        work_arr(       Npts, 0. ),
-        div_term(       Npts, 0. ),
-        vort_term(      Npts, 0. ),
-        u_lon_rem(      Npts, 0. ),
-        u_lat_rem(      Npts, 0. );
+        RHS_vector(   Nrow, 0. ),
+        Psi_seed(     Npts, 0. ),
+        Phi_seed(     Npts, 0. ),
+        work_arr(     Npts, 0. ),
+        div_term(     Npts, 0. ),
+        vort_term(    Npts, 0. ),
+        u_lon_rem(    Npts, 0. ),
+        u_lat_rem(    Npts, 0. );
+
+    // alglib variables
+    alglib::real_1d_array rhs;
+    rhs.attach_to_ptr( Nrow, &RHS_vector[0] );
+
+    alglib::linlsqrstate state;
+    alglib::linlsqrreport report;
+
+    alglib::real_1d_array F_alglib;
+
+    double *F_array;
     
 
-    fprintf( stdout, "Copy seed\n" );
     // Copy the starting seed.
     if (single_seed) {
         #pragma omp parallel \
@@ -131,29 +219,6 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
         }
     }
 
-    const size_t num_neighbours = source_data.num_neighbours;
-    // Get a magnitude for the derivatives, to help normalize the rows of the 
-    //  Laplace entries to have similar magnitude to the others.
-    long double deriv_ref_1 = 0, deriv_ref_2 = 0;
-    size_t Ineighbour;
-    #pragma omp parallel default(none) \
-    private( Ineighbour, index ) \
-    shared( source_data ) \
-    firstprivate( num_neighbours, Npts ) \
-    reduction( +:deriv_ref_1,deriv_ref_2 )
-    {
-        #pragma omp for collapse(1) schedule(static)
-        for (index = 0; index < Npts; ++index) {
-            for ( Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
-                deriv_ref_1 += std::fabs( source_data.adjacency_ddlat_weights.at(index).at(Ineighbour) ) / (Npts*num_neighbours);
-                //deriv_ref_2 += std::fabs( source_data.adjacency_d2dlat2_weights.at(index).at(Ineighbour) ) / (Npts*num_neighbours);
-            }
-        }
-    }
-    //const double deriv_scale_factor = deriv_ref_2 / deriv_ref_1;
-    const double deriv_scale_factor = deriv_ref_1;
-    fprintf( stdout, "deriv-scale-factor: %g\n", deriv_scale_factor );
-
     //
     //// Build the LHS part of the problem
     //      Ordering is: [  u_from_psi      u_from_phi   ] *  [ psi ]   =    [  u   ]
@@ -161,200 +226,135 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
     //
     //      Ordering is: [           - ddlat   sec(phi) * ddlon   ] *  [ psi ]   =    [     u     ]
     //                   [  sec(phi) * ddlon              ddlat   ]    [ phi ]        [     v     ]
-    //                   [           Laplace                  0   ]                   [ vort(u,v) ]
-    //                   [                 0            Laplace   ]                   [  div(u,v) ]
+    //      followed by entries forcing psi and phi to be constant over land
     
-    #if DEBUG >= 1
+
+    #if DEBUG >= 0
     if (wRank == 0) {
         fprintf(stdout, "Building the LHS of the least squares problem.\n");
         fflush(stdout);
     }
     #endif
+    alglib::sparsematrix LHS_matr;
+    alglib::sparsecreate(Nrow, Ncol, Nrow*25, LHS_matr);
 
     double val;
     size_t column_skip, row_skip, land_counter = 0;
 
     const bool USE_TRUE_2ND_DERIV = false;
-    double *F_array;
-    typedef Eigen::Triplet<double> T;
-    const int pts_per_1st_deriv = (constants::ADJACENCY_SIZE + 1),
-              pts_per_2nd_deriv = pow(constants::ADJACENCY_SIZE + 1, USE_TRUE_2ND_DERIV ? 1 : 2);
-    //std::vector<T> Aij_triplets( Npts * (2 * pts_per_2nd_deriv + pts_per_1st_deriv) + 2 * num_land_points * pts_per_1st_deriv );
-    std::vector<T> Aij_triplets( Npts * (2 * pts_per_2nd_deriv + pts_per_1st_deriv) 
-                                  + 2 * num_land_points * constants::ADJACENCY_SIZE );
-    size_t Itriplet, Ipt, neighbour_ind;
-    double weight_val, cos_lat_inv, R_inv;
-    bool is_pole, all_land_neighbours;
-    #pragma omp parallel default(none) \
-    shared( mask, dAreas, latitude, source_data, Aij_triplets ) \
-    private( Ipt, Ineighbour, neighbour_ind, Itriplet, row_skip, column_skip, is_pole, val, \
-             weight_val, cos_lat_inv, R_inv, all_land_neighbours ) \
-    firstprivate( Npts, weight_err, num_neighbours, Tikhov_Laplace, \
-                  stdout, deriv_scale_factor, pts_per_1st_deriv, pts_per_2nd_deriv )
-    { 
-        #pragma omp for collapse(1) schedule(static)
+    size_t Ipt_mapped, neighbour_mapped;
+    double weight_val, cos_lat_inv, R_inv, rand_val;
+    bool is_pole;
+    //#pragma omp parallel default(none) \
+    shared( LHS_matr, mask, dAreas, latitude, source_data, \
+            pt_maps_to, num_mapped_before, num_mapped_before_noncoastal, all_land_neighbours ) \
+    private( Ipt, Ineighbour, neighbour_ind, row_skip, column_skip, is_pole, val, \
+             weight_val, cos_lat_inv, R_inv, rand_val, counter, \
+             Ipt_mapped, neighbour_mapped ) \
+    firstprivate( Npts, Nrow, Ncol, weight_err, num_neighbours, Tikhov_Laplace, \
+                  stdout, Npts_mapped, alglib::xdefault )
+    //{ 
+    //    #pragma omp for collapse(1) schedule(static)
         for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+
+            if ( Ipt == 0 ) { continue; } // Force to zero at corner
+            if ( all_land_neighbours[Ipt] == 1 ) { continue; } // Skip points that were mapped
 
             weight_val = weight_err ? dAreas.at(Ipt) : 1.;
             cos_lat_inv = 1. / cos(latitude.at(Ipt));
             R_inv = 1. / constants::R_earth;
-
-            if ( not(mask[Ipt]) ) {
-                // If it's land, instead of solving the Lapacian, just do the
-                // equal-to-neighbours bit
-
-                // Check that all neighbours are land
-                all_land_neighbours = true;
-                for ( Ineighbour = 0; Ineighbour < num_neighbours; Ineighbour++ ) {
-                    neighbour_ind = source_data.adjacency_indices.at(Ipt).at(Ineighbour);
-                    if ( mask[neighbour_ind] ) { all_land_neighbours = false; }
-                }
-
-                if ( all_land_neighbours ) {
-                    // all neighbours are land, so just take the first
-                    neighbour_ind = source_data.adjacency_indices.at(Ipt).at(0);
-                    column_skip = neighbour_ind;
-                    row_skip    = Ipt;
-                    if ( USE_TRUE_2ND_DERIV ) {
-                        Itriplet = Ipt * pts_per_2nd_deriv + 0;
-                    } else {
-                        Itriplet = Ipt * pts_per_2nd_deriv + 0*(num_neighbours+1) + 0;
-                    }
-                    Aij_triplets[Itriplet  ] = T( row_skip, Ipt,            weight_val * Tikhov_Laplace );
-                    Aij_triplets[Itriplet+1] = T( row_skip, neighbour_ind, -weight_val * Tikhov_Laplace );
-                    continue;
-                }
-            }
 
             for ( Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
 
                 neighbour_ind = (Ineighbour < num_neighbours) ? 
                                         source_data.adjacency_indices.at(Ipt).at(Ineighbour) :
                                         Ipt;
+                neighbour_ind = pt_maps_to[neighbour_ind]; // convert to mapped coordinated
+                if ( neighbour_ind == 0 ) { continue; } // zero is mapped to zero
+                neighbour_mapped = neighbour_ind - num_mapped_before[neighbour_ind]; // all land removed from columns
+                Ipt_mapped = Ipt - num_mapped_before_noncoastal[Ipt]; // coast included in rows
+                neighbour_mapped--; // removal of zero
+                Ipt_mapped--;       // removal of zero
+                if ( ( Ipt_mapped < 0 ) or (Ipt_mapped > Nrow) ) { 
+                    fprintf( stdout, "BAD POINT! %'zu - %'zu - 1 |-> %'zu\n", Ipt, num_mapped_before_noncoastal[Ipt], Ipt_mapped );
+                    assert(false);
+                }
+                if ( ( neighbour_mapped < 0 ) or (neighbour_mapped > Ncol) ) { 
+                    fprintf( stdout, "BAD Neighbour! %'zu - %'zu - 1 |-> %'zu\n", neighbour_ind, num_mapped_before[neighbour_ind], neighbour_mapped );
+                    assert(false);
+                }
 
                 is_pole = std::fabs( std::fabs( latitude.at(Ipt) * 180.0 / M_PI ) - 90 ) < 1e-6;
                 if ( is_pole ) { fprintf(stdout, "SKIPPING POLE POINT!\n"); continue; }
 
-                //
-                //// Second LON derivative
-                //
-
+                // Second LON derivative
                 if ( USE_TRUE_2ND_DERIV ) {
                     val  = source_data.adjacency_d2dlon2_weights.at(Ipt).at(Ineighbour);
                     val *= weight_val * pow(cos_lat_inv * R_inv, 2.);
 
-                    column_skip = neighbour_ind;
-                    row_skip    = Ipt;
-                    Itriplet = Ipt * pts_per_2nd_deriv + Ineighbour;
-                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                    column_skip = neighbour_mapped;
+                    row_skip    = Ipt_mapped;
+                    alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
                 } else {
                     for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
                         val  =   source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour)
-                               * source_data.adjacency_ddlon_weights.at(neighbour_ind).at(D2_ind);
+                            * source_data.adjacency_ddlon_weights.at(neighbour_ind).at(D2_ind);
                         val *= weight_val * pow(R_inv, 2.) * cos_lat_inv / cos(latitude.at(neighbour_ind));
 
                         column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
-                        row_skip    = Ipt;
-                        Itriplet = Ipt * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
-                        Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                        column_skip = pt_maps_to[column_skip];
+                        if (column_skip == 0) {continue;}
+                        column_skip = column_skip - num_mapped_before[column_skip] - 1;
+                        row_skip    = Ipt_mapped;
+                        assert( (row_skip >= 0) );
+                        assert( (row_skip < Nrow) );
+                        assert( (column_skip >= 0) );
+                        assert( (column_skip < Ncol) );
+                        alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
                     }
                 }
-    
-                //
-                //// Second LAT derivative
-                //
-    
+
+                // Second LAT derivative
                 if ( USE_TRUE_2ND_DERIV ) {
                     val = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour);
                     val *= weight_val * pow(R_inv, 2.);
 
-                    column_skip = neighbour_ind;
-                    row_skip    = Ipt;
-                    Itriplet    = (Npts + Ipt) * pts_per_2nd_deriv + Ineighbour;
-                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                    column_skip = neighbour_mapped;
+                    row_skip    = Ipt_mapped;
+                    alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
                 } else {
                     for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
                         val  =   source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour)
-                               * source_data.adjacency_ddlat_weights.at(neighbour_ind).at(D2_ind);
+                            * source_data.adjacency_ddlat_weights.at(neighbour_ind).at(D2_ind);
                         val *= weight_val * pow(R_inv, 2.);
 
                         column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
-                        row_skip    = Ipt;
-                        Itriplet = (Npts + Ipt) * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
-                        Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                        column_skip = pt_maps_to[column_skip];
+                        if (column_skip == 0) {continue;}
+                        column_skip = column_skip - num_mapped_before[column_skip] - 1;
+                        row_skip    = Ipt_mapped;
+                        assert( (row_skip >= 0) );
+                        assert( (row_skip < Nrow) );
+                        assert( (column_skip >= 0) );
+                        assert( (column_skip < Ncol) );
+                        alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
                     }
                 }
 
-                //
-                //// First LAT derivative
-                //
-    
+                // First LAT derivative
                 val = - source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour) * tan( latitude.at(Ipt) );
                 val *= weight_val * pow(R_inv, 2.);
-    
-                column_skip = neighbour_ind;
-                row_skip    = Ipt;
-                Itriplet    = 2 * Npts * pts_per_2nd_deriv + Ipt * pts_per_1st_deriv + Ineighbour;
-                Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
 
+                column_skip = neighbour_mapped;
+                row_skip    = Ipt_mapped;
+                assert( (row_skip >= 0) );
+                assert( (row_skip < Nrow) );
+                assert( (column_skip >= 0) );
+                assert( (column_skip < Ncol) );
+                alglib::sparseadd( LHS_matr, row_skip, column_skip, val );
             }
         }
-    }
-
-    size_t Iland, count, row, column;
-
-    #pragma omp parallel default(none) \
-    shared( source_data, Aij_triplets, mask, dAreas, latitude ) \
-    private( count, Iland, Ipt, Ineighbour, row, column, val, \
-             weight_val, cos_lat_inv, R_inv, neighbour_ind, Itriplet, \
-             all_land_neighbours ) \
-    firstprivate( num_land_points, Npts, num_neighbours, weight_err,\
-                  Tikhov_Laplace )
-    {
-        count = 0;
-        #pragma omp for collapse(1) schedule(guided)
-        for ( Iland = 0; Iland < num_land_points; Iland++ ) {
-            for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
-                if ( not(mask[Ipt]) ) {
-                    if ( Iland == count ) {
-
-                        weight_val = weight_err ? dAreas.at(Ipt) : 1.;
-                        cos_lat_inv = 1. / cos(latitude.at(Ipt));
-                        R_inv = 1. / constants::R_earth;
-
-                        // Check that all neighbours are land
-                        all_land_neighbours = true;
-                        for ( Ineighbour = 0; Ineighbour < num_neighbours; Ineighbour++ ) {
-                            neighbour_ind = source_data.adjacency_indices.at(Ipt).at(Ineighbour);
-                            if ( mask[neighbour_ind] ) { all_land_neighbours = false; }
-                        }
-                        if ( not(all_land_neighbours) ) { continue; }
-
-                        // If they are, enforce equality between all neighbours (and centre)
-                        for ( Ineighbour = 0; Ineighbour < num_neighbours; Ineighbour++ ) {
-                            neighbour_ind = source_data.adjacency_indices.at(Ipt).at(Ineighbour);
-                            row = Npts + Iland * constants::ADJACENCY_SIZE + Ineighbour;
-                            Itriplet = Npts * (2 * pts_per_2nd_deriv + pts_per_1st_deriv) 
-                                        + 2 * (Iland * constants::ADJACENCY_SIZE + Ineighbour);
-                            Aij_triplets[Itriplet  ] = T( row, Ipt,            weight_val * Tikhov_Laplace );
-                            Aij_triplets[Itriplet+1] = T( row, neighbour_ind, -weight_val * Tikhov_Laplace );
-                        }
-                    }
-                    count++;
-                }
-            }
-        }
-    }
-
-
-
-
-
-    //Eigen::SparseMatrix<double> LHS_matr( Npts + 2*num_land_points, Npts );
-    Eigen::SparseMatrix<double> LHS_matr( Npts + constants::ADJACENCY_SIZE*num_land_points, Npts );
-    LHS_matr.setFromTriplets( Aij_triplets.begin(), Aij_triplets.end() );
-
-    fprintf(stdout, "  Land counter: %'zu\n", land_counter);
+    //}
 
     #if DEBUG >= 1
     if (wRank == 0) {
@@ -362,17 +362,9 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
         fflush(stdout);
     }
     #endif
-
-    LHS_matr.makeCompressed();
-    Eigen::LeastSquaresConjugateGradient< Eigen::SparseMatrix<double> > solver;
-    solver.setMaxIterations(max_iters);
-    solver.setTolerance(rel_tol);
-    solver.compute( LHS_matr );
-    if ( solver.info() != Eigen::Success ) {
-        // decomposition failed
-        fprintf( stderr, "!!Eigen decomposition failed.\n" );
-        return;
-    }
+    alglib::sparseconverttocrs(LHS_matr);
+    alglib::linlsqrcreate( Nrow, Ncol, state);
+    alglib::linlsqrsetcond(state, rel_tol, rel_tol, max_iters);
 
     // Counters to track termination types
     int terminate_count_abs_tol = 0,
@@ -439,109 +431,123 @@ void Apply_LLC_Helmholtz_Projection_Eigen(
             toroidal_vel_div(        div_term, u_lon_rem, u_lat_rem, source_data, use_mask ? mask : unmask );
             toroidal_curl_u_dot_er( vort_term, u_lon_rem, u_lat_rem, source_data, use_mask ? mask : unmask );
 
+            //
+            //// Set up the RHS_vector
+            //
+
             #if DEBUG >= 2
             if ( wRank == 0 ) {
                 fprintf(stdout, "Building the RHS of the least squares problem.\n");
                 fflush(stdout);
             }
             #endif
-
-            //
-            //// Set up the RHS_vector
-            //
             
             double is_pole;
             std::fill( RHS_vector.begin(), RHS_vector.end(), 0. );
             #pragma omp parallel default(none) \
-            shared( dAreas, RHS_vector, vort_term ) \
-            private( index_sub ) firstprivate( weight_err, Npts )
+            shared( dAreas, RHS_vector, u_lon_rem, u_lat_rem, vort_term, div_term, \
+                    num_mapped_before_noncoastal, pt_maps_to ) \
+            private( Ipt ) \
+            firstprivate( weight_err, Npts, Nrow, Tikhov_Laplace )
             {
                 #pragma omp for collapse(1) schedule(static)
-                for (index_sub = 0; index_sub < Npts; ++index_sub) {
-                    RHS_vector.at( index_sub) = vort_term.at(index_sub) * ( weight_err ? dAreas.at(index_sub) : 1. );
+                for ( Ipt = 0; Ipt < Npts; ++Ipt) {
+                    if ( pt_maps_to[Ipt] != Ipt ) { continue; }
+                    if (Ipt == 0) {continue;}
+                    RHS_vector.at(Ipt - num_mapped_before_noncoastal[Ipt] - 1) = 
+                        vort_term.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
                 }
             }
-
-            /*
-            fprintf( stdout, "Also adding the seed info over land, %zu\n", Nboxrows );
-            land_counter = 0;
-            for (index_sub = 0; index_sub < Npts; ++index_sub) {
-                if (not(mask.at(index_sub))) {
-                    double weight_val = weight_err ? dAreas.at(index_sub) : 1.;
-
-                    row_skip    = Nboxrows*Npts + 0*num_land_points + land_counter;
-                    //RHS_vector.at( row_skip ) = -dPsi_dlon;
-                    RHS_vector.at( row_skip ) = -u_lat_tor_seed[index_sub] * weight_val;
-
-                    row_skip    = Nboxrows*Npts + 1*num_land_points + land_counter;
-                    //RHS_vector.at( row_skip ) = -dPhi_dlon;
-                    RHS_vector.at( row_skip ) = -u_lon_pot_seed[index_sub] * weight_val;
-
-                    row_skip    = Nboxrows*Npts + 2*num_land_points + land_counter;
-                    //RHS_vector.at( row_skip ) = -dPsi_dlat;
-                    RHS_vector.at( row_skip ) = -u_lon_tor_seed[index_sub] * weight_val;
-
-                    row_skip    = Nboxrows*Npts + 3*num_land_points + land_counter;
-                    //RHS_vector.at( row_skip ) = -dPhi_dlat;
-                    RHS_vector.at( row_skip ) = -u_lat_pot_seed[index_sub] * weight_val;
-
-                    land_counter++;
-                }
-            }
-            fprintf( stdout, "%zu land points\n", land_counter );
-            */
-            Eigen::VectorXd RHS = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
 
             //
             //// Now apply the least-squares solver
             //
-            #if DEBUG >= 2
+            #if DEBUG >= 0
             if ( wRank == 0 ) {
-                fprintf(stdout, "Solving the least squares problem for Psi.\n");
+                fprintf(stdout, "Solving the least squares problem.\n");
                 fflush(stdout);
             }
             #endif
-            Eigen::VectorXd F_Eigen = solver.solve( RHS );
-            #if DEBUG >= 2
-            if ( wRank == 0 ) {
-                fprintf( stdout, "    Solver converged after %ld iterations to error %g.\n", 
-                        solver.iterations(), solver.error() );
-                fflush(stdout);
-            }
-            #endif
-            std::vector<double> Psi_vector(F_Eigen.data(), F_Eigen.data() + Npts);
+            alglib::linlsqrsolvesparse(state, LHS_matr, rhs);
+            alglib::linlsqrresults(state, F_alglib, report);
 
-            //
-            //// And repeat for divergence!
-            //
+            #if DEBUG >= 1
+            if      (report.terminationtype == 1) { fprintf(stdout, "Termination type: absolulte tolerance reached.\n"); }
+            else if (report.terminationtype == 4) { fprintf(stdout, "Termination type: relative tolerance reached.\n"); }
+            else if (report.terminationtype == 5) { fprintf(stdout, "Termination type: maximum number of iterations reached.\n"); }
+            else if (report.terminationtype == 7) { fprintf(stdout, "Termination type: round-off errors prevent further progress.\n"); }
+            else if (report.terminationtype == 8) { fprintf(stdout, "Termination type: user requested (?)\n"); }
+            else                                  { fprintf(stdout, "Termination type: unknown\n"); }
+            #endif
+            if      (report.terminationtype == 1) { terminate_count_abs_tol++; }
+            else if (report.terminationtype == 4) { terminate_count_rel_tol++; }
+            else if (report.terminationtype == 5) { terminate_count_max_iter++; }
+            else if (report.terminationtype == 7) { terminate_count_rounding++; }
+            else if (report.terminationtype == 8) { terminate_count_other++; }
+            else                                  { terminate_count_other++; }
+            std::vector<double> Psi_vector(Npts, 0), Phi_vector(Npts, 0);
+
+            F_array = F_alglib.getcontent();
+            for (size_t ii = 0; ii < Npts; ++ii) {
+                if ( ii == 0 ) {continue;}
+                index = pt_maps_to[ii] - num_mapped_before[pt_maps_to[ii]];
+                if ( index == 0 ) { continue; }
+                Psi_vector[ii] = F_array[index-1];
+            }
+
+
+            // Solve for Phi
+            #if DEBUG >= 0
+            if ( wRank == 0 ) {
+                fprintf(stdout, "Preparing solver for Phi.\n");
+                fflush(stdout);
+            }
+            #endif
             std::fill( RHS_vector.begin(), RHS_vector.end(), 0. );
             #pragma omp parallel default(none) \
-            shared( dAreas, RHS_vector, div_term ) \
-            private( index_sub ) firstprivate( weight_err, Npts )
+            shared( dAreas, RHS_vector, u_lon_rem, u_lat_rem, vort_term, div_term, \
+                    num_mapped_before_noncoastal, pt_maps_to ) \
+            private( Ipt ) \
+            firstprivate( weight_err, Npts, Nrow, Tikhov_Laplace )
             {
                 #pragma omp for collapse(1) schedule(static)
-                for (index_sub = 0; index_sub < Npts; ++index_sub) {
-                    RHS_vector.at( index_sub) = div_term.at(index_sub) * ( weight_err ? dAreas.at(index_sub) : 1. );
+                for ( Ipt = 0; Ipt < Npts; ++Ipt) {
+                    if ( pt_maps_to[Ipt] != Ipt ) { continue; }
+                    if (Ipt == 0) {continue;}
+                    RHS_vector.at(Ipt - num_mapped_before_noncoastal[Ipt] - 1) = 
+                        div_term.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
                 }
             }
-            RHS = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
+            #if DEBUG >= 0
+            if ( wRank == 0 ) {
+                fprintf(stdout, "Solving the least squares problem.\n");
+                fflush(stdout);
+            }
+            #endif
+            alglib::linlsqrsolvesparse(state, LHS_matr, rhs);
+            alglib::linlsqrresults(state, F_alglib, report);
 
-            #if DEBUG >= 2
-            if ( wRank == 0 ) {
-                fprintf(stdout, "Solving the least squares problem for Phi.\n");
-                fflush(stdout);
-            }
+            #if DEBUG >= 1
+            if      (report.terminationtype == 1) { fprintf(stdout, "Termination type: absolulte tolerance reached.\n"); }
+            else if (report.terminationtype == 4) { fprintf(stdout, "Termination type: relative tolerance reached.\n"); }
+            else if (report.terminationtype == 5) { fprintf(stdout, "Termination type: maximum number of iterations reached.\n"); }
+            else if (report.terminationtype == 7) { fprintf(stdout, "Termination type: round-off errors prevent further progress.\n"); }
+            else if (report.terminationtype == 8) { fprintf(stdout, "Termination type: user requested (?)\n"); }
+            else                                  { fprintf(stdout, "Termination type: unknown\n"); }
             #endif
-            F_Eigen = solver.solve( RHS );
-            #if DEBUG >= 2
-            if ( wRank == 0 ) {
-                fprintf( stdout, "    Solver converged after %ld iterations to error %g.\n", 
-                        solver.iterations(), solver.error() );
-                fflush(stdout);
+            if      (report.terminationtype == 1) { terminate_count_abs_tol++; }
+            else if (report.terminationtype == 4) { terminate_count_rel_tol++; }
+            else if (report.terminationtype == 5) { terminate_count_max_iter++; }
+            else if (report.terminationtype == 7) { terminate_count_rounding++; }
+            else if (report.terminationtype == 8) { terminate_count_other++; }
+            else                                  { terminate_count_other++; }
+            F_array = F_alglib.getcontent();
+            for (size_t ii = 0; ii < Npts; ++ii) {
+                if ( ii == 0 ) {continue;}
+                index = pt_maps_to[ii] - num_mapped_before[pt_maps_to[ii]];
+                if ( index == 0 ) { continue; }
+                Phi_vector[ii] = F_array[index-1];
             }
-            #endif
-            std::vector<double> Phi_vector(F_Eigen.data(), F_Eigen.data() + Npts);
-            
 
             // Add the seed back in
             for (size_t ii = 0; ii < Npts; ++ii) {

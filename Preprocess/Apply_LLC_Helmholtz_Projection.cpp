@@ -773,6 +773,7 @@ void Apply_LLC_Helmholtz_Projection(
                 }
             }
 
+            /*
             fprintf( stdout, "Also adding the seed info over land, %zu\n", Nboxrows );
             land_counter = 0;
             for (index_sub = 0; index_sub < Npts; ++index_sub) {
@@ -799,6 +800,7 @@ void Apply_LLC_Helmholtz_Projection(
                 }
             }
             fprintf( stdout, "%zu land points\n", land_counter );
+            */
 
             //
             //// Now apply the least-squares solver

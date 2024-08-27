@@ -159,11 +159,14 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
         num_mapped_before[Ipt] = counter;
 
         if ( ( pt_maps_to[Ipt-1] != (Ipt-1) ) and ( all_land_neighbours[Ipt-1] == 1) ) { 
-        //if ( all_land_neighbours[Ipt-1] == 1 ) { 
             noncoastal_counter++; 
         }
         num_mapped_before_noncoastal[Ipt] = noncoastal_counter;
     }
+    fprintf( stdout, "%'zu, %'zu\n", 
+          (Npts-1) - num_mapped_before_noncoastal[Npts-1],
+          (Npts-1) - num_mapped_before[Npts-1]
+          );
 
     // Storage vectors
     std::vector<double> 
@@ -303,7 +306,6 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                 if ( USE_TRUE_2ND_DERIV ) {
                     val  = source_data.adjacency_d2dlon2_weights.at(Ipt).at(Ineighbour);
                     val *= weight_val * pow(cos_lat_inv * R_inv, 2.);
-                    val *= Tikhov_Laplace / deriv_scale_factor;
 
                     column_skip = neighbour_mapped;
                     row_skip    = Ipt_mapped;
@@ -314,7 +316,6 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                         val  =   source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour)
                             * source_data.adjacency_ddlon_weights.at(neighbour_ind).at(D2_ind);
                         val *= weight_val * pow(R_inv, 2.) * cos_lat_inv / cos(latitude.at(neighbour_ind));
-                        val *= Tikhov_Laplace / deriv_scale_factor;
 
                         column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
                         column_skip = pt_maps_to[column_skip];
@@ -334,7 +335,6 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                 if ( USE_TRUE_2ND_DERIV ) {
                     val = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour);
                     val *= weight_val * pow(R_inv, 2.);
-                    val *= Tikhov_Laplace / deriv_scale_factor;
 
                     column_skip = neighbour_mapped;
                     row_skip    = Ipt_mapped;
@@ -345,7 +345,6 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                         val  =   source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour)
                             * source_data.adjacency_ddlat_weights.at(neighbour_ind).at(D2_ind);
                         val *= weight_val * pow(R_inv, 2.);
-                        val *= Tikhov_Laplace / deriv_scale_factor;
 
                         column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
                         column_skip = pt_maps_to[column_skip];
@@ -364,7 +363,6 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                 // First LAT derivative
                 val = - source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour) * tan( latitude.at(Ipt) );
                 val *= weight_val * pow(R_inv, 2.);
-                val *= Tikhov_Laplace / deriv_scale_factor;
 
                 column_skip = neighbour_mapped;
                 row_skip    = Ipt_mapped;
@@ -492,14 +490,14 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
             shared( dAreas, RHS_vector, u_lon_rem, u_lat_rem, vort_term, div_term, \
                     num_mapped_before_noncoastal, pt_maps_to ) \
             private( Ipt ) \
-            firstprivate( weight_err, Npts, Nrow, Tikhov_Laplace, deriv_scale_factor )
+            firstprivate( weight_err, Npts, Nrow )
             {
                 #pragma omp for collapse(1) schedule(static)
                 for ( Ipt = 0; Ipt < Npts; ++Ipt) {
                     if ( pt_maps_to[Ipt] != Ipt ) { continue; }
                     if (Ipt == 0) {continue;}
                     RHS_vector.at(Ipt - num_mapped_before_noncoastal[Ipt] - 1) = 
-                        (Tikhov_Laplace / deriv_scale_factor) * vort_term.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
+                        vort_term.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
                 }
             }
             Eigen::VectorXd RHS = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
@@ -542,14 +540,14 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
             shared( dAreas, RHS_vector, u_lon_rem, u_lat_rem, vort_term, div_term, \
                     num_mapped_before_noncoastal, pt_maps_to ) \
             private( Ipt ) \
-            firstprivate( weight_err, Npts, Nrow, Tikhov_Laplace, deriv_scale_factor )
+            firstprivate( weight_err, Npts, Nrow )
             {
                 #pragma omp for collapse(1) schedule(static)
                 for ( Ipt = 0; Ipt < Npts; ++Ipt) {
                     if ( pt_maps_to[Ipt] != Ipt ) { continue; }
                     if (Ipt == 0) {continue;}
                     RHS_vector.at(Ipt - num_mapped_before_noncoastal[Ipt] - 1) = 
-                        (Tikhov_Laplace / deriv_scale_factor) * div_term.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
+                        div_term.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
                 }
             }
             RHS = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());

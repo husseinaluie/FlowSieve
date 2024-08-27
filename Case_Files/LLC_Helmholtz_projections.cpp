@@ -239,7 +239,8 @@ int main(int argc, char *argv[]) {
     //Apply_LLC_Helmholtz_Projection_Eigen_vels_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
     //Apply_LLC_Helmholtz_Projection_Eigen_both( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
     //Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
-    Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
+    //Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
+    Apply_LLC_Helmholtz_Projection_ALGLIB_PsiPhi_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
             tolerance, max_iterations, use_area_weight, use_mask, Tikhov_Laplace );
 
     // Done!
