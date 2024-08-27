@@ -9,6 +9,8 @@ void initialize_projected_particle_file(
         const std::vector<double> & trajectory,
         std::vector<std::string> & vars,
         const std::string & filename,
+        size_t * my_starts,
+        size_t * my_counts,
         const MPI_Comm comm
         ) {
 
@@ -19,9 +21,6 @@ void initialize_projected_particle_file(
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_CLOBBER | NC_MPIIO;
     int ncid=0, retval;
-    //char buffer [50];
-    //snprintf(buffer, 50, filename.c_str());
-    //retval = nc_create_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
     retval = nc_create_par( filename.c_str(), FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
@@ -53,13 +52,13 @@ void initialize_projected_particle_file(
 
     // Write the coordinate variables
     size_t start[1], count[1];
-    start[0] = 0;
-    count[0] = Ntime;
+    start[0] = my_starts[0];
+    count[0] = my_counts[0];
     retval = nc_put_vara_double(ncid, time_varid, start, count, &time[0]);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
-    start[0] = wRank * Nparts;
-    count[0] = Nparts;
+    start[0] = my_starts[1];
+    count[0] = my_counts[1];
     retval = nc_put_vara_double(ncid, traj_varid, start, count, &trajectory[0]);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
@@ -83,39 +82,6 @@ void initialize_projected_particle_file(
             add_var_to_file(vars.at(varInd), dim_names, ndims, filename );
         }
     }
-
-    /*
-    if ( (wRank == 0) ) {
-        // Loop through and add the desired variables
-        // Dimension names (in order!)
-        const char* correl_dim_names[] = {"trajectory"};
-        add_var_to_file("correl_coarse_KE_Pi", correl_dim_names, 1, buffer);
-        add_var_to_file("correl_coarse_KE_La", correl_dim_names, 1, buffer);
-        add_var_to_file("correl_fine_KE_Pi",   correl_dim_names, 1, buffer);
-        add_var_to_file("correl_fine_KE_La",   correl_dim_names, 1, buffer);
-        add_var_to_file("correl_EN_La",        correl_dim_names, 1, buffer);
-
-        #if DEBUG >= 2
-        add_var_to_file("mean_ddt_cKE", correl_dim_names, 1, buffer);
-        add_var_to_file("mean_ddt_fKE", correl_dim_names, 1, buffer);
-        add_var_to_file("mean_ddt_EN",  correl_dim_names, 1, buffer);
-        add_var_to_file("mean_Pi",      correl_dim_names, 1, buffer);
-        add_var_to_file("mean_Lambda",  correl_dim_names, 1, buffer);
-
-        add_var_to_file("numer_cKE_Pi", correl_dim_names, 1, buffer);
-        add_var_to_file("numer_cKE_La", correl_dim_names, 1, buffer);
-        add_var_to_file("numer_fKE_Pi", correl_dim_names, 1, buffer);
-        add_var_to_file("numer_fKE_La", correl_dim_names, 1, buffer);
-        add_var_to_file("numer_EN_La",  correl_dim_names, 1, buffer);
-
-        add_var_to_file("denom_cKE", correl_dim_names, 1, buffer);
-        add_var_to_file("denom_fKE", correl_dim_names, 1, buffer);
-        add_var_to_file("denom_EN",  correl_dim_names, 1, buffer);
-        add_var_to_file("denom_Pi",  correl_dim_names, 1, buffer);
-        add_var_to_file("denom_La",  correl_dim_names, 1, buffer);
-        #endif
-    }
-    */
 
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }

@@ -224,9 +224,6 @@ int main(int argc, char *argv[]) {
     //// Initialize particle output file
     ////    and write what we have so far
     //
-    if (wRank == 0) { fprintf(stdout, "Initializing output file\n"); fflush(stdout); }
-    initialize_projected_particle_file( particle_time, particle_traj, vars_to_filter, 
-            output_name.c_str());
 
     if (wRank == 0) { fprintf(stdout, "Done projection, outputting partial results.\n"); fflush(stdout); }
     size_t starts[2], counts[2];
@@ -235,6 +232,10 @@ int main(int argc, char *argv[]) {
 
     starts[1] = size_t(myStarts_particles[1]);
     counts[1] = size_t(myCounts_particles[1]);
+
+    if (wRank == 0) { fprintf(stdout, "Initializing output file\n"); fflush(stdout); }
+    initialize_projected_particle_file( particle_time, particle_traj, vars_to_filter, 
+            output_name.c_str(), starts, counts);
 
     MPI_Barrier(MPI_COMM_WORLD);
 
