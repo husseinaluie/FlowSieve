@@ -49,11 +49,14 @@ void add_var_to_file(
 
     // Add the fill value
     const double fill_value = constants::fill_value;
+    const double fill_value_double = constants::fill_value_double;
     const signed short fill_value_s = constants::fill_value_s;
     if (constants::CAST_TO_INT) {
         retval = nc_put_att_short( ncid, var_id, "_FillValue", datatype, 1, &fill_value_s);
-    } else {
+    } else if (constants::CAST_TO_SINGLE) {
         retval = nc_put_att_double(ncid, var_id, "_FillValue", datatype, 1, &fill_value);
+    } else {
+        retval = nc_put_att_double(ncid, var_id, "_FillValue", datatype, 1, &fill_value_double);
     }
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
