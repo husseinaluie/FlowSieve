@@ -11,6 +11,7 @@ void initialize_output_file(
         //const char * filename,
         const std::string filename,
         const double filter_scale,
+        const int GridType,
         const MPI_Comm comm
         ) {
 
@@ -76,12 +77,12 @@ void initialize_output_file(
     retval = nc_def_dim(ncid, "depth",     Ndepth,    &depth_dimid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     
-    if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+    if ( GridType == constants::GridType::MeshGrid ) {
         retval = nc_def_dim(ncid, "latitude",  Nlat,      &lat_dimid);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
         retval = nc_def_dim(ncid, "longitude", Nlon,      &lon_dimid);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    } else if ( constants::GRID_TYPE == constants::GridType::LLC ) {
+    } else if ( GridType == constants::GridType::LLC ) {
         retval = nc_def_dim(ncid, "latlon",  Nlat,      &lat_dimid);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
         lon_dimid = lat_dimid;
@@ -137,7 +138,7 @@ void initialize_output_file(
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Write the cell areas for convenience
-    if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+    if ( GridType == constants::GridType::MeshGrid ) {
         #if DEBUG>=2
         if (wRank == 0) { fprintf(stdout, "    Write the cell areas\n"); }
         #endif
@@ -176,9 +177,9 @@ void initialize_output_file(
         const int ndims_MeshGrid = 4;
         const int ndims_LLC      = 3;
         for (size_t varInd = 0; varInd < vars.size(); ++varInd) {
-            if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+            if ( GridType == constants::GridType::MeshGrid ) {
                 add_var_to_file( vars.at(varInd), dim_names_MeshGrid, ndims_MeshGrid, filename );
-            } else if ( constants::GRID_TYPE == constants::GridType::LLC ) {
+            } else if ( GridType == constants::GridType::LLC ) {
                 add_var_to_file( vars.at(varInd), dim_names_LLC, ndims_LLC, filename );
             }
         }

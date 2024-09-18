@@ -82,6 +82,7 @@ void initialize_output_file(
         const std::string filename,
         //const char * filename,
         const double filter_scale = -1,
+        const int GridType = constants::GRID_TYPE,
         MPI_Comm = MPI_COMM_WORLD
         );
 
@@ -166,6 +167,8 @@ void initialize_projected_particle_file(
         const std::vector<double> & trajectory,
         std::vector<std::string> & vars,
         const std::string & filename,
+        size_t * starts,
+        size_t * counts,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
