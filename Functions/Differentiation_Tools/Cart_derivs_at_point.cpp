@@ -21,10 +21,12 @@ void Cart_derivatives_at_point(
         const bool include_depth_derivs
         ) {
 
+    /*
     const int   Ntime   = source_data.Ntime,    // this is the MPI-local Ntime, not the full Ntime
                 Ndepth  = include_depth_derivs ? source_data.full_Ndepth : source_data.Ndepth,   
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
+    */
 
     const std::vector<double>   &depth      = source_data.depth,
                                 &latitude   = source_data.latitude,

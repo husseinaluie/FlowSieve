@@ -32,15 +32,7 @@ void compute_KE_spectra_and_slopes(
         const double filter_scale
         ) {
 
-    // Get dimension sizes
-    const int   Ntime   = source_data.Ntime,    // this is the MPI-local Ntime, not the full Ntime
-                Ndepth  = source_data.Ndepth,   // this is the MPI-local Ndepth, not the full Ndepth
-                Nlat    = source_data.Nlat,
-                Nlon    = source_data.Nlon;
-
     // Create some tidy names for variables
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude;
     const std::vector<bool> &mask = source_data.mask;
 
     const size_t num_pts = u_lon_tot.size();
