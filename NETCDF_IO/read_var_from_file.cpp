@@ -246,7 +246,7 @@ void read_var_from_file(
     // Apply scale factor if appropriate
     double scale = 1.;
     retval = nc_get_att_double(ncid, var_id, "scale_factor", &scale);
-    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    //if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  scale factor = %'g\n", scale); }
     #endif
@@ -254,7 +254,7 @@ void read_var_from_file(
     // Apply offset if appropriate
     double offset = 0.;
     retval = nc_get_att_double(ncid, var_id, "add_offset", &offset);
-    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    //if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  additive offset = %'g\n", offset); }
     #endif
