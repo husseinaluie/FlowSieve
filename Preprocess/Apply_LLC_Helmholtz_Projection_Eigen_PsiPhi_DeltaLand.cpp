@@ -10,6 +10,7 @@
 #include <math.h>
 //#include <eigen3/Eigen/Sparse>
 //#include <eigen3/Eigen/IterativeLinearSolvers>
+//#include "/opt/apps/gcc13/eigen/3.4.0/include/eigen3/unsupported/Eigen/IterativeSolvers"
 #include <Eigen/Sparse>
 #include <Eigen/IterativeLinearSolvers>
 
@@ -39,7 +40,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                                 &longitude  = source_data.longitude,
                                 &dAreas     = source_data.areas;
 
-    const std::vector<bool> &mask = (constants::FILTER_OVER_LAND) ? source_data.reference_mask : source_data.mask;
+    const std::vector<short int> &mask = (constants::FILTER_OVER_LAND) ? source_data.reference_mask : source_data.mask;
 
     const std::vector<int>  &myCounts = source_data.myCounts,
                             &myStarts = source_data.myStarts;
@@ -51,7 +52,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
     //   we'll treat land values as zero velocity
     //   We do this because including land seems
     //   to introduce strong numerical issues
-    const std::vector<bool> unmask(mask.size(), true);
+    const std::vector<short int> unmask(mask.size(), true);
 
     const int   Ntime   = myCounts.at(0),
                 Ndepth  = myCounts.at(1);
@@ -148,24 +149,28 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
           num_mapped_points+num_mapped_onto, num_mapped_onto, num_coastal );
     const size_t Npts_mapped = Npts - num_mapped_points,
           Ncol = Npts - num_mapped_points - 1,
-          Nrow = Npts - (num_mapped_points+num_mapped_onto) + num_coastal - ( 1 - all_land_neighbours[0] );
+          Nrow = Npts - (num_mapped_points+num_mapped_onto) + num_coastal;
+          //Nrow = Npts - (num_mapped_points+num_mapped_onto) + num_coastal - ( 1 - all_land_neighbours[0] );
 
 
-    std::vector<size_t> num_mapped_before( Npts, 0 );
-    std::vector<size_t> num_mapped_before_noncoastal( Npts, 0 );
-    size_t counter = 0, noncoastal_counter = 0;
+    std::vector<size_t> num_mapped_before_col( Npts, 0 ), num_mapped_before_row( Npts, 0 );
+    size_t col_counter = 1, // throw away first column, since we're forcing it to zero 
+           row_counter = 0; // still imposing conditions at all coastal and water points
     for (Ipt = 1; Ipt < Npts; Ipt++) {
-        if ( pt_maps_to[Ipt-1] != (Ipt-1) ) { counter++; }
-        num_mapped_before[Ipt] = counter;
-
-        if ( ( pt_maps_to[Ipt-1] != (Ipt-1) ) and ( all_land_neighbours[Ipt-1] == 1) ) { 
-            noncoastal_counter++; 
+        if ( pt_maps_to[Ipt-1] != (Ipt-1) ) { 
+            col_counter++; 
         }
-        num_mapped_before_noncoastal[Ipt] = noncoastal_counter;
+        if ( (pt_maps_to[Ipt-1] != (Ipt-1) ) or (Ipt-1 == 0) ) { 
+            if ( all_land_neighbours[Ipt-1] == 1) { 
+                row_counter++; 
+            }
+        }
+        num_mapped_before_col[Ipt] = col_counter;
+        num_mapped_before_row[Ipt] = row_counter;
     }
     fprintf( stdout, "%'zu, %'zu\n", 
-          (Npts-1) - num_mapped_before_noncoastal[Npts-1],
-          (Npts-1) - num_mapped_before[Npts-1]
+          (Npts-1) - num_mapped_before_row[Npts-1],
+          (Npts-1) - num_mapped_before_col[Npts-1]
           );
 
     // Storage vectors
@@ -246,7 +251,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
     #endif
 
     double val;
-    size_t column_skip, row_skip, land_counter = 0;
+    size_t column_skip, row_skip, counter;
 
     const bool USE_TRUE_2ND_DERIV = false;
     double *F_array;
@@ -261,7 +266,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
     bool is_pole;
     #pragma omp parallel default(none) \
     shared( mask, dAreas, latitude, source_data, Aij_triplets, \
-            pt_maps_to, num_mapped_before, num_mapped_before_noncoastal, all_land_neighbours ) \
+            pt_maps_to, num_mapped_before_col, num_mapped_before_row, all_land_neighbours ) \
     private( Ipt, Ineighbour, neighbour_ind, Itriplet, row_skip, column_skip, is_pole, val, \
              weight_val, cos_lat_inv, R_inv, rand_val, counter, \
              Ipt_mapped, neighbour_mapped ) \
@@ -271,31 +276,44 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
         #pragma omp for collapse(1) schedule(static)
         for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
 
-            if ( Ipt == 0 ) { continue; } // Force to zero at corner
-            //if ( ( pt_maps_to[Ipt] != Ipt ) and (all_land_neighbours[Ipt] == 1) ) { continue; } // Skip points that were mapped
-            if ( all_land_neighbours[Ipt] == 1 ) { continue; } // Skip points that were mapped
+            // Skip rows that are non-coastal land
+            if (     ( ( pt_maps_to[Ipt] != Ipt ) or (Ipt == 0) ) 
+                 and (all_land_neighbours[Ipt] == 1) 
+               ) { continue; } 
 
-            weight_val = weight_err ? dAreas.at(Ipt) : 1.;
+            weight_val = weight_err ? sqrt(dAreas.at(Ipt)) : 1.;
             cos_lat_inv = 1. / cos(latitude.at(Ipt));
             R_inv = 1. / constants::R_earth;
 
+            // get row index under land mapping
+            Ipt_mapped = Ipt - num_mapped_before_row[Ipt]; // coast included in rows
+            if ( Ipt_mapped == 0 ) {
+                fprintf( stdout, "Point %zu mapped to row zero.\n", Ipt );
+            }
+            if ( ( Ipt_mapped < 0 ) or (Ipt_mapped > Nrow) ) { 
+                fprintf( stdout, "BAD POINT! %'zu - %'zu - 1 |-> %'zu\n", Ipt, num_mapped_before_row[Ipt], Ipt_mapped );
+                assert(false);
+            }
+
             for ( Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
 
+                // get column index under land mapping
                 neighbour_ind = (Ineighbour < num_neighbours) ? 
-                                        source_data.adjacency_indices.at(Ipt).at(Ineighbour) :
-                                        Ipt;
+                                    source_data.adjacency_indices.at(Ipt).at(Ineighbour) :
+                                    Ipt;
+                /*
                 neighbour_ind = pt_maps_to[neighbour_ind]; // convert to mapped coordinated
-                if ( neighbour_ind == 0 ) { continue; } // zero is mapped to zero
-                neighbour_mapped = neighbour_ind - num_mapped_before[neighbour_ind]; // all land removed from columns
-                Ipt_mapped = Ipt - num_mapped_before_noncoastal[Ipt]; // coast included in rows
-                neighbour_mapped--; // removal of zero
-                Ipt_mapped--;       // removal of zero
-                if ( ( Ipt_mapped < 0 ) or (Ipt_mapped > Nrow) ) { 
-                    fprintf( stdout, "BAD POINT! %'zu - %'zu - 1 |-> %'zu\n", Ipt, num_mapped_before_noncoastal[Ipt], Ipt_mapped );
-                    assert(false);
+                if ( neighbour_ind == 0 ) { continue; } // zero-index is mapped to zero-value, so has no contribution
+                neighbour_mapped = neighbour_ind - num_mapped_before_col[neighbour_ind];
+                */
+                neighbour_mapped = pt_maps_to[neighbour_ind]; // convert to mapped coordinated
+                if ( USE_TRUE_2ND_DERIV and (neighbour_mapped == 0) ) { continue; } // zero-index is mapped to zero-value, so has no contribution
+                if (neighbour_mapped != 0) {
+                    neighbour_mapped = neighbour_mapped - num_mapped_before_col[neighbour_mapped];
                 }
+
                 if ( ( neighbour_mapped < 0 ) or (neighbour_mapped > Ncol) ) { 
-                    fprintf( stdout, "BAD Neighbour! %'zu - %'zu - 1 |-> %'zu\n", neighbour_ind, num_mapped_before[neighbour_ind], neighbour_mapped );
+                    fprintf( stdout, "BAD Neighbour! %'zu - %'zu - 1 |-> %'zu\n", neighbour_ind, num_mapped_before_col[neighbour_ind], neighbour_mapped );
                     assert(false);
                 }
 
@@ -320,7 +338,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                         column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
                         column_skip = pt_maps_to[column_skip];
                         if (column_skip == 0) {continue;}
-                        column_skip = column_skip - num_mapped_before[column_skip] - 1;
+                        column_skip = column_skip - num_mapped_before_col[column_skip];
                         row_skip    = Ipt_mapped;
                         assert( (row_skip >= 0) );
                         assert( (row_skip < Nrow) );
@@ -349,7 +367,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                         column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
                         column_skip = pt_maps_to[column_skip];
                         if (column_skip == 0) {continue;}
-                        column_skip = column_skip - num_mapped_before[column_skip] - 1;
+                        column_skip = column_skip - num_mapped_before_col[column_skip];
                         row_skip    = Ipt_mapped;
                         assert( (row_skip >= 0) );
                         assert( (row_skip < Nrow) );
@@ -365,6 +383,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                 val *= weight_val * pow(R_inv, 2.);
 
                 column_skip = neighbour_mapped;
+                if (column_skip == 0) {continue;}
                 row_skip    = Ipt_mapped;
                 assert( (row_skip >= 0) );
                 assert( (row_skip < Nrow) );
@@ -379,16 +398,59 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
     Eigen::SparseMatrix<double> LHS_matr( Nrow, Ncol );
     fprintf( stdout, "%'zu, %'zu\n", Nrow, Ncol );
     LHS_matr.setFromTriplets( Aij_triplets.begin(), Aij_triplets.end() );
+    LHS_matr.makeCompressed();
+
+    // Normalize the columns of LHS
+    std::vector<double> col_norms(Ncol,0), row_norms(Nrow,0);
+    size_t col = 0, row = 0;
+    for ( int k = 0; k < LHS_matr.outerSize(); ++k ) {
+        for ( Eigen::SparseMatrix<double>::InnerIterator it(LHS_matr,k); it; ++it ) {
+            val = it.value();
+
+            row = it.row();   // row index
+            row_norms[row] += pow(val,2) / Nrow;
+
+            col = it.col();   // col index (here it is equal to k)
+            col_norms[col] += pow(val,2) / Nrow;
+        }
+    }
+    double min_row_norm = sqrt(row_norms[0]), max_row_norm = 0,
+           min_col_norm = sqrt(col_norms[0]), max_col_norm;
+    for ( row = 0; row < Nrow; row++ ) {
+        row_norms[row] = sqrt(row_norms[row]);
+        if ( row_norms[row] == 0 ) {
+            fprintf( stdout, "!! Row %zu has zero norm!!\n", row );
+        }
+        min_row_norm = std::fmin( min_row_norm, row_norms[row] );
+        max_row_norm = std::fmax( max_row_norm, row_norms[row] );
+    }
+    for ( col = 0; col < Ncol; col++ ) {
+        col_norms[col] = sqrt(col_norms[col]);
+        min_col_norm = std::fmin( min_col_norm, col_norms[col] );
+        max_col_norm = std::fmax( max_col_norm, col_norms[col] );
+    }
+    for ( int k = 0; k < LHS_matr.outerSize(); ++k ) {
+        for ( Eigen::SparseMatrix<double>::InnerIterator it(LHS_matr,k); it; ++it ) {
+            val = it.value();
+            row = it.row();   // row index
+            col = it.col();   // col index (here it is equal to k)
+            //it.index(); // inner index, here it is equal to it.row()
+            LHS_matr.coeffRef(row,col) = val / col_norms[col];
+        }
+    }
 
     #if DEBUG >= 1
     if (wRank == 0) {
         fprintf(stdout, "Declaring the least squares problem and computing.\n");
+        fprintf(stdout, "Column norms were bounded between %'e and %'e.\n", min_col_norm, max_col_norm);
+        fprintf(stdout, "Row norms were bounded between %'e and %'e.\n", min_row_norm, max_row_norm);
         fflush(stdout);
     }
     #endif
 
-    LHS_matr.makeCompressed();
+    //Eigen::GMRES< Eigen::SparseMatrix<double> > solver;
     Eigen::LeastSquaresConjugateGradient< Eigen::SparseMatrix<double> > solver;
+    //Eigen::LeastSquaresConjugateGradient< Eigen::SparseMatrix<double>, Eigen::IncompleteLUT<Eigen::SparseMatrix<double> > > solver;
     solver.setMaxIterations(max_iters);
     solver.setTolerance(rel_tol);
     //Eigen::SparseLU< Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int> > solver;
@@ -407,6 +469,8 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
         fprintf( stderr, "Eigen decomposition failed in an unknown way.\n" );
         return;
     }
+
+    std::vector<double> Psi_residual(Npts, 0), Phi_residual(Npts, 0);
 
     // Counters to track termination types
     int terminate_count_abs_tol = 0,
@@ -488,7 +552,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
             std::fill( RHS_vector.begin(), RHS_vector.end(), 0. );
             #pragma omp parallel default(none) \
             shared( dAreas, RHS_vector, u_lon_rem, u_lat_rem, vort_term, div_term, \
-                    num_mapped_before_noncoastal, pt_maps_to ) \
+                    num_mapped_before_row, pt_maps_to ) \
             private( Ipt ) \
             firstprivate( weight_err, Npts, Nrow )
             {
@@ -496,11 +560,12 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                 for ( Ipt = 0; Ipt < Npts; ++Ipt) {
                     if ( pt_maps_to[Ipt] != Ipt ) { continue; }
                     if (Ipt == 0) {continue;}
-                    RHS_vector.at(Ipt - num_mapped_before_noncoastal[Ipt] - 1) = 
-                        vort_term.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
+                    RHS_vector.at(Ipt - num_mapped_before_row[Ipt]) = 
+                        vort_term.at(Ipt) * ( weight_err ? sqrt(dAreas.at(Ipt)) : 1. );
                 }
             }
             Eigen::VectorXd RHS = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
+            Eigen::VectorXd residual;
 
             //
             //// Now apply the least-squares solver
@@ -512,6 +577,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
             }
             #endif
             Eigen::VectorXd F_Eigen = solver.solve( RHS );
+            residual = LHS_matr * F_Eigen;
             #if DEBUG >= 0
             if ( wRank == 0 ) {
                 fprintf( stdout, "    Solver converged after %ld iterations to error %g.\n", 
@@ -519,12 +585,35 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                 fflush(stdout);
             }
             #endif
+
+            double Psi_res_int = 0, Psi_ref_int = 0;
+            for (size_t ii = 0; ii < Nrow; ++ii) {
+                Psi_res_int += pow(RHS[ii] - residual[ii], 2.);
+                Psi_ref_int += pow(RHS[ii], 2.);
+            }
+            fprintf( stdout, "Internal vorticity  residual: %e / %e = %e\n", sqrt(Psi_res_int), sqrt(Psi_ref_int), sqrt(Psi_res_int/Psi_ref_int) );
+
             std::vector<double> Psi_vector(Npts, 0), Phi_vector(Npts, 0);
             for (size_t ii = 0; ii < Npts; ++ii) {
                 if ( ii == 0 ) {continue;}
-                index = pt_maps_to[ii] - num_mapped_before[pt_maps_to[ii]];
-                if ( index == 0 ) { continue; }
-                Psi_vector[ii] = F_Eigen[index-1];
+
+                // len(F_eigen) = Ncol
+                index = pt_maps_to[ii] - num_mapped_before_col[pt_maps_to[ii]];
+                if ( index > 0 ) { 
+                    Psi_vector[ii] = F_Eigen[index] / col_norms[index];
+                }
+
+                if ( ( pt_maps_to[ii] != ii ) and ( all_land_neighbours[ii] == 1) ) { 
+                    // This point does not exist in either RHS or residual
+                    Psi_residual[ii] = 0;
+                } else if ( index > 0 ) {
+                    // len(RHS) = len(residual) = Nrow
+                    //index = pt_maps_to[ii] - num_mapped_before_row[pt_maps_to[ii]];
+                    index = ii - num_mapped_before_row[ii];
+                    //Psi_residual[ii] =    RHS[index-1+all_land_neighbours[0]] 
+                    //                    - residual[index-1+all_land_neighbours[0]];
+                    Psi_residual[ii] = residual[index];
+                }
             }
 
 
@@ -538,7 +627,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
             std::fill( RHS_vector.begin(), RHS_vector.end(), 0. );
             #pragma omp parallel default(none) \
             shared( dAreas, RHS_vector, u_lon_rem, u_lat_rem, vort_term, div_term, \
-                    num_mapped_before_noncoastal, pt_maps_to ) \
+                    num_mapped_before_row, pt_maps_to ) \
             private( Ipt ) \
             firstprivate( weight_err, Npts, Nrow )
             {
@@ -546,8 +635,8 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                 for ( Ipt = 0; Ipt < Npts; ++Ipt) {
                     if ( pt_maps_to[Ipt] != Ipt ) { continue; }
                     if (Ipt == 0) {continue;}
-                    RHS_vector.at(Ipt - num_mapped_before_noncoastal[Ipt] - 1) = 
-                        div_term.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
+                    RHS_vector.at(Ipt - num_mapped_before_row[Ipt]) = 
+                        div_term.at(Ipt) * ( weight_err ? sqrt(dAreas.at(Ipt)) : 1. );
                 }
             }
             RHS = Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>(RHS_vector.data(), RHS_vector.size());
@@ -558,6 +647,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
             }
             #endif
             F_Eigen = solver.solve( RHS );
+            residual = LHS_matr * F_Eigen;
             #if DEBUG >= 0
             if ( wRank == 0 ) {
                 fprintf( stdout, "    Solver converged after %ld iterations to error %g.\n", 
@@ -565,11 +655,33 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
                 fflush(stdout);
             }
             #endif
+            double Phi_res_int = 0, Phi_ref_int = 0;
+            for (size_t ii = 0; ii < Nrow; ++ii) {
+                Phi_res_int += pow(RHS[ii] - residual[ii], 2.);
+                Phi_ref_int += pow(RHS[ii], 2.);
+            }
+            fprintf( stdout, "Internal divergence residual: %e / %e = %e\n", sqrt(Phi_res_int), sqrt(Phi_ref_int), sqrt(Phi_res_int/Phi_ref_int) );
+
             for (size_t ii = 0; ii < Npts; ++ii) {
                 if ( ii == 0 ) {continue;}
-                index = pt_maps_to[ii] - num_mapped_before[pt_maps_to[ii]];
-                if ( index == 0 ) { continue; }
-                Phi_vector[ii] = F_Eigen[index-1];
+
+                // len(F_eigen) = Ncol
+                index = pt_maps_to[ii] - num_mapped_before_col[pt_maps_to[ii]];
+                if ( index > 0 ) { 
+                    Phi_vector[ii] = F_Eigen[index] / col_norms[index];
+                }
+
+                if ( ( pt_maps_to[ii] != ii ) and ( all_land_neighbours[ii] == 1) ) { 
+                    // This point does not exist in either RHS or residual
+                    Phi_residual[ii] = 0;
+                } else if ( index > 0 ) {
+                    // len(RHS) = len(residual) = Nrow
+                    //index = pt_maps_to[ii] - num_mapped_before_row[pt_maps_to[ii]];
+                    index = ii - num_mapped_before_row[ii];
+                    //Phi_residual[ii] =    RHS[index-1+all_land_neighbours[0]] 
+                    //                    - residual[index-1+all_land_neighbours[0]];
+                    Phi_residual[ii] = residual[index];
+                }
             }
 
             // Add the seed back in
@@ -702,6 +814,9 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
 
         vars_to_write.push_back("proj_vorticity");
         vars_to_write.push_back("proj_divergence");
+
+        vars_to_write.push_back("residual_vorticity");
+        vars_to_write.push_back("residual_divergence");
     }
 
     vars_to_write.push_back("Psi");
@@ -724,6 +839,9 @@ void Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand(
 
         write_field_to_output(vort_term,  "proj_vorticity",  starts, counts, output_fname.c_str(), &unmask);
         write_field_to_output(div_term,   "proj_divergence", starts, counts, output_fname.c_str(), &unmask);
+
+        write_field_to_output(Psi_residual,  "residual_vorticity",  starts, counts, output_fname.c_str(), &unmask);
+        write_field_to_output(Phi_residual,  "residual_divergence", starts, counts, output_fname.c_str(), &unmask);
     }
 
     write_field_to_output(full_Psi, "Psi", starts, counts, output_fname.c_str(), &unmask);

@@ -8,8 +8,6 @@
 #include <deque>
 #include <omp.h>
 #include <math.h>
-//#include <eigen3/Eigen/Sparse>
-//#include <eigen3/Eigen/IterativeLinearSolvers>
 #include <Eigen/Sparse>
 #include <Eigen/IterativeLinearSolvers>
 
@@ -39,7 +37,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
                                 &longitude  = source_data.longitude,
                                 &dAreas     = source_data.areas;
 
-    const std::vector<bool> &mask = (constants::FILTER_OVER_LAND) ? source_data.reference_mask : source_data.mask;
+    const std::vector<short int> &mask = (constants::FILTER_OVER_LAND) ? source_data.reference_mask : source_data.mask;
 
     const std::vector<int>  &myCounts = source_data.myCounts,
                             &myStarts = source_data.myStarts;
@@ -51,7 +49,7 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
     //   we'll treat land values as zero velocity
     //   We do this because including land seems
     //   to introduce strong numerical issues
-    const std::vector<bool> unmask(mask.size(), true);
+    const std::vector<short int> unmask(mask.size(), true);
 
     const int   Ntime   = myCounts.at(0),
                 Ndepth  = myCounts.at(1);
@@ -148,23 +146,28 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
             num_mapped_points+num_mapped_onto, num_mapped_onto, num_coastal );
     const size_t Npts_mapped = Npts - num_mapped_points,
           Ncol = Npts - num_mapped_points - 1,
-          Nrow = Npts - (num_mapped_points+num_mapped_onto) + num_coastal - ( 1 - all_land_neighbours[0] );
+          Nrow = Npts - (num_mapped_points+num_mapped_onto) + num_coastal;
 
-    std::vector<size_t> num_mapped_before( Npts, 0 );
-    std::vector<size_t> num_mapped_before_noncoastal( Npts, 0 );
-    size_t counter = 0, noncoastal_counter = 0;
+    std::vector<size_t> num_mapped_before_col( Npts, 0 ), num_mapped_before_row( Npts, 0 );
+    size_t col_counter = 1, 
+           row_counter = 0;
     for (Ipt = 1; Ipt < Npts; Ipt++) {
-        if ( pt_maps_to[Ipt-1] != (Ipt-1) ) { counter++; }
-        num_mapped_before[Ipt] = counter;
-
-        if ( ( pt_maps_to[Ipt-1] != (Ipt-1) ) and ( all_land_neighbours[Ipt-1] == 1) ) { 
-            noncoastal_counter++; 
+        if ( pt_maps_to[Ipt-1] != (Ipt-1) ) {
+            col_counter++; 
         }
-        num_mapped_before_noncoastal[Ipt] = noncoastal_counter;
+
+        if ( (pt_maps_to[Ipt-1] != (Ipt-1) ) or (Ipt-1 == 0) ) { 
+            if ( all_land_neighbours[Ipt-1] == 1) { 
+                row_counter++; 
+            }
+        }
+
+        num_mapped_before_col[Ipt] = col_counter;
+        num_mapped_before_row[Ipt] = row_counter;
     }
     fprintf( stdout, "%'zu, %'zu\n", 
-            (Npts-1) - num_mapped_before_noncoastal[Npts-1],
-            (Npts-1) - num_mapped_before[Npts-1]
+            (Npts-1) - num_mapped_before_row[Npts-1],
+            (Npts-1) - num_mapped_before_col[Npts-1]
            );
 
     // Storage vectors
@@ -245,25 +248,26 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
     #endif
 
     double val;
-    size_t column_skip, row_skip, land_counter = 0;
+    size_t column_skip, row_skip, counter = 0;
 
-    const bool USE_TRUE_2ND_DERIV = false;
+    const bool USE_TRUE_2ND_DERIV = true;
     double *F_array;
     typedef Eigen::Triplet<double> T;
     const int pts_per_1st_deriv = (constants::ADJACENCY_SIZE + 1),
               pts_per_2nd_deriv = pow(constants::ADJACENCY_SIZE + 1, USE_TRUE_2ND_DERIV ? 1 : 2);
     std::vector<T> Aij_triplets( 
-            2 * Nrow * ( 2 * pts_per_1st_deriv + 2 * pts_per_2nd_deriv + pts_per_1st_deriv),
+            //2 * Nrow * ( 2 * pts_per_1st_deriv + 2 * pts_per_2nd_deriv + pts_per_1st_deriv),
+            Nrow * ( 6 * pts_per_1st_deriv + 4 * pts_per_2nd_deriv ),
             T(0,0,0) );
     size_t Itriplet, Ipt_mapped, neighbour_mapped;
     double weight_val, cos_lat_inv, R_inv, rand_val;
-    bool is_pole;
+    bool is_pole, neighbour_is_zero;
     #pragma omp parallel default(none) \
     shared( mask, dAreas, latitude, source_data, Aij_triplets, \
-            pt_maps_to, num_mapped_before, num_mapped_before_noncoastal, all_land_neighbours ) \
+            pt_maps_to, num_mapped_before_row, num_mapped_before_col, all_land_neighbours ) \
     private( Ipt, Ineighbour, neighbour_ind, Itriplet, row_skip, column_skip, is_pole, val, \
              weight_val, cos_lat_inv, R_inv, rand_val, counter, \
-             Ipt_mapped, neighbour_mapped ) \
+             Ipt_mapped, neighbour_mapped, neighbour_is_zero ) \
     firstprivate( Npts, Nrow, Ncol, weight_err, num_neighbours, Tikhov_Laplace, \
                   stdout, pts_per_1st_deriv, Npts_mapped, deriv_scale_factor )
     { 
@@ -278,81 +282,92 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
             cos_lat_inv = 1. / cos(latitude.at(Ipt));
             R_inv = 1. / constants::R_earth;
 
+            // get row index under land mapping
+            Ipt_mapped = Ipt - num_mapped_before_row[Ipt]; // coast included in rows
+            if ( Ipt_mapped == 0 ) {
+                fprintf( stdout, "Point %zu mapped to row zero.\n", Ipt );
+            }
+            if ( ( Ipt_mapped < 0 ) or (Ipt_mapped > Nrow) ) { 
+                fprintf( stdout, "BAD POINT! %'zu - %'zu - 1 |-> %'zu\n", Ipt, num_mapped_before_row[Ipt], Ipt_mapped );
+                assert(false);
+            }
+
             for ( Ineighbour = 0; Ineighbour < num_neighbours + 1; Ineighbour++ ) {
 
                 neighbour_ind = (Ineighbour < num_neighbours) ? 
                                         source_data.adjacency_indices.at(Ipt).at(Ineighbour) :
                                         Ipt;
-                neighbour_ind = pt_maps_to[neighbour_ind]; // convert to mapped coordinated
-                if ( neighbour_ind == 0 ) { continue; } // zero is mapped to zero
-                neighbour_mapped = neighbour_ind - num_mapped_before[neighbour_ind]; // all land removed from columns
-                Ipt_mapped = Ipt - num_mapped_before_noncoastal[Ipt]; // coast included in rows
-                neighbour_mapped--; // removal of zero
-                Ipt_mapped--;       // removal of zero
-                if ( ( Ipt_mapped < 0 ) or (Ipt_mapped > Nrow) ) { 
-                    fprintf( stdout, "BAD POINT! %'zu -> %'zu\n", Ipt, Ipt_mapped );
-                    assert(false);
+                neighbour_mapped = pt_maps_to[neighbour_ind]; // convert to mapped coordinated
+                if ( neighbour_mapped != 0 ) { 
+                    neighbour_mapped = neighbour_mapped - num_mapped_before_col[neighbour_mapped]; // all land removed from columns
+                    neighbour_is_zero = false;
+                } else {
+                    neighbour_is_zero = true;
                 }
                 if ( ( neighbour_mapped < 0 ) or (neighbour_mapped > Ncol) ) { 
-                    fprintf( stdout, "BAD Neighbour! %'zu - %'zu - 1 |-> %'zu\n", neighbour_ind, num_mapped_before[neighbour_ind], neighbour_mapped );
+                    fprintf( stdout, "BAD Neighbour! %'zu - %'zu - 1 |-> %'zu\n", neighbour_ind, num_mapped_before_col[neighbour_ind], neighbour_mapped );
                     assert(false);
                 }
 
                 is_pole = std::fabs( std::fabs( latitude.at(Ipt) * 180.0 / M_PI ) - 90 ) < 1e-6;
                 if ( is_pole ) { fprintf(stdout, "SKIPPING POLE POINT!\n"); continue; }
 
-                // LON first derivative
+                // Hard-setting Psi[Ipt = 0] = 0, so it has no contribution to the LHS
+                if ( not(neighbour_is_zero) ) {
+                    // LON first derivative
+                    val  = source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour);
+                    val *= weight_val * cos_lat_inv * R_inv;
 
-                val  = source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour);
-                val *= weight_val * cos_lat_inv * R_inv;
+                    // Psi part (of u_lat)
+                    column_skip = 0 * Ncol + neighbour_mapped;
+                    row_skip    = 1 * Nrow + Ipt_mapped;
+                    Itriplet = Ipt_mapped * pts_per_1st_deriv + Ineighbour;
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
 
-                // Psi part (of u_lat)
-                column_skip = 0 * Ncol + neighbour_mapped;
-                row_skip    = 1 * Nrow + Ipt_mapped;
-                Itriplet = Ipt_mapped * pts_per_1st_deriv + Ineighbour;
-                Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
-
-                // Phi part (of u_lon)
-                column_skip = 1 * Ncol + neighbour_mapped;
-                row_skip    = 0 * Nrow + Ipt_mapped;
-                Itriplet = (2*Nrow + Ipt_mapped) * pts_per_1st_deriv + Ineighbour;
-                Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                    // Phi part (of u_lon)
+                    column_skip = 1 * Ncol + neighbour_mapped;
+                    row_skip    = 0 * Nrow + Ipt_mapped;
+                    Itriplet = (2*Nrow + Ipt_mapped) * pts_per_1st_deriv + Ineighbour;
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
 
 
-                // LAT first derivative
+                    // LAT first derivative
+                    val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
+                    val *= weight_val * R_inv;
 
-                val  = source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour);
-                val *= weight_val * R_inv;
+                    // Psi part (of u_lon)
+                    column_skip = 0 * Ncol + neighbour_mapped;
+                    row_skip    = 0 * Nrow + Ipt_mapped;
+                    Itriplet = (Nrow + Ipt_mapped) * pts_per_1st_deriv + Ineighbour;
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, -val );
 
-                // Psi part (of u_lon)
-                column_skip = 0 * Ncol + neighbour_mapped;
-                row_skip    = 0 * Nrow + Ipt_mapped;
-                Itriplet = (Nrow + Ipt_mapped) * pts_per_1st_deriv + Ineighbour;
-                Aij_triplets[Itriplet] = T( row_skip, column_skip, -val );
+                    // Phi part (of u_lat)
+                    column_skip = 1 * Ncol + neighbour_mapped;
+                    row_skip    = 1 * Nrow + Ipt_mapped;
+                    Itriplet = (3*Nrow + Ipt_mapped) * pts_per_1st_deriv + Ineighbour;
+                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                }
 
-                // Phi part (of u_lat)
-                column_skip = 1 * Ncol + neighbour_mapped;
-                row_skip    = 1 * Nrow + Ipt_mapped;
-                Itriplet = (3*Nrow + Ipt_mapped) * pts_per_1st_deriv + Ineighbour;
-                Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
 
-                // and do Lap for both Phi and Psi
+                // And do Lap for both Phi and Psi
                 for ( counter = 0; counter < 2; counter++ ) {
 
                     // Second LON derivative
                     if ( USE_TRUE_2ND_DERIV ) {
-                        val  = source_data.adjacency_d2dlon2_weights.at(Ipt).at(Ineighbour);
-                        val *= weight_val * pow(cos_lat_inv * R_inv, 2.);
-                        val *= Tikhov_Laplace;
+                        if ( not(neighbour_is_zero) ) {
+                            val  = source_data.adjacency_d2dlon2_weights.at(Ipt).at(Ineighbour);
+                            val *= weight_val * pow(cos_lat_inv * R_inv, 2.);
+                            val *= Tikhov_Laplace;
 
-                        column_skip = neighbour_mapped;
-                        column_skip += counter * Ncol;
-                        row_skip    = Ipt_mapped;
-                        row_skip    += 2 * Nrow;
-                        row_skip    += counter * Nrow;
-                        Itriplet = Ipt_mapped * pts_per_2nd_deriv + Ineighbour;
-                        Itriplet += 4 * Nrow * pts_per_1st_deriv;
-                        Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                            column_skip = neighbour_mapped;
+                            column_skip += counter * Ncol;
+                            row_skip    = Ipt_mapped;
+                            row_skip    += 2 * Nrow;
+                            row_skip    += counter * Nrow;
+                            Itriplet = (counter*Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour;
+                            Itriplet += 4 * Nrow * pts_per_1st_deriv;
+                            Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                        }
                     } else {
                         for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
                             val  =   source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour)
@@ -363,12 +378,12 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
                             column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
                             column_skip = pt_maps_to[column_skip];
                             if (column_skip == 0) {continue;}
-                            column_skip = column_skip - num_mapped_before[column_skip] - 1;
+                            column_skip = column_skip - num_mapped_before_col[column_skip];
                             column_skip += counter * Ncol;
                             row_skip    = Ipt_mapped;
                             row_skip    += 2 * Nrow;
                             row_skip    += counter * Nrow;
-                            Itriplet = Ipt_mapped * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
+                            Itriplet = (counter*Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
                             Itriplet += 4 * Nrow * pts_per_1st_deriv;
                             Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
                         }
@@ -376,18 +391,21 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
 
                     // Second LAT derivative
                     if ( USE_TRUE_2ND_DERIV ) {
-                        val = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour);
-                        val *= weight_val * pow(R_inv, 2.);
-                        val *= Tikhov_Laplace;
+                        if ( not(neighbour_is_zero) ) {
+                            val = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour);
+                            val *= weight_val * pow(R_inv, 2.);
+                            val *= Tikhov_Laplace;
 
-                        column_skip = neighbour_mapped;
-                        column_skip += counter * Ncol;
-                        row_skip    = Ipt_mapped;
-                        row_skip    += 2 * Nrow;
-                        row_skip    += counter * Nrow;
-                        Itriplet    = (Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour;
-                        Itriplet += 4 * Nrow * pts_per_1st_deriv;
-                        Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                            column_skip = neighbour_mapped;
+                            column_skip += counter * Ncol;
+                            row_skip    = Ipt_mapped;
+                            row_skip    += 2 * Nrow;
+                            row_skip    += counter * Nrow;
+                            Itriplet    = (counter * Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour;
+                            Itriplet += 4 * Nrow * pts_per_1st_deriv;
+                            Itriplet += 2 * Nrow * pts_per_2nd_deriv;
+                            Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                        }
                     } else {
                         for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
                             val  =   source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour)
@@ -398,30 +416,34 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
                             column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
                             column_skip = pt_maps_to[column_skip];
                             if (column_skip == 0) {continue;}
-                            column_skip = column_skip - num_mapped_before[column_skip] - 1;
+                            column_skip = column_skip - num_mapped_before_col[column_skip];
                             column_skip += counter * Ncol;
                             row_skip    = Ipt_mapped;
                             row_skip    += 2 * Nrow;
                             row_skip    += counter * Nrow;
-                            Itriplet = (Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
+                            Itriplet = (counter*Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
                             Itriplet += 4 * Nrow * pts_per_1st_deriv;
+                            Itriplet += 2 * Nrow * pts_per_2nd_deriv;
                             Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
                         }
                     }
 
                     // First LAT derivative
-                    val = - source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour) * tan( latitude.at(Ipt) );
-                    val *= weight_val * pow(R_inv, 2.);
-                    val *= Tikhov_Laplace;
+                    if ( not(neighbour_is_zero) ) {
+                        val = - source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour) * tan( latitude.at(Ipt) );
+                        val *= weight_val * pow(R_inv, 2.);
+                        val *= Tikhov_Laplace;
 
-                    column_skip = neighbour_mapped;
-                    column_skip += counter * Ncol;
-                    row_skip    = Ipt_mapped;
-                    row_skip    += 2 * Nrow;
-                    row_skip    += counter * Nrow;
-                    Itriplet    = 2 * Nrow * pts_per_2nd_deriv + Ipt_mapped * pts_per_1st_deriv + Ineighbour;
-                    Itriplet += 4 * Nrow * pts_per_1st_deriv;
-                    Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                        column_skip = neighbour_mapped;
+                        column_skip += counter * Ncol;
+                        row_skip    = Ipt_mapped;
+                        row_skip    += 2 * Nrow;
+                        row_skip    += counter * Nrow;
+                        Itriplet    = Ipt_mapped * pts_per_1st_deriv + Ineighbour;
+                        Itriplet += 4 * Nrow * pts_per_1st_deriv;
+                        Itriplet += 4 * Nrow * pts_per_2nd_deriv;
+                        Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                    }
                 }
             }
         }
@@ -430,15 +452,59 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
     Eigen::SparseMatrix<double> LHS_matr( 4*Nrow, 2*Ncol );
     fprintf( stdout, "%'zu, %'zu\n", 4*Nrow, 2*Ncol );
     LHS_matr.setFromTriplets( Aij_triplets.begin(), Aij_triplets.end() );
+    LHS_matr.makeCompressed();
+
+    // Normalize the columns of LHS
+    std::vector<double> col_norms(2*Ncol,0), row_norms(4*Nrow,0);
+    size_t col = 0, row = 0;
+    for ( int k = 0; k < LHS_matr.outerSize(); ++k ) {
+        for ( Eigen::SparseMatrix<double>::InnerIterator it(LHS_matr,k); it; ++it ) {
+            val = it.value();
+
+            row = it.row();   // row index
+            row_norms[row] += pow(val,2) / Nrow;
+
+            col = it.col();   // col index (here it is equal to k)
+            col_norms[col] += pow(val,2) / Nrow;
+        }
+    }
+    double min_row_norm = sqrt(row_norms[0]), max_row_norm = 0,
+           min_col_norm = sqrt(col_norms[0]), max_col_norm;
+    for ( row = 0; row < 4*Nrow; row++ ) {
+        row_norms[row] = sqrt(row_norms[row]);
+        if ( row_norms[row] == 0 ) {
+            fprintf( stdout, "!! Row %zu has zero norm!!\n", row );
+        }
+        min_row_norm = std::fmin( min_row_norm, row_norms[row] );
+        max_row_norm = std::fmax( max_row_norm, row_norms[row] );
+    }
+    for ( col = 0; col < 2*Ncol; col++ ) {
+        col_norms[col] = sqrt(col_norms[col]);
+        min_col_norm = std::fmin( min_col_norm, col_norms[col] );
+        max_col_norm = std::fmax( max_col_norm, col_norms[col] );
+    }
+    /*
+    for ( int k = 0; k < LHS_matr.outerSize(); ++k ) {
+        for ( Eigen::SparseMatrix<double>::InnerIterator it(LHS_matr,k); it; ++it ) {
+            val = it.value();
+            row = it.row();   // row index
+            col = it.col();   // col index (here it is equal to k)
+            //it.index(); // inner index, here it is equal to it.row()
+            LHS_matr.coeffRef(row,col) = val / col_norms[col];
+        }
+    }
+    */
 
     #if DEBUG >= 1
     if (wRank == 0) {
         fprintf(stdout, "Declaring the least squares problem and computing.\n");
+        fprintf(stdout, "Column norms were bounded between %e and %e.\n", min_col_norm, max_col_norm);
+        fprintf(stdout, "Row norms were bounded between %e and %e.\n", min_row_norm, max_row_norm);
         fflush(stdout);
     }
     #endif
 
-    LHS_matr.makeCompressed();
+
     Eigen::LeastSquaresConjugateGradient< Eigen::SparseMatrix<double> > solver;
     solver.setMaxIterations(max_iters);
     solver.setTolerance(rel_tol);
@@ -471,18 +537,18 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
         for (int Idepth = 0; Idepth < Ndepth; ++Idepth) {
 
             if (not(single_seed)) {
-                #if DEBUG >= 2
+#if DEBUG >= 2
                 fprintf( stdout, "Extracting seed.\n" );
                 fflush(stdout);
-                #endif
+#endif
                 // If single_seed == false, then we were provided seed values, pull out the appropriate values here
-                #pragma omp parallel \
+#pragma omp parallel \
                 default(none) \
                 shared( Psi_seed, Phi_seed, seed_tor, seed_pot, Itime, Idepth, stdout ) \
                 private( index, index_sub ) \
                 firstprivate( Ntime, Ndepth, Npts )
                 {
-                    #pragma omp for collapse(1) schedule(static)
+#pragma omp for collapse(1) schedule(static)
                     for (index = 0; index < Npts; ++index) {
                         Psi_seed.at(index) = seed_tor.at(index + Npts*(Itime*Ndepth + Idepth));
                         Phi_seed.at(index) = seed_pot.at(index + Npts*(Itime*Ndepth + Idepth));
@@ -491,25 +557,25 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
             }
 
             // Get velocity from seed
-            #if DEBUG >= 3
+#if DEBUG >= 3
             fprintf( stdout, "Getting velocities from seed.\n" );
             fflush(stdout);
-            #endif
+#endif
             toroidal_vel_from_F(  u_lon_tor_seed, u_lat_tor_seed, Psi_seed, source_data, use_mask ? mask : unmask);
             potential_vel_from_F( u_lon_pot_seed, u_lat_pot_seed, Phi_seed, source_data, use_mask ? mask : unmask);
 
-            #if DEBUG >= 3
+#if DEBUG >= 3
             fprintf( stdout, "Subtracting seed velocity to get remaining.\n" );
             fflush(stdout);
-            #endif
-            #pragma omp parallel default(none) \
+#endif
+#pragma omp parallel default(none) \
             shared( Itime, Idepth, stdout, \
                     u_lon, u_lon_tor_seed, u_lon_pot_seed, u_lon_rem, \
                     u_lat, u_lat_tor_seed, u_lat_pot_seed, u_lat_rem ) \
             private( index, index_sub ) \
             firstprivate( Ntime, Ndepth, Npts )
             {
-                #pragma omp for collapse(1) schedule(static)
+#pragma omp for collapse(1) schedule(static)
                 for (index_sub = 0; index_sub < Npts; ++index_sub) {
                     index = index_sub + Npts*(Itime*Ndepth + Idepth);
                     u_lon_rem.at( index_sub ) = u_lon.at(index) - u_lon_tor_seed.at(index_sub) - u_lon_pot_seed.at(index_sub);
@@ -517,10 +583,10 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
                 }
             }
 
-            #if DEBUG >= 3
+#if DEBUG >= 3
             fprintf( stdout, "Getting divergence and vorticity from remaining velocity.\n" );
             fflush(stdout);
-            #endif
+#endif
             toroidal_vel_div(        div_term, u_lon_rem, u_lat_rem, source_data, use_mask ? mask : unmask );
             toroidal_curl_u_dot_er( vort_term, u_lon_rem, u_lat_rem, source_data, use_mask ? mask : unmask );
 
@@ -528,33 +594,33 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
             //// Set up the RHS_vector
             //
 
-            #if DEBUG >= 2
+#if DEBUG >= 2
             if ( wRank == 0 ) {
                 fprintf(stdout, "Building the RHS of the least squares problem.\n");
                 fflush(stdout);
             }
-            #endif
-            
+#endif
+
             double is_pole;
             std::fill( RHS_vector.begin(), RHS_vector.end(), 0. );
-            #pragma omp parallel default(none) \
+#pragma omp parallel default(none) \
             shared( dAreas, RHS_vector, u_lon_rem, u_lat_rem, vort_term, div_term, \
-                    num_mapped_before_noncoastal, pt_maps_to ) \
+                    num_mapped_before_row, pt_maps_to ) \
             private( Ipt, index ) \
             firstprivate( weight_err, Npts, Nrow, Tikhov_Laplace, deriv_scale_factor )
             {
-                #pragma omp for collapse(1) schedule(static)
+#pragma omp for collapse(1) schedule(static)
                 for ( Ipt = 0; Ipt < Npts; ++Ipt) {
                     if ( pt_maps_to[Ipt] != Ipt ) { continue; }
                     if ( Ipt == 0 ) { continue; }
-                    index = Ipt - num_mapped_before_noncoastal[Ipt];
-                    RHS_vector.at(         index - 1 ) = 
+                    index = Ipt - num_mapped_before_row[Ipt];
+                    RHS_vector.at(         index ) = 
                         u_lon_rem.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
-                    RHS_vector.at(  Nrow + index - 1 ) = 
+                    RHS_vector.at(  Nrow + index ) = 
                         u_lat_rem.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
-                    RHS_vector.at(2*Nrow + index - 1 ) = 
+                    RHS_vector.at(2*Nrow + index ) = 
                         Tikhov_Laplace * vort_term.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
-                    RHS_vector.at(3*Nrow + index - 1 ) = 
+                    RHS_vector.at(3*Nrow + index ) = 
                         Tikhov_Laplace * div_term.at(Ipt) * ( weight_err ? dAreas.at(Ipt) : 1. );
                 }
             }
@@ -563,26 +629,27 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
             //
             //// Now apply the least-squares solver
             //
-            #if DEBUG >= 0
+#if DEBUG >= 0
             if ( wRank == 0 ) {
                 fprintf(stdout, "Solving the least squares problem.\n");
                 fflush(stdout);
             }
-            #endif
+#endif
             Eigen::VectorXd F_Eigen = solver.solve( RHS );
-            #if DEBUG >= 0
+#if DEBUG >= 0
             if ( wRank == 0 ) {
                 fprintf( stdout, "    Solver converged after %ld iterations to error %g.\n", 
                         solver.iterations(), solver.error() );
                 fflush(stdout);
             }
-            #endif
+#endif
             std::vector<double> Psi_vector(Npts, 0), Phi_vector(Npts, 0);
             for (size_t ii = 0; ii < Npts; ++ii) {
-                index = pt_maps_to[ii] - num_mapped_before[pt_maps_to[ii]];
-                if ( index == 0 ) { continue; }
-                Psi_vector[ii] = F_Eigen[              index - 1 ];
-                Phi_vector[ii] = F_Eigen[Npts_mapped + index - 1 ];
+                index = pt_maps_to[ii] - num_mapped_before_col[pt_maps_to[ii]];
+                if ( index > 0 ) {
+                    Psi_vector[ii] = F_Eigen[       index];
+                    Phi_vector[ii] = F_Eigen[Ncol + index];
+                }
             }
             //std::vector<double> Psi_vector(F_Eigen.data(),        F_Eigen.data() +   Npts);
             //std::vector<double> Phi_vector(F_Eigen.data() + Npts, F_Eigen.data() + 2*Npts);
@@ -594,12 +661,12 @@ void Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand(
             }
 
             // Get velocity associated to computed F field
-            #if DEBUG >= 2
+#if DEBUG >= 2
             if ( wRank == 0 ) {
                 fprintf(stdout, " Extracting velocities and divergence from toroidal field.\n");
                 fflush(stdout);
             }
-            #endif
+#endif
 
             std::vector<double> u_lon_tor(Npts, 0.), u_lat_tor(Npts, 0.), u_lon_pot(Npts, 0.), u_lat_pot(Npts, 0.);
             toroidal_vel_from_F(  u_lon_tor, u_lat_tor, Psi_vector, source_data, use_mask ? mask : unmask);
