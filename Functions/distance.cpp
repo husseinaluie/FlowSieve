@@ -74,7 +74,11 @@ double distance(
             
             // Handle some rounding cases when distance is nearly maximal
             if ( ( acos_argument < -1 ) and ( fabs(acos_argument + 1) < 1e-10 ) ) { 
+                // If less than -1 but just a tiny bit
                 Delta_sigma = M_PI;
+            } else if ( ( acos_argument > 1 ) and ( acos_argument - 1 < 1e-10 ) ) {
+                // If greater than +1 but just a tiny bit
+                Delta_sigma = 0.;
             } else {
                 Delta_sigma = acos( acos_argument );
             }
