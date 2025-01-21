@@ -4,6 +4,7 @@
 #include <vector>
 #include <omp.h>
 #include <mpi.h>
+#include <random>
 #include "../../constants.hpp"
 #include "../../functions.hpp"
 #include "../../particles.hpp"
@@ -89,12 +90,17 @@ void particles_initial_positions(
 
     double part_lon, part_lat;
 
-    srand( time(NULL) + (time_t)(1+wRank));
+    // ADD A CLOCK CONDITION TO THE SEED
+    //srand( time(NULL) + (time_t)(1+wRank));
+    std::random_device rd;  // seed generator for random
+    std::mt19937_64 gen(rd());  // replace rd() with a number to fix the seed
+    std::uniform_real_distribution<> get_rand(-0.5, 0.5);
+    // calling get_rand(gen) returns a random double in range [-0.5, 0.5)
 
     for ( int II = 0; II < Npts; ++II ) {
 
-        part_lon = ( ((double) rand() / (RAND_MAX)) - 0.5) * lon_rng.at(II % Nreg) + lon_mid.at(II % Nreg);
-        part_lat = ( ((double) rand() / (RAND_MAX)) - 0.5) * lat_rng.at(II % Nreg) + lat_mid.at(II % Nreg);
+        part_lon = get_rand(gen) * lon_rng.at(II % Nreg) + lon_mid.at(II % Nreg);
+        part_lat = get_rand(gen) * lat_rng.at(II % Nreg) + lat_mid.at(II % Nreg);
 
         // Check if this particle is on land
         particles_get_edges(left, right, bottom, top, 
@@ -115,8 +121,8 @@ void particles_initial_positions(
                 or ( std::isnan(top)    )
               ) {
 
-            part_lon = ( ((double) rand() / (RAND_MAX)) - 0.5) * lon_rng.at(II % Nreg) + lon_mid.at(II % Nreg);
-            part_lat = ( ((double) rand() / (RAND_MAX)) - 0.5) * lat_rng.at(II % Nreg) + lat_mid.at(II % Nreg);
+            part_lon = get_rand(gen) * lon_rng.at(II % Nreg) + lon_mid.at(II % Nreg);
+            part_lat = get_rand(gen) * lat_rng.at(II % Nreg) + lat_mid.at(II % Nreg);
 
             // Check if this particle is on land
             particles_get_edges(left, right, bottom, top, 

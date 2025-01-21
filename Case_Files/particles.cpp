@@ -250,6 +250,11 @@ int main(int argc, char *argv[]) {
     write_field_to_output(part_lon_hist, "longitude", starts, counts, output_fname, &out_mask);
     write_field_to_output(part_lat_hist, "latitude",  starts, counts, output_fname, &out_mask);
 
+    if ( names_of_tracked_fields.size() != field_trajectories.size() ) {
+        fprintf( stdout, "Names of fields has different length (%zu) from fields (%zu)\n",
+              names_of_tracked_fields.size(), field_trajectories.size() );
+        throw std::range_error( "Names of fields, and fields themselves, have different lengths.\n" );
+    }
     for (size_t Ifield = 0; Ifield < names_of_tracked_fields.size(); ++Ifield) {
         write_field_to_output(field_trajectories.at(Ifield), 
                 names_of_tracked_fields.at(Ifield),  

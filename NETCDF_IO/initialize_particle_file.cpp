@@ -71,7 +71,7 @@ void initialize_particle_file(
     if (wRank == 0) { fprintf(stdout, "\nOutput file (%s) initialized.\n", filename.c_str() ); }
     #endif
 
-    vars.push_back("longitude");
+    vars.push_back("longitude"); // we need to remove these after (see pop_back)
     vars.push_back("latitude");
 
     if (wRank == 0) {
@@ -83,6 +83,9 @@ void initialize_particle_file(
             add_var_to_file(vars.at(varInd), dim_names, ndims, filename );
         }
     }
+
+    vars.pop_back(); // remove latitude
+    vars.pop_back(); // remove longitude
 
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "\n"); }

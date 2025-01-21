@@ -1,10 +1,11 @@
 #include <cassert>
-#include <time.h>
+#include <ctime>
 #include <math.h>
 #include <algorithm>
 #include <vector>
 #include <mpi.h>
 #include <omp.h>
+#include <random>
 #include "../../constants.hpp"
 #include "../../functions.hpp"
 #include "../../particles.hpp"
@@ -28,7 +29,9 @@ void recycle_position(
         double & lon0,
         double & lat0,
         const std::vector<double> & longitude,
-        const std::vector<double> & latitude
+        const std::vector<double> & latitude,
+        const double rand1, // [0,1]
+        const double rand2  // [0,1]
         ) {
 
     // Set the bounds
@@ -39,12 +42,9 @@ void recycle_position(
     lon_mid = 0.5 * ( longitude.back() + longitude.front());
     lat_mid = 0.5 * ( latitude.back()  + latitude.front() );
     
-    // Update the random seed
-    srand( time(NULL) );
-
     // And randomize the particle
-    lon0 = ( ((double) rand() / (RAND_MAX)) - 0.5) * lon_rng + lon_mid;
-    lat0 = ( ((double) rand() / (RAND_MAX)) - 0.5) * lat_rng + lat_mid;
+    lon0 = ( rand1 - 0.5) * lon_rng + lon_mid;
+    lat0 = ( rand2 - 0.5) * lat_rng + lat_mid;
 }
 
 void move_on_sphere(
@@ -60,8 +60,8 @@ void move_on_sphere(
     y_dest = y_init + v / constants::R_earth;
 
     // Account for moving across the poles
-    if (y_dest >  M_PI/2) { y_dest = ( M_PI/2) - y_dest; x_dest += M_PI; }
-    if (y_dest < -M_PI/2) { y_dest = (-M_PI/2) - y_dest; x_dest += M_PI; }
+    if (y_dest >  M_PI/2) { y_dest -= y_dest - ( M_PI/2); x_dest += M_PI; }
+    if (y_dest < -M_PI/2) { y_dest -= y_dest - (-M_PI/2); x_dest += M_PI; }
 
     // Adjust lon for periodicity
     if (x_dest >  M_PI) { x_dest -= 2 * M_PI; }
@@ -458,12 +458,16 @@ void particles_evolve_trajectories(
     int perc_base = 5;
     int perc = 0, perc_count=0;
 
+    std::random_device rd;  // seed generator for random
+    std::mt19937_64 gen(rd());  // replace rd() with a number to fix the seed
+    std::uniform_real_distribution<> get_rand(0, 1);
+
     if ( particle_lifespan > 0 ) {
         for (Ip = 0; Ip < Nparts; Ip++) {
             if ( constants::PARTICLE_RECYCLE_TYPE == constants::ParticleRecycleType::FixedInterval ) {
                 recycle_times[Ip] = time.at(0) + particle_lifespan;
             } else if (constants::PARTICLE_RECYCLE_TYPE == constants::ParticleRecycleType::Stochastic) {
-                recycle_times[Ip] = time.at(0) - log((double) rand() / (RAND_MAX)) * particle_lifespan; 
+                recycle_times[Ip] = time.at(0) - log( get_rand(gen) ) * particle_lifespan; 
             }
         }
     }
@@ -515,6 +519,11 @@ void particles_evolve_trajectories(
         reduction( max:out_ind )
         {
 
+            // Make a thread-local random generator
+            std::random_device rd;  // seed generator for random
+            std::mt19937_64 gen(rd());  // replace rd() with a number to fix the seed
+            std::uniform_real_distribution<> get_rand(0, 1);
+
             #pragma omp for collapse(1) schedule(static)
             for (Ip = 0; Ip < Nparts; ++Ip) {
 
@@ -536,7 +545,7 @@ void particles_evolve_trajectories(
 
                 // Check if initial positions are fill_value, and recycle if they are
                 if ( (lon0 == constants::fill_value) or (lat0 == constants::fill_value) ) {
-                    recycle_position( lon0, lat0, lon, lat );
+                    recycle_position( lon0, lat0, lon, lat, get_rand(gen), get_rand(gen) );
                 }
 
                 // Seed values for velocities (only used for dt)
@@ -622,7 +631,7 @@ void particles_evolve_trajectories(
 
                     // If our particle went out of bounds, just recycle now.
                     if ( (lat0 <= lat.front()) or (lat0 >= lat.back()) ) {
-                        recycle_position( lon0, lat0, lon, lat );
+                        recycle_position( lon0, lat0, lon, lat, get_rand(gen), get_rand(gen) );
 
                         // We also need to flag the recycle in the previous output
                         if (out_ind > 0) { 
@@ -653,11 +662,11 @@ void particles_evolve_trajectories(
                             if ( constants::PARTICLE_RECYCLE_TYPE == constants::ParticleRecycleType::FixedInterval ) {
                                 recycle_times[Ip] += particle_lifespan; 
                             } else if (constants::PARTICLE_RECYCLE_TYPE == constants::ParticleRecycleType::Stochastic) {
-                                recycle_times[Ip] += -log((double) rand() / (RAND_MAX)) * particle_lifespan; 
+                                recycle_times[Ip] += -log( get_rand(gen) ) * particle_lifespan; 
                             }
 
                             // And recycle
-                            recycle_position( lon0, lat0, lon, lat );
+                            recycle_position( lon0, lat0, lon, lat, get_rand(gen), get_rand(gen) );
 
                             do_recycle = false;
                         } else {
