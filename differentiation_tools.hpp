@@ -13,6 +13,47 @@
  * \brief Collection of all differentiation-related functions.
  */
 
+void curl_vec_dot_er(
+        std::vector<double> & out_arr,
+        const std::vector<double> & u_lon,
+        const std::vector<double> & u_lat,
+        const dataset & source_data,
+        const std::vector<short int> & mask
+        );
+
+void div_vec(
+        std::vector<double> & out_arr,
+        const std::vector<double> & u_lon,
+        const std::vector<double> & u_lat,
+        const dataset & source_data,
+        const std::vector<short int> & mask
+        );
+
+void grad_scalar(  
+        std::vector<double> & vel_lon,
+        std::vector<double> & vel_lat,
+        const std::vector<double> & F,
+        const dataset & source_data,
+        const std::vector<short int> & mask
+    );
+
+void perp_grad_scalar(  
+        std::vector<double> & vel_lon,
+        std::vector<double> & vel_lat,
+        const std::vector<double> & F,
+        const dataset & source_data,
+        const std::vector<short int> & mask
+    );
+
+void scalar_laplacian(  
+        std::vector<double> & Lap_scalar,
+        const std::vector<double> & scalar,
+        const dataset & source_data,
+        const std::vector<short int> & mask
+    );
+
+
+
 /*!
  * \brief Assign appropriate differentiation vector
  *
