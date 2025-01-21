@@ -188,7 +188,6 @@ int main(int argc, char *argv[]) {
     const std::vector<int>  &myStarts = source_data.myStarts;
 
     //
-    int LAT_lb, LAT_ub, Itime, Idepth, Ilat, Ilon;
     const int   Ntime   = source_data.Ntime,
                 Ndepth  = source_data.Ndepth,
                 Nlat    = source_data.Nlat,
@@ -230,14 +229,11 @@ int main(int argc, char *argv[]) {
     #if DEBUG >= 1
     if (wRank == 0) { fprintf( stdout, "Setting up filtering values.\n" ); fflush(stdout); }
     #endif
-    double dl_kernel_val, dll_kernel_val;
     std::vector<double > filter_values_doubles, filter_dl_values_doubles, filter_dll_values_doubles, 
         aniso_values_doubles, aniso_dim_values_doubles,
         local_kernel(Nlat * Nlon, 0.),
         local_dl_kernel(Nlat * Nlon, 0.),
         local_dll_kernel(Nlat * Nlon, 0.);
-    std::vector<double*> filter_values_ptrs, filter_dl_values_ptrs, filter_dll_values_ptrs, 
-                         aniso_values_ptrs, aniso_dim_values_ptrs;
     std::vector<const std::vector<double>*> filter_fields;
     for (size_t field_ind = 0; field_ind < vars_to_filter.size(); field_ind++) {
         filter_fields.push_back( &source_data.variables.at(vars_to_filter.at(field_ind)) );
@@ -270,6 +266,9 @@ int main(int argc, char *argv[]) {
         // anisotropy metric of the field
         postprocess_fields.push_back( &aniso_fields.at(Ivar) );
         postprocess_names.push_back( vars_to_filter.at(Ivar) + "_aniso" );
+
+        postprocess_fields.push_back( &aniso_dim_fields.at(Ivar) );
+        postprocess_names.push_back( vars_to_filter.at(Ivar) + "_aniso_dim" );
 
         // Also get some relevant indices for PE<->KE conversions
         if ( compute_PEKE_conv == "true" ) {
@@ -333,49 +332,29 @@ int main(int argc, char *argv[]) {
         shared( source_data, filter_fields, coarse_fields, dl_coarse_fields, dll_coarse_fields, \
                 aniso_fields, aniso_dim_fields, \
                 scale, stdout, barrho_barwo, dl_barrho_barwo, rho_ind, wo_ind, compute_PEKE_conv ) \
-        private( filter_values_doubles, filter_dl_values_doubles, filter_dll_values_doubles, \
-                 filter_values_ptrs, filter_dl_values_ptrs, filter_dll_values_ptrs, \
-                 aniso_values_doubles, aniso_values_ptrs, aniso_dim_values_doubles, aniso_dim_values_ptrs, \
-                 dl_kernel_val, dll_kernel_val, \
-                 Itime, Idepth, Ilat, Ilon, Ivar, index, \
-                 LAT_lb, LAT_ub, null_vector ) \
         firstprivate( local_kernel, local_dl_kernel, local_dll_kernel, \
                       Nlon, Nlat, Ndepth, Ntime, Nvars )
         {
 
-            filter_values_doubles.clear();
-            filter_dl_values_doubles.clear();
-            filter_dll_values_doubles.clear();
-            aniso_values_doubles.clear();
-            aniso_dim_values_doubles.clear();
+            std::vector<double> filter_values_doubles( Nvars ),
+                filter_dl_values_doubles( Nvars ),
+                filter_dll_values_doubles( Nvars );
 
-            filter_values_doubles.resize( Nvars );
-            filter_dl_values_doubles.resize( Nvars );
-            filter_dll_values_doubles.resize( Nvars );
-            aniso_values_doubles.resize( Nvars );
-            aniso_dim_values_doubles.resize( Nvars );
+            std::vector<double*> filter_values_ptrs( Nvars ),
+                filter_dl_values_ptrs( Nvars ),
+                filter_dll_values_ptrs( Nvars );
 
-            filter_values_ptrs.clear();
-            filter_dl_values_ptrs.clear();
-            filter_dll_values_ptrs.clear();
-            aniso_values_ptrs.clear();
-            aniso_dim_values_ptrs.clear();
-
-            filter_values_ptrs.resize( Nvars );
-            filter_dl_values_ptrs.resize( Nvars );
-            filter_dll_values_ptrs.resize( Nvars );
-            aniso_values_ptrs.resize( Nvars );
-            aniso_dim_values_ptrs.resize( Nvars );
-            for ( Ivar = 0; Ivar < Nvars; Ivar++ ) { 
+            for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) { 
                 filter_values_ptrs.at(Ivar) = &(filter_values_doubles.at(Ivar)); 
                 filter_dl_values_ptrs.at(Ivar) = &(filter_dl_values_doubles.at(Ivar)); 
                 filter_dll_values_ptrs.at(Ivar) = &(filter_dll_values_doubles.at(Ivar)); 
-                aniso_values_ptrs.at(Ivar) = &(aniso_values_doubles.at(Ivar));
-                aniso_dim_values_ptrs.at(Ivar) = &(aniso_dim_values_doubles.at(Ivar));
             }
 
+            int LAT_lb, LAT_ub;
+            double dl_kernel_val, dll_kernel_val;
+
             #pragma omp for collapse(1) schedule(dynamic)
-            for (Ilat = 0; Ilat < Nlat; Ilat++) {
+            for (int Ilat = 0; Ilat < Nlat; Ilat++) {
                 get_lat_bounds(LAT_lb, LAT_ub, source_data.latitude,  Ilat, scale); 
 
                 // If our longitude grid is uniform, and spans the full periodic domain,
@@ -387,7 +366,7 @@ int main(int argc, char *argv[]) {
                             scale, source_data, Ilat, 0, LAT_lb, LAT_ub );
                 }
 
-                for (Ilon = 0; Ilon < Nlon; Ilon++) {
+                for ( int Ilon = 0; Ilon < Nlon; Ilon++) {
 
                     if ( not( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) ) {
                         // If we couldn't precompute the kernel earlier, then do it now
@@ -397,36 +376,31 @@ int main(int argc, char *argv[]) {
                                 scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
                     }
 
-                    for (Itime = 0; Itime < Ntime; Itime++) {
-                        for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+                    for ( int Itime = 0; Itime < Ntime; Itime++) {
+                        for ( int Idepth = 0; Idepth < Ndepth; Idepth++) {
 
                             // Convert our four-index to a one-index
-                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                            size_t index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
                             if ( not(constants::FILTER_OVER_LAND) and not(source_data.mask.at(index)) ) {
-                                for ( Ivar = 0; Ivar < Nvars; Ivar++ ) { 
+                                for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) { 
                                     coarse_fields.at(Ivar).at(index) = constants::fill_value; 
-                                    aniso_fields.at(Ivar).at(index) = constants::fill_value; 
-                                    aniso_dim_fields.at(Ivar).at(index) = constants::fill_value; 
                                 }
                                 if ( compute_PEKE_conv == "true" ) {
                                     barrho_barwo.at(index) = constants::fill_value;
                                 }
                             } else{
                                 // Apply the filter at the point
-                                apply_filter_at_point_aniso(  
+                                apply_filter_at_point(  
                                         filter_values_ptrs, filter_dl_values_ptrs, filter_dll_values_ptrs,
-                                        aniso_values_ptrs, aniso_dim_values_ptrs,
                                         dl_kernel_val, dll_kernel_val,
                                         filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
                                         LAT_lb, LAT_ub, scale, std::vector<bool>(Nvars,false), 
                                         local_kernel, local_dl_kernel, local_dll_kernel );
 
                                 // Store the filtered values in the appropriate arrays
-                                for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
+                                for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {
                                     coarse_fields.at(Ivar).at(index) = filter_values_doubles.at(Ivar);
-                                    aniso_fields.at(Ivar).at(index)  = aniso_values_doubles.at(Ivar);
-                                    aniso_dim_fields.at(Ivar).at(index)  = aniso_dim_values_doubles.at(Ivar);
 
                                     // The ell-derivative of the filtered field
                                     dl_coarse_fields.at(Ivar).at(index) = 
@@ -450,6 +424,106 @@ int main(int argc, char *argv[]) {
                                         coarse_fields.at(rho_ind).at(index) * dl_coarse_fields.at(wo_ind).at(index);
                                         + dl_coarse_fields.at(rho_ind).at(index) * coarse_fields.at(wo_ind).at(index);
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        #if DEBUG >= 0
+        if (wRank == 0) { fprintf( stdout, "Re-applying filter for anisotropy.\n" ); }
+        #endif
+
+        #pragma omp parallel \
+        default(none) \
+        shared( source_data, filter_fields, coarse_fields, dl_coarse_fields, dll_coarse_fields, \
+                aniso_fields, aniso_dim_fields, \
+                scale, stdout, barrho_barwo, dl_barrho_barwo, rho_ind, wo_ind, compute_PEKE_conv ) \
+        firstprivate( local_kernel, local_dl_kernel, local_dll_kernel, \
+                      Nlon, Nlat, Ndepth, Ntime, Nvars )
+        {
+            std::vector<double> filter_values_doubles( Nvars ),
+                filter_dl_values_doubles( Nvars ),
+                filter_dll_values_doubles( Nvars ),
+                aniso_values_doubles( Nvars ),
+                aniso_dim_values_doubles( Nvars );
+
+            std::vector<double*> filter_values_ptrs( Nvars ),
+                filter_dl_values_ptrs( Nvars ),
+                filter_dll_values_ptrs( Nvars ),
+                aniso_values_ptrs( Nvars ),
+                aniso_dim_values_ptrs( Nvars );
+
+            for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) { 
+                filter_values_ptrs.at(Ivar) = &(filter_values_doubles.at(Ivar)); 
+                filter_dl_values_ptrs.at(Ivar) = &(filter_dl_values_doubles.at(Ivar)); 
+                filter_dll_values_ptrs.at(Ivar) = &(filter_dll_values_doubles.at(Ivar)); 
+                aniso_values_ptrs.at(Ivar) = &(aniso_values_doubles.at(Ivar)); 
+                aniso_dim_values_ptrs.at(Ivar) = &(aniso_dim_values_doubles.at(Ivar)); 
+            }
+
+            for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) { 
+                filter_values_ptrs.at(Ivar) = &(filter_values_doubles.at(Ivar)); 
+                filter_dl_values_ptrs.at(Ivar) = &(filter_dl_values_doubles.at(Ivar)); 
+                filter_dll_values_ptrs.at(Ivar) = &(filter_dll_values_doubles.at(Ivar)); 
+                aniso_values_ptrs.at(Ivar) = &(aniso_values_doubles.at(Ivar));
+                aniso_dim_values_ptrs.at(Ivar) = &(aniso_dim_values_doubles.at(Ivar));
+            }
+
+            int LAT_lb, LAT_ub;
+            double dl_kernel_val, dll_kernel_val;
+
+            #pragma omp for collapse(1) schedule(dynamic)
+            for ( int Ilat = 0; Ilat < Nlat; Ilat++) {
+                get_lat_bounds(LAT_lb, LAT_ub, source_data.latitude,  Ilat, scale); 
+
+                // If our longitude grid is uniform, and spans the full periodic domain,
+                // then we can just compute it once and translate it at each lon index
+                if ( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) {
+                    std::fill(local_kernel.begin(), local_kernel.end(), 0);
+                    compute_local_kernel( 
+                            local_kernel, local_dl_kernel, local_dll_kernel, 
+                            scale, source_data, Ilat, 0, LAT_lb, LAT_ub );
+                }
+
+                for (int Ilon = 0; Ilon < Nlon; Ilon++) {
+
+                    if ( not( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) ) {
+                        // If we couldn't precompute the kernel earlier, then do it now
+                        std::fill(local_kernel.begin(), local_kernel.end(), 0);
+                        compute_local_kernel( 
+                                local_kernel, local_dl_kernel, local_dll_kernel,
+                                scale, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
+                    }
+
+                    for (int Itime = 0; Itime < Ntime; Itime++) {
+                        for (int Idepth = 0; Idepth < Ndepth; Idepth++) {
+
+                            // Convert our four-index to a one-index
+                            size_t index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+
+                            if ( not(constants::FILTER_OVER_LAND) and not(source_data.mask.at(index)) ) {
+                                for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) { 
+                                    aniso_fields.at(Ivar).at(index) = constants::fill_value; 
+                                    aniso_dim_fields.at(Ivar).at(index) = constants::fill_value; 
+                                }
+                            } else{
+                                // Apply the filter at the point
+                                apply_filter_at_point_aniso(  
+                                        filter_values_ptrs, filter_dl_values_ptrs, filter_dll_values_ptrs,
+                                        aniso_values_ptrs, aniso_dim_values_ptrs,
+                                        dl_kernel_val, dll_kernel_val,
+                                        filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
+                                        LAT_lb, LAT_ub, scale, std::vector<bool>(Nvars,false), 
+                                        local_kernel, local_dl_kernel, local_dll_kernel );
+
+                                // Store the filtered values in the appropriate arrays
+                                for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {
+                                    aniso_fields.at(Ivar).at(index)  = aniso_values_doubles.at(Ivar);
+                                    aniso_dim_fields.at(Ivar).at(index)  = aniso_dim_values_doubles.at(Ivar);
+                                }
+
                             }
                         }
                     }
