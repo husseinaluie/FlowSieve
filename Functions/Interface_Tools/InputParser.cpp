@@ -176,3 +176,64 @@ void InputParser::getListofStrings(
     #endif
 
 }
+
+void InputParser::getListofStringPairs( 
+        std::vector< std::vector<std::string> > &list_of_strings, 
+        const std::string &argname,
+        const bool help,
+        const std::string &description
+        ) const{
+
+    int wRank=-1;
+    MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
+
+    //using namespace std;
+    const std::string raw_input_string = getCmdOption( argname, "", help, description );
+    if (help) { return; }
+    if ( raw_input_string.size() <= 0) {
+        fprintf( stderr, "The input to %s is empty! Halting.\n", argname.c_str() );
+    }
+    assert( raw_input_string.size() > 0 );
+
+    std::istringstream iss( raw_input_string );
+
+    // Split up the list of inputs based on white space into separate strings
+    std::vector<std::string> list_of_pairs;
+    copy( std::istream_iterator< std::string >(iss), 
+          std::istream_iterator< std::string >(), 
+          std::back_inserter( list_of_pairs ));
+
+    // Set up the size of the output
+    list_of_strings.resize( list_of_pairs.size() );
+
+    for ( size_t istr = 0; istr < list_of_pairs.size(); istr++ ) {
+
+        // Replace commas with spaces for second round of splitting
+        std::string to_split = list_of_pairs[istr];
+        std::replace( to_split.begin(), to_split.end(), ',', ' ');
+        std::istringstream splitstream( to_split );
+        copy( std::istream_iterator< std::string >( splitstream ), 
+              std::istream_iterator< std::string >(), 
+              std::back_inserter( list_of_strings[istr] ));
+
+        if ( list_of_strings[istr].size() != 2 ) {
+            fprintf( stderr, "Expected two-element pair. Received %s, which has %zu elements\n", list_of_pairs[istr].c_str(),
+                  list_of_strings[istr].size() );
+            throw std::invalid_argument("Bad input to string pairs.");
+        }
+
+    }
+
+
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf(stdout, "String arguments (%zu) for %s are: ", list_of_strings.size(), argname.c_str()); }
+    for ( size_t II = 0; II < list_of_strings.size(); II++ ) {
+        if (wRank == 0) { fprintf(stdout, "  (%s * %s)", 
+                list_of_strings.at(II)[0].c_str(),
+                list_of_strings.at(II)[1].c_str()
+                ); }
+    }
+    if (wRank == 0) { fprintf(stdout, "\n\n"); }
+    #endif
+
+}

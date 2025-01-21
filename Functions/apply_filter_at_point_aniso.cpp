@@ -53,7 +53,7 @@ void apply_filter_at_point_aniso(
                                 &longitude  = source_data.longitude,
                                 &dAreas     = source_data.areas;
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     const int   Ntime   = source_data.Ntime,
                 Ndepth  = source_data.Ndepth,
@@ -193,17 +193,19 @@ void apply_filter_at_point_aniso(
             for (int Ibin = 0; Ibin < theta_bins; Ibin++) {
                 int Ianiso = II*theta_bins + Ibin;
                 if ( kA_aniso_vals[Ianiso] == 0) { continue; }
-                p_i = pow(tmp_aniso_vals[Ianiso] / kA_aniso_vals[Ianiso], 2);
-                w_i = kA_aniso_vals[Ianiso];
 
+                w_i = kA_aniso_vals[Ianiso];
+                w_sum += w_i;
+
+                // Square
+                p_i = pow(tmp_aniso_vals[Ianiso] / kA_aniso_vals[Ianiso], 2);
                 mu_p  += p_i * w_i;
                 rms_p += pow( p_i, 2 ) * w_i;
 
+                // Normal
                 p_i = pow(tmp_aniso_vals[Ianiso] / kA_aniso_vals[Ianiso], 1);
                 mu_d  += p_i * w_i;
                 rms_d += pow( p_i, 2 ) * w_i;
-
-                w_sum += w_i;
             }
             mu_p = mu_p / w_sum;
             rms_p = sqrt( rms_p / w_sum );

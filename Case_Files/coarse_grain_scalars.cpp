@@ -113,6 +113,12 @@ int main(int argc, char *argv[]) {
     input.getListofStrings( vars_to_filter, "--variables", asked_help );
     size_t Nvars = vars_to_filter.size();
 
+    // Allow users to define scalar products for postprocessing ( bar(a) * bar(b) )
+    //   e.g. --product_pars "a,b a,c b,c" (names must match with input netcdf file)
+    std::vector< std::vector< std::string > > var_products;
+    input.getListofStringPairs( var_products, "--products", asked_help );
+    size_t Nproducts = var_products.size();
+
     // Also read in the filter scales from the commandline
     //   e.g. --filter_scales "10.e3 150.76e3 1000e3" (units are in metres)
     std::vector<double> filter_scales;
@@ -214,6 +220,15 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // Make varname <-> index maps for building product terms
+    std::map< std::string, size_t > var_indices;
+    for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
+        var_indices.insert( std::pair< std::string, size_t >( vars_to_filter[Ivar], Ivar ) );
+        #if DEBUG >= 2
+        fprintf( stdout, "Variable %s mapped to index %zu\n", vars_to_filter[Ivar].c_str(), var_indices.at(vars_to_filter[Ivar]) );
+        #endif
+    }
+
     // Get some relevant indices for PE<->KE conversions
     int rho_ind = -1, wo_ind = -1, rhowo_ind = -1, Lambda_g_ind = -1;
     std::vector<double> dl_PEKE;
@@ -284,6 +299,9 @@ int main(int argc, char *argv[]) {
     }
     
 
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf( stdout, "Setting up postprocessing fields.\n" ); fflush(stdout); }
+    #endif
     // Set up postprocessing fields
     std::vector<const std::vector<double>*> postprocess_fields;
     std::vector<std::string> postprocess_names;
@@ -310,6 +328,18 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf( stdout, "Setting up for requested products\n" ); fflush(stdout); }
+    #endif
+    // Add the requested product terms to the postprocessing
+    std::vector< std::vector<double> > product_fields( Nproducts );
+    for ( size_t Ipair = 0; Ipair < Nproducts; Ipair++ ) {
+        product_fields[Ipair].resize( Npts );
+        postprocess_fields.push_back( &product_fields[Ipair] );
+        postprocess_names.push_back( var_products[Ipair][0] + "_times_" + var_products[Ipair][1] );
+    }
+
+    // This stuff to be fixed with new method
     std::vector<double> barrho_barwo(  0 ), dl_barrho_barwo;
     if ( compute_PEKE_conv == "true" ) {
 
@@ -563,6 +593,26 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
+
+
+            // Build the requested product terms
+            size_t Ipair;
+            #pragma omp parallel \
+            default( none ) \
+            shared( product_fields, coarse_fields, var_indices, var_products ) \
+            private( Ipair, index ) \
+            firstprivate( Nproducts, Npts )
+            {
+                #pragma omp for collapse(2) schedule(static)
+                for ( Ipair = 0; Ipair < Nproducts; Ipair++ ) {
+                    for ( index = 0; index < Npts; index++ ) {
+                        product_fields.at(Ipair).at(index) = 
+                              coarse_fields.at( var_indices.at( var_products[Ipair][0] ) ).at(index)
+                            * coarse_fields.at( var_indices.at( var_products[Ipair][1] ) ).at(index);
+                    }
+                }
+            }
+
 
             #if DEBUG >= 1
             if (wRank == 0) { fprintf(stdout, "Beginning post-process routines\n"); }
