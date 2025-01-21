@@ -27,8 +27,7 @@ void initialize_adjacency_file(
 
     // Create some tidy names for variables
     const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude,
-                                &areas      = source_data.areas;
+                                &longitude  = source_data.longitude;
 
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_CLOBBER | NC_MPIIO;
@@ -81,11 +80,12 @@ void initialize_adjacency_file(
     #if DEBUG>=2
     if (wRank == 0) { fprintf(stdout, "    Defining the dimension variables\n"); }
     #endif
-    int lat_varid, lon_varid, neighbour_varid;
+    int lat_varid, lon_varid;
     retval = nc_def_var(ncid, "latitude",  NC_DOUBLE, 1, &lat_dimid,   &lat_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     retval = nc_def_var(ncid, "longitude", NC_DOUBLE, 1, &lon_dimid,   &lon_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    //int neighbour_varid;
     //retval = nc_def_var(ncid, "neighbour", NC_DOUBLE, 1, &neighbour_dimid,   &neighbour_varid);
     //if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 

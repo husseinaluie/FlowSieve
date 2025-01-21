@@ -33,9 +33,6 @@ void initialize_output_file(
     // Open the NETCDF file
     int FLAG = NC_NETCDF4 | NC_CLOBBER | NC_MPIIO;
     int ncid=0, retval;
-    //char buffer [50];
-    //snprintf(buffer, 50, filename);
-    //retval = nc_create_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
     retval = nc_create_par( filename.c_str(), FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
