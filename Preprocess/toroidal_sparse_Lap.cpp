@@ -31,7 +31,7 @@ void toroidal_sparse_Lap(
         const dataset & source_data,
         const int Itime,
         const int Idepth,
-        const std::vector<bool>   & mask,
+        const std::vector<short int>   & mask,
         const bool area_weight,
         const size_t row_skip,
         const size_t column_skip

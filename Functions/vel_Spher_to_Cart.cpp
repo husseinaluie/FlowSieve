@@ -23,7 +23,7 @@ void vel_Spher_to_Cart(
     const std::vector<double>   &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude;
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     const int   Ntime   = source_data.Ntime,
                 Ndepth  = source_data.Ndepth,

@@ -23,7 +23,7 @@ void write_regions(
         const std::string filename,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const std::vector<double> & areas,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,
@@ -33,7 +33,7 @@ void write_regions(
 void compute_region_areas(
         std::vector<double> & region_areas,
         const std::vector<double> & areas,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
         const int num_regions,
@@ -91,7 +91,7 @@ void compute_time_avg_std(
         const dataset & source_data,
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<int> & mask_count,
-        const std::vector<bool> & always_masked,
+        const std::vector<short int> & always_masked,
         const int full_Ntime
         );
 

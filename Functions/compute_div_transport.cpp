@@ -108,8 +108,8 @@ void compute_div_transport(
     //const bool use_depth_mask  = (source_data.use_depth_derivatives 
     //                              and ( source_data.Nprocs_in_depth > 1 )
     //                              );
-    //const std::vector<bool> &mask = use_depth_mask ? source_data.mask_DEPTH : source_data.mask;
-    const std::vector<bool> &mask = source_data.mask;
+    //const std::vector<short int> &mask = use_depth_mask ? source_data.mask_DEPTH : source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     assert( u_x.size() == u_y.size() );
     assert( u_x.size() == u_z.size() );

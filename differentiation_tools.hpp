@@ -95,7 +95,7 @@ void spher_derivative_at_point(
         const std::string & dim,
         const dataset & source_data,
         const int Itime, const int Idepth, const int Ilat, const int Ilon,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const int order_of_deriv = 1,
         const int diff_ord = constants::DiffOrd
         );
@@ -166,7 +166,7 @@ void get_diff_vector(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const int order_of_deriv,
         const int diff_ord = constants::DiffOrd
         );

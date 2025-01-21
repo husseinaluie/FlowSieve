@@ -15,7 +15,7 @@ void spher_derivative_at_point(
         const int Idepth,
         const int Ilat,
         const int Ilon,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const int order_of_deriv,
         const int diff_ord
         ) {
@@ -40,7 +40,7 @@ void spher_derivative_at_point(
 
     if ( (not(do_dep)) and ( constants::GRID_TYPE == constants::GridType::LLC ) ) {
         // If we're on an LLC grid, then we've already computed
-        // the differentiation weights / stencils when we build
+        // the differentiation weights / stencils when we built
         // the adjacency matrix. So just apply those now and exit.
 
         // Unless we want a depth derivative, in which case just use the
@@ -54,30 +54,41 @@ void spher_derivative_at_point(
         size_t val_ind;
 
         for (int ii = 0; ii < num_deriv; ii++) {
-            if (deriv_vals.at(ii) != NULL) {
-                for ( size_t II = 0; II < source_data.num_neighbours+1; II++ ) {
-                    if ( II < source_data.num_neighbours ) {
-                        val_ind = source_data.adjacency_indices.at(index).at(II);
-                    } else {
-                        val_ind = index;
-                    }
-                    #if DEBUG >= 1
-                    if (do_lat) {
+            if (deriv_vals.at(ii) == NULL) { continue; }
+            for ( size_t II = 0; II < source_data.num_neighbours+1; II++ ) {
+                val_ind = source_data.adjacency_indices.at(index).at(II);
+                #if DEBUG >= 1
+                if (do_lat) {
+                    if (order_of_deriv == 1) {
                         weight = source_data.adjacency_ddlat_weights.at(index).at(II);
                     } else {
-                        weight = source_data.adjacency_ddlon_weights.at(index).at(II);
+                        weight = source_data.adjacency_d2dlat2_weights.at(index).at(II);
                     }
-                    val = fields[ii]->at( val_ind );
-                    #else
-                    if (do_lat) {
+                } else {
+                    if (order_of_deriv == 1) {
+                        weight = source_data.adjacency_ddlon_weights.at(index).at(II);
+                    } else {
+                        weight = source_data.adjacency_d2dlon2_weights.at(index).at(II);
+                    }
+                }
+                val = fields[ii]->at( val_ind );
+                #else
+                if (do_lat) {
+                    if (order_of_deriv == 1) {
                         weight = source_data.adjacency_ddlat_weights[index][II];
                     } else {
-                        weight = source_data.adjacency_ddlon_weights[index][II];
+                        weight = source_data.adjacency_d2dlat2_weights[index][II];
                     }
-                    val = (*fields[ii])[ val_ind ];
-                    #endif
-                    *(deriv_vals.at(ii)) += val * weight;
+                } else {
+                    if (order_of_deriv == 1) {
+                        weight = source_data.adjacency_ddlon_weights[index][II];
+                    } else {
+                        weight = source_data.adjacency_d2dlon2_weights[index][II];
+                    }
                 }
+                val = (*fields[ii])[ val_ind ];
+                #endif
+                *(deriv_vals.at(ii)) += val * weight;
             }
         }
 
@@ -93,6 +104,68 @@ void spher_derivative_at_point(
                do_lat ? Ilat :
                do_lon ? Ilon : -1;
     const int Nref = grid.size();
+
+    // If first order, just short-circuit and using nearest point
+    if ( diff_ord == 1 ) {
+
+        index = Index( Itime, Idepth, Ilat, Ilon,
+                       Ntime, Ndepth, Nlat, Nlon );
+
+        // Check if the prior point would be land
+        int lb = ( ( Iref - 1 ) % Nref + Nref ) % Nref;
+        size_t L_index = Index( Itime, do_dep ? lb : Idepth, do_lat ? lb : Ilat, do_lon ? lb : Ilon,
+                                Ntime, Ndepth,               Nlat,               Nlon );
+
+        // Check if the next point would be land
+        int ub = ( ( Iref + 1 ) % Nref + Nref ) % Nref;
+        size_t R_index = Index( Itime, do_dep ? lb : Idepth, do_lat ? lb : Ilat, do_lon ? lb : Ilon,
+                                Ntime, Ndepth,               Nlat,               Nlon );
+
+        double ldist = 1e15, rdist = 1e15;
+        if ( ( do_lon 
+                    or 
+               ( (do_lat or do_dep) and (Iref > 0 ) ) 
+             )
+             and 
+             (mask[L_index]) 
+           ) {
+            ldist = grid.at(Iref) - grid.at(lb);
+        }
+
+        if ( ( do_lon 
+                    or 
+               ( (do_lat or do_dep) and (Iref < Nref - 1 ) ) 
+             )
+             and 
+             (mask[R_index]) 
+           ) {
+            rdist = grid.at(ub) - grid.at(Iref);
+        }
+
+        for (int ii = 0; ii < num_deriv; ii++) {
+            if (deriv_vals.at(ii) != NULL) {
+                #if DEBUG >= 1
+                if ( (ldist == 1e15) and (rdist == 1e15) ) {
+                    *(deriv_vals.at(ii)) = 0.;
+                } else if ( rdist < ldist ) {
+                    *(deriv_vals.at(ii)) = ( fields[ii]->at(R_index) - fields[ii]->at(  index) ) / rdist;
+                } else {
+                    *(deriv_vals.at(ii)) = ( fields[ii]->at(  index) - fields[ii]->at(L_index) ) / ldist;
+                }
+                #else
+                if ( (ldist == 1e15) and (rdist == 1e15) ) {
+                    *(deriv_vals.at(ii)) = 0.;
+                } else if ( rdist < ldist ) {
+                    *(deriv_vals.at(ii)) = ( (*fields[ii])[R_index] - (*fields[ii])[  index] ) / rdist;
+                } else {
+                    *(deriv_vals.at(ii)) = ( (*fields[ii])[  index] - (*fields[ii])[L_index] ) / ldist;
+                }
+                #endif
+            }
+        }
+
+        return;
+    }
 
     // If it's a singleton dimension, just return zeros (we zeroed out earlier)
     //      this if for the case of no actual depth values

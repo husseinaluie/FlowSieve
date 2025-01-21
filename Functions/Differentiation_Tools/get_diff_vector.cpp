@@ -19,13 +19,15 @@ void get_diff_vector(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const int order_of_deriv,
         const int diff_ord
         ) {
 
+    const int LB_input = LB_ret;
+
     // Check which derivative we're taking
-    int index;
+    int index = 0;
     const bool do_dep = (dim == "depth");
     const bool do_lat = (dim == "lat");
     const bool do_lon = (dim == "lon");
@@ -95,6 +97,7 @@ void get_diff_vector(
         else { LB++; }
     }
 
+
     // We're including LB and UB in our stencil, so the stencil
     //   has UB - LB + 1 points. The requisit number of points is
     //   num_deriv_pts.
@@ -162,4 +165,5 @@ void get_diff_vector(
         }
     }
 
+    assert( LB_ret != LB_input );
 }

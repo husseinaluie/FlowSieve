@@ -9,7 +9,7 @@ void package_field(
         double & scale_factor,
         double & add_offset,
         const std::vector<double> & original,
-        const std::vector<bool> * mask,
+        const std::vector<short int> * mask,
         MPI_Comm comm
         ) {
 

@@ -33,7 +33,7 @@ void compute_KE_spectra_and_slopes(
         ) {
 
     // Create some tidy names for variables
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     const size_t num_pts = u_lon_tot.size();
     size_t index;

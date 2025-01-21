@@ -79,7 +79,7 @@ void compute_vorticity_at_point(
         const std::vector<double>   &latitude   = source_data.latitude,
                                     &longitude  = source_data.longitude;
 
-        const std::vector<bool> &mask = source_data.mask;
+        const std::vector<short int> &mask = source_data.mask;
 
         size_t index = Index(Itime, Idepth, Ilat, Ilon,
                              Ntime, Ndepth, Nlat, Nlon);

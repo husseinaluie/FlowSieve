@@ -13,6 +13,7 @@
 #include "hdf5.h"
 
 #include "functions.hpp" // this provides class info
+#include "preprocess.hpp" // this provides class info
 
 /*!
  * \file
@@ -197,7 +198,7 @@ void write_field_to_output(
         const size_t * start, 
         const size_t * count,
         const std::string & filename,
-        const std::vector<bool> * mask = NULL,
+        const std::vector<short int> * mask = NULL,
         MPI_Comm = MPI_COMM_WORLD
         );
 
@@ -224,7 +225,7 @@ void write_time_average_to_post(
         size_t * count,
         //const char * filename,
         const std::string & filename,
-        const std::vector<bool> * mask,
+        const std::vector<short int> * mask,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -240,7 +241,7 @@ void read_var_from_file(
         std::vector<double> &var,
         const std::string & var_name,
         const std::string & filename,
-        std::vector<bool> *mask = NULL,
+        std::vector<short int> *mask = NULL,
         std::vector<int> *myCounts = NULL,
         std::vector<int> *myStarts = NULL,
         const int Nprocs_in_time = 1,
@@ -256,13 +257,13 @@ void read_var_from_file_at_time(
         const size_t time_index,
         const std::string & var_name,
         const std::string & filename,
-        std::vector<bool> *mask = NULL,
+        std::vector<short int> *mask = NULL,
         const double land_fill_value = 0.,
         const MPI_Comm = MPI_COMM_WORLD 
         );
 
 void read_mask_from_file(
-        std::vector<bool> &mask,
+        std::vector<short int> &mask,
         const std::string & var_name,
         const std::string & filename,
         const int Nprocs_in_time = 1,
@@ -348,7 +349,7 @@ void package_field(
         double & scale_factor,
         double & add_offset,
         const std::vector<double> & original,
-        const std::vector<bool> * mask,
+        const std::vector<short int> * mask,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -367,6 +368,24 @@ void initialize_adjacency_file(
         const std::vector<std::string> & vars,
         const char * filename,
         const double filter_scale = -1,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+// Helmholtz
+void write_Helmholtz_output(
+        const std::string & filename,
+        const HelmholtzDataClass & Helmholtz_data,
+        const dataset & source_data,
+        const dataset & solution_data,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+// Scalar Landfill
+void write_HelmholtzScalar_output(
+        const std::string & filename,
+        const HelmholtzDataClass & Helmholtz_data,
+        const dataset & source_data,
+        const dataset & solution_data,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 

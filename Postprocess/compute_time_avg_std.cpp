@@ -14,7 +14,7 @@ void compute_time_avg_std(
         const dataset & source_data,
         const std::vector<const std::vector<double>*> & postprocess_fields,
         const std::vector<int> & mask_count,
-        const std::vector<bool> & always_masked,
+        const std::vector<short int> & always_masked,
         const int full_Ntime
         ){
 

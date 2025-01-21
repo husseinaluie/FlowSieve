@@ -11,7 +11,7 @@ void toroidal_vel_div(
         const std::vector<double> & vel_lon,
         const std::vector<double> & vel_lat,
         const dataset & source_data,
-        const std::vector<bool> & mask
+        const std::vector<short int> & mask
     ) {
 
     size_t index;
@@ -38,8 +38,8 @@ void toroidal_vel_div(
     default(none) \
     shared( latitude, longitude, mask, div, vel_lon, vel_lat, \
             lon_deriv_fields, lat_deriv_fields, source_data )\
-    private(Itime, Idepth, Ilat, Ilon, index, cos_lat, sin_lat, tmp_val, ulat, \
-            local_lat, dulon_dlon, dulat_dlat, lon_deriv_vals, lat_deriv_vals, is_pole ) \
+    private(Itime, Idepth, Ilat, Ilon, index, tmp_val, \
+            local_lat, dulon_dlon, dulat_dlat, lon_deriv_vals, lat_deriv_vals ) \
     firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
     {
 
@@ -49,7 +49,7 @@ void toroidal_vel_div(
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < Npts; ++index) {
 
-            tmp_val = constants::fill_value;
+            tmp_val = 0.;//constants::fill_value;
 
             if (mask.at(index)) { // Skip land areas
 
@@ -78,19 +78,20 @@ void toroidal_vel_div(
                                 ? latitude.at(Ilat)
                                 : latitude.at(index);
 
-                cos_lat = cos(local_lat);
-                sin_lat = sin(local_lat);
 
-                ulat = vel_lat.at(index);
 
-                // If we're too close to the pole (less than 0.01 degrees), bad things happen
-                is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 0.01;
+                // If we're too close to the pole bad things happen
+                bool is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 1e-6;
 
                 if ( is_pole ) {
                     tmp_val = 0.;
                 } else {
-                    tmp_val = dulon_dlon  +  cos_lat * dulat_dlat  -  ulat * sin_lat ;
-                    tmp_val *= 1. / ( cos_lat * constants::R_earth );
+                    double cos_lat = cos(local_lat);
+                    double tan_lat = tan(local_lat);
+                    double ulat = vel_lat.at(index);
+
+                    tmp_val = dulon_dlon / cos_lat  +  dulat_dlat  -  ulat * tan_lat ;
+                    tmp_val *= 1. / constants::R_earth;
                 }
 
             }

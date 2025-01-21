@@ -66,7 +66,7 @@ void apply_filter_at_point_for_quadratics(
                                 &longitude  = source_data.longitude,
                                 &dAreas     = source_data.areas;
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     const int   Ntime   = source_data.Ntime,
                 Ndepth  = source_data.Ndepth,

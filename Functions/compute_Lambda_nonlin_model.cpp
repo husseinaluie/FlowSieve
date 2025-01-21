@@ -33,7 +33,7 @@ void  compute_Lambda_nonlin_model(
     const MPI_Comm comm
     ) {
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     #if DEBUG >= 2
     int wRank, wSize;

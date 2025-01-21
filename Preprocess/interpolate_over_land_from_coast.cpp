@@ -18,7 +18,7 @@ void interpolate_over_land_from_coast(
         const std::vector<double> & depth,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
-        const std::vector<bool>   & mask,
+        const std::vector<short int> & mask,
         const std::vector<int>    & myCounts,
         const MPI_Comm comm
         ){

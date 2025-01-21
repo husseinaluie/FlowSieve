@@ -10,7 +10,7 @@
 void compute_region_areas(
         std::vector<double> & region_areas,
         const std::vector<double> & areas,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
         const int num_regions,

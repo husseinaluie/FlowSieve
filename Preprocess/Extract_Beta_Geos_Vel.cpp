@@ -14,7 +14,7 @@
 void build_LHS_matrix(
         alglib::sparsematrix & matr,
         const dataset & source_data,
-        const std::vector<bool> &mask,
+        const std::vector<short int> &mask,
         const int Itime,
         const int Idepth
         ) {
@@ -89,7 +89,7 @@ void build_LHS_matrix(
 void build_RHS_matrix(
         alglib::sparsematrix & matr,
         const dataset & source_data,
-        const std::vector<bool> &mask,
+        const std::vector<short int> &mask,
         const int Itime,
         const int Idepth
         ) {
@@ -188,7 +188,7 @@ void Extract_Beta_Geos_Vel(
         std::vector<double> & u_beta,
         std::vector<double> & v_beta,
         const std::vector<double> & ssh,
-        const std::vector<bool> &mask,
+        const std::vector<short int> &mask,
         dataset & source_data,
         const double rel_tol,
         const int max_iters,

@@ -36,7 +36,7 @@ void Cart_derivatives_at_point(
                                   and include_depth_derivs                  // and the call to Cart_derivs wants depth derivatives
                                   and ( source_data.Nprocs_in_depth > 1 )   // and we have more than one MPI rank in depth
                                   );
-    const std::vector<bool> &mask = use_depth_mask ? source_data.mask_DEPTH : source_data.mask;
+    const std::vector<short int> &mask = use_depth_mask ? source_data.mask_DEPTH : source_data.mask;
     const int Idepth_DEPTH = use_depth_mask ? (Idepth + source_data.myStarts[1]) : Idepth;
 
     // Confirm that input sizes match

@@ -11,7 +11,7 @@ void potential_vel_from_F(
         std::vector<double> & vel_lat,
         const std::vector<double> & F,
         const dataset & source_data,
-        const std::vector<bool> & mask
+        const std::vector<short int> & mask
     ) {
 
     int Itime, Idepth, Ilat, Ilon;
@@ -81,7 +81,7 @@ void potential_vel_from_F(
                     local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
                                     ? latitude.at(Ilat)
                                     : latitude.at(index);
-                    is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 0.01;
+                    is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 1e-4;
                     cos_lat = cos(local_lat);
 
                     tmp_lon = is_pole ? 0. : dFdlon / (constants::R_earth * cos_lat);

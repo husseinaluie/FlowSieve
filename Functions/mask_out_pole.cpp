@@ -20,7 +20,7 @@
  */
 void mask_out_pole(
         const std::vector<double> & latitude,
-        std::vector<bool> & mask,
+        std::vector<short int> & mask,
         const int Ntime,
         const int Ndepth,
         const int Nlat,

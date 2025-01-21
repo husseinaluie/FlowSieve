@@ -18,7 +18,7 @@ void KE_from_vels(
             std::vector<double> * u1,
             std::vector<double> * u2,
             std::vector<double> * u3,
-            const std::vector<bool> & mask,
+            const std::vector<short int> & mask,
             const double rho0
         ) {
 

@@ -62,7 +62,7 @@ void filtering_helmholtz(
         &density = ( source_data.has_density ) ? source_data.variables.at("density") : zero_vector;
 
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     const std::vector<int>  &myStarts = source_data.myStarts;
 

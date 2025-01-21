@@ -13,7 +13,7 @@ void write_regions(
         const std::string & filename,
         const std::vector<double> & latitude,
         const std::vector<double> & longitude,
-        const std::vector<bool>   & mask,
+        const std::vector<short int> & mask,
         const std::vector<double> & areas,
         const std::vector<int>    & myCounts,
         const std::vector<int>    & myStarts,

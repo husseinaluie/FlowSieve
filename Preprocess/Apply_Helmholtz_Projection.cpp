@@ -16,7 +16,7 @@ void sparse_vel_from_PsiPhi_vortdiv(
         const dataset & source_data,
         const int Itime,
         const int Idepth,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const bool weight_err,
         const double Tikhov_Laplace,
         const double deriv_scale_factor,
@@ -339,7 +339,7 @@ void Apply_Helmholtz_Projection(
                                 &longitude  = source_data.longitude,
                                 &dAreas     = source_data.areas;
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     const std::vector<int>  &myCounts = source_data.myCounts,
                             &myStarts = source_data.myStarts;
@@ -351,7 +351,7 @@ void Apply_Helmholtz_Projection(
     //   we'll treat land values as zero velocity
     //   We do this because including land seems
     //   to introduce strong numerical issues
-    const std::vector<bool> unmask(mask.size(), true);
+    const std::vector<short int> unmask(mask.size(), true);
 
     const int   Ntime   = myCounts.at(0),
                 Ndepth  = myCounts.at(1),

@@ -36,7 +36,7 @@ void compute_vorticity(
         const MPI_Comm comm
         ) {
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     const int   Ntime   = source_data.Ntime,
                 Ndepth  = source_data.Ndepth,
@@ -98,6 +98,11 @@ void compute_vorticity(
             div_tmp = 0.; 
 
             OkuboWeiss_tmp = 0.; 
+
+            cyclonic_energy_tmp = 0.;
+            anticyclonic_energy_tmp = 0.;
+            divergent_strain_energy_tmp = 0.;
+            traceless_strain_energy_tmp = 0.;
 
             if ( mask.at(index) ) { // Skip land areas
 

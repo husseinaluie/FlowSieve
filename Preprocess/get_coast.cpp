@@ -13,7 +13,7 @@ void get_coast(
         const std::vector<double> & lon_full,
         const std::vector<double> & lat_full,
         const std::vector<double> & field_full,
-        const std::vector<bool>   & mask,
+        const std::vector<short int>   & mask,
         const int Itime,
         const int Idepth,
         const int Ntime,

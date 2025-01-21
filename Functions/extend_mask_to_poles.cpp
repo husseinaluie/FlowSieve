@@ -8,7 +8,7 @@
 
 
 void extend_mask_to_poles(
-        std::vector<bool> & mask_to_extend,
+        std::vector<short int> & mask_to_extend,
         const dataset & source_data,
         const std::vector<double> & extended_latitude,
         const int Ilat_start,
@@ -28,7 +28,7 @@ void extend_mask_to_poles(
 
     // Start extended mask if 'land' everywhere if using land,
     //  otherwise zero-velocity water
-    std::vector<bool> extended_mask( extended_size, extend_val );
+    std::vector<short int> extended_mask( extended_size, extend_val );
 
     int Itime, Idepth, Ilat, Ilon;
     size_t extended_index, index;

@@ -14,7 +14,7 @@ void interpolate_over_land(
         const std::vector<double> &depth,
         const std::vector<double> &latitude,
         const std::vector<double> &longitude,
-        const std::vector<bool>   &mask)
+        const std::vector<short int>   &mask)
 {
     // Count how mayn water points there are (since these are the data points
     //   that are known / valid)

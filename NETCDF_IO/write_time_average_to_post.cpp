@@ -14,7 +14,7 @@ void write_time_average_to_post(
         size_t * count,
         //const char * filename,
         const std::string & filename,
-        const std::vector<bool> * mask,
+        const std::vector<short int> * mask,
         const MPI_Comm comm
         ) {
 

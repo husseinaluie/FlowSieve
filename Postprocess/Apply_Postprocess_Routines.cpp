@@ -23,7 +23,7 @@ void Apply_Postprocess_Routines(
         ) {
 
     // Create some tidy names for variables
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     const std::vector<int>  &myStarts = source_data.myStarts;
 
@@ -307,8 +307,8 @@ void Apply_Postprocess_Routines(
 
         // Extract a common mask that determines what points are always masked.
         //    Also keep a tally of how often a cell is masked
-        std::vector<bool>   always_masked(   Ndepth * Nlat * Nlon, true ),
-                            output_mask(     Ndepth * Nlat * Nlon, false );
+        std::vector<short int>   always_masked(   Ndepth * Nlat * Nlon, true ),
+                                 output_mask(     Ndepth * Nlat * Nlon, false );
         std::vector<int>    mask_count(      Ndepth * Nlat * Nlon, 0 ),
                             mask_count_loc(  Ndepth * Nlat * Nlon, 0 );
 

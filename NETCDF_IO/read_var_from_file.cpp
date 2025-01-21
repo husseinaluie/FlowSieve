@@ -32,7 +32,7 @@ void read_var_from_file(
         std::vector<double> &var,
         const std::string & var_name,
         const std::string & filename,
-        std::vector<bool> *mask,
+        std::vector<short int> *mask,
         std::vector<int> *myCounts,
         std::vector<int> *myStarts,
         const int Nprocs_in_time,
@@ -99,7 +99,6 @@ void read_var_from_file(
     // This should return an error if the variable doesn't exist
     retval = nc_inq_var(ncid, var_id, NULL, NULL, NULL, NULL, NULL);
     if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
-    if (retval == NC_ENOTVAR ) { NC_ERR(NC_ENOTVAR, __LINE__, __FILE__); }
 
     // Get information about the variable
     retval = nc_inq_var(ncid, var_id, NULL, NULL, &num_dims, dim_ids, NULL );
@@ -139,7 +138,7 @@ void read_var_from_file(
             //   we don't split the last two because those 
             //   are assumed to be lat/lon
 
-            if ( ( (num_dims > 2) and (wSize > 1) and (II <= 1) )
+            if ( ( (num_dims > 2) and (wSize > 1) and (II <= 1) and ( force_split_dim == -1 ) )
                  or
                  ( II == force_split_dim )
                ) {
@@ -148,9 +147,13 @@ void read_var_from_file(
                 assert( Nprocs_in_depth > 0 ); // Must specify the number of processors used in depth
                 assert( Nprocs_in_time * Nprocs_in_depth == wSize ); // Total number of processors does no match with specified values
 
-                if      ( II == 0 ) { Nprocs_in_dim = Nprocs_in_time;  }
-                else if ( II == 1 ) { Nprocs_in_dim = Nprocs_in_depth; }
-                else                { Nprocs_in_dim = 0; assert(false); }  // II <= 1 so won't happen
+                if ( force_split_dim == -1 ) {
+                    if      ( II == 0 ) { Nprocs_in_dim = Nprocs_in_time;  }
+                    else if ( II == 1 ) { Nprocs_in_dim = Nprocs_in_depth; }
+                    else                { Nprocs_in_dim = 0; assert(false); }  // II <= 1 so won't happen
+                } else {
+                    Nprocs_in_dim = wSize;
+                }
 
                 assert( (count[II] >= (size_t)Nprocs_in_dim) && "Too many processors have been assigned to dimension." );
 
@@ -158,11 +161,15 @@ void read_var_from_file(
                 overflow = (int)( count[II] - my_count * Nprocs_in_dim );
 
 
-                Index1to4( wRank, Itime_proc,      Idepth_proc,     Ilat_proc, Ilon_proc,
-                                  Nprocs_in_time,  Nprocs_in_depth, 1,         1          );
-                if      ( II == 0 ) { Iproc_in_dim = Itime_proc;  }
-                else if ( II == 1 ) { Iproc_in_dim = Idepth_proc; }
-                else                { Iproc_in_dim = -1; assert(false); }  // II <= 1 so won't happen
+                if ( force_split_dim == -1 ) {
+                    Index1to4( wRank, Itime_proc,      Idepth_proc,     Ilat_proc, Ilon_proc,
+                                      Nprocs_in_time,  Nprocs_in_depth, 1,         1          );
+                    if      ( II == 0 ) { Iproc_in_dim = Itime_proc;  }
+                    else if ( II == 1 ) { Iproc_in_dim = Idepth_proc; }
+                    else                { Iproc_in_dim = -1; assert(false); }  // II <= 1 so won't happen
+                } else {
+                    Iproc_in_dim = wRank;
+                }
 
                 start[II] = (size_t) (   
                           std::min(Iproc_in_dim,            overflow) * (my_count + 1)
@@ -319,7 +326,7 @@ void read_var_from_file(
     // Apply scale factor if appropriate
     double scale = 1.;
     retval = nc_get_att_double(ncid, var_id, "scale_factor", &scale);
-    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    //if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  scale factor = %'g\n", scale); }
     #endif
@@ -327,7 +334,7 @@ void read_var_from_file(
     // Apply offset if appropriate
     double offset = 0.;
     retval = nc_get_att_double(ncid, var_id, "add_offset", &offset);
-    if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
+    //if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
     #if DEBUG >= 2
     if (wRank == 0) { fprintf(stdout, "  additive offset = %'g\n", offset); }
     #endif

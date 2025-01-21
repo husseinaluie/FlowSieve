@@ -29,8 +29,8 @@ void build_main_projection_matrix(
     const std::vector<double>   &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude,
                                 &dAreas     = source_data.areas;
-    const std::vector<bool> &mask = source_data.mask;
-    const std::vector<bool> unmask(mask.size(), true);
+    const std::vector<short int> &mask = source_data.mask;
+    const std::vector<short int> unmask(mask.size(), true);
 
     const std::vector<int>  &myCounts = source_data.myCounts;
 
@@ -341,7 +341,7 @@ void Apply_Helmholtz_Projection_uiuj(
     const std::vector<double>   &latitude   = source_data.latitude,
                                 &dAreas     = source_data.areas;
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     const std::vector<int>  &myCounts = source_data.myCounts,
                             &myStarts = source_data.myStarts;
@@ -353,7 +353,7 @@ void Apply_Helmholtz_Projection_uiuj(
     //   we'll treat land values as zero velocity
     //   We do this because including land seems
     //   to introduce strong numerical issues
-    const std::vector<bool> unmask(mask.size(), true);
+    const std::vector<short int> unmask(mask.size(), true);
 
     const int   Ntime   = myCounts.at(0),
                 Ndepth  = myCounts.at(1),

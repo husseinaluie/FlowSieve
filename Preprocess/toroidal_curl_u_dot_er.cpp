@@ -12,7 +12,7 @@ void toroidal_curl_u_dot_er(
         const std::vector<double> & u_lon,
         const std::vector<double> & u_lat,
         const dataset & source_data,
-        const std::vector<bool>   & mask,
+        const std::vector<short int>   & mask,
         const std::vector<double> * seed
         ) {
 
@@ -80,11 +80,11 @@ void toroidal_curl_u_dot_er(
                             source_data, 0, 0, index, index, mask);
                 }
 
-                // If we're too close to the pole (less than 0.01 degrees), bad things happen
+                // check if we're too close to the pole
                 local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
                                 ? latitude.at(Ilat)
                                 : latitude.at(index);
-                is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 0.01;
+                is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 1e-6;
 
                 if (is_pole) {
                     tmp = 0.;

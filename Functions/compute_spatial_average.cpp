@@ -26,7 +26,7 @@ void compute_spatial_average(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<bool> & mask
+        const std::vector<short int> & mask
         ) {
 
     double integrated_area=0., integrated_sum=0.;
