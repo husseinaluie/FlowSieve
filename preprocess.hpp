@@ -7,6 +7,10 @@
 #include <mpi.h>
 #include <vector>
 
+#include <Eigen/Sparse>
+#include <Eigen/IterativeLinearSolvers>
+#include <Eigen/OrderingMethods>
+
 /*!
  * \file
  * \brief Various pre-processing routines related to coarse-graining.
@@ -31,7 +35,7 @@ void interpolate_over_land(
         const std::vector<double> &depth,
         const std::vector<double> &latitude,
         const std::vector<double> &longitude,
-        const std::vector<bool> &mask);
+        const std::vector<short int> &mask);
 
 /*!
  * @ingroup InterpolationRoutines
@@ -44,7 +48,7 @@ void interpolate_over_land_from_coast(
         const std::vector<double> &depth,
         const std::vector<double> &latitude,
         const std::vector<double> &longitude,
-        const std::vector<bool> &mask,
+        const std::vector<short int> &mask,
         const std::vector<int>    &myCounts,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
@@ -59,7 +63,7 @@ void get_coast(
         const std::vector<double> &lon_full,
         const std::vector<double> &lat_full,
         const std::vector<double> &field_full,
-        const std::vector<bool> &mask,
+        const std::vector<short int> &mask,
         const int Itime,
         const int Idepth,
         const int Ntime,
@@ -71,6 +75,205 @@ void depth_integrate(
         std::vector<double> & depth_integral,
         const std::vector<double> & field_to_integrate,
         const dataset & source_data,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void map_grid_to_grid(
+        const dataset & source_data,
+        dataset & target_data,
+        std::vector<std::string> vars_to_map,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+/*!
+ * \brief Class to store relevant variables for Helmholtz projections
+ *
+ */
+class HelmholtzDataClass {
+
+    public:
+
+        //
+        //// Variables
+        //
+
+        std::vector<short int> all_land_neighbours;
+        size_t num_coastal, num_all_land;
+        std::vector<size_t> pt_maps_to;
+        size_t Ncol, Nrow, Npts_mapped;
+        std::vector<size_t> num_mapped_before_col, num_mapped_before_row, num_land_before;
+        std::vector<size_t> island_reps;
+        std::map< size_t, std::vector<size_t> > coastal_boundaries;
+
+        // Eigen-related
+        Eigen::SparseMatrix<double> LHS;
+        Eigen::LeastSquaresConjugateGradient< Eigen::SparseMatrix<double> > solver;
+        Eigen::SparseQR< Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int> > direct_solver;
+        Eigen::VectorXd RHS, x0, soln;
+        std::vector<double> RHS_vector;
+
+        //
+        bool weight_err = true, use_vel = true, use_vort_div = true, collapse_land = false;
+        double Tikhov = 1, tolerance = 0;
+        unsigned int iteration_max, iterations_per_cycle;
+        double stagnation_tolerance = 1e-30;
+
+
+        // Convergence tracking
+        std::vector<double> vel_2_errors, vort_2_errors, div_2_errors,
+                            vel_inf_errors, vort_inf_errors, div_inf_errors,
+                            vel_2_norms, vort_2_norms, div_2_norms,
+                            vel_inf_norms, vort_inf_norms, div_inf_norms;
+
+
+        //
+        //// Functions
+        //
+
+        // Constructor
+        HelmholtzDataClass();
+
+        // Clear
+        void clear();
+
+        // Identify which points have land-only neighbours
+        void IdentifyLandlockedPoints( const dataset & data, 
+                                       const bool second_order_adjacency = false );
+
+        // Create land-collapsing map [i.e. map continguous land to single point]
+        void CreateLandCollapsingMap( const dataset & data );
+
+        // Build the LHS and RHS part of the problem
+        void Build_LHS( const dataset & data );
+        void Build_RHS( const dataset & data );
+        void VerifyRowNorms();
+
+        void Build_Scalar_LHS_and_RHS( const dataset & data );
+
+        // Set the seed for the solver
+        void Set_Seed( const dataset & data );
+
+        // Set the solver
+        void InitializeSolver();
+
+        // Apply the solver with guess x0
+        void Solve();
+
+        // Apply direct solver to sparse system (no guess)
+        void DirectSolve();
+
+        // Extract Psi/Phi from the solver grid onto the physical grid
+        void Extract_PsiPhi( dataset & data );
+
+        // Extract the projected vels
+        void Extract_ProjectedVars( dataset & data );
+
+        // Extract Land-filled Scalar
+        void Extract_LandfilledScalar( dataset & data );
+
+        // Extract the residuals
+        void Extract_Residuals( dataset & data );
+
+        // Compute projection errors
+        void ComputeProjectionErrors( const dataset & data );
+
+        // Determine convergence
+        bool IsConverged() const;
+        bool StagnationTestScalar() const;
+        bool StagnationTestVector() const;
+
+};
+
+void Helmholtz_Solver(
+        const std::string output_fname,
+        dataset & source_data,
+        const double rel_tol,
+        const unsigned int max_iters,
+        const unsigned int iters_per_batch,
+        const bool weight_err,
+        const bool use_mask,
+        const bool use_vel,
+        const bool use_vort_div,
+        const bool collapse_land, 
+        const int num_refinements,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void Helmholtz_Solver_wSPH(
+        const std::string output_fname,
+        dataset & source_data,
+        const double rel_tol,
+        const unsigned int max_iters,
+        const unsigned int iters_per_batch,
+        const bool weight_err,
+        const bool use_mask,
+        const bool use_vel,
+        const bool use_vort_div,
+        const bool collapse_land, 
+        const int num_refinements,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void Helmholtz_Solver_Diffusion(
+        const std::string output_fname,
+        dataset & source_data,
+        const double rel_tol,
+        const unsigned int max_iters,
+        const unsigned int iters_per_batch,
+        const bool weight_err,
+        const bool use_mask,
+        const bool use_vel,
+        const bool use_vort_div,
+        const bool collapse_land, 
+        const int num_refinements,
+        const double CFL,
+        const double hyper_visc,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void Scalar_Solver(
+        const std::string output_fname,
+        dataset & source_data,
+        const double rel_tol,
+        const unsigned int max_iters,
+        const unsigned int iters_per_batch,
+        const bool weight_err,
+        const bool use_mask,
+        const int num_refinements,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void initialize_coarsened_grid(
+        dataset & coarsened_grid,
+        const dataset & reference_grid,
+        const int Nlat_coarse,
+        const int Nlon_coarse
+        );
+
+void BuildPolyhedralGrid(
+        dataset & polyhedral_grid,
+        const size_t target_num_points 
+        );
+
+void SphericalHarmonicSolver(
+        std::vector<double> & reconstructed_field,
+        const dataset & source_data,
+        const std::vector<double> & Laplaclian_of_field
+        );
+
+
+
+void Apply_Helmholtz_Projection_Eigen(
+        const std::string output_fname,
+        dataset & source_data,
+        const std::vector<double> & seed_tor,
+        const std::vector<double> & seed_pot,
+        const bool single_seed,
+        const double rel_tol,
+        const int max_iters,
+        const bool weight_err,
+        const bool use_mask,
+        const double Tikhov_Laplace,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -263,7 +466,7 @@ void toroidal_vel_from_F(
         std::vector<double> & vel_lat,
         const std::vector<double> & F,
         const dataset & source_data,
-        const std::vector<bool> & mask
+        const std::vector<short int> & mask
     );
 
 void potential_vel_from_F(  
@@ -271,7 +474,7 @@ void potential_vel_from_F(
         std::vector<double> & vel_lat,
         const std::vector<double> & F,
         const dataset & source_data,
-        const std::vector<bool> & mask
+        const std::vector<short int> & mask
     );
 
 void uiuj_from_Helmholtz(  
@@ -313,9 +516,16 @@ void toroidal_curl_u_dot_er(
         const std::vector<double> & u_lon,
         const std::vector<double> & u_lat,
         const dataset & source_data,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const std::vector<double> * seed = NULL
         );
+
+void scalar_laplacian(  
+        std::vector<double> & Lap_scalar,
+        const std::vector<double> & scalar,
+        const dataset & source_data,
+        const std::vector<short int> & mask
+    );
 
 
 void toroidal_sparse_Lap(
@@ -323,7 +533,7 @@ void toroidal_sparse_Lap(
         const dataset & source_data,
         const int Itime,
         const int Idepth,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const bool area_weight = false,
         const size_t row_skip = 0,
         const size_t column_skip = 0
@@ -334,7 +544,7 @@ void sparse_vel_from_PsiPhi(
         const dataset & source_data,
         const int Itime,
         const int Idepth,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         const bool area_weight
         );
 
@@ -359,7 +569,7 @@ void toroidal_Lap_F(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<bool> & mask
+        const std::vector<short int> & mask
         );
 
 
@@ -379,14 +589,14 @@ void toroidal_vel_div(
         const std::vector<double> & vel_lon,
         const std::vector<double> & vel_lat,
         const dataset & source_data,
-        const std::vector<bool> & mask
+        const std::vector<short int> & mask
     );
 
 void Extract_Beta_Geos_Vel(
         std::vector<double> & u_beta,
         std::vector<double> & v_beta,
         const std::vector<double> & ssh,
-        const std::vector<bool> & mask,
+        const std::vector<short int> & mask,
         dataset & source_data,
         const double rel_tol,
         const int max_iters,

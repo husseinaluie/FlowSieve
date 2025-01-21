@@ -29,6 +29,10 @@ class dataset {
         //// Variables
         //
 
+        // IO
+        // Before implementing, need to sort out path sanitization!
+        std::string output_directory = "./";
+
         // Storage for processor assignments
         int Nprocs_in_time, Nprocs_in_depth, Nprocs_in_quadrature = 1;
 
@@ -68,11 +72,22 @@ class dataset {
         std::vector<double> coarse_map_lat, coarse_map_lon, coarse_map_areas;
 
         // Store mask data (i.e. land vs water)
-        std::vector<bool> mask, reference_mask, mask_DEPTH;
+        std::vector<short int> mask, reference_mask, mask_DEPTH;
 
         // Store data-chunking info. These keep track of the MPI divisions to ensure 
         // that the output is in the same order as the input.
         std::vector<int> myCounts, myStarts;
+
+        // Variables for unstructured grids
+        const size_t num_neighbours = constants::ADJACENCY_SIZE;
+        std::vector< std::vector< size_t > >    adjacency_indices;
+        std::vector< std::vector< double > >    adjacency_projected_x,
+                                                adjacency_projected_y,
+                                                adjacency_distances,
+                                                adjacency_ddlon_weights,
+                                                adjacency_ddlat_weights,
+                                                adjacency_d2dlon2_weights,
+                                                adjacency_d2dlat2_weights;
 
         //
         //// Functions
@@ -80,6 +95,13 @@ class dataset {
 
         // Constructor
         dataset();
+        dataset( dataset &set_to_copy ); // copy constructor
+
+        // 'constructor' copy from pointer
+        void copy_from_ptr( const dataset *source );
+
+        // Reset
+        void clear();
 
         // Dimension loaders
         void load_time(      const std::string dim_name, const std::string filename );
@@ -119,8 +141,8 @@ class dataset {
         //  this is necessary for things like depth derivatives
         void gather_variable_across_depth( const std::vector<double> & var,
                                             std::vector<double> & gathered_var ) const ;
-        void gather_mask_across_depth( const std::vector<bool> & var,
-                                                std::vector<bool> & gathered_var
+        void gather_mask_across_depth( const std::vector<short int> & var,
+                                                std::vector<short int> & gathered_var
                                               ) const ;
 
         // Indexing functions
@@ -146,19 +168,6 @@ class dataset {
                              ) const;
 
         // Functions / variables for working with LLC-type grids
-        //const size_t num_neighbours = 3;
-        //const size_t num_neighbours = 5;
-        //const size_t num_neighbours = 7;
-        //const size_t num_neighbours = 8;
-        const size_t num_neighbours = constants::ADJACENCY_SIZE;
-        std::vector< std::vector< size_t > >    adjacency_indices;
-        std::vector< std::vector< double > >    adjacency_projected_x,
-                                                adjacency_projected_y,
-                                                adjacency_distances,
-                                                adjacency_ddlon_weights,
-                                                adjacency_ddlat_weights,
-                                                adjacency_d2dlon2_weights,
-                                                adjacency_d2dlat2_weights;
         void build_adjacency( const MPI_Comm comm = MPI_COMM_WORLD );
         void write_adjacency( const std::string filename, 
                               const MPI_Comm comm = MPI_COMM_WORLD );
@@ -659,6 +668,18 @@ class InputParser {
          */
         void getListofStrings( 
                 std::vector<std::string> &list_of_strings, 
+                const std::string &argname,
+                const bool help = false,
+                const std::string &description = ""
+                ) const;
+
+        /*!
+         *  Extract, parse, and format, a list of strings. This is typically a list of variable names.
+         *  Assumes a string of space-delimited strings, with commas separating product elements
+         *  (e.g. "rho,u rho,v u,u v,v")
+         */
+        void getListofStringPairs( 
+                std::vector< std::vector< std::string > > &list_of_pairs, 
                 const std::string &argname,
                 const bool help = false,
                 const std::string &description = ""

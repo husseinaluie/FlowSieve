@@ -10,6 +10,79 @@
 dataset::dataset() {
 };
 
+// Copy constructor
+dataset::dataset( dataset &set_to_copy ) {
+};
+
+// Reset
+void dataset::clear() {
+
+    time.clear();
+    depth.clear();
+    latitude.clear();
+    longitude.clear();
+
+    areas.clear();
+
+    variables.clear();
+
+    regions.clear();
+    region_names.clear();
+    region_areas.clear();
+    region_areas_water_only.clear();
+
+    coarse_map_lat.clear();
+    coarse_map_lon.clear();
+    coarse_map_areas.clear();
+
+    mask.clear();
+    reference_mask.clear();
+    mask_DEPTH.clear();
+
+    myCounts.clear();
+    myStarts.clear();
+
+
+    adjacency_indices.clear();
+    adjacency_projected_x.clear();
+    adjacency_projected_y.clear();
+    adjacency_distances.clear();
+    adjacency_ddlon_weights.clear();
+    adjacency_ddlat_weights.clear();
+    adjacency_d2dlon2_weights.clear();
+    adjacency_d2dlat2_weights.clear();
+
+};
+
+// Copy from pointer
+void dataset::copy_from_ptr( const dataset *source ) {
+    full_Ntime = source->full_Ntime;
+    full_Ndepth = source->full_Ndepth;
+
+    Ntime = source->Ntime;
+    Ndepth = source->Ndepth;
+
+    time = source->time;
+    depth = source->depth;
+
+    myCounts = source->myCounts;
+    myStarts = source->myStarts;
+
+    longitude = source->longitude;
+    latitude = source->latitude;
+
+    mask = source->mask;
+    areas = source->areas;
+
+    adjacency_indices = source->adjacency_indices;
+
+    adjacency_ddlon_weights = source->adjacency_ddlon_weights;
+    adjacency_ddlat_weights = source->adjacency_ddlat_weights;
+
+    adjacency_d2dlon2_weights = source->adjacency_d2dlon2_weights;
+    adjacency_d2dlat2_weights = source->adjacency_d2dlat2_weights;
+}
+
 void dataset::load_time( const std::string dim_name, const std::string filename ) {
     if ( ( dim_name == "DNE" ) or ( dim_name == "DOES_NOT_EXIST" ) ) {
         time.resize(1);
@@ -298,8 +371,8 @@ void dataset::gather_variable_across_depth( const std::vector<double> & var,
                     comm );
 }
 
-void dataset::gather_mask_across_depth( const std::vector<bool> & var,
-                                        std::vector<bool> & gathered_var
+void dataset::gather_mask_across_depth( const std::vector<short int> & var,
+                                        std::vector<short int> & gathered_var
                                       ) const {
 
     const MPI_Comm &comm = MPI_subcomm_sametimes;
@@ -415,9 +488,9 @@ void dataset::write_adjacency(
     std::vector<std::string> vars_to_write;
 
     vars_to_write.push_back("adjacency_indices");
-    vars_to_write.push_back("adjacency_proj_x");
-    vars_to_write.push_back("adjacency_proj_y");
-    vars_to_write.push_back("adjacency_distances");
+    //vars_to_write.push_back("adjacency_proj_x");
+    //vars_to_write.push_back("adjacency_proj_y");
+    //vars_to_write.push_back("adjacency_distances");
     vars_to_write.push_back("adjacency_ddlon_weights");
     vars_to_write.push_back("adjacency_ddlat_weights");
     vars_to_write.push_back("adjacency_d2dlon2_weights");
@@ -440,6 +513,7 @@ void dataset::write_adjacency(
     } }
     write_field_to_output( var_to_write, "adjacency_indices", starts, counts, filename.c_str() );
 
+    /*
     // Projected x
     for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
             var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_projected_x[II][JJ];
@@ -457,6 +531,7 @@ void dataset::write_adjacency(
             var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_distances[II][JJ];
     } }
     write_field_to_output( var_to_write, "adjacency_distances", starts, counts, filename.c_str() );
+    */
 
 
     // 1st lon deriv weights
