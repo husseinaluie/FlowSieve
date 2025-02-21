@@ -1147,8 +1147,8 @@ void filtering_helmholtz(
                 write_field_to_output(coarse_uiuj_F_Psi, "coarse_uiuj_F_Psi", starts, counts, fname, NULL);
             }
 
-            write_field_to_output( coarse_pressure, "coarse_pressure", starts, counts, fname, &mask );
-            write_field_to_output( coarse_density, "coarse_density", starts, counts, fname, &mask );
+            if ( source_data.has_pressure ) { write_field_to_output( coarse_pressure, "coarse_pressure", starts, counts, fname, &mask ); }
+            if ( source_data.has_density ) { write_field_to_output( coarse_density, "coarse_density", starts, counts, fname, &mask ); }
 
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");  }
         }

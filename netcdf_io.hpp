@@ -37,7 +37,8 @@
 void NC_ERR(
         const int e, 
         const int line_num, 
-        const char* file_name
+        const char* file_name,
+        const bool is_fatal = true
         );
 
 

@@ -9,10 +9,8 @@
 // Write to netcdf file
 void read_attr_from_file(
         double &attr,
-        //const char * attr_name,
         const std::string & attr_name,
         const std::string & filename,
-        //const char * var_name,
         const std::string & var_name,
         const MPI_Comm comm
         ) {
@@ -56,9 +54,6 @@ void read_attr_from_file(
         retval = nc_inq_var(ncid, var_id, NULL, NULL, &num_dims, dim_ids, NULL );
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
     }
-
-    //char attrname [50];
-    //snprintf(attrname, 50, attr_name);
 
     nc_type att_type;
     nc_inq_atttype(ncid, var_id, attr_name.c_str(), &att_type);
@@ -107,8 +102,6 @@ void read_attr_from_file(
         case NC_DOUBLE  : nc_get_att(ncid, var_id, attr_name.c_str(), &att_val_double);  
                           attr = double(att_val_double);  break;
     }
-
-    //nc_get_att(ncid, var_id, attrname, &attr);
 
     #if DEBUG >= 1
     if (wRank == 0) {
