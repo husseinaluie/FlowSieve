@@ -1,7 +1,9 @@
 import numpy as np
 import argparse
-import glob
+import glob, gc
 from netCDF4 import Dataset
+
+gc.enable()
 
 parser = argparse.ArgumentParser(description='Merge postprocessing.')
 
@@ -196,6 +198,7 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
                 prog += 5
             
         if not( varname in all_dims):
+            gc.collect()
             for Ifp, fp in enumerate(sorted_fps):
                 with Dataset( fp, 'r' ) as in_dset:
                     nc_var_objs[varname][Ifp,:] = in_dset[varname][:]
