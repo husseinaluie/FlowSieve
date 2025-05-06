@@ -280,7 +280,7 @@ int main(int argc, char *argv[]) {
         size_t num_land = 0, num_fill = 0, num_missed = 0;
         #pragma omp parallel \
         default(none) shared( source_data, filter_fields, Ivar ) private( index ) \
-        reduction( + : num_land, num_fill, num_missed ) 
+        reduction( + : num_land, num_fill, num_missed ) firstprivate( Npts )
         {
             #pragma omp for collapse(1) schedule(static)
             for (index = 0; index < Npts; index++) {
@@ -428,7 +428,7 @@ int main(int argc, char *argv[]) {
             size_t num_land = 0, num_fill = 0, num_missed = 0;
             #pragma omp parallel \
             default(none) shared( source_data, coarse_fields, Ivar ) private( index ) \
-            reduction( + : num_land, num_fill, num_missed ) 
+            reduction( + : num_land, num_fill, num_missed ) firstprivate( Npts )
             {
                 #pragma omp for collapse(1) schedule(static)
                 for (index = 0; index < Npts; index++) {
@@ -483,7 +483,7 @@ int main(int argc, char *argv[]) {
         size_t num_land = 0;
         #pragma omp parallel \
         default(none) shared( source_data ) private( index ) \
-        reduction( + : num_land ) 
+        reduction( + : num_land ) firstprivate( Npts )
         {
             #pragma omp for collapse(1) schedule(static)
             for (index = 0; index < Npts; index++) {

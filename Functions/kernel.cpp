@@ -97,9 +97,11 @@ double kernel(
                 if ( deriv_order == 0 ) {
                     kern = 0.5 * (1 - tanh( arg ));
                 } else if (deriv_order == 1 ) {
-                    kern = -5 * pow(1./cosh(arg), 2) * dDdell;
+                    double cosh_arg_inv = ( std::fabs(arg) > 700 ) ? 0. : 1./cosh(arg);
+                    kern = -5 * pow(cosh_arg_inv, 2) * dDdell;
                 } else if (deriv_order == 2 ) {
-                    kern = 5 * pow(1./cosh(arg), 2) * ( 20 * tanh(arg) * pow(dDdell,2) - d2Ddell2 );
+                    double cosh_arg_inv = ( std::fabs(arg) > 700 ) ? 0. : 1./cosh(arg);
+                    kern = 5 * pow(cosh_arg_inv, 2) * ( 20 * tanh(arg) * pow(dDdell,2) - d2Ddell2 );
                 }
                 break;
         case constants::KernelType::HighOrder: 
@@ -108,10 +110,12 @@ double kernel(
                 if ( deriv_order == 0 ) {
                     kern = 0.5 * (1 - tanh( arg )) - c2 * exp( -pow(arg2,2.) );
                 } else if (deriv_order == 1 ) {
-                    kern = -5 * pow(1./cosh(arg), 2) * dDdell
+                    double cosh_arg_inv = ( std::fabs(arg) > 700 ) ? 0. : 1./cosh(arg);
+                    kern = -5 * pow(cosh_arg_inv, 2) * dDdell
                         + c2 * 4 * arg2 * exp( -pow(arg2,2.) ) * dDdell;
                 } else if (deriv_order == 2 ) {
-                    kern = 5 * pow(1./cosh(arg), 2) * ( 20 * tanh(arg) * pow(dDdell,2) - d2Ddell2 )
+                    double cosh_arg_inv = ( std::fabs(arg) > 700 ) ? 0. : 1./cosh(arg);
+                    kern = 5 * pow(cosh_arg_inv, 2) * ( 20 * tanh(arg) * pow(dDdell,2) - d2Ddell2 )
                         + c2 * 4 * exp( -pow(arg2,2.) ) * ( 2 * (1 - 2*pow(arg2,2)) * pow( dDdell, 2 ) 
                                                             + arg2 * d2Ddell2 
                                                           );
