@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <mpi.h>
+#include <stdexcept>
 #include "constants.hpp"
 
 
@@ -54,10 +55,7 @@ double particles_interp_from_edges(
         const int left,
         const int right,
         const int bottom,
-        const int top,
-        const double time_p,
-        const int Itime,
-        const int Ntime
+        const int top
         );
 
 void particles_initial_positions(
@@ -76,21 +74,6 @@ void particles_fore_back_difference(
         const std::vector<double> & fore_lat_hist,
         const std::vector<double> & back_lon_hist,
         const std::vector<double> & back_lat_hist,
-        const MPI_Comm comm = MPI_COMM_WORLD
-        );
-
-void particles_project_onto_trajectory(
-        std::vector< std::vector<double> > & field_trajectories,
-        const std::vector<double> & trajectory_time,
-        const std::vector<double> & trajectory_lat,
-        const std::vector<double> & trajectory_lon,
-        const std::vector<const std::vector<double>*> & fields_to_track,
-        const std::vector<double> & time,
-        const std::vector<double> & lat,
-        const std::vector<double> & lon,
-        const std::vector<bool> & particle_mask,
-        const std::vector<bool> & field_mask,
-        const std::vector<int> & myCounts,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 

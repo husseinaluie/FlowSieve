@@ -148,6 +148,7 @@ int main(int argc, char *argv[]) {
     read_var_from_file_at_time( u_lon_0, 0, zonal_vel_name, input_fname, &mask );
     read_var_from_file_at_time( u_lat_0, 0, merid_vel_name, input_fname, &mask );
     if (Ntime == 1) {
+        fprintf(stdout, "Velocity data has a single time instance. Will compute streamlines.\n");
         u_lon_1 = u_lon_0;
         u_lat_1 = u_lat_0;
     } else {
@@ -183,11 +184,9 @@ int main(int argc, char *argv[]) {
 
     // Tracked fields is currently broken. Need to figure out how
     //  to make it work with the leap-frog loading system
+    // Only vels are tracked by default
     names_of_tracked_fields.push_back( "vel_lon");
-    //fields_to_track.push_back(&u_lon);
-
     names_of_tracked_fields.push_back( "vel_lat");
-    //fields_to_track.push_back(&u_lat);
 
     // Storage for tracked fields
     std::vector< std::vector< double > > field_trajectories(names_of_tracked_fields.size());
@@ -250,7 +249,7 @@ int main(int argc, char *argv[]) {
     write_field_to_output(part_lon_hist, "longitude", starts, counts, output_fname, &out_mask);
     write_field_to_output(part_lat_hist, "latitude",  starts, counts, output_fname, &out_mask);
 
-    for (size_t Ifield = 0; Ifield < names_of_tracked_fields.size(); ++Ifield) {
+    for (size_t Ifield = 0; Ifield < field_trajectories.size(); ++Ifield) {
         write_field_to_output(field_trajectories.at(Ifield), 
                 names_of_tracked_fields.at(Ifield),  
                 starts, counts, output_fname, &out_mask);

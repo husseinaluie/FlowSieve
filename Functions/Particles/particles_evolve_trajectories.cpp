@@ -1,10 +1,11 @@
 #include <cassert>
-#include <time.h>
+#include <ctime>
 #include <math.h>
 #include <algorithm>
 #include <vector>
 #include <mpi.h>
 #include <omp.h>
+#include <random>
 #include "../../constants.hpp"
 #include "../../functions.hpp"
 #include "../../particles.hpp"
@@ -28,23 +29,19 @@ void recycle_position(
         double & lon0,
         double & lat0,
         const std::vector<double> & longitude,
-        const std::vector<double> & latitude
+        const std::vector<double> & latitude,
+        const double rand1, // [0,1]
+        const double rand2  // [0,1]
         ) {
 
-    // Set the bounds
-    double lon_rng, lat_rng, lon_mid, lat_mid;
 
-    lon_rng =         longitude.back() - longitude.front();
-    lat_rng = 0.9 * ( latitude.back()  - latitude.front() );
-    lon_mid = 0.5 * ( longitude.back() + longitude.front());
-    lat_mid = 0.5 * ( latitude.back()  + latitude.front() );
+    // reset longitude
+    lon0 = rand1 * longitude.front() + (1.-rand1) * longitude.back();
     
-    // Update the random seed
-    srand( time(NULL) );
-
-    // And randomize the particle
-    lon0 = ( ((double) rand() / (RAND_MAX)) - 0.5) * lon_rng + lon_mid;
-    lat0 = ( ((double) rand() / (RAND_MAX)) - 0.5) * lat_rng + lat_mid;
+    // reset latitude [with cosine weighting]
+    double sin_LB = sin( latitude.front() );
+    double sin_UB = sin( latitude.back() );
+    lat0 = asin( rand2 * sin_UB + (1.-rand2) * sin_LB );
 }
 
 void move_on_sphere(
@@ -60,8 +57,8 @@ void move_on_sphere(
     y_dest = y_init + v / constants::R_earth;
 
     // Account for moving across the poles
-    if (y_dest >  M_PI/2) { y_dest = ( M_PI/2) - y_dest; x_dest += M_PI; }
-    if (y_dest < -M_PI/2) { y_dest = (-M_PI/2) - y_dest; x_dest += M_PI; }
+    if (y_dest >  M_PI/2) { y_dest -= y_dest - ( M_PI/2); x_dest += M_PI; }
+    if (y_dest < -M_PI/2) { y_dest -= y_dest - (-M_PI/2); x_dest += M_PI; }
 
     // Adjust lon for periodicity
     if (x_dest >  M_PI) { x_dest -= 2 * M_PI; }
@@ -86,8 +83,8 @@ double get_at_point(
     particles_get_edges(left, right, bottom, top, lat0, lon0, lat, lon);
 
     double f0, f1;
-    f0 = particles_interp_from_edges( lat0, lon0, lat, lon, &var0, mask, left, right, bottom, top, 0, 0, 1);
-    f1 = particles_interp_from_edges( lat0, lon0, lat, lon, &var1, mask, left, right, bottom, top, 0, 0, 1);
+    f0 = particles_interp_from_edges( lat0, lon0, lat, lon, &var0, mask, left, right, bottom, top );
+    f1 = particles_interp_from_edges( lat0, lon0, lat, lon, &var1, mask, left, right, bottom, top );
 
     double t_p = ( t - t0 ) / (t1 - t0);
 
@@ -458,12 +455,16 @@ void particles_evolve_trajectories(
     int perc_base = 5;
     int perc = 0, perc_count=0;
 
+    std::random_device rd;  // seed generator for random
+    std::mt19937_64 gen(rd());  // replace rd() with a number to fix the seed
+    std::uniform_real_distribution<> get_rand(0, 1);
+
     if ( particle_lifespan > 0 ) {
         for (Ip = 0; Ip < Nparts; Ip++) {
             if ( constants::PARTICLE_RECYCLE_TYPE == constants::ParticleRecycleType::FixedInterval ) {
                 recycle_times[Ip] = time.at(0) + particle_lifespan;
             } else if (constants::PARTICLE_RECYCLE_TYPE == constants::ParticleRecycleType::Stochastic) {
-                recycle_times[Ip] = time.at(0) - log((double) rand() / (RAND_MAX)) * particle_lifespan; 
+                recycle_times[Ip] = time.at(0) - log( get_rand(gen) ) * particle_lifespan; 
             }
         }
     }
@@ -472,10 +473,10 @@ void particles_evolve_trajectories(
     //  each particle is using adaptive stepping, so just loop through them getting there
     // We've already loaded in the first two times, so just flag the target time and continue.
     prev_out_ind = 0;
-    for ( next_load_index = 1; next_load_index < Ntime; next_load_index++ ) {
+    for ( next_load_index = 1; next_load_index < (unsigned int) std::fmax(2.,(double)Ntime); next_load_index++ ) {
 
         #if DEBUG >= 0
-        if ( wRank == 0 ) {
+        if ( (wRank == 0) and (Ntime > 1) ) {
             // Every perc_base percent, print a dot, but only the first thread
             while ( ((double)(next_load_index+1) / Ntime) * 100 >= perc ) {
                 perc_count++;
@@ -487,7 +488,7 @@ void particles_evolve_trajectories(
         }
         #endif
 
-        data_load_time = time.at(next_load_index);
+        data_load_time = (Ntime == 1) ? target_times.back() : time.at(next_load_index);
 
         if (next_load_index > 1) {
             // Swap time 1 to time 0
@@ -515,6 +516,11 @@ void particles_evolve_trajectories(
         reduction( max:out_ind )
         {
 
+            // Make a thread-local random generator
+            std::random_device rd;  // seed generator for random
+            std::mt19937_64 gen(rd());  // replace rd() with a number to fix the seed
+            std::uniform_real_distribution<> get_rand(0, 1);
+
             #pragma omp for collapse(1) schedule(static)
             for (Ip = 0; Ip < Nparts; ++Ip) {
 
@@ -536,16 +542,16 @@ void particles_evolve_trajectories(
 
                 // Check if initial positions are fill_value, and recycle if they are
                 if ( (lon0 == constants::fill_value) or (lat0 == constants::fill_value) ) {
-                    recycle_position( lon0, lat0, lon, lat );
+                    recycle_position( lon0, lat0, lon, lat, get_rand(gen), get_rand(gen) );
                 }
 
                 // Seed values for velocities (only used for dt)
                 particles_get_edges(left, right, bottom, top, lat0, lon0, lat, lon);
                 vel_lon_part = particles_interp_from_edges( lat0, lon0, lat, lon, &vel_lon_0, 
-                        mask, left, right, bottom, top, 0, 0, 1);
+                        mask, left, right, bottom, top );
 
                 vel_lat_part = particles_interp_from_edges( lat0, lon0, lat, lon, &vel_lat_0, 
-                        mask, left, right, bottom, top, 0, 0, 1);
+                        mask, left, right, bottom, top );
 
                 // Get initial values for tracked fields
                 if ( next_load_index == 1 ) {
@@ -556,6 +562,21 @@ void particles_evolve_trajectories(
                 }
 
                 while (t_part < time_block_1) {
+
+                    /*
+                    #if DEBUG >= 0
+                    if ( (wRank == 0) and (Ntime == 1) and (Ip == 0) ) {
+                        // Every perc_base percent, print a dot, but only the first thread
+                        while ( (t_part / time_block_1) * 100 >= perc ) {
+                            perc_count++;
+                            if (perc_count % 5 == 0) { fprintf(stdout, "|"); }
+                            else                     { fprintf(stdout, "."); }
+                            fflush(stdout);
+                            perc += perc_base;
+                        }
+                    }
+                    #endif
+                    */
 
                     // Get local dt
                     //   we'll use the previous velocities, which should
@@ -620,9 +641,10 @@ void particles_evolve_trajectories(
                     dt = dt_new;
                     t_part += dt;
 
+                    /*
                     // If our particle went out of bounds, just recycle now.
                     if ( (lat0 <= lat.front()) or (lat0 >= lat.back()) ) {
-                        recycle_position( lon0, lat0, lon, lat );
+                        recycle_position( lon0, lat0, lon, lat, get_rand(gen), get_rand(gen) );
 
                         // We also need to flag the recycle in the previous output
                         if (out_ind > 0) { 
@@ -633,6 +655,7 @@ void particles_evolve_trajectories(
                             part_lat_hist.at(index) = constants::fill_value;
                         }
                     }
+                    */
 
                     // Keep track of if we're going to recycle at the next output
                     //  we're syncing recycling with outputs so that we can flag
@@ -653,11 +676,11 @@ void particles_evolve_trajectories(
                             if ( constants::PARTICLE_RECYCLE_TYPE == constants::ParticleRecycleType::FixedInterval ) {
                                 recycle_times[Ip] += particle_lifespan; 
                             } else if (constants::PARTICLE_RECYCLE_TYPE == constants::ParticleRecycleType::Stochastic) {
-                                recycle_times[Ip] += -log((double) rand() / (RAND_MAX)) * particle_lifespan; 
+                                recycle_times[Ip] += -log( get_rand(gen) ) * particle_lifespan; 
                             }
 
                             // And recycle
-                            recycle_position( lon0, lat0, lon, lat );
+                            recycle_position( lon0, lat0, lon, lat, get_rand(gen), get_rand(gen) );
 
                             do_recycle = false;
                         } else {

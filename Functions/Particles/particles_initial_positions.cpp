@@ -4,6 +4,7 @@
 #include <vector>
 #include <omp.h>
 #include <mpi.h>
+#include <random>
 #include "../../constants.hpp"
 #include "../../functions.hpp"
 #include "../../particles.hpp"
@@ -25,61 +26,11 @@ void particles_initial_positions(
     std::vector<double> lon_rng, lat_rng, lon_mid, lat_mid;
 
     lon_rng.push_back(         longitude.back() - longitude.front()  );
-    lat_rng.push_back( 0.9 * ( latitude.back()  - latitude.front() ) );
     lon_mid.push_back( 0.5 * ( longitude.back() + longitude.front()) );
+
+    lat_rng.push_back( 0.9 * ( latitude.back()  - latitude.front() ) );
     lat_mid.push_back( 0.5 * ( latitude.back()  + latitude.front() ) );
     
-    //const double D2R = M_PI / 180.;
-    // Agulhas
-    // plt.xlim( 10,  60)
-    // plt.ylim(-40,  20)
-    /*
-    lon_rng.push_back(  50 * D2R );
-    lat_rng.push_back(  60 * D2R );
-    lon_mid.push_back(  35 * D2R );
-    lat_mid.push_back( -10 * D2R );
-    */
-    
-    // Gulf
-    // plt.xlim(-100, -30 )
-    // plt.ylim(  10,  60 )
-    /*
-    lon_rng.push_back(  70 * D2R );
-    lat_rng.push_back(  50 * D2R );
-    lon_mid.push_back( -65 * D2R );
-    lat_mid.push_back(  35 * D2R );
-    */
-    
-    // ACC
-    // plt.xlim(-90, -20)
-    // plt.ylim(-75, -15)
-    /*
-    lon_rng.push_back(  70 * D2R );
-    lat_rng.push_back(  60 * D2R );
-    lon_mid.push_back( -55 * D2R );
-    lat_mid.push_back( -45 * D2R );
-    */
-    
-    // Kuroshio
-    // plt.xlim(110, 150)
-    // plt.ylim(  0,  60)
-    /*
-    lon_rng.push_back(   40 * D2R );
-    lat_rng.push_back(   60 * D2R );
-    lon_mid.push_back(  130 * D2R );
-    lat_mid.push_back(   30 * D2R );
-    */
-    
-    // Kuroshio (spot)
-    // plt.xlim(132, 136)
-    // plt.ylim( 29,  31)
-    /*
-    lon_rng.push_back(   4 * D2R );
-    lat_rng.push_back(   2 * D2R );
-    lon_mid.push_back( 134 * D2R );
-    lat_mid.push_back(  30 * D2R );
-    */
-
     int left, right, bottom, top;
     size_t BL_ind, BR_ind, TL_ind, TR_ind;
 
@@ -89,12 +40,24 @@ void particles_initial_positions(
 
     double part_lon, part_lat;
 
-    srand( time(NULL) + (time_t)(1+wRank));
+    // set up the random generator
+    std::random_device rd;  // seed generator for random
+    std::mt19937_64 gen(rd());  // replace rd() with a number to fix the seed
+    std::uniform_real_distribution<> get_rand(-0.5, 0.5);
+    // calling get_rand(gen) returns a random double in range [-0.5, 0.5)
 
     for ( int II = 0; II < Npts; ++II ) {
 
-        part_lon = ( ((double) rand() / (RAND_MAX)) - 0.5) * lon_rng.at(II % Nreg) + lon_mid.at(II % Nreg);
-        part_lat = ( ((double) rand() / (RAND_MAX)) - 0.5) * lat_rng.at(II % Nreg) + lat_mid.at(II % Nreg);
+        // longitude is uniformly sampled
+        part_lon = get_rand(gen) * lon_rng.at(II % Nreg) + lon_mid.at(II % Nreg);
+
+        // latitude is sampled with a cosine weighting
+        // we'll invert from the cumulative probability function,
+        // so get r in [0,1] the CDF value
+        double r = 0.5 + get_rand(gen);
+        double sin_LB = sin( latitude.front() );
+        double sin_UB = sin( latitude.back() );
+        part_lat = asin( r * sin_UB + (1.-r) * sin_LB );
 
         // Check if this particle is on land
         particles_get_edges(left, right, bottom, top, 
@@ -115,12 +78,16 @@ void particles_initial_positions(
                 or ( std::isnan(top)    )
               ) {
 
-            part_lon = ( ((double) rand() / (RAND_MAX)) - 0.5) * lon_rng.at(II % Nreg) + lon_mid.at(II % Nreg);
-            part_lat = ( ((double) rand() / (RAND_MAX)) - 0.5) * lat_rng.at(II % Nreg) + lat_mid.at(II % Nreg);
+            part_lon = get_rand(gen) * lon_rng.at(II % Nreg) + lon_mid.at(II % Nreg);
+
+            double r = 0.5 + get_rand(gen);
+            double sin_LB = sin( latitude.front() );
+            double sin_UB = sin( latitude.back() );
+            part_lat = asin( r * sin_UB + (1.-r) * sin_LB );
+            //part_lat = get_rand(gen) * lat_rng.at(II % Nreg) + lat_mid.at(II % Nreg);
 
             // Check if this particle is on land
-            particles_get_edges(left, right, bottom, top, 
-                    part_lat, part_lon, latitude, longitude);
+            particles_get_edges(left, right, bottom, top, part_lat, part_lon, latitude, longitude);
 
             BL_ind = Index(0, 0, bottom, left,
                            1, 1, Nlat,   Nlon);

@@ -44,7 +44,7 @@ void particles_get_edges(
     } else {
         top = std::upper_bound( lat.begin(), lat.end(), ref_lat ) - lat.begin();
         if (top == 0) {
-            bottom = lat.size() - 1;
+            bottom = 0;
         } else {
             bottom = top - 1;
         }

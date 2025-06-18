@@ -7,6 +7,7 @@
 #include <string>
 #include <map>
 #include <mpi.h>
+#include <stdexcept>
 #include "constants.hpp"
 
 /*!
