@@ -1,9 +1,9 @@
+set -ex
+
 FINAL_TIME="26280" # three years in hours [unit of 'time_unit']
 OUTPUT_FREQUENCY="28800" # eight hours in seconds [always in seconds]
 
 NUM_PARTICLES="1000"  # this is the number of particles *per MPI rank*
-
-set -ex
 
 ./particles.x --zonal_vel "uo" \
               --merid_vel "vo" \

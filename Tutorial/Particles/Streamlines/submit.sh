@@ -1,12 +1,14 @@
 #!/bin/bash
 #SBATCH --output=sim-%j.log
 #SBATCH --error=sim-%j.err
-#SBATCH --time=00-00:30:00         # time (DD-HH:MM:SS)
+#SBATCH --time=00-03:00:00         # time (DD-HH:MM:SS)
 #SBATCH -p spr
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=112
 #SBATCH --job-name="tutorial - Streamlines"
+
+set -ex
 
 echo "${SLURM_NTASKS} MPI processors with ${SLURM_CPUS_PER_TASK} threads each"
 

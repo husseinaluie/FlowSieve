@@ -521,7 +521,7 @@ void particles_evolve_trajectories(
             std::mt19937_64 gen(rd());  // replace rd() with a number to fix the seed
             std::uniform_real_distribution<> get_rand(0, 1);
 
-            #pragma omp for collapse(1) schedule(static)
+            #pragma omp for collapse(1) schedule(guided)
             for (Ip = 0; Ip < Nparts; ++Ip) {
 
                 do_recycle = false;
@@ -562,21 +562,6 @@ void particles_evolve_trajectories(
                 }
 
                 while (t_part < time_block_1) {
-
-                    /*
-                    #if DEBUG >= 0
-                    if ( (wRank == 0) and (Ntime == 1) and (Ip == 0) ) {
-                        // Every perc_base percent, print a dot, but only the first thread
-                        while ( (t_part / time_block_1) * 100 >= perc ) {
-                            perc_count++;
-                            if (perc_count % 5 == 0) { fprintf(stdout, "|"); }
-                            else                     { fprintf(stdout, "."); }
-                            fflush(stdout);
-                            perc += perc_base;
-                        }
-                    }
-                    #endif
-                    */
 
                     // Get local dt
                     //   we'll use the previous velocities, which should
