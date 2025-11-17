@@ -1,7 +1,9 @@
 import numpy as np
 import argparse
-import glob
+import glob, gc
 from netCDF4 import Dataset
+
+gc.enable()
 
 parser = argparse.ArgumentParser(description='Merge postprocessing.')
 
@@ -125,7 +127,7 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
                 continue
 
             # Don't include time averages
-            if ( (DO_NOT_COPY_ZONAL_MEANS ) and ('zonal_average' in varname) ):
+            if ( (DO_NOT_COPY_ZONAL_MEANS ) and ( ('zonal_average' in varname) or ('zonal_median' in varname) ) ):
                 continue
 
             # Don't include time averages
@@ -175,8 +177,8 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
         if ( (DO_NOT_COPY_OKUBOWEISS ) and ('OkuboWeiss' in varname) ):
             continue
 
-        # Don't include time averages
-        if ( (DO_NOT_COPY_ZONAL_MEANS ) and ('zonal_average' in varname) ):
+        # Don't include zonal averages
+        if ( (DO_NOT_COPY_ZONAL_MEANS ) and ( ('zonal_average' in varname) or ('zonal_median' in varname) ) ):
             continue
 
         # Don't include time averages
@@ -195,14 +197,18 @@ with Dataset( args.output_filename[0], 'w', format='NETCDF4') as out_fp:
                     print(".", end = '', flush = True)
                 prog += 5
             
-        if not( varname in all_dims):
-            for Ifp, fp in enumerate(sorted_fps):
-                with Dataset( fp, 'r' ) as in_dset:
-                    nc_var_objs[varname][Ifp,:] = in_dset[varname][:]
-        else:
-            dims = var_dims
-            with Dataset( all_fps[0], 'r' ) as in_dset:
-                nc_var_objs[varname][:] = in_dset[varname][:]
+        try:
+            if not( varname in all_dims):
+                gc.collect()
+                for Ifp, fp in enumerate(sorted_fps):
+                    with Dataset( fp, 'r' ) as in_dset:
+                        nc_var_objs[varname][Ifp,:] = in_dset[varname][:]
+            else:
+                dims = var_dims
+                with Dataset( all_fps[0], 'r' ) as in_dset:
+                    nc_var_objs[varname][:] = in_dset[varname][:]
+        except:
+            print("        - COPY FAILED FOR " + varname, flush = True)
 
 if print_level >= 2:
     print("Done.")
