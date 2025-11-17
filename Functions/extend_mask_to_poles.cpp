@@ -1,7 +1,6 @@
 #include <math.h>
 #include <algorithm>
 #include <vector>
-#include <cassert>
 #include <omp.h>
 #include "../functions.hpp"
 #include "../constants.hpp"
