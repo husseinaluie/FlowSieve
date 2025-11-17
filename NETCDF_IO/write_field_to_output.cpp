@@ -126,10 +126,8 @@ void write_field_to_output(
         MPI_Allreduce(&fmax_loc, &fmax, 1, MPI_DOUBLE, MPI_MAX, comm);
         MPI_Allreduce(&fmin_loc, &fmin, 1, MPI_DOUBLE, MPI_MIN, comm);
 
-        //const double fmiddle = 0.5 * ( fmax + fmin );
-        //const double frange  = fmax - fmin;
-        const double fmiddle = 0.;
-        const double frange  = 0.;
+        const double fmiddle = 0.5 * ( fmax + fmin );
+        const double frange  = fmax - fmin;
 
         #if DEBUG >= 2
         if (wRank == 0) { 
@@ -140,8 +138,7 @@ void write_field_to_output(
         #endif
 
         // Get the multiplicative scale factor. If it's extreme, then truncate it.
-        //scale_factor = frange == 0. ? 1. : fabs( frange / max_val );
-        scale_factor = 1.;
+        scale_factor = frange == 0. ? 1. : fabs( frange / max_val );
 
         #if DEBUG >= 2
         if (wRank == 0) { 

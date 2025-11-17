@@ -27,8 +27,6 @@ void add_var_to_file(
     // Open the NETCDF file
     int FLAG = NC_WRITE;
     int ncid=0, retval;
-    //char buffer [50];
-    //snprintf(buffer, 50, filename);
     retval = nc_open( filename.c_str(), FLAG, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
@@ -41,11 +39,14 @@ void add_var_to_file(
 
     // Declare the variable
     int var_id;
-    //char varname [50];
-    //snprintf(varname, 50, var_name.c_str());
-    //retval = nc_def_var(ncid, varname, datatype, num_dims, dim_ids, &var_id);
     retval = nc_def_var(ncid, var_name.c_str(), datatype, num_dims, dim_ids, &var_id);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+
+    // Chunk the data if there's enough dimensions to justify
+    //if ( num_dims > 2 ) {
+    //    retval = nc_def_var_chunking(ncid, var_id, NC_CHUNKED, NULL); // for now just default chunking
+    //    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    //}
 
     // Add the fill value
     const double fill_value = constants::fill_value;

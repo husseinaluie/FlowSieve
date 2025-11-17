@@ -87,7 +87,9 @@ void read_var_from_file(
         fflush(stdout);
     }
     #endif
-    assert( input_nc_format == NC_FORMAT_NETCDF4 ); // input file must be netCDF-4 format. Use `nccopy -k netCDF-4 input.nc output.nc` to change file version
+    if ( not( input_nc_format == NC_FORMAT_NETCDF4 ) ) {
+        throw std::runtime_error("Input file must be netCDF-4 format. Use `nccopy -k netCDF-4 input.nc output.nc` to change file version.");
+    }
 
     int var_id, num_dims;
     int dim_ids[NC_MAX_VAR_DIMS] = {};
@@ -115,7 +117,7 @@ void read_var_from_file(
     #endif
 
     // Get the size of each dimension
-    size_t start[num_dims], count[num_dims];
+    size_t start[num_dims], count[num_dims], full_count[num_dims];
     size_t num_pts = 1;
     int my_count, overflow,
         Itime_proc, Idepth_proc, Ilat_proc, Ilon_proc;
@@ -130,6 +132,7 @@ void read_var_from_file(
         #if DEBUG >= 2
         if (wRank == 0) { fprintf(stdout, "%'zu ", count[II]); }
         #endif
+        full_count[II] = count[II];
 
         if (do_splits) {
             // If we're split on multiple MPI procs and have > 2 dimensions, 
@@ -235,16 +238,21 @@ void read_var_from_file(
         fprintf( stdout, "Using %d, %d, %d chunks in time, depth, and dim3.\n", num_chunks_time, num_chunks_depth, num_chunks_dim3 );
         #endif
 
-        size_t pts_per_slice, target = 0;
+        size_t pts_per_slice;
         size_t start_chunk[num_dims], count_chunk[num_dims];
         size_t curr_time_count, curr_depth_count, curr_dim3_count;
-        start_chunk[0] = 0;
+        start_chunk[0] = start[0];// 0;
+        size_t target = 0; // target is the index in our storage array
         for (unsigned int Ichunk_time = 0; Ichunk_time < num_chunks_time; ++Ichunk_time) {
+
             curr_time_count = (count[0] / num_chunks_time) + ( (Ichunk_time < (count[0] % num_chunks_time)) ? 1 : 0 );
             pts_per_slice = curr_time_count;
             count_chunk[0] = curr_time_count;
 
-            if (num_dims > 1) { start_chunk[1] = 0; }
+            if (num_dims > 1) { 
+                start_chunk[1] = start[1];// 0;
+            }
+
 
             for (unsigned int Ichunk_depth = 0; Ichunk_depth < num_chunks_depth; ++Ichunk_depth) {
                 if ( num_dims > 1) {
@@ -253,8 +261,12 @@ void read_var_from_file(
                     count_chunk[1] = curr_depth_count;
                 }
 
-                if (num_dims > 2) { start_chunk[2] = 0; }
-                if (num_dims > 3) { start_chunk[3] = 0; }
+                if (num_dims > 2) { 
+                    start_chunk[2] = start[2]; // 0;
+                }
+                if (num_dims > 3) { 
+                    start_chunk[3] = start[3]; // 0;
+                }
 
                 for (unsigned int Ichunk_dim3 = 0; Ichunk_dim3 < num_chunks_dim3; ++Ichunk_dim3) {
                     if ( num_dims > 2 ) {
@@ -267,6 +279,23 @@ void read_var_from_file(
                         pts_per_slice *= count[3];
                         count_chunk[3] = count[3];
                     }
+
+                    /*
+                    size_t target = 0, sub_count = 1;
+                    if ( num_dims > 3 ) { 
+                        target += start_chunk[3];
+                        sub_count *= full_count[3];
+                    }
+                    if ( num_dims > 2 ) {
+                        target += start_chunk[2] * sub_count;
+                        sub_count *= full_count[2];
+                    }
+                    if ( num_dims > 1 ) {
+                        target += start_chunk[1] * sub_count;
+                        sub_count *= full_count[1];
+                    }
+                    target += start_chunk[0] * sub_count;
+                    */
                     
                     #if DEBUG>=2
                     if (num_dims > 2) {
@@ -304,6 +333,9 @@ void read_var_from_file(
 
             start_chunk[0] += curr_time_count;
         }
+
+        fprintf( stdout, "Final target [%'zu], var size [%'zu], expected num pts [%'zu]\n",
+                target, var.size(), num_pts );
     }
     
     // Determine masking, if desired
@@ -372,6 +404,7 @@ void read_var_from_file(
         if (var.at(II) == 0) { num_zeros++; }
         #endif
     }
+    fprintf( stdout, "Rank %d processed the data.\n", wRank );
 
     var_max = var_max * scale + offset;
     var_min = var_min * scale + offset;

@@ -38,7 +38,8 @@
 void NC_ERR(
         const int e, 
         const int line_num, 
-        const char* file_name
+        const char* file_name,
+        const bool is_fatal = true
         );
 
 
@@ -81,7 +82,6 @@ void initialize_output_file(
         const dataset & source_data,
         const std::vector<std::string> & vars,
         const std::string filename,
-        //const char * filename,
         const double filter_scale = -1,
         const int GridType = constants::GRID_TYPE,
         MPI_Comm = MPI_COMM_WORLD

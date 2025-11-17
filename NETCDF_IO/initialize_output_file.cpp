@@ -8,7 +8,6 @@
 void initialize_output_file(
         const dataset & source_data,
         const std::vector<std::string> & vars,
-        //const char * filename,
         const std::string filename,
         const double filter_scale,
         const int GridType,
@@ -20,8 +19,14 @@ void initialize_output_file(
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
     #if DEBUG>=1
-    if (wRank == 0) { fprintf(stdout, "\nPreparing to initialize the output file.\n"); }
+    if (wRank == 0) { fprintf(stdout, "\nPreparing to initialize the output file, %s.\n", filename.c_str()); }
     #endif
+
+    // Open the NETCDF file
+    int FLAG = NC_NETCDF4 | NC_CLOBBER | NC_MPIIO;
+    int ncid=0, retval;
+    retval = nc_create_par( filename.c_str(), FLAG, comm, MPI_INFO_NULL, &ncid);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     // Create some tidy names for variables
     const std::vector<double>   &time       = source_data.time,
@@ -29,12 +34,6 @@ void initialize_output_file(
                                 &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude,
                                 &areas      = source_data.areas;
-
-    // Open the NETCDF file
-    int FLAG = NC_NETCDF4 | NC_CLOBBER | NC_MPIIO;
-    int ncid=0, retval;
-    retval = nc_create_par( filename.c_str(), FLAG, comm, MPI_INFO_NULL, &ncid);
-    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     #if DEBUG>=2
     if (wRank == 0) { fprintf(stdout, "    Logging the filter scale\n"); }
