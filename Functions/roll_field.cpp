@@ -1,7 +1,6 @@
 #include <math.h>
 #include <algorithm>
 #include <vector>
-#include <cassert>
 #include "../functions.hpp"
 
 /*!
@@ -26,7 +25,9 @@ void roll_field(
         const int Nlon
         ) {
 
-    assert(roll_count == 1);
+    if (roll_count != 1) {
+        throw std::runtime_error("Roll count currently forced to be 1. Non-1 input given.");
+    }
 
     // If roll_count is zero, just stop now
     if (roll_count == 0) {return;}
