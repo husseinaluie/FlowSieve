@@ -1,0 +1,1214 @@
+#include "../constants.hpp"
+#include "../functions.hpp"
+#include "../netcdf_io.hpp"
+#include "../preprocess.hpp"
+#include "../differentiation_tools.hpp"
+#include <algorithm>
+#include <utility> // std::swap
+#include <vector>
+#include <deque>
+#include <omp.h>
+#include <math.h>
+#include <numeric> // std::accumulate
+#include <Eigen/Sparse>
+#include <Eigen/IterativeLinearSolvers>
+#include <Eigen/QR>
+
+// Pragma-magic to allow reduction over vector operator
+//      thanks to: https://stackoverflow.com/questions/43168661/openmp-and-reduction-on-stdvector
+#pragma omp declare reduction(vec_long_plus : std::vector<long double> : \
+                              std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<long double>())) \
+                    initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
+
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
+void get_Laplacian( 
+        std::vector<double> & Laplace,
+        const std::vector<double> & field,
+        dataset * coarsened_grid
+        ) {
+
+    const std::vector<double>   &latitude   = coarsened_grid->latitude,
+                                &longitude  = coarsened_grid->longitude;
+    const std::vector<int>  &myCounts = coarsened_grid->myCounts;
+
+    const int   Ntime  = myCounts.at(0),
+                Ndepth = myCounts.at(1),
+                Nlat   = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? myCounts.at(2) : 1,
+                Nlon   = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? myCounts.at(3) : 1;
+    const size_t Npts  = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? Nlat*Nlon : latitude.size();
+
+
+    size_t Ipt, In;
+
+    #pragma omp parallel default(none) private( Ipt ) \
+    shared( coarsened_grid ) firstprivate( Npts )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+
+            Laplace[Ipt] = 0.;
+            double fi = field[Ipt];
+            double Ai = coarsened_grid->adjacency_voronoi_area[Ipt];
+
+            for ( In = 0; In < coarsened_grid->num_neighbours; In++ ) {
+
+                size_t Jpt = coarsened_grid->adjacency_indices[Ipt][In];
+                double fj = field[Jpt];
+
+                double Tij = coarsened_grid->adjacency_DEC_Tij[Ipt][In];
+                Laplace[Ipt] += Tij * ( fj - fi ) / Ai;
+
+            }
+        }
+    }
+
+}
+
+void get_true_vort_div_fast(
+        dataset * coarsened_grid,
+        dataset & PsiPhi_grid
+            ) {
+
+    // Similar to get_vels_vort_and_div, except this manually implements the derivatives
+    // By lumping all of the derivative calculations together we can be more efficient, especially
+    // with the threading.
+
+
+    const std::vector<double>   &latitude   = coarsened_grid->latitude,
+                                &longitude  = coarsened_grid->longitude;
+    const std::vector<int>  &myCounts = coarsened_grid->myCounts;
+
+    const int   Ntime  = myCounts.at(0),
+                Ndepth = myCounts.at(1),
+                Nlat   = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? myCounts.at(2) : 1,
+                Nlon   = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? myCounts.at(3) : 1;
+    const size_t Npts  = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? Nlat*Nlon : latitude.size();
+
+
+    size_t Ipt, In;
+
+    // zero out the fields
+    #pragma omp parallel default(none) private( Ipt ) \
+    shared( coarsened_grid ) firstprivate( Npts )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+
+            #ifdef NDEBUG
+            coarsened_grid->variables["vort"][Ipt] = 0;
+            coarsened_grid->variables["div"][Ipt]  = 0;
+            #else
+            coarsened_grid->variables.at("vort")[Ipt] = 0;
+            coarsened_grid->variables.at("div")[Ipt]  = 0;
+            #endif
+        }
+    }
+
+    //
+    // loop to get vorticity and divergence
+    //
+
+    #pragma omp parallel default(none) private( Ipt, In ) \
+    firstprivate( Ntime, Ndepth, Nlat, Nlon, Npts ) \
+    shared( coarsened_grid, PsiPhi_grid )
+    {
+
+        #pragma omp for collapse(1) schedule(guided)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+            double cos_lat  = cos( coarsened_grid->latitude[Ipt] );
+            for ( In = 0; In < coarsened_grid->num_neighbours+1; In++ ) {
+                size_t Jpt = coarsened_grid->adjacency_indices[Ipt][In];
+
+                double dlon_weight, dlat_weight;
+                const bool use_adjoint = false;
+                if ( (use_adjoint) and (coarsened_grid->adjacency_indices_adjoint.size() > 0) ) {
+                    size_t Jn = coarsened_grid->adjacency_indices_adjoint[Ipt][In];
+                    dlon_weight = -coarsened_grid->adjacency_ddlon_weights[Jpt][Jn];
+                    dlat_weight = -coarsened_grid->adjacency_ddlat_weights[Jpt][Jn];
+                } else {
+                    dlon_weight = coarsened_grid->adjacency_ddlon_weights[Ipt][In];
+                    dlat_weight = coarsened_grid->adjacency_ddlat_weights[Ipt][In];
+                }
+
+                double cos_Jlat = cos( coarsened_grid->latitude[Jpt] );
+
+                #ifdef NDEBUG
+                coarsened_grid->variables["vort"][Ipt] += 
+                    (   dlon_weight * coarsened_grid->variables.at("u_lat")[Jpt]
+                      - dlat_weight * coarsened_grid->variables.at("u_lon")[Jpt] * cos_Jlat
+                    ) / (constants::R_earth * cos_lat);
+
+                coarsened_grid->variables["div"][Ipt] += 
+                    (   dlon_weight * coarsened_grid->variables.at("u_lon")[Jpt]
+                      + dlat_weight * coarsened_grid->variables.at("u_lat")[Jpt] * cos_Jlat
+                    ) / (constants::R_earth * cos_lat);
+                #else
+                coarsened_grid->variables.at("vort")[Ipt] += 
+                    (   dlon_weight * coarsened_grid->variables.at("u_lat")[Jpt]
+                      - dlat_weight * coarsened_grid->variables.at("u_lon")[Jpt] * cos_Jlat
+                    ) / (constants::R_earth * cos_lat);
+
+                coarsened_grid->variables.at("div")[Ipt] += 
+                    (   dlon_weight * coarsened_grid->variables.at("u_lon")[Jpt]
+                      + dlat_weight * coarsened_grid->variables.at("u_lat")[Jpt] * cos_Jlat
+                    ) / (constants::R_earth * cos_lat);
+                #endif
+
+            }
+        }
+    }
+
+
+}
+
+void get_vels_vort_and_div_fast(
+        dataset * coarsened_grid,
+        dataset & PsiPhi_grid
+            ) {
+
+    // Similar to get_vels_vort_and_div, except this manually implements the derivatives
+    // By lumping all of the derivative calculations together we can be more efficient, especially
+    // with the threading.
+
+
+    const std::vector<double>   &latitude   = coarsened_grid->latitude,
+                                &longitude  = coarsened_grid->longitude;
+    const std::vector<int>  &myCounts = coarsened_grid->myCounts;
+
+    const int   Ntime  = myCounts.at(0),
+                Ndepth = myCounts.at(1),
+                Nlat   = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? myCounts.at(2) : 1,
+                Nlon   = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? myCounts.at(3) : 1;
+    const size_t Npts  = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? Nlat*Nlon : latitude.size();
+
+
+    size_t Ipt, In;
+
+    // zero out the fields
+    #pragma omp parallel default(none) private( Ipt ) \
+    shared( coarsened_grid ) firstprivate( Npts )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+
+            #ifdef NDEBUG
+            coarsened_grid->variables["proj_uo_tor"][Ipt] = 0; 
+            coarsened_grid->variables["proj_vo_tor"][Ipt] = 0;  
+            coarsened_grid->variables["proj_uo_pot"][Ipt] = 0;
+            coarsened_grid->variables["proj_vo_pot"][Ipt] = 0;
+
+            coarsened_grid->variables["proj_vort"][Ipt] = 0;
+            coarsened_grid->variables["proj_div"][Ipt]  = 0;
+            #else
+            coarsened_grid->variables.at("proj_uo_tor")[Ipt] = 0; 
+            coarsened_grid->variables.at("proj_vo_tor")[Ipt] = 0;  
+            coarsened_grid->variables.at("proj_uo_pot")[Ipt] = 0;
+            coarsened_grid->variables.at("proj_vo_pot")[Ipt] = 0;
+
+            coarsened_grid->variables.at("proj_vort")[Ipt] = 0;
+            coarsened_grid->variables.at("proj_div")[Ipt]  = 0;
+            #endif
+        }
+    }
+
+
+    //
+    // First loop set gets the velocity components
+    //
+
+    #pragma omp parallel default(none) private( Ipt, In ) \
+    firstprivate( Ntime, Ndepth, Nlat, Nlon, Npts ) \
+    shared( coarsened_grid, PsiPhi_grid )
+    {
+
+        #pragma omp for collapse(1) schedule(guided)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+            double cos_lat = cos( coarsened_grid->latitude[Ipt] );
+            for ( In = 0; In < coarsened_grid->num_neighbours+1; In++ ) {
+                size_t Jpt = coarsened_grid->adjacency_indices[Ipt][In];
+
+                double dlon_weight = coarsened_grid->adjacency_ddlon_weights[Ipt][In];
+                double dlat_weight = coarsened_grid->adjacency_ddlat_weights[Ipt][In];
+
+
+                #ifdef NDEBUG
+                coarsened_grid->variables["proj_uo_tor"][Ipt] += 
+                    - dlat_weight * PsiPhi_grid.variables.at("Psi")[Jpt] /  constants::R_earth;
+                coarsened_grid->variables["proj_vo_tor"][Ipt] +=   
+                      dlon_weight * PsiPhi_grid.variables.at("Psi")[Jpt] / (constants::R_earth * cos_lat);
+
+                coarsened_grid->variables["proj_uo_pot"][Ipt] += 
+                      dlon_weight * PsiPhi_grid.variables.at("Phi")[Jpt] / (constants::R_earth * cos_lat);
+                coarsened_grid->variables["proj_vo_pot"][Ipt] += 
+                      dlat_weight * PsiPhi_grid.variables.at("Phi")[Jpt] /  constants::R_earth;
+                #else
+                coarsened_grid->variables.at("proj_uo_tor")[Ipt] += 
+                    - dlat_weight * PsiPhi_grid.variables.at("Psi")[Jpt] /  constants::R_earth;
+                coarsened_grid->variables.at("proj_vo_tor")[Ipt] +=   
+                      dlon_weight * PsiPhi_grid.variables.at("Psi")[Jpt] / (constants::R_earth * cos_lat);
+
+                coarsened_grid->variables.at("proj_uo_pot")[Ipt] += 
+                      dlon_weight * PsiPhi_grid.variables.at("Phi")[Jpt] / (constants::R_earth * cos_lat);
+                coarsened_grid->variables.at("proj_vo_pot")[Ipt] += 
+                      dlat_weight * PsiPhi_grid.variables.at("Phi")[Jpt] /  constants::R_earth;
+                #endif
+            }
+        }
+    }
+
+
+    //
+    // Second loop sets gets vorticity and divergence
+    //
+
+    #pragma omp parallel default(none) private( Ipt, In ) \
+    firstprivate( Ntime, Ndepth, Nlat, Nlon, Npts ) \
+    shared( coarsened_grid, PsiPhi_grid )
+    {
+
+        #pragma omp for collapse(1) schedule(guided)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+            double cos_lat  = cos( coarsened_grid->latitude[Ipt] );
+            for ( In = 0; In < coarsened_grid->num_neighbours+1; In++ ) {
+                size_t Jpt = coarsened_grid->adjacency_indices[Ipt][In];
+
+                double dlon_weight, dlat_weight;
+                const bool use_adjoint = false;
+                if ( (use_adjoint) and (coarsened_grid->adjacency_indices_adjoint.size() > 0) ) {
+                    size_t Jn = coarsened_grid->adjacency_indices_adjoint[Ipt][In];
+                    dlon_weight = -coarsened_grid->adjacency_ddlon_weights[Jpt][Jn];
+                    dlat_weight = -coarsened_grid->adjacency_ddlat_weights[Jpt][Jn];
+                } else {
+                    dlon_weight = coarsened_grid->adjacency_ddlon_weights[Ipt][In];
+                    dlat_weight = coarsened_grid->adjacency_ddlat_weights[Ipt][In];
+                }
+
+                double cos_Jlat = cos( coarsened_grid->latitude[Jpt] );
+
+                #ifdef NDEBUG
+                coarsened_grid->variables["proj_vort"][Ipt] += 
+                    (   dlon_weight * coarsened_grid->variables.at("proj_vo_tor")[Jpt]
+                      - dlat_weight * coarsened_grid->variables.at("proj_uo_tor")[Jpt] * cos_Jlat
+                    ) / (constants::R_earth * cos_lat);
+
+                coarsened_grid->variables["proj_div"][Ipt] += 
+                    (   dlon_weight * coarsened_grid->variables.at("proj_uo_pot")[Jpt]
+                      + dlat_weight * coarsened_grid->variables.at("proj_vo_pot")[Jpt] * cos_Jlat
+                    ) / (constants::R_earth * cos_lat);
+                #else
+                coarsened_grid->variables.at("proj_vort")[Ipt] += 
+                    (   dlon_weight * coarsened_grid->variables.at("proj_vo_tor")[Jpt]
+                      - dlat_weight * coarsened_grid->variables.at("proj_uo_tor")[Jpt] * cos_Jlat
+                    ) / (constants::R_earth * cos_lat);
+
+                coarsened_grid->variables.at("proj_div")[Ipt] += 
+                    (   dlon_weight * coarsened_grid->variables.at("proj_uo_pot")[Jpt]
+                      + dlat_weight * coarsened_grid->variables.at("proj_vo_pot")[Jpt] * cos_Jlat
+                    ) / (constants::R_earth * cos_lat);
+                #endif
+
+            }
+        }
+    }
+
+
+}
+
+double get_mean( std::vector<double> & f,
+             dataset * data
+             ) {
+
+
+    size_t Ipt, Npts = f.size();
+    long double f_sum = 0., area_sum = 0.;
+    #pragma omp parallel default(none) \
+    shared( f, data ) private( Ipt ) firstprivate( Npts ) \
+    reduction( +:f_sum,area_sum )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts; Ipt++) {
+            long double dA = data->areas[Ipt];
+            area_sum += dA;
+            f_sum  += dA * f[Ipt];
+        }
+    }
+    double mean_val = f_sum / area_sum;
+    return mean_val;
+}
+
+void demean( std::vector<double> & f,
+             dataset * data,
+             double & mean_val,
+             std::vector<short int> * saved_mask
+             ) {
+
+
+    size_t Ipt, Npts = f.size();
+    long double f_sum = 0., area_sum = 0.;
+    #pragma omp parallel default(none) \
+    shared( f, data, saved_mask ) private( Ipt ) firstprivate( Npts ) \
+    reduction( +:f_sum,area_sum )
+    {
+        #pragma omp for collapse(1) schedule(guided)
+        for ( Ipt = 0; Ipt < Npts; Ipt++) {
+            if ( (saved_mask == NULL) or (saved_mask->at(Ipt)) ) {
+                long double dA = data->areas[Ipt];
+                area_sum += dA;
+                f_sum  += dA * f[Ipt];
+            }
+        }
+    }
+    mean_val = f_sum / area_sum;
+    #pragma omp parallel default(none) \
+    shared( f, data, saved_mask ) private( Ipt ) \
+    firstprivate( Npts, mean_val )
+    {
+    #pragma omp for collapse(1) schedule(guided)
+        for ( Ipt = 0; Ipt < Npts; Ipt++) {
+            if ( (saved_mask == NULL) or (saved_mask->at(Ipt)) ) {
+                f[Ipt] -= mean_val;
+            }
+        }
+    }
+}
+
+void get_norms(
+        double & vel_2_err,
+        double & vort_2_err,
+        double & div_2_err,
+        double & vel_2_norm,
+        double & vort_2_norm,
+        double & div_2_norm,
+        double & vel_inf_err,
+        double & vort_inf_err,
+        double & div_inf_err,
+        double & vel_inf_norm,
+        double & vort_inf_norm,
+        double & div_inf_norm,
+        double & vort_2_ener,
+        double & div_2_ener,
+        double & Psi_2_norm,
+        double & Phi_2_norm,
+        dataset * coarsened_grid
+        ) {
+
+    size_t Ipt;
+    bool use_vel = true, use_vort_div = true;
+    const size_t & Npts_coarse = coarsened_grid->mask.size();
+
+    // We lose precision when summing a lot of numbers, so
+    // step into higher precision for the accumulants
+    long double total_area = 0;
+    long double vel_2_err_L = 0, vort_2_err_L = 0, div_2_err_L = 0, 
+                vel_2_norm_L = 0, vort_2_norm_L = 0, div_2_norm_L = 0, vort_2_ener_L = 0, 
+                div_2_ener_L = 0, Phi_2_norm_L = 0, Psi_2_norm_L = 0;
+
+    #pragma omp parallel default(none) \
+    shared( coarsened_grid ) \
+    private( Ipt ) \
+    firstprivate( Npts_coarse, use_vel, use_vort_div ) \
+    reduction( +:total_area,vel_2_err_L,vort_2_err_L,div_2_err_L,vel_2_norm_L,vort_2_norm_L,div_2_norm_L ) \
+    reduction( +:vort_2_ener_L,div_2_ener_L,Phi_2_norm_L,Psi_2_norm_L )\
+    reduction( max:vel_inf_err,vort_inf_err,div_inf_err,vel_inf_norm,vort_inf_norm,div_inf_norm )
+    {
+        #pragma omp for collapse(1) schedule(guided)
+        for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+
+            long double area = coarsened_grid->areas[Ipt];
+            long double incr;
+
+            total_area += area;
+
+            if ( use_vel ) {
+                // Velocity Errors
+                #ifdef NDEBUG
+                incr = sqrt(
+                        pow(
+                               coarsened_grid->variables["proj_uo_tor"][Ipt]
+                             + coarsened_grid->variables["proj_uo_pot"][Ipt]
+                             - coarsened_grid->variables["u_lon"][Ipt]
+                            , 2)
+                        +  pow(
+                               coarsened_grid->variables["proj_vo_tor"][Ipt]
+                             + coarsened_grid->variables["proj_vo_pot"][Ipt]
+                             - coarsened_grid->variables["u_lat"][Ipt]
+                            , 2)
+                        );
+                #else
+                incr = sqrt(
+                        pow(
+                               coarsened_grid->variables.at("proj_uo_tor")[Ipt]
+                             + coarsened_grid->variables.at("proj_uo_pot")[Ipt]
+                             - coarsened_grid->variables.at("u_lon")[Ipt]
+                            , 2)
+                        +  pow(
+                               coarsened_grid->variables.at("proj_vo_tor")[Ipt]
+                             + coarsened_grid->variables.at("proj_vo_pot")[Ipt]
+                             - coarsened_grid->variables.at("u_lat")[Ipt]
+                            , 2)
+                        );
+                #endif
+                vel_inf_err = std::fmax( incr, vel_inf_err );
+
+                vel_2_err_L += area * pow( incr, 2 ); 
+            }
+
+            if ( use_vort_div ) {
+
+                // Vorticity errors
+                #ifdef NDEBUG
+                incr = std::fabs(
+                          coarsened_grid->variables["proj_vort"][Ipt]
+                        - coarsened_grid->variables["vort"][Ipt]
+                        );
+                #else
+                incr = std::fabs(
+                          coarsened_grid->variables.at("proj_vort")[Ipt]
+                        - coarsened_grid->variables.at("vort")[Ipt]
+                        );
+                #endif
+                vort_inf_err = std::fmax( incr, vort_inf_err );
+                vort_2_err_L += area * pow( incr, 2 );
+
+                #ifdef NDEBUG
+                incr = std::fabs( coarsened_grid->variables["proj_vort"][Ipt] );
+                #else
+                incr = std::fabs( coarsened_grid->variables.at("proj_vort")[Ipt] );
+                #endif
+                vort_2_ener_L += area * pow( incr, 2 );
+
+                // Divergence errors
+                #ifdef NDEBUG
+                incr = std::fabs(
+                          coarsened_grid->variables["proj_div"][Ipt]
+                        - coarsened_grid->variables["div"][Ipt]
+                        );
+                #else
+                incr = std::fabs(
+                          coarsened_grid->variables.at("proj_div")[Ipt]
+                        - coarsened_grid->variables.at("div")[Ipt]
+                        );
+                #endif
+                div_inf_err = std::fmax( incr, div_inf_err );
+                div_2_err_L += area * pow( incr, 2 );
+
+                #ifdef NDEBUG
+                incr = std::fabs( coarsened_grid->variables["proj_div"][Ipt] );
+                #else
+                incr = std::fabs( coarsened_grid->variables.at("proj_div")[Ipt] );
+                #endif
+                div_2_ener_L += area * pow( incr, 2 );
+            }
+
+            // Reference norms
+            if ( use_vel ) {
+                #ifdef NDEBUG
+                incr = sqrt(   pow(  coarsened_grid->variables["u_lon"][Ipt], 2)
+                             + pow(  coarsened_grid->variables["u_lat"][Ipt], 2)
+                        );
+                #else
+                incr = sqrt(   pow(  coarsened_grid->variables.at("u_lon")[Ipt], 2)
+                             + pow(  coarsened_grid->variables.at("u_lat")[Ipt], 2)
+                        );
+                #endif
+                vel_inf_norm = std::fmax( incr, vel_inf_norm );
+                vel_2_norm_L += area * pow( incr, 2 ); 
+            }
+
+            if ( use_vort_div ) {
+                #ifdef NDEBUG
+                incr = std::fabs( coarsened_grid->variables["vort"][Ipt] );
+                #else
+                incr = std::fabs( coarsened_grid->variables.at("vort")[Ipt] );
+                #endif
+                vort_inf_norm = std::fmax( incr, vort_inf_norm );
+                vort_2_norm_L += area * pow( incr, 2 );
+
+                #ifdef NDEBUG
+                incr = std::fabs( coarsened_grid->variables["div"][Ipt] );
+                #else
+                incr = std::fabs( coarsened_grid->variables.at("div")[Ipt] );
+                #endif
+                div_inf_norm = std::fmax( incr, div_inf_norm );
+                div_2_norm_L += area * pow( incr, 2 );
+            }
+
+            // Psi and Phi 2 norms
+            #ifdef NDEBUG
+            incr = std::fabs( coarsened_grid->variables["Psi"][Ipt] );
+            #else
+            incr = std::fabs( coarsened_grid->variables.at("Psi")[Ipt] );
+            #endif
+            Psi_2_norm_L += area * pow( incr, 2 );
+
+            #ifdef NDEBUG
+            incr = std::fabs( coarsened_grid->variables["Phi"][Ipt] );
+            #else
+            incr = std::fabs( coarsened_grid->variables.at("Phi")[Ipt] );
+            #endif
+            Phi_2_norm_L += area * pow( incr, 2 );
+        }
+    }
+
+    vel_2_err  = sqrt( vel_2_err_L  / total_area );
+    vort_2_err = sqrt( vort_2_err_L / total_area );
+    div_2_err  = sqrt( div_2_err_L  / total_area );
+
+    vort_2_ener = sqrt( vort_2_ener_L / total_area );
+    div_2_ener  = sqrt( div_2_ener_L  / total_area );
+
+    vel_2_norm  = sqrt( vel_2_norm_L  / total_area );
+    vort_2_norm = sqrt( vort_2_norm_L / total_area );
+    div_2_norm  = sqrt( div_2_norm_L  / total_area );
+
+    Psi_2_norm = sqrt( Psi_2_norm_L / total_area );
+    Phi_2_norm = sqrt( Phi_2_norm_L / total_area );
+}
+
+
+void Helmholtz_Solver_Diffusion_DEC(
+        const std::string output_fname,
+        dataset & source_data,
+        const double rel_tol,
+        const unsigned int max_iters,
+        const unsigned int iters_per_batch,
+        const bool weight_err,
+        const bool use_mask,
+        const bool use_vel,
+        const bool use_vort_div,
+        const bool collapse_land,
+        const int num_refinements,
+        const double CFL,
+        const bool seed_provided,
+        const std::vector<double> & Psi_seed,
+        const std::vector<double> & Phi_seed,
+        const MPI_Comm comm
+        ) {
+
+    if ( not(use_vort_div and use_vel) ) {
+        throw std::runtime_error("Must use both vortdiv and vels for time-step solver.");
+    }
+
+    int wRank, wSize;
+    MPI_Comm_rank( comm, &wRank );
+    MPI_Comm_size( comm, &wSize );
+
+    // If we've passed the DO_TIMING flag, then create some timing vars
+    Timing_Records timing_records;
+    double clock_on;
+
+    const size_t Npts = source_data.mask.size();
+
+    // Fill in the land areas with zero velocity
+    size_t index, Ipt;
+    #pragma omp parallel default(none) \
+    shared( source_data ) \
+    private( index ) \
+    firstprivate( Npts )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for (index = 0; index < Npts; index++) {
+            if (not(source_data.mask[index])) {
+                source_data.variables["u_lon"][index] = 0.;
+                source_data.variables["u_lat"][index] = 0.;
+            }
+        }
+    }
+
+    /*
+    double mean_uo, mean_vo;
+    demean( source_data.variables.at("u_lon"), &source_data, mean_uo, NULL );
+    demean( source_data.variables.at("u_lat"), &source_data, mean_vo, NULL );
+    fprintf( stdout, "Mean values of zonal and meridional velocity are %.2e, %.2e\n", mean_uo, mean_vo );
+    fprintf( stdout, "REMOVING THE MEAN VELOCITIES FOR NOW\n" );
+    */
+
+    #if DEBUG >= 2
+    fprintf(stdout, "Initializing class objects for data storage.\n");
+    #endif
+    HelmholtzDataClass Helmholtz_data;
+    Helmholtz_data.collapse_land = collapse_land;
+    dataset solution_grid;
+    dataset *coarsened_grid = new dataset();
+
+    // Beginning the v-cycle [or, more acurrately, just a / cycle?]
+    // Start at the coarsest resolution, solve, refine, repeat
+    int Nlat_coarse = 0, Nlon_coarse = 0;
+    size_t Npts_coarse = 0;
+    for ( int refine_level = num_refinements; refine_level >= 0; refine_level-- ) {
+
+        #if DEBUG >= 0
+        fprintf(stdout, "\n\nBeginning refinement level %d.\n", refine_level);
+        #endif
+        std::vector<short int> saved_mask;
+
+        // If refinement is turned on, do it
+        if ( refine_level > 0 ) {
+            Nlat_coarse = floor(sqrt( 0.5 * (Npts / pow(4., 2*refine_level)) ));
+            Nlon_coarse = 2 * Nlat_coarse;
+            Npts_coarse = (size_t) Nlat_coarse * Nlon_coarse;
+
+            #if DEBUG >= 2
+            fprintf(stdout, "Refinement level has Nlat x Nlon of %d x %d.\n", Nlat_coarse, Nlon_coarse);
+            #endif
+
+
+            // Downsample the velocities onto the coarse grid
+            std::vector<std::string> vars_to_map = { "u_lon", "u_lat", "vort", "div" };
+
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+            initialize_coarsened_grid( *coarsened_grid, source_data, Nlat_coarse, Nlon_coarse );
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "InitializeCoarseGrid"); }
+
+            Npts_coarse = coarsened_grid->longitude.size(); // The coarsened grid might have a different size
+            for ( size_t Ivar = 0; Ivar < vars_to_map.size(); Ivar++ ) {
+                coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                            vars_to_map[Ivar], std::vector<double>(Npts_coarse, 0.) ) );
+            }
+
+            #if DEBUG >= 2
+            fprintf(stdout, "Mapping velocities onto the coarse grid.\n");
+            #endif
+            vars_to_map = { "u_lon", "u_lat" };
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+            map_grid_to_grid( source_data, *coarsened_grid, vars_to_map );
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Downsampling"); }
+
+            coarsened_grid->adjacency_indices_adjoint.resize(0);
+        } else {
+            // Otherwise we're on the original grid, so just use the source
+            coarsened_grid = &source_data;
+            Npts_coarse = Npts;
+
+            coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                        "vort", std::vector<double>(Npts_coarse, 0.) ) );
+            coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                        "div", std::vector<double>(Npts_coarse, 0.) ) );
+
+        }
+
+        // Prepare the DEC stencil
+        coarsened_grid->build_DEC_stencil();
+
+        saved_mask = coarsened_grid->mask; // store a copy
+
+        // In addition to cell areas, we also need cell side lengths
+        // this is necessary for cells with wild aspect ratios
+        // such as in NEMO tripolar grid near the tripole
+        std::vector<double> min_side_length( Npts_coarse, 0. ), diff_coeff( Npts_coarse, 0. );
+        std::vector<short int> ill_conditioned( Npts_coarse, false );
+        std::map< size_t, std::vector<size_t> > local_kernel_indices;
+        std::map< size_t, std::vector<double> > local_kernel_kA;
+        size_t num_ill_conditioned = 0;
+        double min_da = 4 * M_PI * pow( constants::R_earth, 2.);;
+        double total_area = 0.;
+        #pragma omp parallel default(none) private( Ipt ) \
+        shared(min_side_length, coarsened_grid, ill_conditioned, diff_coeff, saved_mask ) \
+        firstprivate(Npts_coarse, refine_level) \
+        reduction( min:min_da ) reduction( +:total_area )
+        {
+            #pragma omp for collapse(1) schedule(guided) 
+            for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+                total_area += coarsened_grid->adjacency_voronoi_area[Ipt];
+                min_da = std::fmin( min_da, coarsened_grid->adjacency_voronoi_area[Ipt] )
+            }
+        }
+        fprintf( stdout, "min_da = %.3e\n", min_da );
+
+
+        std::ostringstream adj_stream;
+        adj_stream << "adjacency_R" << (refine_level) << ".nc";
+        coarsened_grid->write_adjacency( adj_stream.str() );
+
+        // We're done with the land mask, so remove it. This causes vort and
+        // div to be computed on land cells to ensure agreement
+        std::fill( coarsened_grid->mask.begin(), coarsened_grid->mask.end(), true );
+
+        // Get vorticity and divergence
+        #if DEBUG >= 2
+        fprintf(stdout, "Computing vorticity and divergence on coarse grid.\n");
+        #endif
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+        //get_true_vort_div( coarsened_grid, *coarsened_grid );
+        get_true_vort_div_fast( coarsened_grid, *coarsened_grid );
+
+        // zero out at ill-conditioned points
+        #pragma omp parallel default(none) shared( coarsened_grid, ill_conditioned ) \
+        firstprivate( Npts_coarse )
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+                if ( ill_conditioned[Ipt] ) {
+                    coarsened_grid->variables.at("div" )[Ipt] = 0.;
+                    coarsened_grid->variables.at("vort")[Ipt] = 0.;
+                }
+            }
+        }
+        double mean_vort, mean_div;
+        demean( coarsened_grid->variables.at("vort"), coarsened_grid, mean_vort, refine_level == 0 ? &saved_mask : NULL );
+        demean( coarsened_grid->variables.at("div" ), coarsened_grid, mean_div,  refine_level == 0 ? &saved_mask : NULL );
+        fprintf( stdout, "Mean values of vorticity and divergence are %.2e, %.2e\n", mean_vort, mean_div );
+
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Downsampling"); }
+
+        // Add Psi and Phi variables to our coarsened grid
+        coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                    "Psi", std::vector<double>(Npts_coarse, 0.) ) );
+        coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                    "Phi", std::vector<double>(Npts_coarse, 0.) ) );
+
+        // Now, up-sample the previous solutions onto the new grid
+        if ( refine_level < num_refinements ) {
+
+            std::vector<std::string> vars_to_map = { "Psi", "Phi" };
+
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+            map_grid_to_grid( solution_grid, *coarsened_grid, vars_to_map );
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Upsampling"); }
+        }
+
+        // Re-initialize the solution grid on the new computational grid
+        // To avoid having to re-build, just copy from the coarsened grid
+        solution_grid.clear();
+        solution_grid.copy_from_ptr( coarsened_grid );
+        std::fill( solution_grid.mask.begin(), solution_grid.mask.end(), true ); 
+
+        solution_grid.variables.insert( std::pair< std::string, std::vector<double> >(
+                    "Psi", std::vector<double>(Npts_coarse, 0.) ) );
+        solution_grid.variables.insert( std::pair< std::string, std::vector<double> >(
+                    "Phi", std::vector<double>(Npts_coarse, 0.) ) );
+
+        // Reset the Helmholtz data for this resolution
+        Helmholtz_data.clear();
+        Helmholtz_data.collapse_land = collapse_land;
+        Helmholtz_data.use_vort_div = use_vort_div;
+        Helmholtz_data.use_vel = use_vel;
+        Helmholtz_data.weight_err = weight_err;
+        Helmholtz_data.tolerance = rel_tol;
+
+        Helmholtz_data.iterations_per_cycle = refine_level == 0 ? 1000 : 10000;
+        Helmholtz_data.iteration_max = refine_level == 0 ? 500000 : 1000000;
+
+        //Helmholtz_data.iterations_per_cycle = refine_level == 0 ? 100 : Npts_coarse / 10;
+        //Helmholtz_data.iteration_max = refine_level == 0 ? 500 : Npts_coarse * 100;
+
+        // Use spherical harmonics to set the seed
+        coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                    "Psi", std::vector<double>(Npts_coarse, 0.) ) );
+        coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                    "Phi", std::vector<double>(Npts_coarse, 0.) ) );
+        if ( (num_refinements == 0) and (seed_provided) ) {
+            coarsened_grid->variables["Psi"] = Psi_seed;
+            coarsened_grid->variables["Phi"] = Phi_seed;
+        } else if ( refine_level == num_refinements ) {
+            /*
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+            SphericalHarmonicSolver(  
+                    coarsened_grid->variables.at("Psi"),
+                    coarsened_grid->variables.at("Phi"),
+                   *coarsened_grid,
+                    coarsened_grid->variables.at("vort"),
+                    coarsened_grid->variables.at("div") 
+                    );
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "SphericalHarmonicSolver"); }
+            */
+        }
+
+
+        //
+        //// Output the seed / starting guess
+        //
+        std::vector<std::string> vars_to_add = { 
+            "projected_u_lon", "projected_u_lat", "projected_vort", "projected_div",
+            "proj_uo_tor", "proj_uo_pot", "proj_vo_tor", "proj_vo_pot" ,
+            "proj_vort", "proj_div"
+        };
+        for ( size_t Ivar = 0; Ivar < vars_to_add.size(); Ivar++ ) {
+            coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                        vars_to_add[Ivar], std::vector<double>(Npts_coarse, 0.) ) );
+        }
+
+        // Compute velocity components
+        //get_vels_vort_and_div( coarsened_grid, *coarsened_grid );
+        get_vels_vort_and_div_fast( coarsened_grid, *coarsened_grid );
+        demean( coarsened_grid->variables.at("proj_vort"), coarsened_grid, mean_vort, refine_level == 0 ? &saved_mask : NULL );
+        demean( coarsened_grid->variables.at("proj_div" ), coarsened_grid, mean_div,  refine_level == 0 ? &saved_mask : NULL );
+
+        for ( size_t Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+            coarsened_grid->variables.at("projected_u_lon")[Ipt] = 
+                  coarsened_grid->variables.at("proj_uo_tor")[Ipt] 
+                + coarsened_grid->variables.at("proj_uo_pot")[Ipt];
+            coarsened_grid->variables.at("projected_u_lat")[Ipt] = 
+                  coarsened_grid->variables.at("proj_vo_tor")[Ipt] 
+                + coarsened_grid->variables.at("proj_vo_pot")[Ipt];
+        }
+
+        // zero out at ill-conditioned points
+        #pragma omp parallel default(none) shared( coarsened_grid, ill_conditioned ) \
+        firstprivate( Npts_coarse )
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+                if ( ill_conditioned[Ipt] ) {
+                    coarsened_grid->variables.at("proj_div" )[Ipt] = coarsened_grid->variables.at("div" )[Ipt];
+                    coarsened_grid->variables.at("proj_vort")[Ipt] = coarsened_grid->variables.at("vort")[Ipt];
+                }
+            }
+        }
+
+        coarsened_grid->variables.at("projected_vort") = coarsened_grid->variables.at("proj_vort");
+        coarsened_grid->variables.at("projected_div") = coarsened_grid->variables.at("proj_div");
+
+        std::ostringstream seed_stream;
+        seed_stream << "seed_R" << (refine_level) << ".nc";
+        const std::string seed_filename = seed_stream.str();
+        solution_grid.variables.at("Psi") = coarsened_grid->variables.at("Psi");
+        solution_grid.variables.at("Phi") = coarsened_grid->variables.at("Phi");
+        write_Helmholtz_output( seed_filename, Helmholtz_data, *coarsened_grid, solution_grid );
+
+
+        // compute errors and check convergence
+        double vel_2_err  = 0, vel_inf_err  = 0,
+               vort_2_err = 0, vort_inf_err = 0,
+               div_2_err  = 0, div_inf_err  = 0;
+        double vel_2_norm  = 0, vel_inf_norm  = 0,
+               vort_2_norm = 0, vort_inf_norm = 0,
+               div_2_norm  = 0, div_inf_norm  = 0;
+        double vort_2_ener = 0, div_2_ener = 0;
+        double Psi_2_norm = 0, Phi_2_norm = 0;
+
+        get_norms(  vel_2_err,  vort_2_err,  div_2_err,
+                vel_2_norm, vort_2_norm, div_2_norm,
+                vel_inf_err,  vort_inf_err,  div_inf_err,
+                vel_inf_norm, vort_inf_norm, div_inf_norm,
+                vort_2_ener, div_2_ener,
+                Psi_2_norm, Phi_2_norm,
+                coarsened_grid
+                );
+        fprintf( stdout,"Solver starting with relative 2-norm errors of vels, vort, and div at  %.2e, %.2e, and %.2e\n", 
+                vel_2_err / vel_2_norm,
+                vort_2_err / vort_2_norm,
+                div_2_err / div_2_norm
+               );
+
+        double min_div_err = 1e10, min_vort_err = 1e10;
+        int vort_stagnation_count = 0, div_stagnation_count = 0;
+        std::vector<double> dPsidt(Npts_coarse, 0), dPhidt(Npts_coarse, 0);
+
+        bool keep_solving = true;
+        unsigned long int iter_cycle = 0;
+
+        const bool common_dt = false;
+        if ( common_dt ) {
+            fprintf( stdout, "\n\nCommon dt at all points\n\n\n" );
+        } else {
+            fprintf( stdout, "\n\ndt is spatially varying\n\n\n" );
+        }
+
+        while ( keep_solving ) {
+
+            const double dt = CFL;
+
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+
+            #pragma omp parallel default(none) private(Ipt) \
+            shared( Helmholtz_data, coarsened_grid, solution_grid, dPsidt, dPhidt, \
+                    diff_coeff, ill_conditioned, saved_mask, local_kernel_indices, local_kernel_kA ) \
+            firstprivate( Npts_coarse, dt, refine_level, CFL, min_da )
+            {
+                #pragma omp for collapse(1) schedule(guided)
+                for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+
+                    if (     ( refine_level == 0) 
+                         and ( ill_conditioned[Ipt] ) 
+                         //and ( solution_grid.latitude[Ipt] > -70*D2R )
+                         ) {
+
+                        double kA_sum = 0., PsikA_sum = 0., PhikA_sum = 0.;
+                        for ( size_t II = 0; II < local_kernel_indices.at(Ipt).size(); II++ ) {
+                            size_t Jpt = local_kernel_indices.at(Ipt)[II];
+                            double kA = local_kernel_kA.at(Ipt)[II];
+
+                            kA_sum += kA;
+                            #ifdef NDEBUG
+                            PsikA_sum += kA * solution_grid.variables["Psi"][Jpt];
+                            PhikA_sum += kA * solution_grid.variables["Phi"][Jpt];
+                            #else
+                            PsikA_sum += kA * solution_grid.variables.at("Psi")[Jpt];
+                            PhikA_sum += kA * solution_grid.variables.at("Phi")[Jpt];
+                            #endif
+                        }
+                        #ifdef NDEBUG
+                        solution_grid.variables["Psi"][Ipt] = ( kA_sum == 0 ) ? 0. : PsikA_sum / kA_sum;
+                        solution_grid.variables["Phi"][Ipt] = ( kA_sum == 0 ) ? 0. : PhikA_sum / kA_sum;
+                        #else
+                        solution_grid.variables.at("Psi")[Ipt] = ( kA_sum == 0 ) ? 0. : PsikA_sum / kA_sum;
+                        solution_grid.variables.at("Phi")[Ipt] = ( kA_sum == 0 ) ? 0. : PhikA_sum / kA_sum;
+                        #endif
+
+                    } else {
+                        double Psi_force, Phi_force, diff_coeff_local;
+                        diff_coeff_local = common_dt ? min_da : coarsened_grid->areas[Ipt];
+                        #ifdef NDEBUG
+                        Psi_force = (coarsened_grid->variables["proj_vort"][Ipt] - coarsened_grid->variables["vort"][Ipt]);
+                        Phi_force = (coarsened_grid->variables["proj_div" ][Ipt] - coarsened_grid->variables["div" ][Ipt]);
+                        #else
+                        Psi_force = (coarsened_grid->variables.at("proj_vort")[Ipt] - coarsened_grid->variables.at("vort")[Ipt]);
+                        Phi_force = (coarsened_grid->variables.at("proj_div" )[Ipt] - coarsened_grid->variables.at("div" )[Ipt]);
+                        #endif
+
+                        // d(Psi)/dt = Lap(Psi) - vorticity
+                        dPsidt[Ipt] = diff_coeff_local * Psi_force;
+
+                        // d(Phi)/dt = Lap(Phi) - divergence
+                        dPhidt[Ipt] = diff_coeff_local * Phi_force;
+
+                        // Euler for Diffusion
+                        #ifdef NDEBUG
+                        solution_grid.variables["Psi"][Ipt] += dt * dPsidt[Ipt];
+                        solution_grid.variables["Phi"][Ipt] += dt * dPhidt[Ipt];
+                        #else
+                        solution_grid.variables.at("Psi")[Ipt] += dt * dPsidt[Ipt];
+                        solution_grid.variables.at("Phi")[Ipt] += dt * dPhidt[Ipt];
+                        #endif
+                    }
+
+                }
+            }
+
+            // Compute velocity components and vort,div
+            // To measure errors and use for next iteration
+            //get_vels_vort_and_div( coarsened_grid, solution_grid );
+            get_vels_vort_and_div_fast( coarsened_grid, solution_grid );
+
+            double mean_vort, mean_div;
+            //demean( coarsened_grid->variables.at("proj_vort"), coarsened_grid, mean_vort, refine_level == 0 ? &saved_mask : NULL );
+            //demean( coarsened_grid->variables.at("proj_div" ), coarsened_grid, mean_div,  refine_level == 0 ? &saved_mask : NULL );
+
+
+
+            iter_cycle++;
+            if ( iter_cycle > Helmholtz_data.iteration_max ) { keep_solving = false; }
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Solving"); }
+
+            if ( iter_cycle % Helmholtz_data.iterations_per_cycle == 0 ) {
+
+                //double mean_Psi, mean_Phi;
+                //demean( solution_grid.variables.at("Psi"),  coarsened_grid, mean_Psi );
+                //demean( solution_grid.variables.at("Phi" ), coarsened_grid, mean_Phi );
+
+                // zero out at ill-conditioned points
+                #pragma omp parallel default(none) shared( coarsened_grid, ill_conditioned ) \
+                firstprivate( Npts_coarse )
+                {
+                #pragma omp for collapse(1) schedule(guided)
+                    for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+                        if ( ill_conditioned[Ipt] ) {
+                            #ifdef NDEBUG
+                            #else
+                            coarsened_grid->variables.at("proj_div" )[Ipt] = 0.; //coarsened_grid->variables.at("div" )[Ipt];
+                            coarsened_grid->variables.at("proj_vort")[Ipt] = 0.; //coarsened_grid->variables.at("vort")[Ipt];
+                            coarsened_grid->variables.at("proj_uo_tor")[Ipt] = 0.;
+                            coarsened_grid->variables.at("proj_vo_tor")[Ipt] = 0.;
+                            coarsened_grid->variables.at("proj_uo_pot")[Ipt] = 0.;
+                            coarsened_grid->variables.at("proj_vo_pot")[Ipt] = 0.;
+                            #endif
+                        }
+                    }
+                }
+                demean( coarsened_grid->variables.at("proj_vort"), coarsened_grid, mean_vort, refine_level == 0 ? &saved_mask : NULL );
+                demean( coarsened_grid->variables.at("proj_div" ), coarsened_grid, mean_div,  refine_level == 0 ? &saved_mask : NULL );
+
+                /*
+                double mean_uo_tor, mean_vo_tor, mean_uo_pot, mean_vo_pot;
+                demean( coarsened_grid->variables.at("proj_uo_tor"), coarsened_grid, mean_uo_tor, refine_level == 0 ? &saved_mask : NULL );
+                demean( coarsened_grid->variables.at("proj_vo_tor"), coarsened_grid, mean_vo_tor, refine_level == 0 ? &saved_mask : NULL );
+
+                demean( coarsened_grid->variables.at("proj_uo_pot"), coarsened_grid, mean_uo_pot, refine_level == 0 ? &saved_mask : NULL );
+                demean( coarsened_grid->variables.at("proj_vo_pot"), coarsened_grid, mean_vo_pot, refine_level == 0 ? &saved_mask : NULL );
+                */
+
+                coarsened_grid->variables.at("Psi") = solution_grid.variables.at("Psi");
+                coarsened_grid->variables.at("Phi") = solution_grid.variables.at("Phi");
+
+                // compute errors and check convergence
+                double vel_2_err  = 0, vel_inf_err  = 0,
+                       vort_2_err = 0, vort_inf_err = 0,
+                       div_2_err  = 0, div_inf_err  = 0;
+                double vel_2_norm  = 0, vel_inf_norm  = 0,
+                       vort_2_norm = 0, vort_inf_norm = 0,
+                       div_2_norm  = 0, div_inf_norm  = 0;
+                double vort_2_ener = 0, div_2_ener = 0;
+                double Psi_2_norm = 0, Phi_2_norm = 0;
+
+                get_norms(  vel_2_err,  vort_2_err,  div_2_err,
+                            vel_2_norm, vort_2_norm, div_2_norm,
+                            vel_inf_err,  vort_inf_err,  div_inf_err,
+                            vel_inf_norm, vort_inf_norm, div_inf_norm,
+                            vort_2_ener, div_2_ener,
+                            Psi_2_norm, Phi_2_norm,
+                            coarsened_grid
+                          );
+
+                // If we've hit tolerance, halt
+                if (      (vort_2_err / vort_2_norm < rel_tol) 
+                      and (div_2_err  / div_2_norm  < rel_tol) ) {
+                    keep_solving = false;
+                }
+
+                // If diverged or stagnated, halt
+                if ( vort_2_err / vort_2_norm > 5 * min_vort_err ) {
+                    keep_solving = false;
+                } else if ( std::fabs( (vort_2_err / vort_2_norm) - min_vort_err ) < std::fmax(1e-5 * min_vort_err, 1e-14) ) {
+                    vort_stagnation_count++;
+                } else {
+                    vort_stagnation_count = 0;
+                }
+                min_vort_err = std::fmin( min_vort_err, vort_2_err / vort_2_norm );
+
+                // If diverged or stagnated, halt
+                if ( div_2_err / div_2_norm > 5 * min_div_err ) {
+                    keep_solving = false;
+                } else if ( std::fabs( (div_2_err / div_2_norm) - min_div_err ) < std::fmax(1e-5 * min_div_err, 1e-14) ) {
+                    div_stagnation_count++;
+                } else {
+                    div_stagnation_count = 0;
+                }
+                min_div_err = std::fmin( min_div_err, div_2_err / div_2_norm );
+
+                // If the solver has stagnated, move on to the next resolution tier
+                if ( ( div_stagnation_count > 5 ) and ( vort_stagnation_count > 5 ) ) { keep_solving = false; }
+
+                // Save the convergence records
+                Helmholtz_data.vel_2_errors.push_back(  vel_2_err  );
+                Helmholtz_data.vort_2_errors.push_back( vort_2_err );
+                Helmholtz_data.div_2_errors.push_back(  div_2_err  );
+
+                Helmholtz_data.vel_inf_errors.push_back(  vel_inf_err  );
+                Helmholtz_data.vort_inf_errors.push_back( vort_inf_err );
+                Helmholtz_data.div_inf_errors.push_back(  div_inf_err  );
+
+                // Save the convergence reference values
+                Helmholtz_data.vel_2_norms.push_back(  vel_2_norm  );
+                Helmholtz_data.vort_2_norms.push_back( vort_2_norm );
+                Helmholtz_data.div_2_norms.push_back(  div_2_norm  );
+
+                Helmholtz_data.vel_inf_norms.push_back(  vel_inf_norm  );
+                Helmholtz_data.vort_inf_norms.push_back( vort_inf_norm );
+                Helmholtz_data.div_inf_norms.push_back(  div_inf_norm  );
+
+
+                // If sufficient convergence, stop
+                if ( Helmholtz_data.IsConverged() ) { 
+                    keep_solving = false;
+                    fprintf( stdout,"  Halting at solver cycle %'zu. Solver has converged to desired tolerance.\n", iter_cycle );
+                }
+
+                #if DEBUG >= 0
+                if (use_vort_div and use_vel) {
+                    fprintf( stdout,"  Solver cycle %'zu complete. Relative 2-norm errors of vels, vort, and div are %.2e, %.2e, and %.2e\n", 
+                            iter_cycle,
+                            Helmholtz_data.vel_2_errors.back()  / Helmholtz_data.vel_2_norms.back(),
+                            Helmholtz_data.vort_2_errors.back() / Helmholtz_data.vort_2_norms.back(), 
+                            Helmholtz_data.div_2_errors.back()  / Helmholtz_data.div_2_norms.back() 
+                           );
+                } else if (use_vort_div) {
+                    fprintf( stdout,"  Solver cycle %'zu complete. Relative 2-norm errors of vort and div are %.2e and %.2e\n", 
+                            iter_cycle,
+                            Helmholtz_data.vort_2_errors.back() / Helmholtz_data.vort_2_norms.back(), 
+                            Helmholtz_data.div_2_errors.back()  / Helmholtz_data.div_2_norms.back() 
+                           );
+                } else {
+                    fprintf( stdout,"  Solver cycle %'zu complete. Relative 2-norm errors of vels is %.2e\n", 
+                            iter_cycle,
+                            Helmholtz_data.vel_2_errors.back()  / Helmholtz_data.vel_2_norms.back()
+                           );
+                }
+                #endif
+            }
+        }
+
+        if (use_vort_div and use_vel) {
+            fprintf( stdout,"\nSolver completed with relative 2-norm errors of vels, vort, and div are %.2e, %.2e, and %.2e\n", 
+                    Helmholtz_data.vel_2_errors.back()  / Helmholtz_data.vel_2_norms.back(),
+                    Helmholtz_data.vort_2_errors.back() / Helmholtz_data.vort_2_norms.back(), 
+                    Helmholtz_data.div_2_errors.back()  / Helmholtz_data.div_2_norms.back() 
+                   );
+        } else if (use_vort_div) {
+            fprintf( stdout,"\nSolver completed with relative 2-norm errors of vort and div are %.2e and %.2e\n", 
+                    Helmholtz_data.vort_2_errors.back() / Helmholtz_data.vort_2_norms.back(), 
+                    Helmholtz_data.div_2_errors.back()  / Helmholtz_data.div_2_norms.back() 
+                   );
+        } else {
+            fprintf( stdout,"\nSolver completed with relative 2-norm errors of vels is %.2e\n", 
+                    Helmholtz_data.vel_2_errors.back()  / Helmholtz_data.vel_2_norms.back()
+                   );
+        }
+
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+
+        coarsened_grid->variables.at("Psi") = solution_grid.variables.at("Psi");
+        coarsened_grid->variables.at("Phi") = solution_grid.variables.at("Phi");
+
+        // Compute velocity components
+        //get_vels_vort_and_div( coarsened_grid, *coarsened_grid );
+        get_vels_vort_and_div_fast( coarsened_grid, *coarsened_grid );
+
+        // zero out at ill-conditioned points
+        #pragma omp parallel default(none) shared( coarsened_grid, ill_conditioned ) \
+        firstprivate( Npts_coarse )
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+                if ( ill_conditioned[Ipt] ) {
+                    coarsened_grid->variables.at("proj_div" )[Ipt] = coarsened_grid->variables.at("div" )[Ipt];
+                    coarsened_grid->variables.at("proj_vort")[Ipt] = coarsened_grid->variables.at("vort")[Ipt];
+                }
+            }
+        }
+
+        demean( coarsened_grid->variables.at("proj_vort"), coarsened_grid, mean_vort, refine_level == 0 ? &saved_mask : NULL );
+        demean( coarsened_grid->variables.at("proj_div" ), coarsened_grid, mean_div,  refine_level == 0 ? &saved_mask : NULL );
+        fprintf( stdout, "Final mean values of vorticity and divergence are %.2e, %.2e\n", mean_vort, mean_div );
+
+        coarsened_grid->variables.at("projected_vort") = coarsened_grid->variables.at("proj_vort");
+        coarsened_grid->variables.at("projected_div") = coarsened_grid->variables.at("proj_div");
+
+        #pragma omp parallel default(none) private(Ipt) \
+        shared( coarsened_grid ) firstprivate( Npts_coarse )
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for ( size_t Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+                coarsened_grid->variables.at("projected_u_lon")[Ipt] = 
+                      coarsened_grid->variables.at("proj_uo_tor")[Ipt] 
+                    + coarsened_grid->variables.at("proj_uo_pot")[Ipt];
+                coarsened_grid->variables.at("projected_u_lat")[Ipt] = 
+                      coarsened_grid->variables.at("proj_vo_tor")[Ipt] 
+                    + coarsened_grid->variables.at("proj_vo_pot")[Ipt];
+            }
+        }
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "ProcessingSolution"); }
+
+        std::ostringstream name_stream;
+        name_stream << "projection_R" << (refine_level) << ".nc";
+        const std::string output_filename = name_stream.str();
+
+        // Put the mask back
+        //coarsened_grid->mask = saved_mask;
+
+        write_Helmholtz_output( output_filename, Helmholtz_data, *coarsened_grid, solution_grid );
+        add_attr_to_file( "CFL", CFL, output_filename );
+        std::fill( coarsened_grid->mask.begin(), coarsened_grid->mask.end(), true );
+
+        // If we're doing timings, then print out and reset values now
+        if (constants::DO_TIMING) { 
+            timing_records.print();
+            timing_records.reset();
+            fflush(stdout);
+        }
+
+    }
+}

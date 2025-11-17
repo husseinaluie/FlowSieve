@@ -202,6 +202,7 @@ void Helmholtz_Solver_wSPH(
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Build_LHS_RHS"); }
 
         // Use spherical harmonics to set the seed
+        /*
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
                     "Psi", std::vector<double>(Npts_coarse, 0.) ) );
@@ -216,6 +217,7 @@ void Helmholtz_Solver_wSPH(
                                   coarsened_grid->variables.at("div") );
         Helmholtz_data.Set_Seed( *coarsened_grid );
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "SphericalHarmonicSolver"); }
+        */
 
         //
         //// Output the seed / starting guess

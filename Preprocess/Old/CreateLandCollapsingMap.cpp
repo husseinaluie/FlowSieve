@@ -167,7 +167,10 @@ void HelmholtzDataClass::CreateLandCollapsingMap(
 
         for (Ipt = 0; Ipt < Npts; Ipt++) {
             bool is_land = not( data.mask[Ipt] );
-            bool is_coastal = is_land and (all_land_neighbours[Ipt] == 0);
+            bool is_coastal = is_land and not(all_land_neighbours[Ipt]);
+
+            //pt_maps_to[Ipt] = Ipt; 
+            //continue;
 
             // Water+coast points map to themselves
             if ( not(is_land) ) { 
@@ -224,8 +227,9 @@ void HelmholtzDataClass::CreateLandCollapsingMap(
         }
 
         Npts_mapped = Npts - num_mapped_points;
-        Ncol = Npts - (num_mapped_points + 1); // +1 accounts for the first point [south pole], removes all land except for a 
-                                               // 'representative' of each continguous mass
+        //Ncol = Npts - (num_mapped_points + 1); // +1 accounts for the first point [south pole], removes all land except for a 
+        //                                       // 'representative' of each continguous mass
+        Ncol = Npts - num_mapped_points; // removes all land except for a 'representative' of each continguous mass
         Nrow = Npts - (num_mapped_points+num_mapped_onto) + ( collapse_coast ? num_coastal : 0); // removes all land, but adds coastal back in
         #if DEBUG >= 0
         fprintf( stdout, "Mapping %'zu land points onto %'zu 'islands' (contiguous land masses). %'zu points are coastal.\n",
@@ -233,7 +237,7 @@ void HelmholtzDataClass::CreateLandCollapsingMap(
         fprintf(stdout, "Resulting Nrow and Ncol are %'zu and %'zu\n", Nrow, Ncol);
         #endif
 
-        size_t col_counter = 1, 
+        size_t col_counter = 0,//1, 
                row_counter = 0,
                land_counter = 0,
                mapped_counter = 0,
@@ -264,7 +268,7 @@ void HelmholtzDataClass::CreateLandCollapsingMap(
             //row_counter = (mapped_counter + island_counter) - coastal_counter;
             //row_counter = land_counter - coastal_counter;
             row_counter = mapped_counter + mapped_onto_counter;
-            col_counter = mapped_counter + 1;
+            col_counter = mapped_counter ;//+ 1;
 
             // Some sanity checks / bounds checking
             bool curr_is_mapped = pt_maps_to[Ipt] != Ipt;
@@ -287,6 +291,7 @@ void HelmholtzDataClass::CreateLandCollapsingMap(
 
         }
 
+        /*
         // If the last point is mapped, it doesn't impact anything, but still account for it
         // for the sake of enabling sanity checks
         bool last_is_land = not(data.mask[Npts-1]);
@@ -306,6 +311,7 @@ void HelmholtzDataClass::CreateLandCollapsingMap(
             fprintf(stdout, "col_counter, Ncol, Npt = %'zu, %'zu, %'zu\n", col_counter, Ncol, Npts );
             throw std::runtime_error( "col_counter not accounting for all skipped columns." );
         }
+        */
     } else {
         // raise an error
         throw std::invalid_argument("Mesh grid option not recognized.");

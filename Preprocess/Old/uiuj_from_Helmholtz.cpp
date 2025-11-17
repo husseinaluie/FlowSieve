@@ -25,8 +25,8 @@ void build_Helm_matrix(
     // Create some tidy names for variables
     const std::vector<double>   &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude;
-    const std::vector<bool> &mask = source_data.mask;
-    const std::vector<bool> unmask(mask.size(), true);
+    const std::vector<short int> &mask = source_data.mask;
+    const std::vector<short int> unmask(mask.size(), true);
 
     const std::vector<int>  &myCounts = source_data.myCounts;
 
@@ -324,7 +324,7 @@ void uiuj_from_Helmholtz(
                 Nlat    = source_data.Nlat,
                 Nlon    = source_data.Nlon;
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     assert( not(constants::CARTESIAN) );
 

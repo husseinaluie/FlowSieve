@@ -15,7 +15,7 @@ void HelmholtzDataClass::Build_LHS(
         ) {
 
     typedef Eigen::Triplet<double> T;
-    const bool USE_TRUE_2ND_DERIV = true;
+    const bool USE_TRUE_2ND_DERIV = false;
     if (USE_TRUE_2ND_DERIV) {
         fprintf( stdout, "Using explicit second derivatives.\n" );
     } else {
@@ -31,12 +31,12 @@ void HelmholtzDataClass::Build_LHS(
     #endif
     std::vector<T> Aij_triplets( 
             (use_vort_div and use_vel) ? 
-                Nrow * ( 6 * pts_per_1st_deriv + 4 * pts_per_2nd_deriv )
+                Nrow * ( 4 * pts_per_1st_deriv + 4 * pts_per_2nd_deriv )
                 :
             ( use_vel ) ? 
                 Nrow *   4 * pts_per_1st_deriv
                 :
-                Nrow * ( 2 * pts_per_1st_deriv + 4 * pts_per_2nd_deriv )
+                Nrow *                           4 * pts_per_2nd_deriv
             ,
             T(0,0,0) );
     size_t Itriplet, Ipt, Ipt_mapped, neighbour_mapped, neighbour_ind, row_skip, column_skip,
@@ -76,11 +76,20 @@ void HelmholtzDataClass::Build_LHS(
             #pragma omp for collapse(1) schedule(static)
             for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
 
-                if ( Ipt == 0 ) { continue; } // Force to zero at corner
+                /*
+                if ( Ipt == 0 ) { 
+                    // Use this row to force zero mean. This avoids the constant for 
+                    // killing off the rest from precision issues
+                    for ( size_t Jpt = 0; Jpt < Npts; Jpt++ ) {
+                        if ( all_land_neighbours[Jpt] == 1 ) { continue; } // Skip points that were mapped
+                        
+                    continue;
+                } 
+                */
                 if ( all_land_neighbours[Ipt] == 1 ) { continue; } // Skip points that were mapped
 
                 Index1to4( Ipt, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
-                is_pole = std::fabs( std::fabs( source_data.latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 1e-6;
+                is_pole = std::fabs( std::fabs( source_data.latitude.at(Ilat) * 180.0 / M_PI ) - 90 ) < 1e-10;
                 if ( is_pole ) { fprintf(stdout, "Build_LHS: SKIPPING POLE POINT!\n"); continue; }
 
                 weight_val = weight_err ? source_data.areas.at(Ipt) : 1.;
@@ -263,7 +272,7 @@ void HelmholtzDataClass::Build_LHS(
 
                 if ( collapse_land ) { 
                     if ( Ipt == 0 ) { continue; } // Force to zero at first point, this fixes the '+C' unknown constant
-                    if ( all_land_neighbours[Ipt] == 1 ) { continue; } // Skip land-locked points
+                    //if ( all_land_neighbours[Ipt] == 1 ) { continue; } // Skip land-locked points
                 }
 
                 double weight_val = weight_err ? source_data.areas.at(Ipt) : 1.;
@@ -294,6 +303,8 @@ void HelmholtzDataClass::Build_LHS(
                         neighbour_mapped = neighbour_mapped - num_mapped_before_col[neighbour_mapped]; // all land removed from columns
                         neighbour_is_zero = false;
                     } else {
+                        //neighbour_mapped = 0;
+                        //neighbour_is_zero = false;
                         neighbour_is_zero = true;
                     }
                     if ( ( neighbour_mapped < 0 ) or (neighbour_mapped >= Ncol) ) { 
@@ -348,105 +359,51 @@ void HelmholtzDataClass::Build_LHS(
                     for ( counter = 0; counter < 2; counter++ ) {
 
                         // Second LON derivative
-                        if ( USE_TRUE_2ND_DERIV ) {
-                            if ( not(neighbour_is_zero) ) {
-                                val  = source_data.adjacency_d2dlon2_weights.at(Ipt).at(Ineighbour);
-                                val *= weight_val * pow(cos_lat_inv * R_inv, 2.);
-                                val *= Tikhov;
-
-                                column_skip = neighbour_mapped;
-                                column_skip += counter * Ncol;
-                                row_skip    = Ipt_mapped;
-                                if ( use_vel ) { row_skip += 2 * Nrow; }
-                                row_skip    += counter * Nrow;
-                                Itriplet = (counter*Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour;
-                                if ( use_vel ) { Itriplet += 4 * Nrow * pts_per_1st_deriv; }
-                                Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
-                            }
-                        } else {
-                            for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
-                                val  =   source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour)
-                                    * source_data.adjacency_ddlon_weights.at(neighbour_ind).at(D2_ind);
-                                val *= weight_val * pow(R_inv, 2.) * cos_lat_inv / cos(source_data.latitude.at(neighbour_ind));
-                                val *= Tikhov;
-
-                                column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
-                                column_skip = pt_maps_to[column_skip];
-                                if (column_skip == 0) {continue;}
-                                column_skip = column_skip - num_mapped_before_col[column_skip];
-                                column_skip += counter * Ncol;
-                                row_skip    = Ipt_mapped;
-                                if ( use_vel ) { row_skip += 2 * Nrow; }
-                                row_skip    += counter * Nrow;
-                                Itriplet = (counter*Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
-                                if ( use_vel ) { Itriplet += 4 * Nrow * pts_per_1st_deriv; }
-                                Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
-                            }
-                        }
-
-                        // Second LAT derivative
-                        if ( USE_TRUE_2ND_DERIV ) {
-                            if ( not(neighbour_is_zero) ) {
-                                val = source_data.adjacency_d2dlat2_weights.at(Ipt).at(Ineighbour);
-                                val *= weight_val * pow(R_inv, 2.);
-                                val *= Tikhov;
-
-                                column_skip = neighbour_mapped;
-                                column_skip += counter * Ncol;
-                                row_skip    = Ipt_mapped;
-                                if ( use_vel ) { row_skip += 2 * Nrow; }
-                                row_skip    += counter * Nrow;
-                                Itriplet    = (counter * Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour;
-                                if ( use_vel ) { Itriplet += 4 * Nrow * pts_per_1st_deriv; }
-                                Itriplet += 2 * Nrow * pts_per_2nd_deriv;
-                                Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
-                            }
-                        } else {
-                            for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
-                                val  =   source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour)
-                                    * source_data.adjacency_ddlat_weights.at(neighbour_ind).at(D2_ind);
-                                val *= weight_val * pow(R_inv, 2.);
-                                val *= Tikhov;
-
-                                column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
-                                column_skip = pt_maps_to[column_skip];
-                                if (column_skip == 0) {continue;}
-                                column_skip = column_skip - num_mapped_before_col[column_skip];
-                                column_skip += counter * Ncol;
-                                row_skip    = Ipt_mapped;
-                                if ( use_vel ) { row_skip += 2 * Nrow; }
-                                row_skip    += counter * Nrow;
-                                Itriplet = (counter*Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
-                                if ( use_vel ) { Itriplet += 4 * Nrow * pts_per_1st_deriv; }
-                                Itriplet += 2 * Nrow * pts_per_2nd_deriv;
-                                Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
-                            }
-                        }
-
-                        // First LAT derivative
-                        if ( not(neighbour_is_zero) ) {
-                            val = - source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour) * tan( source_data.latitude.at(Ipt) );
-                            val *= weight_val * pow(R_inv, 2.);
+                        for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
+                            val  =   source_data.adjacency_ddlon_weights.at(Ipt).at(Ineighbour)
+                                   * ( 1. / cos(source_data.latitude.at(neighbour_ind)) )
+                                   * source_data.adjacency_ddlon_weights.at(neighbour_ind).at(D2_ind);
+                            val *= weight_val * pow(R_inv, 2.) * cos_lat_inv;
                             val *= Tikhov;
 
-                            column_skip = neighbour_mapped;
+                            column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
+                            column_skip = pt_maps_to[column_skip];
+                            if (column_skip == 0) {continue;}
+                            column_skip = column_skip - num_mapped_before_col[column_skip];
                             column_skip += counter * Ncol;
                             row_skip    = Ipt_mapped;
                             if ( use_vel ) { row_skip += 2 * Nrow; }
                             row_skip    += counter * Nrow;
-                            Itriplet    = (counter * Nrow + Ipt_mapped) * pts_per_1st_deriv + Ineighbour;
+                            Itriplet = (counter*Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
                             if ( use_vel ) { Itriplet += 4 * Nrow * pts_per_1st_deriv; }
-                            Itriplet += 4 * Nrow * pts_per_2nd_deriv;
+                            Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
+                        }
+
+                        // Second LAT derivative
+                        for ( size_t D2_ind = 0; D2_ind < num_neighbours+1; D2_ind++ ) {
+                            val  =   source_data.adjacency_ddlat_weights.at(Ipt).at(Ineighbour)
+                                   * cos(source_data.latitude.at(neighbour_ind))
+                                   * source_data.adjacency_ddlat_weights.at(neighbour_ind).at(D2_ind);
+                            val *= weight_val * pow(R_inv, 2.) * cos_lat_inv;
+                            val *= Tikhov;
+
+                            column_skip = source_data.adjacency_indices.at(neighbour_ind).at(D2_ind);
+                            column_skip = pt_maps_to[column_skip];
+                            if (column_skip == 0) {continue;}
+                            column_skip = column_skip - num_mapped_before_col[column_skip];
+                            column_skip += counter * Ncol;
+                            row_skip    = Ipt_mapped;
+                            if ( use_vel ) { row_skip += 2 * Nrow; }
+                            row_skip    += counter * Nrow;
+                            Itriplet = (counter*Nrow + Ipt_mapped) * pts_per_2nd_deriv + Ineighbour*(num_neighbours+1)  + D2_ind;
+                            if ( use_vel ) { Itriplet += 4 * Nrow * pts_per_1st_deriv; }
+                            Itriplet += 2 * Nrow * pts_per_2nd_deriv;
                             Aij_triplets[Itriplet] = T( row_skip, column_skip, val );
                         }
                     }
                 }
             }
         }
-
-
-
-
     }
 
 

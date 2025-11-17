@@ -34,9 +34,9 @@ void HelmholtzDataClass::Build_RHS(
     {
         #pragma omp for collapse(1) schedule(static)
         for ( Ipt = 0; Ipt < Npts; ++Ipt) {
-            if ( pt_maps_to[Ipt] != Ipt ) { continue; } // skip mapped points
-            if ( Ipt == 0 ) { continue; }
-            if ( not(data.mask[Ipt]) ) { continue; } // if it's land, skip [i.e. set RHS to zero]
+            if ( pt_maps_to[Ipt] != Ipt ) { continue; } // skip mapped points, they're not on the grid
+            if ( Ipt == 0 ) { continue; } // point 0 removed to fix the constant
+            if ( all_land_neighbours[Ipt] ) { continue; } // if it doesn't see water, skip
             w = weight_err ? data.areas.at(Ipt) : 1.;
             index = Ipt - num_mapped_before_row[Ipt];
             if ( use_vel ) {
