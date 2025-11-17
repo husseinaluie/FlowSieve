@@ -36,6 +36,12 @@ void depth_integrate(
 
     const bool  IS_ELEV = source_data.depth_is_elevation,
                 IS_INCR = source_data.depth_is_increasing;
+    #if DEBUG >= 2
+    fprintf( stdout, "%s is %s\n", 
+            IS_ELEV ? "elevation" : "depth", 
+            IS_INCR ? "increasing" : "decreasing"
+           );
+    #endif
 
 
     #if DEBUG >= 0
@@ -45,7 +51,7 @@ void depth_integrate(
     default(none) \
     shared( field_to_integrate, depth_integral, depth, source_data )\
     private( Itime, Ilat, Ilon, index, index_below, Iz ) \
-    firstprivate( Nlon, Nlat, Ndepth, Ntime, IS_INCR, IS_ELEV )
+    firstprivate( Nlon, Nlat, Ndepth, Ntime, IS_INCR, IS_ELEV, stdout )
     {
         #pragma omp for collapse(3) schedule(static)
         for ( Itime = 0; Itime < Ntime; ++Itime ) {
@@ -70,7 +76,7 @@ void depth_integrate(
                         // Integrate from the bottom up using trapezoid rule
                         index = Index( Itime, Ndepth-1, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
                         depth_integral.at(index) = 0.;
-                        for ( Iz = Ndepth - 2; Iz > -1; --Iz ) {
+                        for ( Iz = Ndepth - 2; Iz > -1; --Iz ) { // skip bottom-most (fixed at zero)
                             index       = Index( Itime, Iz,   Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
                             index_below = Index( Itime, Iz+1, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
                             depth_integral.at(index) = depth_integral.at( index_below ) + 

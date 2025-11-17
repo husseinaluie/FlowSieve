@@ -32,7 +32,7 @@ void map_grid_to_grid(
     const bool mapping_from_fine_to_coarse = 
         ( source_data.latitude.size() > target_data.latitude.size() );
 
-    // Confirm that that vars are in both source and target
+    // Confirm that vars are in both source and target
     for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {
         if ( not( source_data.variables.count( vars_to_map[Ivar] ) ) ) {
             fprintf( stderr, "Source does not contain variable %s.\n", vars_to_map[Ivar].c_str() );
@@ -54,110 +54,116 @@ void map_grid_to_grid(
     size_t source_index, target_index;
 
     if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
-        throw std::runtime_error("map_grid_to_grid currently not accepting mesh grids.");
+        // The Mesh and Unstructured grid routines are different enough that we'll just
+        // wrap the MeshGrid version in a different function
+        map_grid_to_grid_MeshGrid( source_data, target_data, vars_to_map, comm );
+        return;
     }
 
     const double typical_spacing = ( mapping_from_fine_to_coarse ) 
-        ? sqrt( 4 * M_PI * pow(6371e3,2.) / Nlatlon_target )
-        : sqrt( 4 * M_PI * pow(6371e3,2.) / Nlatlon_source );
-
-    // To ensure a smooth mapping, we're just going to coarse grain across grids
-    // at 10 times the 'typical' spacing of the coarse grid.
-    // This will help to ensure a well-behaved mapping, which is more
-    // important for seeding than a rough-but-accurate mapping
-    const double filter_scale = ( mapping_from_fine_to_coarse )
-        ?  5 * typical_spacing
-        :  5 * typical_spacing;
+        ? sqrt( 4 * M_PI * pow(constants::R_earth,2.) / Nlatlon_target )
+        : sqrt( 4 * M_PI * pow(constants::R_earth,2.) / Nlatlon_source );
 
     // First, we need to find the nearest point in source for each target
     std::vector<size_t> nearest_source(Nlatlon_target, Nlatlon_source);
     double max_dist = 0;
-    #pragma omp parallel \
-    default(none) \
+    #pragma omp parallel default(none) private( target_index ) \
     shared( source_data, target_data, nearest_source ) \
-    private( target_index ) \
-    firstprivate( Nlatlon_source, Nlatlon_target, typical_spacing, Nvars, filter_scale ) \
+    firstprivate( Nlatlon_source, Nlatlon_target, typical_spacing, Nvars ) \
     reduction( max:max_dist )
     {
-        max_dist = 0;
+        max_dist = 0.;
 
-        // Make a random number generator
-        std::random_device random_device; // obtain a random number from hardware
-        std::mt19937_64 random_generator(random_device()); // seed the generator
-        std::uniform_int_distribution<size_t> random_index(0, Nlatlon_source-1); // define the range
-
-        max_dist = 0;
         #pragma omp for collapse(1) schedule(guided)
         for ( target_index = 0; target_index < Nlatlon_target; target_index++ ) {
 
             double target_lat = target_data.latitude.at(target_index),
                    target_lon = target_data.longitude.at(target_index);
 
-            size_t best_index = random_index(random_generator);
+            double best_dist = 2 * M_PI * constants::R_earth;
 
-            double best_dist = distance(
-                    source_data.longitude.at(best_index),
-                    source_data.latitude.at( best_index),
-                    target_lon,
-                    target_lat
-                    );
+            size_t best_index = 0;
 
-            int num_resets = 0;
-            while (true) {
-                size_t best_II = source_data.num_neighbours;
-                for ( size_t II = 0; II < source_data.num_neighbours; II++ ) {
+            // start with 1000 random guesses to get a less terrible starting guess
+            // Make a random number generator
+            std::random_device random_device; // obtain a random number from hardware
+            std::mt19937_64 random_generator(random_device()); // seed the generator
+            std::uniform_int_distribution<size_t> random_index(0, Nlatlon_source-1); // define the range
+            for ( int II = 0; II < 1000; II++ ) {
+                size_t source_index = random_index(random_generator);
 
-                    size_t source_index = source_data.adjacency_indices.at(best_index).at(II);
+                double source_lat = source_data.latitude.at(source_index),
+                       source_lon = source_data.longitude.at(source_index);
 
-                    double local_dist = distance(
-                            source_data.longitude.at(source_index),
-                            source_data.latitude.at( source_index),
-                            target_lon,
-                            target_lat
-                            );
-                    if (local_dist < best_dist) {
-                        best_dist = local_dist;
-                        best_II = II;
-                    }
-                }
+                double test_dist = distance( source_lon, source_lat, target_lon, target_lat );
 
-                if ( best_II < source_data.num_neighbours ) {
-                    // If we found a closer point, move to it, and repeat
-                    best_index = source_data.adjacency_indices.at(best_index).at(best_II);
-                } else if ( best_dist > 1.5*typical_spacing ) {
-                    // If we didn't find a closer point in the neighbours, but the current
-                    // point is still too far away, then just jump to a new random starting point
-                    best_index = random_index(random_generator);
-                    num_resets++;
-                } else {
-                    // Otherwise, we've found the closest point. So break out of the loop now.
-                    break;
+                if ( test_dist < best_dist ) {
+                    best_dist = test_dist;
+                    best_index = source_index;
                 }
             }
+
+            // also check our neighbours, see if they already have their nearest source set
+            for ( size_t II = 0; II < target_data.num_neighbours; II++ ) {
+                size_t neighbour_index = target_data.adjacency_indices.at(target_index).at(II);
+
+                if ( nearest_source[neighbour_index] < Nlatlon_source ) {
+                    size_t source_index = nearest_source[neighbour_index];
+
+                    double source_lat = source_data.latitude.at(source_index),
+                           source_lon = source_data.longitude.at(source_index);
+
+                    double test_dist = distance( source_lat, source_lat, target_lon, target_lat );
+
+                    if ( test_dist < best_dist ) {
+                        best_dist = test_dist;
+                        best_index = source_index;
+                    }
+                }
+            }
+
+            // and finally loop over space
+            for ( size_t source_index = 0; source_index < Nlatlon_source; source_index++ ) {
+                double source_lat = source_data.latitude.at(source_index),
+                       source_lon = source_data.longitude.at(source_index);
+
+                // short-circuit quickly if obviously too far
+                double lat_dist = constants::R_earth * std::fabs( source_lat - target_lat );
+                if ( lat_dist > best_dist ) { continue; }
+
+                double del_lon = std::fabs( source_lon - target_lon );
+                if ( del_lon > M_PI ) { del_lon -= 2 * M_PI; }
+                double approx_cos = cos( std::fmax( std::fabs(target_lat), std::fabs(source_lat) ) );
+                double lon_dist = constants::R_earth * del_lon * approx_cos;
+                if ( lon_dist > best_dist ) { continue; }
+
+                // otherwise compute the actual distance
+                double test_dist = distance( source_lon, source_lat, target_lon, target_lat );
+
+                if ( test_dist < best_dist ) {
+                    best_dist = test_dist;
+                    best_index = source_index;
+                }
+            }
+
             nearest_source[target_index] = best_index;
             max_dist = std::fmax( max_dist, best_dist );
 
         }
     }
-    #if DEBUG >= 2
+
+    // To ensure a smooth mapping, we're just going to coarse grain across grids
+    // at 10 times the 'typical' spacing of the coarse grid.
+    // This will help to ensure a well-behaved mapping, which is more
+    // important for seeding than a rough-but-accurate mapping
+    const double filter_scale = 2 * 5 * std::fmin(typical_spacing, max_dist);
+
+
+    #if DEBUG >= 0
     fprintf( stdout, "Greatest distance between source and target is %.2ekm. Typical spacing set as %.2ekm and filter scale at %.2ekm.\n",
           max_dist/1e3, typical_spacing/1e3, filter_scale/1e3 );
     #endif
 
-
-    /*
-    // If we're refining, just use nearest-neighbour as a test
-    if ( not( mapping_from_fine_to_coarse ) ) {
-        for ( target_index = 0; target_index < Nlatlon_target; target_index++) {
-            source_index = nearest_source[target_index];
-            for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {
-                target_data.variables.at(vars_to_map[Ivar]).at(target_index) = 
-                    source_data.variables.at(vars_to_map[Ivar]).at(source_index);
-            }
-        }
-        return;
-    }
-    */
 
     // Now that we have the mapping from target to the nearest source, we can proceed with filtering
     #pragma omp parallel \
@@ -174,12 +180,6 @@ void map_grid_to_grid(
                                 planned_for_testing(Nlatlon_source, false);
             // intentionally using the secretly-a-bitset vector<bool>. bitset itself
             // doesn't allow dynamic sizing
-
-            /*
-            std::fill(was_rejected.begin(), was_rejected.end(), false);
-            std::fill(was_accepted.begin(), was_accepted.end(), false);
-            std::fill(planned_for_testing.begin(), planned_for_testing.end(), false);
-            */
 
             std::vector<double> value_sums( Nvars, 0. );
 
@@ -297,8 +297,8 @@ void map_grid_to_grid(
             // Store the filtered values in the appropriate arrays
             if ( mapping_from_fine_to_coarse ) {
                 // Only set the mask if we're coarsening
-                target_data.mask[target_index] = source_data.mask[ nearest_source[target_index] ];
-                //target_data.mask[target_index] = ( water_area > 0 );
+                //target_data.mask[target_index] = source_data.mask[ nearest_source[target_index] ];
+                target_data.mask[target_index] = ( water_area > 0 );
                 //target_data.mask[target_index] = ( water_area > land_area );
             }
             for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {

@@ -21,8 +21,8 @@ void HelmholtzDataClass::ComputeProjectionErrors(
 
     #if DEBUG >= 2
     // Get L2 error w.r.t. RHS for comparison
-    double RHS_u_err = 0, RHS_v_err = 0, RHS_vort_err = 0, RHS_div_err = 0,
-           RHS_u_ref = 0, RHS_v_ref = 0, RHS_vort_ref = 0, RHS_div_ref = 0;
+    long double RHS_u_err = 0, RHS_v_err = 0, RHS_vort_err = 0, RHS_div_err = 0,
+                RHS_u_ref = 0, RHS_v_ref = 0, RHS_vort_ref = 0, RHS_div_ref = 0;
 
     #pragma omp parallel default(none) \
     shared( data, Ax ) \
@@ -52,27 +52,27 @@ void HelmholtzDataClass::ComputeProjectionErrors(
 
         }
     }
-    fprintf(stdout, "(u,v,vort,div) -> (%.2e, %.2e, %.2e, %.2e) / (%.2e, %.2e, %.2e, %.2e)\n",
+    fprintf(stdout, "(u,v,vort,div) -> (%.2Le, %.2Le, %.2Le, %.2Le) / (%.2Le, %.2Le, %.2Le, %.2Le)\n",
             RHS_u_err, RHS_v_err, RHS_vort_err, RHS_div_err, 
             RHS_u_ref, RHS_v_ref, RHS_vort_ref, RHS_div_ref );
     #endif
 
     // Now loop over space and get the L2 and Linf errors for
     // vel, vort, div
-    double vel_2_err  = 0, vel_inf_err  = 0,
-           vort_2_err = 0, vort_inf_err = 0,
-           div_2_err  = 0, div_inf_err  = 0;
-    double vel_2_norm  = 0, vel_inf_norm  = 0,
-           vort_2_norm = 0, vort_inf_norm = 0,
-           div_2_norm  = 0, div_inf_norm  = 0;
+    long double vel_2_err  = 0, vel_inf_err  = 0,
+                vort_2_err = 0, vort_inf_err = 0,
+                div_2_err  = 0, div_inf_err  = 0;
+    long double vel_2_norm  = 0, vel_inf_norm  = 0,
+                vort_2_norm = 0, vort_inf_norm = 0,
+                div_2_norm  = 0, div_inf_norm  = 0;
 
 
     const size_t Npts = data.mask.size();
-    double area, total_area = 0, incr, w;
+    long double total_area = 0;
 
     #pragma omp parallel default(none) \
     shared( data, pt_maps_to, num_mapped_before_row, Ax ) \
-    private( Ipt, incr ) \
+    private( Ipt ) \
     firstprivate( Npts, stdout ) \
     reduction( +:total_area,vel_2_err,vort_2_err,div_2_err,vel_2_norm,vort_2_norm,div_2_norm ) \
     reduction( max:vel_inf_err,vort_inf_err,div_inf_err,vel_inf_norm,vort_inf_norm,div_inf_norm )
@@ -82,8 +82,9 @@ void HelmholtzDataClass::ComputeProjectionErrors(
 
             if (pt_maps_to[Ipt] == 0) { continue; }
 
-            double area = data.areas[Ipt];
-            double w = weight_err ? data.areas.at(Ipt) : 1.;
+            long double incr;
+            long double area = data.areas[Ipt];
+            long double w = weight_err ? data.areas.at(Ipt) : 1.;
             size_t Ipt_mapped = Ipt - num_mapped_before_row[Ipt];
 
             total_area += area;

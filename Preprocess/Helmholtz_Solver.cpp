@@ -39,7 +39,7 @@ void Helmholtz_Solver(
     const size_t Npts = source_data.mask.size();
 
     // Fill in the land areas with zero velocity
-    size_t index;
+    size_t index, Ipt;
     #pragma omp parallel default(none) \
     shared( source_data ) \
     private( index ) \
@@ -100,30 +100,6 @@ void Helmholtz_Solver(
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             map_grid_to_grid( source_data, *coarsened_grid, vars_to_map );
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Downsampling"); }
-
-            #if DEBUG >= 2
-            fprintf(stdout, "Computing vorticity on coarse grid.\n");
-            #endif
-            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-            toroidal_curl_u_dot_er( 
-                    coarsened_grid->variables.at("vort"),
-                    coarsened_grid->variables.at("u_lon"),
-                    coarsened_grid->variables.at("u_lat"),
-                    *coarsened_grid,
-                    coarsened_grid->mask
-                    );
-
-            #if DEBUG >= 2
-            fprintf(stdout, "Computing divergence on coarse grid.\n");
-            #endif
-            toroidal_vel_div( 
-                    coarsened_grid->variables.at("div"),
-                    coarsened_grid->variables.at("u_lon"),
-                    coarsened_grid->variables.at("u_lat"),
-                    *coarsened_grid,
-                    coarsened_grid->mask
-                    );
-            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Computing Vort and Div"); }
         } else {
             // Otherwise we're on the original grid, so just use the source
             coarsened_grid = &source_data;
@@ -133,57 +109,69 @@ void Helmholtz_Solver(
                         "vort", std::vector<double>(Npts_coarse, 0.) ) );
             coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
                         "div", std::vector<double>(Npts_coarse, 0.) ) );
-
-            // Get vorticity and divergence
-            #if DEBUG >= 2
-            fprintf(stdout, "Computing vorticity on coarse grid.\n");
-            #endif
-            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-            toroidal_curl_u_dot_er( 
-                    coarsened_grid->variables.at("vort"),
-                    coarsened_grid->variables.at("u_lon"),
-                    coarsened_grid->variables.at("u_lat"),
-                    *coarsened_grid,
-                    coarsened_grid->mask
-                    );
-
-            #if DEBUG >= 2
-            fprintf(stdout, "Computing divergence on coarse grid.\n");
-            #endif
-            toroidal_vel_div( 
-                    coarsened_grid->variables.at("div"),
-                    coarsened_grid->variables.at("u_lon"),
-                    coarsened_grid->variables.at("u_lat"),
-                    *coarsened_grid,
-                    coarsened_grid->mask
-                    );
-            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Downsampling"); }
         }
 
-        // Set vort and div to zero on land
-        size_t Ipt;
-        if ( use_vort_div ) {
-            #pragma omp parallel default(none) \
-            shared( coarsened_grid ) \
-            private( Ipt ) \
-            firstprivate( Npts_coarse )
-            {
-                #pragma omp for collapse(1) schedule(static)
-                for ( Ipt = 0; Ipt < Npts_coarse; ++Ipt) {
-                    if ( not( coarsened_grid->mask[Ipt] ) ) {
-                        coarsened_grid->variables.at("vort")[Ipt] = 0.;
-                        coarsened_grid->variables.at( "div")[Ipt] = 0.;
-                    }
-                }
+        #if DEBUG >= 2
+        fprintf(stdout, "Computing vorticity on coarse grid.\n");
+        #endif
+        if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+        curl_vec_dot_er( 
+                 coarsened_grid->variables.at("vort"),
+                 coarsened_grid->variables.at("u_lon"),
+                 coarsened_grid->variables.at("u_lat"),
+                *coarsened_grid,
+                 coarsened_grid->mask
+                );
+
+        #if DEBUG >= 2
+        fprintf(stdout, "Computing divergence on coarse grid.\n");
+        #endif
+        div_vec( 
+                coarsened_grid->variables.at("div"),
+                coarsened_grid->variables.at("u_lon"),
+                coarsened_grid->variables.at("u_lat"),
+               *coarsened_grid,
+                coarsened_grid->mask
+               );
+
+        // For numerical reasons, remove the mean from vort and div
+        // ( these should be zero mathematically )
+        long double vort_sum = 0., div_sum = 0., area_sum = 0.;
+        #pragma omp parallel default(none) \
+        shared( coarsened_grid ) private( Ipt ) firstprivate( Npts_coarse ) \
+        reduction( +:vort_sum,div_sum,area_sum )
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for ( Ipt = 0; Ipt < Npts_coarse; Ipt++) {
+                long double dA = coarsened_grid->areas[Ipt];
+                area_sum += dA;
+                vort_sum += dA * coarsened_grid->variables.at("vort")[Ipt];
+                div_sum  += dA * coarsened_grid->variables.at("div" )[Ipt];
             }
         }
+        double mean_vort = vort_sum / area_sum,
+               mean_div  = div_sum  / area_sum;
+        fprintf( stdout, "Area-mean vorticity and divergence are %.2e and %.2e. Removing them now.\n", mean_vort, mean_div );
+        #pragma omp parallel default(none) \
+        shared( coarsened_grid ) private( Ipt ) \
+        firstprivate( Npts_coarse, mean_vort, mean_div )
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for ( Ipt = 0; Ipt < Npts_coarse; Ipt++) {
+                coarsened_grid->variables.at("vort")[Ipt] -= mean_vort;
+                coarsened_grid->variables.at("div" )[Ipt] -= mean_div;
+            }
+        }
+
+        if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Computing Vort and Div"); }
+
 
         // Compute norms of velocities, vort, and div
         //   we'll use these later to normalize the components of
         //   the RHS
         // NOTE: This is a linear-algebra norm, not a physical norm
         //       [i.e. not weighted by space]
-        double uo_norm = 0, vo_norm = 0, vort_norm = 0, div_norm = 0;
+        long double uo_norm = 0, vo_norm = 0, vort_norm = 0, div_norm = 0;
         if ( use_vort_div and use_vel ) {
             #pragma omp parallel default(none) \
             shared( coarsened_grid ) \
@@ -220,6 +208,21 @@ void Helmholtz_Solver(
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             map_grid_to_grid( solution_grid, *coarsened_grid, vars_to_map );
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Upsampling"); }
+
+
+            // Different grids imposed Psi/Phi = 0 at different points, so adjust that constant now
+            double Psi_const = coarsened_grid->variables.at("Psi")[0],
+                   Phi_const = coarsened_grid->variables.at("Phi")[0];
+            #pragma omp parallel default(none) \
+            shared( coarsened_grid ) private( Ipt ) firstprivate( Npts_coarse, Psi_const, Phi_const )
+            {
+                #pragma omp for collapse(1) schedule(static)
+                for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+                    coarsened_grid->variables.at("Psi")[Ipt] -= Psi_const;
+                    coarsened_grid->variables.at("Phi")[Ipt] -= Phi_const;
+                }
+            }
+
         }
 
         // Re-initialize the solution grid on the new computational grid
@@ -269,12 +272,33 @@ void Helmholtz_Solver(
             Helmholtz_data.pt_maps_to.resize(Npts_coarse, 0);
             for ( size_t II = 0; II < Npts_coarse; II++ ) { Helmholtz_data.pt_maps_to[II] = II; }
             Helmholtz_data.all_land_neighbours.resize(Npts_coarse, false);
-            Helmholtz_data.num_mapped_before_col.resize( Npts_coarse, 1 ); 
+            //Helmholtz_data.num_mapped_before_col.resize( Npts_coarse, 1 ); 
+            Helmholtz_data.num_mapped_before_col.resize( Npts_coarse, 0 ); 
             Helmholtz_data.num_mapped_before_col[0] = 0;
             Helmholtz_data.num_mapped_before_row.resize( Npts_coarse, 0 );
             Helmholtz_data.Nrow = Npts_coarse;
-            Helmholtz_data.Ncol = Npts_coarse-1;
+            //Helmholtz_data.Ncol = Npts_coarse-1;
+            Helmholtz_data.Ncol = Npts_coarse;
         }
+
+        // Use spherical harmonics to set the seed
+        /*
+        if ( refine_level == num_refinements ) {
+            if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
+            coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                        "Psi", std::vector<double>(Npts_coarse, 0.) ) );
+            SphericalHarmonicSolver(  coarsened_grid->variables.at("Psi"),
+                                     *coarsened_grid,
+                                      coarsened_grid->variables.at("vort") );
+
+            coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                        "Phi", std::vector<double>(Npts_coarse, 0.) ) );
+            SphericalHarmonicSolver(  coarsened_grid->variables.at("Phi"),
+                                     *coarsened_grid,
+                                      coarsened_grid->variables.at("div") );
+            if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "SphericalHarmonicSolver"); }
+        }
+        */
 
         // Build the LHS and RHS part of the problem
         #if DEBUG >= 2
@@ -301,7 +325,6 @@ void Helmholtz_Solver(
         //// Output the seed / starting guess
         //
 
-        // Now that solving is done, output the solution
         std::vector<std::string> vars_to_add = { 
             "projected_u_lon", "projected_u_lat", 
             "proj_uo_tor", "proj_uo_pot", "proj_vo_tor", "proj_vo_pot" ,
@@ -317,20 +340,20 @@ void Helmholtz_Solver(
         }
 
         // Compute velocity components
-        toroidal_vel_from_F( coarsened_grid->variables.at("proj_uo_tor"),
-                             coarsened_grid->variables.at("proj_vo_tor"),
-                             coarsened_grid->variables.at("Psi"),
-                             *coarsened_grid,
-                             coarsened_grid->mask );
+        perp_grad_scalar( coarsened_grid->variables.at("proj_uo_tor"),
+                          coarsened_grid->variables.at("proj_vo_tor"),
+                          coarsened_grid->variables.at("Psi"),
+                         *coarsened_grid,
+                          coarsened_grid->mask );
 
-        potential_vel_from_F( coarsened_grid->variables.at("proj_uo_pot"),
-                              coarsened_grid->variables.at("proj_vo_pot"),
-                              coarsened_grid->variables.at("Phi"),
-                              *coarsened_grid,
-                              coarsened_grid->mask );
+        grad_scalar( coarsened_grid->variables.at("proj_uo_pot"),
+                     coarsened_grid->variables.at("proj_vo_pot"),
+                     coarsened_grid->variables.at("Phi"),
+                    *coarsened_grid,
+                     coarsened_grid->mask );
         
         // Compute vorticity and divergence
-        toroidal_curl_u_dot_er( 
+        curl_vec_dot_er( 
                 coarsened_grid->variables.at("proj_vort"),
                 coarsened_grid->variables.at("proj_uo_tor"),
                 coarsened_grid->variables.at("proj_vo_tor"),
@@ -338,7 +361,7 @@ void Helmholtz_Solver(
                 coarsened_grid->mask
                 );
 
-        toroidal_vel_div( 
+        div_vec( 
                 coarsened_grid->variables.at("proj_div"),
                 coarsened_grid->variables.at("proj_uo_pot"),
                 coarsened_grid->variables.at("proj_vo_pot"),
@@ -390,8 +413,6 @@ void Helmholtz_Solver(
         #endif
 
         if ( ( refine_level == num_refinements ) and ( Npts_coarse < 4000 ) ) {
-            fprintf( stdout, "Using a direct solver for R%d\n", refine_level );
-
             // On the coarsest grid, if it's coarse enough, do a direct solve
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             Helmholtz_data.DirectSolve();
@@ -424,9 +445,7 @@ void Helmholtz_Solver(
             }
 
             // Increment the seed
-            //      note that x0 stores the accumulated solution across all solver iterations
-            //Helmholtz_data.x0 = Helmholtz_data.soln + Helmholtz_data.x0;
-            Helmholtz_data.x0 = Helmholtz_data.soln;// + Helmholtz_data.x0; // solveWithGuess side-steps this
+            Helmholtz_data.x0 = Helmholtz_data.soln;
 
             // Compute errors
             Helmholtz_data.ComputeProjectionErrors( *coarsened_grid );
@@ -444,7 +463,7 @@ void Helmholtz_Solver(
                 fprintf( stdout,"  Halting at solver cycle %d. Iteration limit reached.\n", iter_cycle );
             }
 
-            #if DEBUG >= 2
+            #if DEBUG >= 0
             if ( keep_solving ) {
                 if (use_vort_div and use_vel) {
                     fprintf( stdout,"  Solver cycle %d complete with internal error %.2e. Relative 2-norm errors of vels, vort, and div are %.2e, %.2e, and %.2e\n", 
@@ -504,8 +523,7 @@ void Helmholtz_Solver(
         // Now that solving is done, output the solution
         vars_to_add.clear();
         vars_to_add = { 
-            "projected_u_lon", "projected_u_lat", //"residual_u_lon", "residual_u_lat", 
-            "projected_vort", "projected_div", //"residual_div", "residual_vort",
+            "projected_u_lon", "projected_u_lat", "projected_vort", "projected_div", 
             "proj_uo_tor", "proj_uo_pot", "proj_vo_tor", "proj_vo_pot" ,
             "proj_vort", "proj_div"
         };
@@ -515,20 +533,20 @@ void Helmholtz_Solver(
         }
 
         // Compute velocity components
-        toroidal_vel_from_F( coarsened_grid->variables.at("proj_uo_tor"),
-                             coarsened_grid->variables.at("proj_vo_tor"),
-                             solution_grid.variables.at("Psi"),
-                             *coarsened_grid,
-                             coarsened_grid->mask );
+        perp_grad_scalar( coarsened_grid->variables.at("proj_uo_tor"),
+                          coarsened_grid->variables.at("proj_vo_tor"),
+                          solution_grid.variables.at("Psi"),
+                          *coarsened_grid,
+                          coarsened_grid->mask );
 
-        potential_vel_from_F( coarsened_grid->variables.at("proj_uo_pot"),
-                              coarsened_grid->variables.at("proj_vo_pot"),
-                              solution_grid.variables.at("Phi"),
-                              *coarsened_grid,
-                              coarsened_grid->mask );
+        grad_scalar( coarsened_grid->variables.at("proj_uo_pot"),
+                     coarsened_grid->variables.at("proj_vo_pot"),
+                     solution_grid.variables.at("Phi"),
+                     *coarsened_grid,
+                     coarsened_grid->mask );
         
         // Compute vorticity and divergence
-        toroidal_curl_u_dot_er( 
+        curl_vec_dot_er( 
                 coarsened_grid->variables.at("proj_vort"),
                 coarsened_grid->variables.at("proj_uo_tor"),
                 coarsened_grid->variables.at("proj_vo_tor"),
@@ -536,7 +554,7 @@ void Helmholtz_Solver(
                 coarsened_grid->mask
                 );
 
-        toroidal_vel_div( 
+        div_vec( 
                 coarsened_grid->variables.at("proj_div"),
                 coarsened_grid->variables.at("proj_uo_pot"),
                 coarsened_grid->variables.at("proj_vo_pot"),
@@ -548,11 +566,6 @@ void Helmholtz_Solver(
         //  we'll do this at each resolution for tracking convergence etc.
         Helmholtz_data.Extract_ProjectedVars( *coarsened_grid );
 
-        if ( not(use_vort_div) ) {
-            coarsened_grid->variables.at("proj_vort") = coarsened_grid->variables.at("projected_vort");
-            coarsened_grid->variables.at("proj_div") = coarsened_grid->variables.at("projected_div");
-        }
-    
         if ( not(use_vel) ) {
             for ( size_t Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
                 coarsened_grid->variables.at("projected_u_lon")[Ipt] = coarsened_grid->variables.at("proj_uo_tor")[Ipt] 
@@ -562,7 +575,6 @@ void Helmholtz_Solver(
             }
         }
 
-        /*
         if ( use_vort_div ) {
             double vort_diff = 0, div_diff = 0, total_area = 0, vort_ref = 0, div_ref = 0;
             for ( size_t Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
@@ -603,7 +615,6 @@ void Helmholtz_Solver(
             fprintf( stdout, "Difference between LHS-derived and independently computed uo and vo is %.2e / %.2e and %.2e / %.2e.\n", 
                     uo_diff, uo_ref, vo_diff, vo_ref );
         }
-        */
 
 
         //Helmholtz_data.Extract_Residuals( *coarsened_grid );

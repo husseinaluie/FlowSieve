@@ -19,25 +19,42 @@
 
 
 void SphericalHarmonicSolver(
-        std::vector<double> & reconstructed_field,
+        std::vector<double> & Psi,
+        std::vector<double> & Phi,
         const dataset & source_data,
-        const std::vector<double> & Laplacian_of_field
+        const std::vector<double> & vorticity,
+        const std::vector<double> & divergence
         ) {
 
     const int max_L = 128;
     const size_t Npts = source_data.mask.size();
-    std::vector<long double> sph_coeffs_Real( max_L * 2 * max_L, 0 );
-    std::vector<long double> sph_coeffs_Imag( max_L * 2 * max_L, 0 );
+    std::vector<long double> vort_coeffs_Real( max_L * (2 * max_L + 1), 0 ),
+                             vort_coeffs_Imag( max_L * (2 * max_L + 1), 0 ),
+                             div_coeffs_Real(  max_L * (2 * max_L + 1), 0 ),
+                             div_coeffs_Imag(  max_L * (2 * max_L + 1), 0 );
 
     size_t Ipt;
-    int L_degree, M_order;
+    int L_degree;
+
+    long double surface_area = 0.;
+    #pragma omp parallel default(none) shared( source_data ) private(Ipt) \
+    reduction( +:surface_area ) firstprivate( Npts )
+    {
+        #pragma omp for collapse(1) schedule(guided)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+            surface_area += source_data.areas[Ipt];
+        }
+    }
+    surface_area /= pow( (long double) constants::R_earth, 2. );
+    fprintf( stdout, "Numerical Surface Area / True Surface Area = %.3e\n", (double) (surface_area / (4 * M_PI)) );
+
 
     #pragma omp parallel \
     default(none) \
-    shared( source_data, Laplacian_of_field ) \
-    private( Ipt, L_degree, M_order ) \
+    shared( source_data, vorticity, divergence ) \
+    private( Ipt, L_degree ) \
     firstprivate( Npts ) \
-    reduction( vec_long_double_plus:sph_coeffs_Real,sph_coeffs_Imag )
+    reduction( vec_long_double_plus:vort_coeffs_Real,vort_coeffs_Imag,div_coeffs_Real,div_coeffs_Imag )
     {
         // Loop over space to compute the inner produce of Lap_of_field with Y_L^M
         // Loop over the different spherical hamonic degrees and ordrs
@@ -45,21 +62,33 @@ void SphericalHarmonicSolver(
         #pragma omp for collapse(2) schedule(guided)
         for ( L_degree = 1; L_degree < max_L; L_degree++ ) {
             for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+
                 // Divergence/Vorticity is zero of land, so avoid the computational cost
-                if ( not(source_data.mask[Ipt]) ) { continue; }
+                if ( (vorticity[Ipt] == 0) and (divergence[Ipt] == 0) ) { continue; }
+
+                long double lon = source_data.longitude[Ipt];
+                long double lat = (M_PI/2) - source_data.latitude[Ipt]; //convert to polar angle
+
                 for ( int M_order = -L_degree; M_order <= L_degree; M_order++ ) {
-                    long double lon = source_data.longitude[Ipt];
-                    long double lat = (M_PI/2) - source_data.latitude[Ipt]; //convert to polar angle
 
                     long double Y_L_M = std::sph_legendre( L_degree, M_order, lat );
 
                     long double dA = source_data.areas[Ipt];
 
-                    long double alpha_L_M_Re = dA * Y_L_M * Laplacian_of_field[Ipt] * cos( M_order * lon );
-                    long double alpha_L_M_Im = dA * Y_L_M * Laplacian_of_field[Ipt] * sin( M_order * lon );
+                    long double cos_M_lon = cos( M_order * lon );
+                    long double sin_M_lon = sin( M_order * lon );
 
-                    sph_coeffs_Real[ L_degree * (2*max_L) + (M_order + max_L) ] += alpha_L_M_Re;
-                    sph_coeffs_Imag[ L_degree * (2*max_L) + (M_order + max_L) ] += alpha_L_M_Im;
+                    long double vort_L_M_Re = dA * Y_L_M * vorticity[Ipt] * cos_M_lon;
+                    long double vort_L_M_Im = dA * Y_L_M * vorticity[Ipt] * sin_M_lon;
+
+                    long double div_L_M_Re = dA * Y_L_M * divergence[Ipt] * cos_M_lon;
+                    long double div_L_M_Im = dA * Y_L_M * divergence[Ipt] * sin_M_lon;
+
+                    vort_coeffs_Real[ L_degree * (2*max_L+1) + (M_order + max_L) ] += vort_L_M_Re;
+                    vort_coeffs_Imag[ L_degree * (2*max_L+1) + (M_order + max_L) ] += vort_L_M_Im;
+
+                    div_coeffs_Real[ L_degree * (2*max_L+1) + (M_order + max_L) ] += div_L_M_Re;
+                    div_coeffs_Imag[ L_degree * (2*max_L+1) + (M_order + max_L) ] += div_L_M_Im;
                 }
             }
         }
@@ -67,36 +96,50 @@ void SphericalHarmonicSolver(
 
 
     // Now that we have the coefficients, use them to build the new field
-    reconstructed_field.resize(Npts, 0);
+    std::vector<long double> long_Psi(Npts, 0.), long_Phi(Npts, 0.);
 
     #pragma omp parallel \
     default(none) \
-    shared( source_data, reconstructed_field, sph_coeffs_Real, sph_coeffs_Imag ) \
-    private( Ipt, L_degree, M_order ) \
-    firstprivate( Npts )
+    shared( source_data, long_Psi, long_Phi, vort_coeffs_Real, vort_coeffs_Imag, div_coeffs_Real, div_coeffs_Imag ) \
+    private( Ipt, L_degree ) \
+    firstprivate( Npts, surface_area )
     {
         // Loop over the different spherical hamonic degrees and ordrs
-        #pragma omp for collapse(1) schedule(static)
+        #pragma omp for collapse(1) schedule(guided)
         for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+
             long double lon = source_data.longitude[Ipt];
             long double lat = (M_PI/2) - source_data.latitude[Ipt]; //convert to polar angle
 
             for ( L_degree = 1; L_degree < max_L; L_degree++ ) {
-                for ( M_order = -L_degree; M_order <= L_degree; M_order++ ) {
+                for ( int M_order = -L_degree; M_order <= L_degree; M_order++ ) {
                     long double Y_L_M = std::sph_legendre( L_degree, M_order, lat );
 
-                    long double alpha_L_M_Re = sph_coeffs_Real[ L_degree * (2*max_L) + (M_order + max_L) ];
-                    long double alpha_L_M_Im = sph_coeffs_Imag[ L_degree * (2*max_L) + (M_order + max_L) ];
+                    long double vort_L_M_Re = vort_coeffs_Real[ L_degree * (2*max_L+1) + (M_order + max_L) ];
+                    long double vort_L_M_Im = vort_coeffs_Imag[ L_degree * (2*max_L+1) + (M_order + max_L) ];
 
-                    alpha_L_M_Re = - alpha_L_M_Re / ( L_degree * (L_degree+1) );
-                    alpha_L_M_Im = - alpha_L_M_Im / ( L_degree * (L_degree+1) );
+                    long double div_L_M_Re = div_coeffs_Real[ L_degree * (2*max_L+1) + (M_order + max_L) ];
+                    long double div_L_M_Im = div_coeffs_Imag[ L_degree * (2*max_L+1) + (M_order + max_L) ];
+
+                    vort_L_M_Re = - vort_L_M_Re / ( L_degree * (L_degree+1) );
+                    vort_L_M_Im = - vort_L_M_Im / ( L_degree * (L_degree+1) );
+
+                    div_L_M_Re = - div_L_M_Re / ( L_degree * (L_degree+1) );
+                    div_L_M_Im = - div_L_M_Im / ( L_degree * (L_degree+1) );
 
                     // Our input field is real, so only keep the real parts
-                    long double real_from_real = alpha_L_M_Re * Y_L_M * cos( M_order * lon );
-                    long double real_from_imag = alpha_L_M_Im * Y_L_M * sin( M_order * lon );
+                    long double cos_M_lon = cos( M_order * lon );
+                    long double sin_M_lon = sin( M_order * lon );
 
-                    //reconstructed_field[Ipt] += real_from_real - real_from_imag;
-                    reconstructed_field[Ipt] += (double) (real_from_real + real_from_imag);
+                    long double Psi_from_real = vort_L_M_Re * Y_L_M * cos_M_lon;
+                    long double Psi_from_imag = vort_L_M_Im * Y_L_M * sin_M_lon;
+
+                    long_Psi[Ipt] += (Psi_from_real + Psi_from_imag) * sqrt( surface_area );
+
+                    long double Phi_from_real = div_L_M_Re * Y_L_M * cos_M_lon;
+                    long double Phi_from_imag = div_L_M_Im * Y_L_M * sin_M_lon;
+
+                    long_Phi[Ipt] += (Phi_from_real + Phi_from_imag) * sqrt( surface_area );
                 }
             }
         }
@@ -105,16 +148,17 @@ void SphericalHarmonicSolver(
 
     // Finally, adjust so that Psi[0] = 0, Phi[0] = 0
     #pragma omp parallel \
-    default(none) \
-    shared( reconstructed_field ) \
-    private( Ipt ) \
-    firstprivate( Npts )
+    default(none) shared( long_Psi, long_Phi, Psi, Phi ) \
+    private( Ipt ) firstprivate( Npts )
     {
         #pragma omp for collapse(1) schedule(static)
         for ( Ipt = 1; Ipt < Npts; Ipt++ ) {
-            reconstructed_field[Ipt] = reconstructed_field[Ipt] - reconstructed_field[0];
+            Psi[Ipt] = long_Psi[Ipt] - long_Psi[0];
+            Phi[Ipt] = long_Phi[Ipt] - long_Phi[0];
+
         }
     }
-    reconstructed_field[0] = 0.;
+    Psi[0] = 0.;
+    Phi[0] = 0.;
 
 }
