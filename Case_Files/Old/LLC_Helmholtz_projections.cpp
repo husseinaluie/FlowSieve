@@ -133,6 +133,18 @@ int main(int argc, char *argv[]) {
                                                              "Maximum number of iterations for the solver before terminating. Can use exponential notation (e.g. '5e3')");
     const int max_iterations = stod(iteration_string);  
 
+    const std::string &iter_cycle_string = input.getCmdOption("--iterations_per_cycle", 
+                                                             "1e2", 
+                                                             asked_help,
+                                                             "Number of iterations between error calculations. Can use exponential notation (e.g. '5e3')");
+    const int iters_per_cycle = stod(iter_cycle_string);  
+
+    const std::string &num_refine_string = input.getCmdOption("--num_refinements", 
+                                                             "0", 
+                                                             asked_help,
+                                                             "Number of grid refinements (halvings) to use in solving");
+    const int num_refinements = stod(num_refine_string);  
+
     const std::string &Tikhov_Lap_string = input.getCmdOption("--Tikhov_Laplace", "1.", asked_help);
     const double Tikhov_Laplace = stod(Tikhov_Lap_string);  
 
@@ -238,9 +250,10 @@ int main(int argc, char *argv[]) {
     //Apply_LLC_Helmholtz_Projection_Eigen_vels( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
     //Apply_LLC_Helmholtz_Projection_Eigen_vels_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
     //Apply_LLC_Helmholtz_Projection_Eigen_both( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
-    //Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
     //Apply_LLC_Helmholtz_Projection_Eigen_PsiPhi_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
-    Apply_LLC_Helmholtz_Projection_ALGLIB_PsiPhi_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
+    //Apply_LLC_Helmholtz_Projection_ALGLIB_PsiPhi_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
+
+    Apply_LLC_Helmholtz_Projection_Eigen_both_DeltaLand( output_fname, source_data, Psi_seed, Phi_seed, single_seed, 
             tolerance, max_iterations, use_area_weight, use_mask, Tikhov_Laplace );
 
     // Done!
