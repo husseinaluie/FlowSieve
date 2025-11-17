@@ -111,7 +111,7 @@ namespace constants
      * If false, land is included in local average (treated as zero velocity
      * @ingroup constants
      */
-    const bool DEFORM_AROUND_LAND = false;
+    const bool DEFORM_AROUND_LAND = true;
 
     /*!
      * \param FILTER_OVER_LAND
@@ -124,7 +124,7 @@ namespace constants
      * Note that this does NOT affect the shape of filtering kernels.
      * @ingroup constants
      */
-    const bool FILTER_OVER_LAND = true;
+    const bool FILTER_OVER_LAND = false;
 
     /*!
      * \param ZONAL_KERNEL_ONLY
@@ -144,7 +144,7 @@ namespace constants
      *
      * @ingroup constants
      */
-    const bool EXTEND_DOMAIN_TO_POLES = true;
+    const bool EXTEND_DOMAIN_TO_POLES = false;
 
     /*!
      * \param CARTESIAN
@@ -319,7 +319,7 @@ namespace constants
     //const int KERNEL_OPT = 4;
     enum KernelType : int { TopHat, HyperGaussian, Gaussian, JohnsonGaussian, 
                             Sinc, SmoothHat, HighOrder };
-    const int KERNEL_OPT = KernelType::Gaussian;
+    const int KERNEL_OPT = KernelType::SmoothHat;
 
     /*!
      * \param KernPad
@@ -363,7 +363,7 @@ namespace constants
         { "KE_spectral_slope",  "Log-log slope of KE power spectrum." },
         { "coarse_KE",          "Kinetic energy of coarse-grained velocity" },
         { "fine_KE",            "Small-scale kinetic energy ( filter(KE(u)) - KE(filter(u)) )" },
-        { "Fine_KE_mod",        "Modified small-scale kinetic energy ( KE(u) - KE(filter(u)) )" },
+        { "KE_from_fine_vel",   "Kinetic energy from small-scale velocity (KE(u - u_bar))" },
         { "enstrophy",          "Enstrophy of coarse-grained velocity" },
         { "Pi",                 "Non-linear energy transfer from large-scales to small-scales" },
         { "Pi_Dversus",         "As Pi, but large-scale strain is potential-only." },
@@ -393,6 +393,7 @@ namespace constants
         { "KE_spectral_slope",  "1" },
         { "coarse_KE",          "J / (m^3)" },
         { "fine_KE",            "J / (m^3)" },
+        { "KE_from_fine_vel",   "J / (m^3)" },
         { "enstrophy",          "J / (m^5)" },
         { "Pi",                 "Watt / (m^3)" },
         { "Pi_Dversus",         "Watt / (m^3)" },

@@ -144,9 +144,9 @@ void filtering_helmholtz(
         KE_tot_fine(    num_pts, 0. ),
 
         // Fine KE modified ( uu - bar(u)bar(u) )
-        KE_tor_fine_mod(    num_pts, 0. ),
-        KE_pot_fine_mod(    num_pts, 0. ),
-        KE_tot_fine_mod(    num_pts, 0. ),
+        KE_tor_fine_vel( num_pts, 0. ),
+        KE_pot_fine_vel( num_pts, 0. ),
+        KE_tot_fine_vel( num_pts, 0. ),
 
         // Filtered KE (used to compute fine KE)
         KE_tor_filt(    num_pts, 0. ),
@@ -263,11 +263,15 @@ void filtering_helmholtz(
         u_lon_tor( num_pts, 0. ),
         u_lon_pot( num_pts, 0. ),
         u_lon_tot( num_pts, 0. ),
+        u_lon_tor_unfilt( num_pts, 0. ),
+        u_lon_pot_unfilt( num_pts, 0. ),
 
         // Spherical - meridional velocities
         u_lat_tor( num_pts, 0. ),
         u_lat_pot( num_pts, 0. ),
         u_lat_tot( num_pts, 0. ),
+        u_lat_tor_unfilt( num_pts, 0. ),
+        u_lat_pot_unfilt( num_pts, 0. ),
 
         // Spherical - dyadix products
         ulon_ulon( num_pts, 0. ),
@@ -341,6 +345,11 @@ void filtering_helmholtz(
     if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
     toroidal_vel_from_F(  u_lon_tor, u_lat_tor, F_toroidal,  longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
     potential_vel_from_F( u_lon_pot, u_lat_pot, F_potential, longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask );
+
+    u_lon_tor_unfilt = u_lon_tor; 
+    u_lat_tor_unfilt = u_lat_tor; 
+    u_lon_pot_unfilt = u_lon_pot; 
+    u_lat_pot_unfilt = u_lat_pot; 
     if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute velocities from F"); }
 
     #if DEBUG >= 2
@@ -513,9 +522,9 @@ void filtering_helmholtz(
         // These outputs are only included if not set to minimal outputs
         //
 
-        vars_to_write.push_back("KE_tor_fine_mod");
-        vars_to_write.push_back("KE_pot_fine_mod");
-        vars_to_write.push_back("KE_tot_fine_mod");
+        vars_to_write.push_back("KE_tor_from_fine_vel");
+        vars_to_write.push_back("KE_pot_from_fine_vel");
+        vars_to_write.push_back("KE_tot_from_fine_vel");
 
         vars_to_write.push_back("div_tor");
         vars_to_write.push_back("div_pot");
@@ -653,12 +662,10 @@ void filtering_helmholtz(
     postprocess_fields_pot.push_back( &KE_pot_fine );
     postprocess_fields_tot.push_back( &KE_tot_fine );
 
-    /*
-    postprocess_names.push_back( "Fine_KE_mod" );
-    postprocess_fields_tor.push_back( &KE_tor_fine_mod );
-    postprocess_fields_pot.push_back( &KE_pot_fine_mod );
-    postprocess_fields_tot.push_back( &KE_tot_fine_mod );
-    */
+    postprocess_names.push_back( "KE_from_fine_vel" );
+    postprocess_fields_tor.push_back( &KE_tor_fine_vel );
+    postprocess_fields_pot.push_back( &KE_pot_fine_vel );
+    postprocess_fields_tot.push_back( &KE_tot_fine_vel );
 
     // KE spectra
     postprocess_names.push_back( "u_lon_spectrum" );
@@ -1499,9 +1506,10 @@ void filtering_helmholtz(
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
         #pragma omp parallel \
         default( none ) \
-        shared( KE_tor_coarse, KE_tor_fine, KE_tor_filt, KE_tor_fine_mod, KE_tor_orig, \
-                KE_pot_coarse, KE_pot_fine, KE_pot_filt, KE_pot_fine_mod, KE_pot_orig, \
-                KE_tot_coarse, KE_tot_fine, KE_tot_filt, KE_tot_fine_mod, KE_tot_orig, \
+        shared( KE_tor_coarse, KE_tor_fine, KE_tor_filt, KE_tor_fine_vel, KE_tor_orig, \
+                KE_pot_coarse, KE_pot_fine, KE_pot_filt, KE_pot_fine_vel, KE_pot_orig, \
+                KE_tot_coarse, KE_tot_fine, KE_tot_filt, KE_tot_fine_vel, KE_tot_orig, \
+                u_lon_tor_unfilt, u_lat_tor_unfilt, u_lon_pot_unfilt, u_lat_pot_unfilt, \
                 Enst_tor, Enst_pot, Enst_tot, mask, \
                 u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot, u_lon_tot, u_lat_tot, \
                 vort_tor_r, vort_pot_r, vort_tot_r ) \
@@ -1519,9 +1527,20 @@ void filtering_helmholtz(
                     KE_pot_fine.at(index) = KE_pot_filt.at(index) - KE_pot_coarse.at(index);
                     KE_tot_fine.at(index) = KE_tot_filt.at(index) - KE_tot_coarse.at(index);
 
-                    KE_tor_fine_mod.at(index) = KE_tor_orig.at(index) - KE_tor_coarse.at(index);
-                    KE_pot_fine_mod.at(index) = KE_pot_orig.at(index) - KE_pot_coarse.at(index);
-                    KE_tot_fine_mod.at(index) = KE_tot_orig.at(index) - KE_tot_coarse.at(index);
+                    KE_tor_fine_vel.at(index) = 0.5 * rho0 * (
+                              pow( u_lon_tor_unfilt[index] - u_lon_tor[index], 2.)
+                            + pow( u_lat_tor_unfilt[index] - u_lat_tor[index], 2.)
+                            );
+                    KE_pot_fine_vel.at(index) = 0.5 * rho0 * (
+                              pow( u_lon_pot_unfilt[index] - u_lon_pot[index], 2.)
+                            + pow( u_lat_pot_unfilt[index] - u_lat_pot[index], 2.)
+                            );
+                    KE_tot_fine_vel.at(index) = 0.5 * rho0 * (
+                              pow(   u_lon_tor_unfilt[index] + u_lon_pot_unfilt[index] 
+                                   - (u_lon_tor[index] + u_lon_pot[index]), 2.)
+                            + pow(   u_lat_tor_unfilt[index] + u_lat_pot_unfilt[index] 
+                                   - (u_lat_tor[index] + u_lat_pot[index]), 2.)
+                            );
 
                     Enst_tor.at(index) = 0.5 * rho0 * ( pow(vort_tor_r.at(index), 2.) );
                     Enst_pot.at(index) = 0.5 * rho0 * ( pow(vort_pot_r.at(index), 2.) );
@@ -1545,9 +1564,9 @@ void filtering_helmholtz(
 
         if (not(constants::MINIMAL_OUTPUT)) {
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-            write_field_to_output( KE_tor_fine_mod, "KE_tor_fine_mod", starts, counts, fname, &mask);
-            write_field_to_output( KE_pot_fine_mod, "KE_pot_fine_mod", starts, counts, fname, &mask);
-            write_field_to_output( KE_tot_fine_mod, "KE_tot_fine_mod", starts, counts, fname, &mask);
+            write_field_to_output( KE_tor_fine_vel, "KE_tor_from_fine_vel", starts, counts, fname, &mask);
+            write_field_to_output( KE_pot_fine_vel, "KE_pot_from_fine_vel", starts, counts, fname, &mask);
+            write_field_to_output( KE_tot_fine_vel, "KE_tot_from_fine_vel", starts, counts, fname, &mask);
 
             write_field_to_output( Enst_tor, "Enstrophy_tor", starts, counts, fname, &mask);
             write_field_to_output( Enst_pot, "Enstrophy_pot", starts, counts, fname, &mask);
