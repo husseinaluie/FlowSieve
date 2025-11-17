@@ -1,7 +1,6 @@
 #include <math.h>
 #include <algorithm>
 #include <mpi.h>
-#include <cassert>
 #include "../constants.hpp"
 #include "../functions.hpp"
 
