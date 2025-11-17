@@ -283,7 +283,7 @@ int main(int argc, char *argv[]) {
 
     // Apply to projection routine
     Helmholtz_Solver( "output.nc", source_data, tolerance, max_iterations, iters_per_cycle, use_area_weight,
-           use_mask, use_vel, use_vort_div, collapse_land, num_refinements );
+                        use_mask, use_vel, use_vort_div, collapse_land, num_refinements );
 
 
     // Done!
