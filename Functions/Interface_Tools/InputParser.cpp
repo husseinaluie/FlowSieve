@@ -4,7 +4,6 @@
 #include <iterator>
 #include <algorithm>
 #include <mpi.h>
-#include <cassert>
 
 #include "../../constants.hpp"
 #include "../../functions.hpp"
@@ -102,7 +101,9 @@ void InputParser::getFilterScales(
     if (help) {
         return;
     }
-    assert( string_of_scales.size() > 0 );
+    if ( string_of_scales.size() == 0 ) {
+        throw std::runtime_error("An empty list of filtering scales was provided.");
+    }
 
     std::istringstream iss( string_of_scales );
 
@@ -123,7 +124,7 @@ void InputParser::getFilterScales(
             fprintf(stderr, 
                     "\nReceived bad filter scale (%s). Input must be of form '1.3e4 678e6' etc (i.e. space-separated list of numbers).\n", 
                     scales_as_strings.at(ii).c_str());
-            assert(false);
+            throw std::runtime_error("Bad filter scale received.");
         }
         #if DEBUG >= 0
         if (wRank == 0) { 
@@ -156,9 +157,9 @@ void InputParser::getListofStrings(
     const std::string raw_input_string = getCmdOption( argname, "", help, description );
     if (help) { return; }
     if ( raw_input_string.size() <= 0) {
-        fprintf( stderr, "The input to %s is empty! Halting.\n", argname.c_str() );
+        fprintf( stderr, "Note: the input to %s is empty!\n", argname.c_str() );
+        return;
     }
-    assert( raw_input_string.size() > 0 );
 
     std::istringstream iss( raw_input_string );
 
@@ -191,9 +192,9 @@ void InputParser::getListofStringPairs(
     const std::string raw_input_string = getCmdOption( argname, "", help, description );
     if (help) { return; }
     if ( raw_input_string.size() <= 0) {
-        fprintf( stderr, "The input to %s is empty! Halting.\n", argname.c_str() );
+        fprintf( stderr, "Note: the input to %s is empty!\n", argname.c_str() );
+        return;
     }
-    assert( raw_input_string.size() > 0 );
 
     std::istringstream iss( raw_input_string );
 

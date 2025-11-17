@@ -3,7 +3,8 @@
 #include "../constants.hpp"
 #include "../functions.hpp"
 #include "../netcdf_io.hpp"
-#include <cassert>
+#include <omp.h>
+#include <Eigen/QR>
 
 
 // Class constructor
@@ -44,6 +45,7 @@ void dataset::clear() {
 
 
     adjacency_indices.clear();
+    adjacency_indices_adjoint.clear();
     adjacency_projected_x.clear();
     adjacency_projected_y.clear();
     adjacency_distances.clear();
@@ -132,12 +134,122 @@ void dataset::load_longitude( const std::string dim_name, const std::string file
     Nlon = longitude.size();
 };
 
+void dataset::initialize_index_functions() {
+    stride_lat   = Nlon;
+    stride_depth = Nlat   * stride_lat;
+    stride_time  = Ndepth * stride_depth;
+}
+
 void dataset::compute_cell_areas() {
 
-    assert( (Nlat > 0) and (Nlon > 0) );    
+    if (not( (Nlat > 0) and (Nlon > 0) )) {
+        throw std::runtime_error("Unable to compute cell sizes. Size zero dimensions exist.");
+    }
+
 
     areas.resize( Nlat * Nlon );
     compute_areas( areas, longitude, latitude );
+}
+
+
+void dataset::compute_sin_cos_lat() {
+
+    sin_lat.resize( latitude.size() );
+    cos_lat.resize( latitude.size() );
+
+    sin_lon.resize( longitude.size() );
+    cos_lon.resize( longitude.size() );
+
+    const size_t Nlat = latitude.size(),
+                 Nlon = longitude.size();
+    size_t Ipt;
+    #pragma omp parallel default(none) \
+    shared( cos_lat, sin_lat, latitude ) \
+    private( Ipt ) firstprivate( Nlat )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Nlat; Ipt++ ) {
+            cos_lat[Ipt] = cos(latitude[Ipt]);
+            sin_lat[Ipt] = sin(latitude[Ipt]);
+        }
+    }
+    #pragma omp parallel default(none) \
+    shared( cos_lon, sin_lon, longitude ) \
+    private( Ipt ) firstprivate( Nlon )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Nlon; Ipt++ ) {
+            cos_lon[Ipt] = cos(longitude[Ipt]);
+            sin_lon[Ipt] = sin(longitude[Ipt]);
+        }
+    }
+
+    sin_cos_lat_pre_comp = true;
+
+}
+
+// This is a wrapper for Functions/distance 
+// that takes in indices
+double dataset::distance_from_indices(
+        const size_t Ipt,
+        const size_t Jpt
+        ) const {
+
+    if ( Ipt == Jpt ) { return 0.; }
+
+    const bool pre_comp = 
+        constants::PRECOMPUTE_SIN_COS_LATITUDE and sin_cos_lat_pre_comp;
+    return distance(
+                longitude[Ipt],
+                latitude[ Ipt],
+                longitude[Jpt],
+                latitude[ Jpt],
+                Cartesian_x_range,
+                Cartesian_y_range,
+                pre_comp ? cos_lat[Ipt] : 0.,
+                pre_comp ? cos_lat[Jpt] : 0.,
+                pre_comp ? sin_lat[Ipt] : 0.,
+                pre_comp ? sin_lat[Jpt] : 0.,
+                pre_comp ? cos_lon[Ipt] : 0.,
+                pre_comp ? cos_lon[Jpt] : 0.,
+                pre_comp ? sin_lon[Ipt] : 0.,
+                pre_comp ? sin_lon[Jpt] : 0.,
+                pre_comp
+            );
+
+}
+
+// This is a wrapper for Functions/distance 
+// that takes in Ilat,Ilon indices
+double dataset::distance_from_IlatIlon(
+        const size_t Ilat,
+        const size_t Ilon,
+        const size_t Jlat,
+        const size_t Jlon
+        ) const {
+
+    if (( Ilat == Jlat ) and (Ilon == Jlon))  { return 0.; }
+
+    const bool pre_comp = 
+        constants::PRECOMPUTE_SIN_COS_LATITUDE and sin_cos_lat_pre_comp;
+    return distance(
+                longitude[Ilon],
+                latitude[ Ilat],
+                longitude[Jlon],
+                latitude[ Jlat],
+                Cartesian_x_range,
+                Cartesian_y_range,
+                pre_comp ? cos_lat[Ilat] : 0.,
+                pre_comp ? cos_lat[Jlat] : 0.,
+                pre_comp ? sin_lat[Ilat] : 0.,
+                pre_comp ? sin_lat[Jlat] : 0.,
+                pre_comp ? cos_lon[Ilon] : 0.,
+                pre_comp ? cos_lon[Jlon] : 0.,
+                pre_comp ? sin_lon[Ilon] : 0.,
+                pre_comp ? sin_lon[Jlon] : 0.,
+                pre_comp
+            );
+
 }
 
 void dataset::load_variable( 
@@ -171,7 +283,9 @@ void dataset::check_processor_divisions(    const int Nprocs_in_time_input,
                                             const MPI_Comm ) {
 
     if (constants::GRID_TYPE == constants::GridType::MeshGrid ) {
-        assert( (full_Ntime > 0) and (full_Ndepth > 0) and (Nlon > 0) and (Nlat > 0) ); // Must read in dimensions before checking processor divisions.
+        if (not( (full_Ntime > 0) and (full_Ndepth > 0) and (Nlon > 0) and (Nlat > 0) )) {
+            throw std::runtime_error("Must read in dimensions before checking processor divisions.");
+        }
     }
 
     int wRank=-1, wSize=-1;
@@ -203,7 +317,9 @@ void dataset::check_processor_divisions(    const int Nprocs_in_time_input,
     if (wRank == 0) { fprintf(stdout, " Nproc(time, depth) = (%'d, %'d)\n\n", Nprocs_in_time, Nprocs_in_depth); }
     #endif
 
-    assert( Nprocs_in_time * Nprocs_in_depth * Nprocs_in_quadrature == wSize );
+    if ( Nprocs_in_time * Nprocs_in_depth * Nprocs_in_quadrature != wSize ) {
+        throw std::runtime_error("Processor division mismatch. Nprocs_in_time * Nprocs_in_depth != total MPI ranks");
+    }
 
     // Now that processor divisions have been tested, also create the sub-communicator items
     int color, key;
@@ -257,8 +373,8 @@ void dataset::compute_region_areas() {
     if (wRank == 0) { fprintf(stdout, "  Computing geographic region areas\n"); fflush(stdout); }
     #endif
 
-    assert( mask.size() > 0 ); // must read in mask before computing region areas
-    assert( areas.size() > 0 ); // must compute cell areas before computing region areas
+    if ( mask.size() == 0 ) { throw std::runtime_error("Must read in mask before computing region areas."); }
+    if ( areas.size() == 0 ) { throw std::runtime_error("Must compute cell areas before computing region areas."); }
     const size_t num_regions = region_names.size();
     region_areas.resize( num_regions * Ntime * Ndepth );
     if (constants::FILTER_OVER_LAND) { region_areas_water_only.resize( region_areas.size() ); }
@@ -417,8 +533,12 @@ void dataset::gather_mask_across_depth( const std::vector<short int> & var,
 
 size_t dataset::local_index(  const int Itime, const int Idepth, const int Ilat, const int Ilon 
         ) const {
+    /*
     return Index( Itime, Idepth, Ilat, Ilon, 
                   Ntime, Ndepth, Nlat, Nlon );
+    */
+    size_t index = Itime * stride_time + Idepth * stride_depth + Ilat * stride_lat + Ilon;
+    return index;
 }
 
 
@@ -488,13 +608,10 @@ void dataset::write_adjacency(
     std::vector<std::string> vars_to_write;
 
     vars_to_write.push_back("adjacency_indices");
-    //vars_to_write.push_back("adjacency_proj_x");
-    //vars_to_write.push_back("adjacency_proj_y");
-    //vars_to_write.push_back("adjacency_distances");
-    vars_to_write.push_back("adjacency_ddlon_weights");
-    vars_to_write.push_back("adjacency_ddlat_weights");
-    vars_to_write.push_back("adjacency_d2dlon2_weights");
-    vars_to_write.push_back("adjacency_d2dlat2_weights");
+    //vars_to_write.push_back("adjacency_ddlon_weights");
+    //vars_to_write.push_back("adjacency_ddlat_weights");
+    //vars_to_write.push_back("adjacency_d2dlon2_weights");
+    //vars_to_write.push_back("adjacency_d2dlat2_weights");
 
     initialize_adjacency_file( *this, vars_to_write, filename.c_str() );
 
@@ -502,6 +619,12 @@ void dataset::write_adjacency(
 
     const size_t Npts = longitude.size(),
                  Nneighbours = num_neighbours;
+
+    // Cell areas
+    size_t starts_1D[1] = { 0    };
+    size_t counts_1D[1] = { Npts };
+    write_field_to_output( areas, "dA", starts_1D, counts_1D, filename.c_str() );
+
 
     size_t starts[2] = { 0,   0  };
     size_t counts[2] = { Npts, Nneighbours+1 };
@@ -514,26 +637,6 @@ void dataset::write_adjacency(
     write_field_to_output( var_to_write, "adjacency_indices", starts, counts, filename.c_str() );
 
     /*
-    // Projected x
-    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
-            var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_projected_x[II][JJ];
-    } }
-    write_field_to_output( var_to_write, "adjacency_proj_x", starts, counts, filename.c_str() );
-
-    // Projected y
-    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
-            var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_projected_y[II][JJ];
-    } }
-    write_field_to_output( var_to_write, "adjacency_proj_y", starts, counts, filename.c_str() );
-
-    // Distances
-    for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
-            var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_distances[II][JJ];
-    } }
-    write_field_to_output( var_to_write, "adjacency_distances", starts, counts, filename.c_str() );
-    */
-
-
     // 1st lon deriv weights
     for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
             var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_ddlon_weights[II][JJ];
@@ -547,7 +650,9 @@ void dataset::write_adjacency(
     } }
     write_field_to_output( var_to_write, "adjacency_ddlat_weights", 
             starts, counts, filename.c_str() );
+    */
 
+    /*
     // 2nd lon deriv weights
     for ( size_t II = 0; II < Npts; II++ ) { for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
             var_to_write.at( (Nneighbours+1)*II + JJ ) = adjacency_d2dlon2_weights[II][JJ];
@@ -561,6 +666,7 @@ void dataset::write_adjacency(
     } }
     write_field_to_output( var_to_write, "adjacency_d2dlat2_weights", 
             starts, counts, filename.c_str() );
+    */
 
 }
 
@@ -594,6 +700,14 @@ void dataset::load_adjacency(
 
     std::vector<double> tmp_var;
 
+    /*
+    // Get dimensions
+    int ncid = nc_open( filename.c_str(), NC_NOWRITE );
+    int neighbour_dimid;
+    nc_inq_dimid( ncid, "neighbour", &neighbour_dimid );
+    nc_inq_dimlen( ncid, dimid, &num_neighbours );
+    */
+
     const size_t Npts = longitude.size(),
                  Nneighbours = num_neighbours;
 
@@ -602,100 +716,285 @@ void dataset::load_adjacency(
                         "adjacency_indices", 
                         filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
     adjacency_indices.resize(Npts);
+    adjacency_ddlon_weights.resize(Npts);
+    adjacency_ddlat_weights.resize(Npts);
     for ( size_t II = 0; II < Npts; II++ ) { 
+        adjacency_ddlon_weights.at(II).resize(Nneighbours+1);
+        adjacency_ddlat_weights.at(II).resize(Nneighbours+1);
         adjacency_indices.at(II).resize(Nneighbours+1);
         for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
             adjacency_indices[II][JJ] = (size_t) round(tmp_var.at(II*(Nneighbours+1) + JJ));
         } 
     }
+    size_t Ipt;
+    #pragma omp parallel default(none) private( Ipt ) \
+    firstprivate(Nneighbours, Npts) 
+    {
+        const size_t size_neighbourhood = Nneighbours+1;
+        const size_t Nderiv = size_neighbourhood-1;
+        //const int Nconds = 10; // cubic
+        const int Nconds = 3; // linear
+        const bool keep_latlon = false;
 
-    /*
-     * These aren't actually used anywhere, so avoid wasting memory
-     *
-    // projected x
-    read_var_from_file( tmp_var,
-                        "adjacency_proj_x", 
-                        filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
-    adjacency_projected_x.resize(Npts);
-    for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_projected_x.at(II).resize(Nneighbours+1);
-        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
-            adjacency_projected_x[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
-        } 
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+
+            double centre_lat = latitude[Ipt];
+
+            long double mean_dist = 0,
+                        min_lon =  M_PI,
+                        max_lon = -M_PI,
+                        min_lat =  M_PI,
+                        max_lat = -M_PI,
+                        min_x   =  10,
+                        max_x   = -10,
+                        min_y   =  10,
+                        max_y   = -10;
+            for ( size_t In = 0; In < Nderiv; In++ ) {
+
+                long double local_lon = longitude[ adjacency_indices[Ipt][In] ] - longitude[Ipt];
+                if (local_lon > M_PI) { local_lon = local_lon - 2*M_PI; }
+                else if (local_lon < -M_PI) { local_lon = local_lon + 2*M_PI; }
+
+                long double local_lat = latitude[ adjacency_indices[Ipt][In] ];
+
+                min_lon = std::fmin( local_lon, min_lon );
+                max_lon = std::fmax( local_lon, max_lon );
+
+                min_lat = std::fmin( local_lat, min_lat );
+                max_lat = std::fmax( local_lat, max_lat );
+
+                long double x,y;
+                if ( keep_latlon and (std::fabs(centre_lat) < 88. * M_PI / 180.) ) {
+                    x = local_lon;
+                    y = local_lat - centre_lat;
+                } else {
+                    // Convert to Cartesian
+                    // Rotate to have x = 0 at centre
+                    // Rotate to have z = 1 at centre
+                    // Now a local tangent plane centred at the north pole
+                    x =   cos( local_lat ) * sin( local_lon );
+                    y =   cos( centre_lat ) * sin( local_lat ) 
+                        - sin( centre_lat ) * cos( local_lat ) * cos( local_lon );
+                }
+
+                mean_dist += sqrt( x*x + y*y ) / Nderiv;
+
+                min_x = std::fmin( x, min_x );
+                min_y = std::fmin( y, min_y );
+
+                max_x = std::fmax( x, max_x );
+                max_y = std::fmax( y, max_y );
+            }
+            const long double x_scale = max_x - min_x,
+                              y_scale = max_y - min_y;
+
+            /* Regression
+            */
+            std::map< std::string, long double > Sij;
+            std::vector< std::string > S_comps = 
+                (Nconds == 10) ? std::vector<std::string> {"", "x", "y", "xy", "xx", "yy", "xxx", "xxy", "xyy", "yyy"}
+              : (Nconds ==  6) ? std::vector<std::string> {"", "x", "y", "xy", "xx", "yy"}
+              :                  std::vector<std::string> {"", "x", "y"};
+            for ( size_t i = 0; i < S_comps.size(); i++ ) {
+                for ( size_t j = 0; j <= i; j++ ) {
+                    std::string name = S_comps[i] + S_comps[j];
+                    Sij.insert( std::pair< std::string, long double >(name, 0.) );
+                }
+            }
+            for ( size_t In = 0; In < Nderiv; In++ ) {
+
+                long double local_lon = longitude[ adjacency_indices[Ipt][In] ] - longitude[Ipt];
+                if (local_lon > M_PI) { local_lon = local_lon - 2*M_PI; }
+                else if (local_lon < -M_PI) { local_lon = local_lon + 2*M_PI; }
+
+                long double local_lat = latitude[ adjacency_indices[Ipt][In] ];
+
+                long double x,y;
+                if ( keep_latlon and (std::fabs(centre_lat) < 88. * M_PI / 180.) ) {
+                    x = local_lon;
+                    y = local_lat - centre_lat;
+                } else {
+                    // Convert to Cartesian
+                    // Rotate to have x = 0 at centre
+                    // Rotate to have z = 1 at centre
+                    // Now a local tangent plane centred at the north pole
+                    x =   cos( local_lat ) * sin( local_lon );
+                    y =   cos( centre_lat ) * sin( local_lat ) 
+                        - sin( centre_lat ) * cos( local_lat ) * cos( local_lon );
+                }
+
+                x /= mean_dist;
+                y /= mean_dist;
+                
+                long double dA = areas[adjacency_indices[Ipt][In]];
+
+                for (auto const& sij : Sij ) {
+                    std::string name = sij.first;
+                    long double value = 1.;
+                    for ( size_t i = 0; i < name.size(); i++ ) {
+                        if ( name[i] == 'x' ) { value *= x; }
+                        else {                  value *= y; }
+                    }
+                    Sij[name] += value * dA;
+                }
+            }
+
+            Eigen::Matrix<long double, Nconds, Nconds> A;
+            for ( size_t i = 0; i < S_comps.size(); i++ ) {
+                for ( size_t j = 0; j <= i; j++ ) {
+                    std::string name = S_comps[i] + S_comps[j];
+                    A(i,j) = Sij[name];
+                    A(j,i) = Sij[name];
+                }
+            }
+
+
+            for ( size_t In = 0; In < Nderiv; In++ ) {
+
+                long double local_lon = longitude[ adjacency_indices[Ipt][In] ] - longitude[Ipt];
+                if (local_lon > M_PI) { local_lon = local_lon - 2*M_PI; }
+                else if (local_lon < -M_PI) { local_lon = local_lon + 2*M_PI; }
+
+                long double local_lat = latitude[ adjacency_indices[Ipt][In] ];
+
+                long double x,y;
+                if ( keep_latlon and (std::fabs(centre_lat) < 88. * M_PI / 180.) ) {
+                    x = local_lon;
+                    y = local_lat - centre_lat;
+                } else {
+                    // Convert to Cartesian
+                    // Rotate to have x = 0 at centre
+                    // Rotate to have z = 1 at centre
+                    // Now a local tangent plane centred at the north pole
+                    x =   cos( local_lat ) * sin( local_lon );
+                    y =   cos( centre_lat ) * sin( local_lat ) 
+                        - sin( centre_lat ) * cos( local_lat ) * cos( local_lon );
+                }
+
+                x /= mean_dist;
+                y /= mean_dist;
+                
+                long double dA = areas[adjacency_indices[Ipt][In]];
+
+                Eigen::Vector<long double, Nconds> RHS, sol;
+                RHS[0] = 1.  * dA;
+                RHS[1] = x   * dA;
+                RHS[2] = y   * dA;
+                if ( Nconds > 3 ) {
+                    RHS[3] = x*y * dA;
+                    RHS[4] = x*x * dA;
+                    RHS[5] = y*y * dA;
+                }
+                if ( Nconds > 6 ) {
+                    RHS[6] = x*x*x * dA;
+                    RHS[7] = x*x*y * dA;
+                    RHS[8] = x*y*y * dA;
+                    RHS[9] = y*y*y * dA;
+                }
+                sol = A.completeOrthogonalDecomposition().solve(RHS);
+
+                const bool DDLON_IS_ZERO = false;//std::fabs(max_lon - min_lon) < 1e-4;
+                if ( keep_latlon and (std::fabs(centre_lat) < 88. * M_PI / 180.) ) {
+                    adjacency_ddlon_weights[Ipt][In] = DDLON_IS_ZERO ? 0. : sol[1]                   / mean_dist;
+                } else {
+                    adjacency_ddlon_weights[Ipt][In] = DDLON_IS_ZERO ? 0. : sol[1] * cos(centre_lat) / mean_dist;
+                }
+
+                const bool DDLAT_IS_ZERO = false;//std::fabs(max_lat - min_lat) < 1e-4;
+                adjacency_ddlat_weights[Ipt][In] = DDLAT_IS_ZERO ? 0. : sol[2] / mean_dist;
+            }
+
+            /* Polynomial fit
+            // use a local Cartesian projection to get derivative weights near the poles
+            // we explicitely exclude the centre point from the weighting for stability
+            Eigen::Matrix<long double, Eigen::Dynamic, Eigen::Dynamic> A;
+            A.resize(Nconds,Nderiv);
+            for ( size_t In = 0; In < Nderiv; In++ ) {
+
+                long double local_lon = longitude[ adjacency_indices[Ipt][In] ] - longitude[Ipt];
+                if (local_lon > M_PI) { local_lon = local_lon - 2*M_PI; }
+                else if (local_lon < -M_PI) { local_lon = local_lon + 2*M_PI; }
+
+                long double local_lat = latitude[ adjacency_indices[Ipt][In] ];
+
+                long double x,y;
+                if ( keep_latlon and (std::fabs(centre_lat) < 88. * M_PI / 180.) ) {
+                    x = local_lon;
+                    y = local_lat - centre_lat;
+                } else {
+                    // Convert to Cartesian
+                    // Rotate to have x = 0 at centre
+                    // Rotate to have z = 1 at centre
+                    // Now a local tangent plane centred at the north pole
+                    x =   cos( local_lat ) * sin( local_lon );
+                    y =   cos( centre_lat ) * sin( local_lat ) 
+                        - sin( centre_lat ) * cos( local_lat ) * cos( local_lon );
+                }
+
+                x /= mean_dist;
+                y /= mean_dist;
+
+                // We construct the local polynomial approximation
+                A(0,In) = 1.;
+                A(1,In) = x;
+                A(2,In) = y;
+                if ( Nconds == 3 ) { continue; }
+
+                A(3,In) = x * y; if ( Nconds == 4 ) { continue; }
+                A(4,In) = 0.5 * pow( x, 2. );
+                A(5,In) = 0.5 * pow( y, 2. );
+                if ( Nconds == 6 ) { continue; }
+
+                A(6,In) = (1./6.) * pow( x, 3. );
+                A(7,In) = (1./2.) * pow( x, 2. ) * y;
+                A(8,In) = (1./2.) * pow( y, 2. ) * x;
+                A(9,In) = (1./6.) * pow( y, 3. );
+                if ( Nconds == 10 ) { continue; }
+
+                A(10,In) = (1./24.) * pow( x, 4. ) * pow( y, 0. );
+                A(11,In) = (1./6. ) * pow( x, 3. ) * pow( y, 1. );
+                A(12,In) = (1./4. ) * pow( x, 2. ) * pow( y, 2. );
+                A(13,In) = (1./6. ) * pow( x, 1. ) * pow( y, 3. );
+                A(14,In) = (1./24.) * pow( x, 0. ) * pow( y, 4. );
+            }
+
+            Eigen::Vector<long double, Eigen::Dynamic> RHS, ddx, ddy;
+            RHS.resize(Nconds);
+            for ( int II = 0; II < Nconds; II++ ) { RHS[II] = 0.; }
+
+            const bool DDLON_IS_ZERO = false; //std::fabs(max_lon - min_lon) < 1e-3 * M_PI / 180.;
+            if ( DDLON_IS_ZERO ) {
+                for ( size_t In = 0; In < Nderiv; In++ ) {
+                    adjacency_ddlon_weights[Ipt][In] = 0.;
+                }
+            } else {
+                RHS[1] = 1.;
+                ddx = A.completeOrthogonalDecomposition().solve(RHS);
+                if ( keep_latlon and (std::fabs(centre_lat) < 88. * M_PI / 180.) ) {
+                    for ( size_t In = 0; In < Nderiv; In++ ) {
+                        adjacency_ddlon_weights[Ipt][In] = ddx(In) / mean_dist;
+                    }
+                } else {
+                    for ( size_t In = 0; In < Nderiv; In++ ) {
+                        adjacency_ddlon_weights[Ipt][In] = cos(centre_lat) * ddx(In) / mean_dist;
+                    }
+                }
+            }
+
+            RHS[1] = 0.;
+            RHS[2] = 1.;
+            ddy = A.completeOrthogonalDecomposition().solve(RHS);
+
+            const bool DDLAT_IS_ZERO = false; //std::fabs(max_lat - min_lat) < 1e-3 * M_PI / 180.;
+            for ( size_t In = 0; In < Nderiv; In++ ) {
+                adjacency_ddlat_weights[Ipt][In] = DDLAT_IS_ZERO ? 0. : ddy(In) / mean_dist;
+            }
+            */
+
+
+        }
     }
-
-    // projected y
-    read_var_from_file( tmp_var,
-                        "adjacency_proj_y", 
-                        filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
-    adjacency_projected_y.resize(Npts);
-    for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_projected_y.at(II).resize(Nneighbours+1);
-        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
-            adjacency_projected_y[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
-        } 
-    }
-
-    // distances
-    read_var_from_file( tmp_var,
-                        "adjacency_distances", 
-                        filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
-    adjacency_distances.resize(Npts);
-    for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_distances.at(II).resize(Nneighbours+1);
-        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
-            adjacency_distances[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
-        } 
-    }
-    */
-
-    // 1st lon deriv weights
-    read_var_from_file( tmp_var,
-                        "adjacency_ddlon_weights", 
-                        filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
-    adjacency_ddlon_weights.resize(Npts);
-    for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_ddlon_weights.at(II).resize(Nneighbours+1);
-        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
-            adjacency_ddlon_weights[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
-        } 
-    }
-
-    // 1st lat deriv weights
-    read_var_from_file( tmp_var,
-                        "adjacency_ddlat_weights", 
-                        filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
-    adjacency_ddlat_weights.resize(Npts);
-    for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_ddlat_weights.at(II).resize(Nneighbours+1);
-        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
-            adjacency_ddlat_weights[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
-        } 
-    }
-
-    // 2nd lon deriv weights
-    read_var_from_file( tmp_var,
-                        "adjacency_d2dlon2_weights", 
-                        filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
-    adjacency_d2dlon2_weights.resize(Npts);
-    for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_d2dlon2_weights.at(II).resize(Nneighbours+1);
-        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
-            adjacency_d2dlon2_weights[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
-        } 
-    }
-
-    // 2nd lat deriv weights
-    read_var_from_file( tmp_var,
-                        "adjacency_d2dlat2_weights", 
-                        filename, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, false );
-    adjacency_d2dlat2_weights.resize(Npts);
-    for ( size_t II = 0; II < Npts; II++ ) { 
-        adjacency_d2dlat2_weights.at(II).resize(Nneighbours+1);
-        for ( size_t JJ = 0; JJ < Nneighbours+1; JJ++ ) {
-            adjacency_d2dlat2_weights[II][JJ] = tmp_var.at(II*(Nneighbours+1) + JJ);
-        } 
-    }
-
 
 }
+

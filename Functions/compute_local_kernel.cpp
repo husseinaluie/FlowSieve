@@ -41,11 +41,11 @@ void compute_local_kernel(
 
     double dist, kern, dlat_m, dlon_m;
     size_t index;
-    int curr_lon, curr_lat, LON_lb, LON_ub;
+    int Jlon, Jlat, LON_lb, LON_ub;
 
     const double    lat_at_ilat = latitude.at(Ilat),
                     lon_at_ilon = longitude.at(Ilon);
-    double lat_at_curr;
+    double lat_at_jlat, lon_at_jlon;
 
     const bool do_dl  = (local_dl_kernel.size() > 0),
                do_dll = (local_dll_kernel.size() > 0);
@@ -53,30 +53,48 @@ void compute_local_kernel(
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
         // Handle periodicity
-        if (constants::PERIODIC_Y) { curr_lat = ( LAT % Nlat + Nlat ) % Nlat; }
-        else                       { curr_lat = LAT; }
-        lat_at_curr = latitude.at(curr_lat);
+        if (constants::PERIODIC_Y) { Jlat = ( LAT % Nlat + Nlat ) % Nlat; }
+        else                       { Jlat = LAT; }
+        #ifdef NDEBUG
+        lat_at_jlat = latitude[Jlat];
+        #else
+        lat_at_jlat = latitude.at(Jlat);
+        #endif
 
         // Get lon bounds at the latitude
-        get_lon_bounds(LON_lb, LON_ub, longitude, Ilon, lat_at_ilat, lat_at_curr, scale);
+        get_lon_bounds(LON_lb, LON_ub, longitude, Ilon, lat_at_ilat, lat_at_jlat, scale);
 
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
             // Handle periodicity
-            if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
-            else                       { curr_lon = LON; }
+            if (constants::PERIODIC_X) { Jlon = ( LON % Nlon + Nlon ) % Nlon; }
+            else                       { Jlon = LON; }
 
-            index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
+            index = Index(0, 0, Jlat, Jlon, Ntime, Ndepth, Nlat, Nlon);
+
+            #ifdef NDEBUG
+            lon_at_jlon = longitude[Jlon];
+            #else
+            lon_at_jlon = longitude.at(Jlon);
+            #endif
 
             if (constants::CARTESIAN) {
+                #ifdef NDEBUG
+                dlat_m = latitude[ 1] - latitude[ 0];
+                dlon_m = longitude[1] - longitude[0];
+                #else
                 dlat_m = latitude.at( 1) - latitude.at( 0);
                 dlon_m = longitude.at(1) - longitude.at(0);
-                dist = distance(lon_at_ilon,     lat_at_ilat,
-                                longitude.at(curr_lon), lat_at_curr,
+                #endif
+                dist = distance(lon_at_ilon, lat_at_ilat,
+                                lon_at_jlon, lat_at_jlat,
                                 dlon_m * Nlon, dlat_m * Nlat);
             } else {
-                dist = distance(lon_at_ilon,            lat_at_ilat,
-                                longitude.at(curr_lon), lat_at_curr);
+                /*
+                dist = distance(lon_at_ilon, lat_at_ilat,
+                                lon_at_jlon, lat_at_jlat);
+                */
+                dist = source_data.distance_from_IlatIlon( Ilat, Ilon, Jlat, Jlon );
             }
             kern = kernel(dist, scale);
             local_kernel.at(index) = kern;

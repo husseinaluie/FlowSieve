@@ -28,6 +28,72 @@ double dsincdx(const double &x) {
     return s;
 }
 
+double tanh_approx( const double x ) {
+
+    double P0, P1, P2, P3, P4, P5, P6,
+           Q0, Q1, Q2, Q3, Q4, Q5, Q6;
+
+    if ( std::fabs(x) < 4 ) {
+        P0 = 9.999999974526363467e-01;
+        P1 = -1.599443322746878782e-01;
+        P2 = 3.595127484720697653e-02;
+        P3 = -7.424073964463595576e-03;
+        P4 = -1.778547808392130693e-03;
+        P5 = -4.007298748504722896e-05;
+        P6 = -9.141379148092099172e-08;
+
+        Q0 = 1.;
+        Q1 = 1.733889779940582243e-01;
+        Q2 = -3.958566605905809027e-02;
+        Q3 = 1.023033368843799008e-02;
+        Q4 = -5.602254840994548395e-03;
+        Q5 = -3.366473730445655385e-04;
+        Q6 = -2.824768502461549868e-06;
+    } else if ( std::fabs(x) < 7 ) {
+        P0 = 3.449407438866221830e-04;
+        P1 = 1.826548470619919224e-03;
+        P2 = 5.229269672913945850e-03;
+        P3 = 1.158050293906958328e-03;
+        P4 = 4.112533925346342767e-03;
+        P5 = 1.635148123074126525e-04;
+        P6 = 3.832501200165625704e-07;
+
+        Q0 = 1.;
+        Q1 = -8.289969959998851360e-04;
+        Q2 = -3.387462347792928076e-03;
+        Q3 = -4.684906547614595997e-03;
+        Q4 = 6.837164721711731785e-03;
+        Q5 = 1.124417323940959295e-03;
+        Q6 = 1.235244647821191148e-05;
+    } else if ( std::fabs(x) < 10 ) {
+        P0 = 7.059619037217820540e-09;
+        P1 = 1.645788529795822215e-07;
+        P2 = 2.675108090246749099e-06;
+        P3 = 2.007672402802097752e-05;
+        P4 = -1.573553261269088378e-05;
+        P5 = -3.672550758982300500e-07;
+        P6 = -4.080115189633750529e-10;
+
+        Q0 = 1.;
+        Q1 = -3.523136566620521056e-08;
+        Q2 = -7.046421480757668838e-07;
+        Q3 = -8.499830267785125977e-06;
+        Q4 = -2.450700574089997782e-05;
+        Q5 = -3.450225273652721158e-06;
+        Q6 = -1.937966035912260994e-08;
+    } else {
+        return ( x > 0 ) ? 1 : -1;
+    }
+
+    const double z = x*x;
+    const double P = ( ( ( ( ( P6 * z + P5 ) * z + P4 ) * z + P3 ) * z + P2 ) * z + P1 ) * z + P0;
+    const double Q = ( ( ( ( ( Q6 * z + Q5 ) * z + Q4 ) * z + Q3 ) * z + Q2 ) * z + Q1 ) * z + Q0;
+
+    return x * P / Q;
+
+}
+
+
 /*!
  * \brief Primary kernel function coarse-graining procedure (G in publications)
  *
@@ -44,9 +110,9 @@ double kernel(
         ) {
    
     double kern = 0.;
-    const double D        = ( scale > 0 ) ? ( dist / ( scale / 2. ) )   : ( dist == 0 ) ? 1. : 0.,
-                 dDdell   = ( scale > 0 ) ? ( -2 * dist / pow(scale,2) ) : 0.,
-                 d2Ddell2 = ( scale > 0 ) ? (  4 * dist / pow(scale,3) ) : 0.;
+    const double D        = ( scale > 0 ) ? ( dist / ( scale / 2. ) )   : ( dist == 0 ) ? 1. : 0.;
+    const double dDdell   = ( ( scale > 0 ) and (deriv_order > 0) ) ? ( -2 * dist / pow(scale,2) ) : 0.,
+                 d2Ddell2 = ( ( scale > 0 ) and (deriv_order > 1) ) ? (  4 * dist / pow(scale,3) ) : 0.;
 
     const double arg = (D - 1) / 0.1;
 
@@ -95,11 +161,16 @@ double kernel(
                 break;
         case constants::KernelType::SmoothHat: 
                 if ( deriv_order == 0 ) {
-                    kern = 0.5 * (1 - tanh( arg ));
+                    /*
+                    if ( arg >= 10 ) { kern = 0.; }
+                    else if ( arg <= -10 ) { kern = 1.; }
+                    else { kern = 0.5 * (1 - tanh( arg )); }
+                    */
+                    kern = 0.5 * ( 1 - tanh_approx( arg ) );
                 } else if (deriv_order == 1 ) {
                     kern = -5 * pow(1./cosh(arg), 2) * dDdell;
                 } else if (deriv_order == 2 ) {
-                    kern = 5 * pow(1./cosh(arg), 2) * ( 20 * tanh(arg) * pow(dDdell,2) - d2Ddell2 );
+                    kern = 5 * pow(1./cosh(arg), 2) * ( 20 * tanh_approx(arg) * pow(dDdell,2) - d2Ddell2 );
                 }
                 break;
         case constants::KernelType::HighOrder: 

@@ -33,7 +33,7 @@ void filtering(
     const std::vector<double>   &latitude   = source_data.latitude,
                                 &longitude  = source_data.longitude;
 
-    const std::vector<bool> &mask = source_data.mask;
+    const std::vector<short int> &mask = source_data.mask;
 
     const std::vector<int>  myStarts = source_data.myStarts;
 
@@ -126,12 +126,14 @@ void filtering(
     std::vector<double> fine_u_r, fine_u_lon, fine_u_lat,
         div_J, fine_KE, filtered_KE;
 
+    /*
     div_J.resize(num_pts);
     postprocess_names.push_back( "div_Jtransport");
     postprocess_fields.push_back(&div_J);
     if (not(constants::MINIMAL_OUTPUT)) {
         vars_to_write.push_back("div_Jtransport");
     }
+    */
 
     if (not(constants::MINIMAL_OUTPUT)) {
         fine_u_r.resize(  num_pts);
@@ -648,11 +650,13 @@ void filtering(
         fflush(stdout);
         #endif
 
-        if ( (constants::EXTEND_DOMAIN_TO_POLES) or (constants::FILTER_OVER_LAND) ) {
+        if (not(constants::NO_FULL_OUTPUTS)) {
+            if ( (constants::EXTEND_DOMAIN_TO_POLES) or (constants::FILTER_OVER_LAND) ) {
                 std::vector<double> mask_double( source_data.reference_mask.begin(), 
-                                                 source_data.reference_mask.end() );
+                        source_data.reference_mask.end() );
                 write_field_to_output( mask_double, "mask", starts, counts, fname, NULL );
                 mask_double.clear();
+            }
         }
 
         // Get KE from coarse velocities
@@ -756,6 +760,7 @@ void filtering(
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing"); }
         }
 
+        /*
         #if DEBUG >= 1
         if (wRank == 0) { fprintf(stdout, "Starting compute_div_transport\n"); }
         fflush(stdout);
@@ -774,6 +779,7 @@ void filtering(
             write_field_to_output(div_J, "div_Jtransport", starts, counts, fname, &mask);
         }
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing"); }
+        */
 
         //
         //// on-line postprocessing, if desired

@@ -8,6 +8,7 @@
 #include <map>
 #include <mpi.h>
 #include "constants.hpp"
+#include <stdexcept>
 
 /*!
  * \file
@@ -38,8 +39,15 @@ class dataset {
 
         // Vectors to store the dimension variables
         std::vector<double> time, depth, latitude, longitude;
+        std::vector<long double> cos_lat, sin_lat, cos_lon, sin_lon;
+        bool sin_cos_lat_pre_comp = false;
         int Ntime = -1, Ndepth = -1, Nlat = -1, Nlon = -1;
         int full_Ntime = -1, full_Ndepth = -1;
+        size_t stride_lat, stride_depth, stride_time;
+        
+        // Cartesian parameters
+        double Cartesian_x_range = 0,
+               Cartesian_y_range = 0;
 
         // MPI Communicator Objects
         MPI_Comm MPI_Comm_Global = MPI_COMM_WORLD;
@@ -65,7 +73,7 @@ class dataset {
         // Vectors and dictionary for storing the regions.
         //    these are what will be used for the post-processing
         std::vector< std::string > region_names;
-        std::map< std::string, std::vector<bool> > regions;
+        std::map< std::string, std::vector<short int> > regions;
         std::vector<double> region_areas, region_areas_water_only;
 
         // The vectors for the coarse lat/lon maps
@@ -79,15 +87,20 @@ class dataset {
         std::vector<int> myCounts, myStarts;
 
         // Variables for unstructured grids
+        //size_t num_neighbours;
         const size_t num_neighbours = constants::ADJACENCY_SIZE;
-        std::vector< std::vector< size_t > >    adjacency_indices;
+        std::vector< std::vector< size_t > >    adjacency_indices,
+                                                adjacency_indices_adjoint;
         std::vector< std::vector< double > >    adjacency_projected_x,
                                                 adjacency_projected_y,
                                                 adjacency_distances,
                                                 adjacency_ddlon_weights,
                                                 adjacency_ddlat_weights,
                                                 adjacency_d2dlon2_weights,
-                                                adjacency_d2dlat2_weights;
+                                                adjacency_d2dlat2_weights,
+                                                adjecency_DEC_Tij;
+        std::vector<double>                     adjacency_voronoi_areas;
+        std::vector< std::vector< double > >    interface_lengths;
 
         //
         //// Functions
@@ -109,8 +122,22 @@ class dataset {
         void load_latitude(  const std::string dim_name, const std::string filename );
         void load_longitude( const std::string dim_name, const std::string filename );
 
+        // Intialize dataset functions
+        void initialize_index_functions();
+
         // Compute areas
         void compute_cell_areas();
+        
+        // Compute sin(lat) and cos(lat)
+        void compute_sin_cos_lat();
+        
+        // Distance wrapper
+        double distance_from_indices( const size_t Ipt, const size_t Jpt ) const;
+
+        double distance_from_IlatIlon(
+                const size_t Ilat, const size_t Ilon,
+                const size_t Jlat, const size_t Jlon
+                ) const;
 
         // Load in variable and store in dictionary
         void load_variable( const std::string var_name, 
@@ -184,15 +211,31 @@ void compute_areas(
         const std::vector<double> & latitude);
 
 size_t Index( const int Itime, const int Idepth, const int Ilat, const int Ilon,
-              const int Ntime, const int Ndepth, const int Nlat, const int Nlon  );
+              const int Ntime, const int Ndepth, const int Nlat, const int Nlon  ) noexcept;
 
 void Index1to4( const size_t index, 
         int & Itime, int & Idepth, int & Ilat, int & Ilon,
         const int & Ntime, const int & Ndepth, const int & Nlat, const int & Nlon  );
 
-double distance(const double lon1,     const double lat1, 
-                const double lon2,     const double lat2,
-                const double Llon = 0, const double Llat = 0);
+
+int apply_periodicity( const int I, const int N );
+
+double distance(const double lon1,     
+                const double lat1, 
+                const double lon2,     
+                const double lat2,
+                const double Llon = 0, 
+                const double Llat = 0,
+                const long double cos_lat_1 = 10, 
+                const long double cos_lat_2 = 10, 
+                const long double sin_lat_1 = 10, 
+                const long double sin_lat_2 = 10,
+                const long double cos_lon_1 = 10, 
+                const long double cos_lon_2 = 10, 
+                const long double sin_lon_1 = 10, 
+                const long double sin_lon_2 = 10,
+                const bool pre_comp = false
+                );
 
 void compute_local_kernel(
         std::vector<double> & local_kernel,
@@ -208,7 +251,7 @@ void KE_from_vels(
             std::vector<double> * u1,
             std::vector<double> * u2,
             std::vector<double> * u3,
-            const std::vector<bool> & mask,
+            const std::vector<short int> & mask,
             const double rho0 = constants::rho0
         );
 
@@ -449,7 +492,7 @@ void compute_spatial_average(
         const int Ndepth,
         const int Nlat,
         const int Nlon,
-        const std::vector<bool> & mask);
+        const std::vector<short int> & mask);
 
 void compute_KE_spectra_and_slopes( 
         std::vector<double> & u_spectrum_tot, 
@@ -532,7 +575,7 @@ void convert_coordinates(
 
 void mask_out_pole(
         const std::vector<double> & latitude,
-        std::vector<bool> & mask,
+        std::vector<short int> & mask,
         const int Ntime,
         const int Ndepth,
         const int Nlat,
@@ -569,7 +612,7 @@ void extend_field_to_poles(
         );
 
 void extend_mask_to_poles(
-        std::vector<bool> & mask_to_extend,
+        std::vector<short int> & mask_to_extend,
         const dataset & source_data,
         const std::vector<double> & extended_latitude,
         const int Ilat_start,

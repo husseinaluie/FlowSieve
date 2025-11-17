@@ -25,7 +25,7 @@ size_t Index(
         const int Ndepth,
         const int Nlat,
         const int Nlon
-        ){
+        ) noexcept {
 
     /*
     int index =   Itime  * ( Ndepth * Nlat * Nlon )
@@ -34,7 +34,14 @@ size_t Index(
                 + Ilon;
     */
 
+    const size_t stride_lat   = Nlon;
+    const size_t stride_depth = Nlat * stride_lat;
+    const size_t stride_time  = Ndepth * stride_depth;
+    size_t index = Itime * stride_time + Idepth * stride_depth + Ilat * stride_lat + Ilon;
+
+    /*
     size_t index =  ( ( (size_t) Itime * (size_t) Ndepth + (size_t) Idepth) * (size_t) Nlat + (size_t) Ilat ) * (size_t) Nlon + (size_t) Ilon;
+    */
 
     #if DEBUG >= 5
     fprintf(stdout, "      Index conversion (%d, %d, %d, %d) -> %d\n ", 

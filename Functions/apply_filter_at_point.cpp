@@ -1,7 +1,6 @@
 #include <math.h>
 #include <algorithm>
 #include <vector>
-#include <cassert>
 #include "../functions.hpp"
 #include "../constants.hpp"
 
@@ -44,7 +43,9 @@ void apply_filter_at_point(
         const std::vector<double> * weight
         ) {
 
-    assert(coarse_vals.size() == fields.size());
+    if (coarse_vals.size() != fields.size()) {
+        throw std::runtime_error("Input mismatch");
+    }
     const size_t Nfields = fields.size();
 
     const std::vector<double>   &latitude   = source_data.latitude,
@@ -79,7 +80,8 @@ void apply_filter_at_point(
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
         // Handle periodicity if necessary
-        if (constants::PERIODIC_Y) { curr_lat = ( LAT % Nlat + Nlat ) % Nlat; }
+        //if (constants::PERIODIC_Y) { curr_lat = ( LAT % Nlat + Nlat ) % Nlat; }
+        if (constants::PERIODIC_Y) { curr_lat = apply_periodicity(LAT, Nlat); }
         else                       { curr_lat = LAT; }
         lat_at_curr = latitude.at(curr_lat);
 
@@ -87,17 +89,23 @@ void apply_filter_at_point(
         for (int LON = LON_lb; LON < LON_ub; LON++ ) {
 
             // Handle periodicity if necessary
-            if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
+            //if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
+            if (constants::PERIODIC_X) { curr_lon = apply_periodicity(LON, Nlon); }
             else                       { curr_lon = LON; }
 
-            index = Index(Itime, Idepth, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
+            //index = Index(Itime, Idepth, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
+            index = source_data.local_index( Itime, Idepth, curr_lat, curr_lon );
 
             if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X) ) {
                 // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
                 //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
-                kernel_index = Index(0, 0, curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon, Ntime, Ndepth, Nlat, Nlon);
+                //const int shifted_lon = ( (LON - Ilon) % Nlon + Nlon ) % Nlon;
+                const int shifted_lon = apply_periodicity( curr_lon - Ilon, Nlon );
+                //kernel_index = Index(0, 0, curr_lat, shifted_lon, Ntime, Ndepth, Nlat, Nlon);
+                kernel_index = source_data.local_index(0, 0, curr_lat, shifted_lon);
             } else {
-                kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
+                //kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
+                kernel_index = source_data.local_index(0, 0, curr_lat, curr_lon);
             }
             #if DEBUG >= 1
             kern = local_kernel.at(kernel_index);
