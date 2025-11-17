@@ -8,8 +8,6 @@
 #include <omp.h>
 #include <math.h>
 #include <assert.h>
-#include "../ALGLIB/stdafx.h"
-#include "../ALGLIB/linalg.h"
 
 
 void depth_integrate(
