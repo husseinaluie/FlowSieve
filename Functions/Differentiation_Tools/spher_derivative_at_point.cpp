@@ -38,25 +38,25 @@ void spher_derivative_at_point(
     const bool do_lon = (dim == "lon");
     assert( do_dep ^ (do_lat ^ do_lon) ); // ^ = xor
 
-    if ( (not(do_dep)) and ( constants::GRID_TYPE == constants::GridType::LLC ) ) {
+    if ( (not(do_dep)) and ( constants::GRID_TYPE != constants::GridType::MeshGrid ) ) {
         // If we're on an LLC grid, then we've already computed
         // the differentiation weights / stencils when we built
         // the adjacency matrix. So just apply those now and exit.
 
         // Unless we want a depth derivative, in which case just use the
         // previous method
-        // NOTE:: THIS REALLY SHOULD BE TESTED TO MAKE SURE THERE ARE NO GREMLINS HIDING
+        // [DEPTH DERIVS SHOULD BE VERIFIED]
 
         assert( Ilat == Ilon );
         index = (size_t) Ilat;
 
-        double weight, val;
+        long double weight, val;
         size_t val_ind;
 
         for (int ii = 0; ii < num_deriv; ii++) {
             if (deriv_vals.at(ii) == NULL) { continue; }
+            long double deriv_val = 0.;
             for ( size_t II = 0; II < source_data.num_neighbours+1; II++ ) {
-                val_ind = source_data.adjacency_indices.at(index).at(II);
                 #if DEBUG >= 1
                 if (do_lat) {
                     if (order_of_deriv == 1) {
@@ -71,6 +71,7 @@ void spher_derivative_at_point(
                         weight = source_data.adjacency_d2dlon2_weights.at(index).at(II);
                     }
                 }
+                val_ind = source_data.adjacency_indices.at(index).at(II);
                 val = fields[ii]->at( val_ind );
                 #else
                 if (do_lat) {
@@ -86,10 +87,12 @@ void spher_derivative_at_point(
                         weight = source_data.adjacency_d2dlon2_weights[index][II];
                     }
                 }
+                val_ind = source_data.adjacency_indices[index][II];
                 val = (*fields[ii])[ val_ind ];
                 #endif
-                *(deriv_vals.at(ii)) += val * weight;
+                deriv_val += val * weight;
             }
+            *(deriv_vals.at(ii)) = deriv_val;
         }
 
         return;

@@ -45,44 +45,40 @@ void grad_scalar(
             double tmp_lat = 0.;
 
             int Itime, Idepth, Ilat, Ilon;
-            if (mask.at(index)) { // Skip land areas
+            if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
+                Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                                 Ntime, Ndepth, Nlat, Nlon);
 
-                if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
-                    Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                                     Ntime, Ndepth, Nlat, Nlon);
+                spher_derivative_at_point(
+                        lon_deriv_vals, deriv_fields, longitude, "lon", source_data,
+                        Itime, Idepth, Ilat, Ilon, mask);
 
-                    spher_derivative_at_point(
-                            lon_deriv_vals, deriv_fields, longitude, "lon", source_data,
-                            Itime, Idepth, Ilat, Ilon, mask);
+                spher_derivative_at_point(
+                        lat_deriv_vals, deriv_fields, latitude, "lat", source_data,
+                        Itime, Idepth, Ilat, Ilon, mask);
+            } else {
+                spher_derivative_at_point(
+                        lon_deriv_vals, deriv_fields, longitude, "lon", source_data,
+                        0, 0, index, index, mask);
 
-                    spher_derivative_at_point(
-                            lat_deriv_vals, deriv_fields, latitude, "lat", source_data,
-                            Itime, Idepth, Ilat, Ilon, mask);
-                } else {
-                    spher_derivative_at_point(
-                            lon_deriv_vals, deriv_fields, longitude, "lon", source_data,
-                            0, 0, index, index, mask);
+                spher_derivative_at_point(
+                        lat_deriv_vals, deriv_fields, latitude, "lat", source_data,
+                        0, 0, index, index, mask);
+            }
 
-                    spher_derivative_at_point(
-                            lat_deriv_vals, deriv_fields, latitude, "lat", source_data,
-                            0, 0, index, index, mask);
-                }
+            if (constants::CARTESIAN) {
+                tmp_lon = dFdlon;
+                tmp_lat = dFdlat;
+            } else {
+                // If we're too close to the pole bad things happen
+                double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
+                                ? latitude.at(Ilat)
+                                : latitude.at(index);
+                bool is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 1e-10;
+                double cos_lat = cos(local_lat);
 
-                if (constants::CARTESIAN) {
-                    tmp_lon = dFdlon;
-                    tmp_lat = dFdlat;
-                } else {
-                    // If we're too close to the pole bad things happen
-                    double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
-                                    ? latitude.at(Ilat)
-                                    : latitude.at(index);
-                    bool is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 1e-10;
-                    double cos_lat = cos(local_lat);
-
-                    tmp_lon = is_pole ? 0. : dFdlon / (constants::R_earth * cos_lat);
-                    tmp_lat = is_pole ? 0. : dFdlat /  constants::R_earth;
-                }
-
+                tmp_lon = is_pole ? 0. : dFdlon / (constants::R_earth * cos_lat);
+                tmp_lat = is_pole ? 0. : dFdlat /  constants::R_earth;
             }
             vel_lon.at(index) = tmp_lon;
             vel_lat.at(index) = tmp_lat;

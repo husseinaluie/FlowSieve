@@ -33,28 +33,26 @@ void div_vec(
 
     #pragma omp parallel \
     default(none) \
-    shared( latitude, mask, source_data, u_lat, cos_lat_u_lat )\
+    shared( latitude, source_data, u_lat, cos_lat_u_lat )\
     private( index )\
     firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
     {
-        #pragma omp for collapse(1) schedule(static)
+        #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < Npts; ++index) {
 
             int Itime, Idepth, Ilat, Ilon;
 
-            if (mask.at(index)) { // Skip land areas
-                if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
-                    Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                                     Ntime, Ndepth, Nlat, Nlon);
-                }
-
-                // check if we're too close to the pole
-                double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
-                                ? latitude.at(Ilat)
-                                : latitude.at(index);
-
-                cos_lat_u_lat[index] = cos(local_lat) * u_lat[index];
+            if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
+                Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                                 Ntime, Ndepth, Nlat, Nlon);
             }
+
+            // check if we're too close to the pole
+            double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
+                            ? latitude.at(Ilat)
+                            : latitude.at(index);
+
+            cos_lat_u_lat[index] = cos(local_lat) * u_lat[index];
         }
     } // end pragma
 
@@ -77,38 +75,35 @@ void div_vec(
 
             int Itime, Idepth, Ilat, Ilon;
 
-            double tmp = 0.;
-            if (mask.at(index)) { // Skip land areas
-                if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
-                    Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                                     Ntime, Ndepth, Nlat, Nlon);
+            if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
+                Index1to4(index, Itime, Idepth, Ilat, Ilon,
+                                 Ntime, Ndepth, Nlat, Nlon);
 
-                    spher_derivative_at_point(
-                            lon_deriv_vals, deriv_fields, longitude, "lon",
-                            source_data, Itime, Idepth, Ilat, Ilon, mask);
+                spher_derivative_at_point(
+                        lon_deriv_vals, deriv_fields, longitude, "lon",
+                        source_data, Itime, Idepth, Ilat, Ilon, mask);
 
-                    spher_derivative_at_point(
-                            lat_deriv_vals, deriv_fields, latitude, "lat",
-                            source_data, Itime, Idepth, Ilat, Ilon, mask);
-                } else {
-                    spher_derivative_at_point(
-                            lon_deriv_vals, deriv_fields, longitude, "lon",
-                            source_data, 0, 0, index, index, mask);
+                spher_derivative_at_point(
+                        lat_deriv_vals, deriv_fields, latitude, "lat",
+                        source_data, Itime, Idepth, Ilat, Ilon, mask);
+            } else {
+                spher_derivative_at_point(
+                        lon_deriv_vals, deriv_fields, longitude, "lon",
+                        source_data, 0, 0, index, index, mask);
 
-                    spher_derivative_at_point(
-                            lat_deriv_vals, deriv_fields, latitude, "lat",
-                            source_data, 0, 0, index, index, mask);
-                }
-
-                // check if we're too close to the pole
-                double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
-                                ? latitude.at(Ilat)
-                                : latitude.at(index);
-
-                // ret = ddlon(vel_lat) / cos_lat - ddlat( u_lon * cos_lat ) / cos_lat
-                tmp = dulon_dlon + dulatcoslat_dlat;
-                tmp *= 1. / ( cos(local_lat) * constants::R_earth );
+                spher_derivative_at_point(
+                        lat_deriv_vals, deriv_fields, latitude, "lat",
+                        source_data, 0, 0, index, index, mask);
             }
+
+            // check if we're too close to the pole
+            double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
+                            ? latitude.at(Ilat)
+                            : latitude.at(index);
+
+            // ret = ddlon(vel_lat) / cos_lat - ddlat( u_lon * cos_lat ) / cos_lat
+            double tmp = dulon_dlon + dulatcoslat_dlat;
+            tmp *= 1. / ( cos(local_lat) * constants::R_earth );
 
             out_arr.at(index) = tmp;
 

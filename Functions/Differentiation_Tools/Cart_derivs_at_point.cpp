@@ -116,19 +116,21 @@ void Cart_derivatives_at_point(
         double sin_lat = sin(lat);
         double sin_lon = sin(lon);
 
+        const bool is_pole = std::fabs(lat) > (M_PI/2. - 1e-5);
+
         // ddx =   ( cos(lon) * cos(lat)                ) * ddr
         //       - ( sin(lon)            / (r cos(lat)) ) * ddlon   
         //       - ( cos(lon) * sin(lat) /  r           ) * ddlat
-        cx_r   =     cos_lon  * cos_lat;
-        cx_lon = -   sin_lon             / (r * cos_lat );
-        cx_lat = -   cos_lon  * sin_lat  /  r;
+        cx_r   =                    cos_lon  * cos_lat;
+        cx_lon = is_pole ? 0. : -   sin_lon             / (r * cos_lat );
+        cx_lat =                -   cos_lon  * sin_lat  /  r;
 
         // ddy =   ( sin(lon) * cos(lat)                ) * ddr
         //         ( cos(lon)            / (r cos(lat)) ) * ddlon   
         //       - ( sin(lon) * sin(lat) /  r           ) * ddlat
-        cy_r   =     sin_lon  * cos_lat;
-        cy_lon =     cos_lon             / (r * cos_lat );
-        cy_lat = -   sin_lon  * sin_lat  /  r;
+        cy_r   =                     sin_lon  * cos_lat;
+        cy_lon = is_pole ? 0. :      cos_lon             / (r * cos_lat );
+        cy_lat =                 -   sin_lon  * sin_lat  /  r;
 
         // ddz =   (            sin(lat)                ) * ddr
         //         (            0.                      ) * ddlon

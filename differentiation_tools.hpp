@@ -80,7 +80,8 @@ void differentiation_vector(
         const double delta, 
         const int index,
         const int order_of_deriv = 1,
-        const int diff_ord = constants::DiffOrd);
+        const int diff_ord = constants::DiffOrd
+        );
 
 
 
