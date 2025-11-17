@@ -15,6 +15,12 @@
                               std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<double>())) \
                     initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
 
+#pragma omp declare reduction(vec_long_double_plus : std::vector<long double> : \
+                              std::transform(omp_out.begin(), omp_out.end(), \
+                                             omp_in.begin(), omp_out.begin(), \
+                                             std::plus<long double>())) \
+                    initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
+
 
 void compute_region_avg_and_std(
         std::vector< std::vector< double > > & field_averages,
@@ -46,16 +52,17 @@ void compute_region_avg_and_std(
     if (wRank == 0) { fprintf(stdout, "  Computing region means\n"); }
     #endif
 
-    std::vector<double> field_integrals(Ntime*Ndepth*num_regions*num_fields,0.);
+    // store in higher precision to avoiding accumulant errors
+    std::vector<long double> field_integrals(Ntime*Ndepth*num_regions*num_fields,0.);
 
     #pragma omp parallel default(none)\
     private(Ilat, Ilon, index, dA, area_index, increment, int_index, \
             Idepth, Itime, Iregion, Ifield, reg_area )\
     shared( source_data, postprocess_fields, stderr ) \
     firstprivate( Nlon, Nlat, Ndepth, Ntime, num_regions, num_fields ) \
-    reduction(vec_double_plus : field_integrals)
+    reduction(vec_long_double_plus : field_integrals)
     { 
-        #pragma omp for collapse(5) schedule(static)
+        #pragma omp for collapse(5) schedule(guided)
         for (Iregion = 0; Iregion < num_regions; ++Iregion) {
             for (Itime = 0; Itime < Ntime; ++Itime) {
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
@@ -66,17 +73,32 @@ void compute_region_avg_and_std(
                             if ( constants::FILTER_OVER_LAND or source_data.mask.at(index) ) { // Skip land areas
 
                                 area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
+                                #ifdef NDEBUG
+                                dA = source_data.areas[area_index];
+                                #else
                                 dA = source_data.areas.at(area_index);
+                                #endif
 
                                 if ( source_data.regions.at( source_data.region_names.at(Iregion) ).at(area_index) )
                                 {
                                     int_index = Index(0, Itime, Idepth, Iregion, 1, Ntime, Ndepth, num_regions);
+
+                                    #ifdef NDEBUG
+                                    reg_area = source_data.region_areas[int_index];
+                                    #else
                                     reg_area = source_data.region_areas.at(int_index);
+                                    #endif
+
                                     for (Ifield = 0; Ifield < num_fields; ++Ifield) {
-                                        increment = postprocess_fields.at(Ifield)->at(index) * dA;
-                                        if ( postprocess_fields.at(Ifield)->at(index) == constants::fill_value ) {
-                                            increment = 0;
+                                        #ifdef NDEBUG
+                                        increment = (*postprocess_fields[Ifield])[index];
+                                        #else
+                                        increment = postprocess_fields.at(Ifield)->at(index);
+                                        #endif
+                                        if ( increment == constants::fill_value ) {
+                                            continue;
                                         }
+                                        increment *= dA;
                                         int_index = Index(Ifield, Itime, Idepth, Iregion, num_fields, Ntime, Ndepth, num_regions);
                                         field_integrals.at(int_index) += (reg_area == 0) ? 0. : increment / reg_area;
                                     }
@@ -96,10 +118,24 @@ void compute_region_avg_and_std(
         #pragma omp for collapse(2) schedule(static)
         for (Ifield = 0; Ifield < num_fields; ++Ifield) {
             for (int_index = 0; int_index < (size_t) Ntime*Ndepth*num_regions; int_index++) {
+                #ifdef NDEBUG
+                field_averages[Ifield][int_index]  = field_integrals[Ifield*Ntime*Ndepth*num_regions + int_index];
+                #else
                 field_averages.at(Ifield).at(int_index)  = field_integrals.at(Ifield*Ntime*Ndepth*num_regions + int_index);
+                #endif
+
             }
         }
     }
+    /*
+    for (Ifield = 0; Ifield < num_fields; ++Ifield) {
+        fprintf( stdout, "Field %d\n   ", Ifield );
+        for (int_index = 0; int_index < (size_t) Ntime*Ndepth*num_regions; int_index++) {
+            fprintf( stdout, "%.3e, ", field_averages.at(Ifield).at(int_index) );
+        }
+        fprintf( stdout, "\n\n" );
+    }
+    */
 
     //
     //// Repeat the process on standard deviations
@@ -117,9 +153,9 @@ void compute_region_avg_and_std(
             Idepth, Itime, Iregion, Ifield, reg_area )\
     shared( source_data, postprocess_fields, field_averages ) \
     firstprivate( Nlon, Nlat, Ndepth, Ntime, num_regions, num_fields ) \
-    reduction(vec_double_plus : field_integrals)
+    reduction(vec_long_double_plus : field_integrals)
     { 
-        #pragma omp for collapse(5) schedule(static)
+        #pragma omp for collapse(5) schedule(guided)
         for (Iregion = 0; Iregion < num_regions; ++Iregion) {
             for (Itime = 0; Itime < Ntime; ++Itime) {
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
@@ -130,21 +166,46 @@ void compute_region_avg_and_std(
                             if ( constants::FILTER_OVER_LAND or source_data.mask.at(index) ) { // Skip land areas
 
                                 area_index = Index(0, 0, Ilat, Ilon, 1, 1, Nlat, Nlon);
+                                #ifdef NDEBUG
+                                dA = source_data.areas[area_index];
+                                #else
                                 dA = source_data.areas.at(area_index);
+                                #endif
 
-                                if ( source_data.regions.at( source_data.region_names.at(Iregion) ).at(area_index) )
-                                {
+                                #ifdef NDEBUG
+                                const bool in_region = source_data.regions.at( source_data.region_names[Iregion] )[area_index];
+                                #else
+                                const bool in_region = source_data.regions.at( source_data.region_names.at(Iregion) ).at(area_index);
+                                #endif
+
+                                if ( in_region ) {
+
                                     int_index = Index(0, Itime, Idepth, Iregion, 1, Ntime, Ndepth, num_regions);
+
+                                    #ifdef NDEBUG
+                                    reg_area = source_data.region_areas[int_index];
+                                    #else
                                     reg_area = source_data.region_areas.at(int_index);
+                                    #endif
+
+
                                     for (Ifield = 0; Ifield < num_fields; ++Ifield) {
+
+                                        #ifdef NDEBUG
+                                        increment = pow(     field_averages[Ifield][int_index]
+                                                           - (*postprocess_fields[Ifield])[index],
+                                                        2.) * dA;
+                                        #else
                                         increment = pow(     field_averages.at(Ifield).at(int_index)
                                                            - postprocess_fields.at(Ifield)->at(index),
                                                         2.) * dA;
+                                        #endif
 
                                         field_integrals.at(Ifield*Ntime*Ndepth*num_regions + int_index) += 
                                             (reg_area == 0) ? 0. : increment / reg_area;
                                     }
                                 }
+
                             }
                         }
                     }

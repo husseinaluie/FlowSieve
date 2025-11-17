@@ -11,7 +11,14 @@
 // Pragma-magic to allow reduction over vector operator
 //      thanks to: https://stackoverflow.com/questions/43168661/openmp-and-reduction-on-stdvector
 #pragma omp declare reduction(vec_double_plus : std::vector<double> : \
-                              std::transform(omp_out.begin(), omp_out.end(), omp_in.begin(), omp_out.begin(), std::plus<double>())) \
+                              std::transform(omp_out.begin(), omp_out.end(), \
+                                             omp_in.begin(), omp_out.begin(), \
+                                             std::plus<double>())) \
+                    initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
+#pragma omp declare reduction(vec_long_double_plus : std::vector<long double> : \
+                              std::transform(omp_out.begin(), omp_out.end(), \
+                                             omp_in.begin(), omp_out.begin(), \
+                                             std::plus<long double>())) \
                     initializer(omp_priv = decltype(omp_orig)(omp_orig.size()))
 
 void compute_region_avg_and_std_OkuboWeiss(
@@ -52,7 +59,7 @@ void compute_region_avg_and_std_OkuboWeiss(
     if (wRank == 0) { fprintf(stdout, "  Computing area OkuboWeiss histograms\n"); }
     #endif
 
-    std::vector<double> area_sums( Ntime * Ndepth * NOkubo * num_regions, 0. );
+    std::vector<long double> area_sums( Ntime * Ndepth * NOkubo * num_regions, 0. );
 
     //fprintf( stdout, "%d, %d, %d, %d, %d, %d - %'zu\n", 
     //         Ntime, Ndepth, Nlat, Nlon, NOkubo, num_regions, area_sums.size());
@@ -61,7 +68,7 @@ void compute_region_avg_and_std_OkuboWeiss(
     private( Iregion, Itime, Idepth, Ilat, Ilon, IOkubo, index, area_index, int_index, dA )\
     shared( source_data, OkuboWeiss, OkuboWeiss_bounds ) \
     firstprivate( Nlon, Nlat, Ndepth, Ntime, NOkubo, num_regions ) \
-    reduction(vec_double_plus : area_sums)
+    reduction(vec_long_double_plus : area_sums)
     { 
         #pragma omp for collapse(5) schedule(static)
         for (Iregion = 0; Iregion < num_regions; ++Iregion) {
@@ -118,14 +125,14 @@ void compute_region_avg_and_std_OkuboWeiss(
         if (wRank == 0) { fprintf(stdout, "    processing field %d of %d\n", Ifield + 1, num_fields); }
         #endif
 
-        std::vector<double> field_integrals( Ntime * Ndepth * NOkubo * num_regions, 0. );
+        std::vector<long double> field_integrals( Ntime * Ndepth * NOkubo * num_regions, 0. );
 
         #pragma omp parallel default(none)\
         private( Iregion, Itime, Idepth, Ilat, Ilon, IOkubo,\
                 index, area_index, int_index, dA )\
         shared( source_data, postprocess_fields, OkuboWeiss, OkuboWeiss_bounds ) \
         firstprivate( Ifield, Nlon, Nlat, Ndepth, Ntime, NOkubo, num_regions ) \
-        reduction(vec_double_plus : field_integrals)
+        reduction(vec_long_double_plus : field_integrals)
         { 
             #pragma omp for collapse(5) schedule(static)
             for (Iregion = 0; Iregion < num_regions; ++Iregion) {

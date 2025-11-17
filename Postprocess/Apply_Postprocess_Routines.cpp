@@ -27,6 +27,7 @@ void Apply_Postprocess_Routines(
 
     const std::vector<int>  &myStarts = source_data.myStarts;
 
+    // MPI-local sizes
     const int   Ntime  = source_data.Ntime,
                 Ndepth = source_data.Ndepth,
                 Nlat   = source_data.Nlat,
@@ -48,6 +49,9 @@ void Apply_Postprocess_Routines(
     int wRank=-1, wSize=-1;
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
+
+    fprintf( stdout, "Rank %d of %d has starts %d,%d and counts %d,%d\n",
+          wRank, wSize, Stime, Sdepth, Ntime, Ndepth );
 
     int Ilat, Ilon, Itime, Idepth;
     size_t index, area_index;
@@ -101,15 +105,8 @@ void Apply_Postprocess_Routines(
     }
 
     // Filename + file
-    //char filename[50];
-    //if (filter_scale >= 0) {
-    //    snprintf(filename, 50, (filename_base + "_%.6gkm.nc").c_str(), filter_scale/1e3);
-    //} else {
-    //    snprintf(filename, 50, (filename_base + ".nc").c_str());
-    //}
     std::ostringstream name_stream;
     if (filter_scale >= 0) {
-        //name_stream << filename_base << std::fixed << std::setprecision(6) << (filter_scale / 1e3) << ".nc";
         name_stream << filename_base << "_" << std::setprecision(6) << (filter_scale / 1e3) << "km.nc";
     } else {
         name_stream << filename_base << ".nc";

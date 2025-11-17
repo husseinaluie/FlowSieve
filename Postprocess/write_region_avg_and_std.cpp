@@ -12,7 +12,6 @@ void write_region_avg_and_std(
         const std::vector< std::vector< double > > & field_averages,
         const std::vector< std::vector< double > > & field_std_devs,
         const std::vector<std::string> & vars_to_process,
-        //const char * filename,
         const std::string & filename,
         const int Stime,
         const int Sdepth,
