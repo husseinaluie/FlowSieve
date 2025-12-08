@@ -109,16 +109,6 @@ void filter_PsiPhi_point(
         points_to_test.pop_front();
         planned_for_testing[ search_index ] = false;
 
-        /*
-        #ifdef NDEBUG
-        double local_lat = coarsened_grid->latitude[  search_index ];
-        double local_lon = coarsened_grid->longitude[ search_index ];
-        #else
-        double local_lat = coarsened_grid->latitude.at(  search_index );
-        double local_lon = coarsened_grid->longitude.at( search_index );
-        #endif
-        double local_dist = distance( target_lon, target_lat, local_lon, local_lat );
-        */
         double local_dist = coarsened_grid->distance_from_indices( target_index, search_index );
 
         double kern_val = kernel( local_dist, filter_scale );
@@ -177,7 +167,6 @@ void filter_PsiPhi_point(
 
 }
 
-/*
 void get_true_vort_div(
         dataset * coarsened_grid,
         dataset & PsiPhi_grid
@@ -201,7 +190,6 @@ void get_true_vort_div(
             coarsened_grid->mask
             );
 }
-*/
 
 void get_true_vort_div_fast(
         dataset * coarsened_grid,
@@ -454,7 +442,6 @@ void get_vels_vort_and_div_fast(
 
 }
 
-/*
 void get_vels_vort_and_div(
         dataset * coarsened_grid,
         dataset & PsiPhi_grid
@@ -495,7 +482,6 @@ void get_vels_vort_and_div(
            );
 
 }
-*/
 
 double get_mean( 
             std::vector<double> & f,
@@ -518,6 +504,7 @@ double get_mean(
     }
     double mean_val = f_sum / area_sum;
     return mean_val;
+
 }
 
 void demean( std::vector<double> & f,
@@ -582,7 +569,7 @@ void get_norms(
     reduction( +:vort_2_ener_L,div_2_ener_L,Phi_2_norm_L,Psi_2_norm_L )\
     reduction( max:vel_inf_err,vort_inf_err,div_inf_err,vel_inf_norm,vort_inf_norm,div_inf_norm )
     {
-        #pragma omp for collapse(1) schedule(guided)
+        #pragma omp for collapse(1) schedule(static)
         for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
 
             long double area = coarsened_grid->areas[Ipt];
@@ -736,52 +723,6 @@ void get_norms(
     Phi_2_norm = sqrt( Phi_2_norm_L / total_area );
 }
 
-
-/*
-void LazyFilter(
-        std::vector<double> & vals,
-        const size_t Ipt,
-        const dataset * coarsened_grid
-        ){
-
-    // Right now, use 2-deep neighbours
-    std::vector<size_t> neighbours, distances;
-    neighbours.reserve( 30 );
-    distances.reserve( 30 );
-    double distance_sum = 0;
-    for ( size_t In = 0; In < coarsened_grid->num_neighbours; In++ ) {
-        size_t Ineigh = coarsened_grid->adjacency_indices[Ipt][In];
-
-        for ( size_t Jn = 0; Jn < coarsened_grid->num_neighbours; Jn++ ) {
-            size_t Jneigh = coarsened_grid->adjacency_indices[Ineigh][Jn];
-
-            // check if it's already tracked, otherwise add it
-            if ( std::find( neighbours.begin(), neighbours.end(), Jneigh ) != neighbours.end() ) {
-                continue;
-            }
-            neighbours.push_back( Jneigh );
-
-            double dist = distance( coarsened_grid->longitude[Ipt],
-                                    coarsened_grid->latitude[ Ipt],
-                                    coarsened_grid->longitude[Jneigh],
-                                    coarsened_grid->latitude[ Jneigh] );
-            distances.push_back( dist );
-            distance_sum += dist;
-        }
-    }
-    double mean_distance = distance_sum / neighbours.size();
-    double kA_sum = 0., FkA_sum = 0.;
-    for ( size_t II = 0; II < neighbours.size(); II++ ) {
-        size_t Jpt = neighbours[II];
-        double kA = kernel( distances[II], mean_distance ) * coarsened_grid->areas[Jpt];
-        kA_sum  += kA;
-        FkA_sum += kA * vals[Jpt];
-    }
-
-    vals[Ipt] = ( kA_sum == 0 ) ? 0. : FkA_sum / kA_sum;
-
-}
-*/
 
 /*
 void FillPointWithRegression(
@@ -1202,6 +1143,8 @@ void Helmholtz_Solver_Diffusion(
                     min_side_length[Ipt] = sqrt( coarsened_grid->areas[Ipt] );
                 } else {
 
+                    ill_conditioned[Ipt] = false;
+                    /*
                     if ( saved_mask[Ipt] ) { ill_conditioned[Ipt] = false; }
                     else if ( (constants::GRID_TYPE == constants::GridType::NEMO_Tripole)
                             and (refine_level == 0)
@@ -1244,6 +1187,7 @@ void Helmholtz_Solver_Diffusion(
                     } else {
                         ill_conditioned[Ipt] = false;
                     }
+                    */
                     min_side_length[Ipt] = sqrt( coarsened_grid->areas[Ipt] );
 
                     if ( not(ill_conditioned[Ipt]) ) { 
@@ -1285,8 +1229,12 @@ void Helmholtz_Solver_Diffusion(
         fprintf(stdout, "Computing vorticity and divergence on coarse grid.\n");
         #endif
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        //get_true_vort_div( coarsened_grid, *coarsened_grid );
-        get_true_vort_div_fast( coarsened_grid, *coarsened_grid );
+
+        if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+            get_true_vort_div( coarsened_grid, *coarsened_grid );
+        } else {
+            get_true_vort_div_fast( coarsened_grid, *coarsened_grid );
+        }
 
         // zero out at ill-conditioned points
         #pragma omp parallel default(none) shared( coarsened_grid, ill_conditioned ) \
@@ -1358,7 +1306,6 @@ void Helmholtz_Solver_Diffusion(
             coarsened_grid->variables["Psi"] = Psi_seed;
             coarsened_grid->variables["Phi"] = Phi_seed;
         } else if ( refine_level == num_refinements ) {
-            /*
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
             SphericalHarmonicSolver(  
                     coarsened_grid->variables.at("Psi"),
@@ -1368,7 +1315,6 @@ void Helmholtz_Solver_Diffusion(
                     coarsened_grid->variables.at("div") 
                     );
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "SphericalHarmonicSolver"); }
-            */
         }
 
 
@@ -1386,8 +1332,11 @@ void Helmholtz_Solver_Diffusion(
         }
 
         // Compute velocity components
-        //get_vels_vort_and_div( coarsened_grid, *coarsened_grid );
-        get_vels_vort_and_div_fast( coarsened_grid, *coarsened_grid );
+        if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+            get_vels_vort_and_div( coarsened_grid, *coarsened_grid );
+        } else {
+            get_vels_vort_and_div_fast( coarsened_grid, *coarsened_grid );
+        }
         demean( coarsened_grid->variables.at("proj_vort"), coarsened_grid, mean_vort, refine_level == 0 ? &saved_mask : NULL );
         demean( coarsened_grid->variables.at("proj_div" ), coarsened_grid, mean_div,  refine_level == 0 ? &saved_mask : NULL );
 
@@ -1415,6 +1364,30 @@ void Helmholtz_Solver_Diffusion(
 
         coarsened_grid->variables.at("projected_vort") = coarsened_grid->variables.at("proj_vort");
         coarsened_grid->variables.at("projected_div") = coarsened_grid->variables.at("proj_div");
+
+        // As a sanity check, get the divergence of the toroidal field and vorticity of the potential field
+        coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                    "proj_vort_of_pot", std::vector<double>(Npts_coarse, 0.) ) );
+        coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                    "proj_div_of_tor", std::vector<double>(Npts_coarse, 0.) ) );
+
+        // Vorticity
+        curl_vec_dot_er( 
+                coarsened_grid->variables.at("proj_vort_of_pot"),
+                coarsened_grid->variables.at("proj_uo_pot"),
+                coarsened_grid->variables.at("proj_vo_pot"),
+                *coarsened_grid,
+                coarsened_grid->mask
+                );
+
+        // Divergence
+        div_vec( 
+                coarsened_grid->variables.at("proj_div_of_tor"),
+                coarsened_grid->variables.at("proj_uo_tor"),
+                coarsened_grid->variables.at("proj_vo_tor"),
+                *coarsened_grid,
+                coarsened_grid->mask
+               );
 
         std::ostringstream seed_stream;
         seed_stream << "seed_R" << (refine_level) << ".nc";
@@ -1472,7 +1445,9 @@ void Helmholtz_Solver_Diffusion(
         }
 
         const double Lap_scale = 5. * sqrt( 4 * M_PI * pow(constants::R_earth, 2.) / Npts_coarse );
-        fprintf(stdout, "Using a filter scale of %.2ekm for ill conditioned points.\n", Lap_scale/1e3);
+        if ( (refine_level == 0) and (num_ill_conditioned > 0) ) {
+            fprintf(stdout, "Using a filter scale of %.2ekm for ill conditioned points.\n", Lap_scale/1e3);
+        }
 
         while ( keep_solving ) {
 
@@ -1480,14 +1455,14 @@ void Helmholtz_Solver_Diffusion(
 
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
 
-            if ( refine_level == 0 ) {
+            if ( (refine_level == 0) and (num_ill_conditioned > 0) ) {
                 #pragma omp parallel default(none) private(Ipt) \
                 shared( Helmholtz_data, coarsened_grid, solution_grid, dPsidt, dPhidt, \
                         soln_Psi, soln_Phi, cgrid_proj_vort, cgrid_proj_div, cgrid_vort, cgrid_div, \
                         diff_coeff, ill_conditioned, saved_mask, local_kernel_indices, local_kernel_kA ) \
                 firstprivate( Npts_coarse, dt, refine_level, CFL, min_da, Lap_scale )
                 {
-                    #pragma omp for collapse(1) schedule(dynamic)
+                    #pragma omp for collapse(1) schedule(dynamic,16)
                     for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
 
                         // If it's ill conditioned, use a coarse-grained variant of Laplacian
@@ -1579,8 +1554,11 @@ void Helmholtz_Solver_Diffusion(
 
             // Compute velocity components and vort,div
             // To measure errors and use for next iteration
-            //get_vels_vort_and_div( coarsened_grid, solution_grid );
-            get_vels_vort_and_div_fast( coarsened_grid, solution_grid );
+            if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+                get_vels_vort_and_div( coarsened_grid, solution_grid );
+            } else {
+                get_vels_vort_and_div_fast( coarsened_grid, solution_grid );
+            }
 
             double mean_vort, mean_div;
             //demean( coarsened_grid->variables.at("proj_vort"), coarsened_grid, mean_vort, refine_level == 0 ? &saved_mask : NULL );
@@ -1602,7 +1580,7 @@ void Helmholtz_Solver_Diffusion(
                 #pragma omp parallel default(none) shared( coarsened_grid, ill_conditioned ) \
                 firstprivate( Npts_coarse )
                 {
-                #pragma omp for collapse(1) schedule(guided)
+                #pragma omp for collapse(1) schedule(dynamic,16)
                     for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
                         if ( ill_conditioned[Ipt] ) {
                             #ifdef NDEBUG
@@ -1758,8 +1736,11 @@ void Helmholtz_Solver_Diffusion(
         coarsened_grid->variables.at("Phi") = solution_grid.variables.at("Phi");
 
         // Compute velocity components
-        //get_vels_vort_and_div( coarsened_grid, *coarsened_grid );
-        get_vels_vort_and_div_fast( coarsened_grid, *coarsened_grid );
+        if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+            get_vels_vort_and_div( coarsened_grid, *coarsened_grid );
+        } else {
+            get_vels_vort_and_div_fast( coarsened_grid, *coarsened_grid );
+        }
 
         // zero out at ill-conditioned points
         #pragma omp parallel default(none) shared( coarsened_grid, ill_conditioned ) \
@@ -1773,6 +1754,8 @@ void Helmholtz_Solver_Diffusion(
                 }
             }
         }
+
+
 
         demean( coarsened_grid->variables.at("proj_vort"), coarsened_grid, mean_vort, refine_level == 0 ? &saved_mask : NULL );
         demean( coarsened_grid->variables.at("proj_div" ), coarsened_grid, mean_div,  refine_level == 0 ? &saved_mask : NULL );
@@ -1795,6 +1778,32 @@ void Helmholtz_Solver_Diffusion(
             }
         }
         if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "ProcessingSolution"); }
+
+        // As a sanity check, get the divergence of the toroidal field and vorticity of the potential field
+        /*
+        coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                    "proj_vort_of_pot", std::vector<double>(Npts_coarse, 0.) ) );
+        coarsened_grid->variables.insert( std::pair< std::string, std::vector<double> >(
+                    "proj_div_of_tor", std::vector<double>(Npts_coarse, 0.) ) );
+        */
+
+        // Vorticity
+        curl_vec_dot_er( 
+                coarsened_grid->variables.at("proj_vort_of_pot"),
+                coarsened_grid->variables.at("proj_uo_pot"),
+                coarsened_grid->variables.at("proj_vo_pot"),
+                *coarsened_grid,
+                coarsened_grid->mask
+                );
+
+        // Divergence
+        div_vec( 
+                coarsened_grid->variables.at("proj_div_of_tor"),
+                coarsened_grid->variables.at("proj_uo_tor"),
+                coarsened_grid->variables.at("proj_vo_tor"),
+                *coarsened_grid,
+                coarsened_grid->mask
+               );
 
         std::ostringstream name_stream;
         name_stream << "projection_R" << (refine_level) << ".nc";
