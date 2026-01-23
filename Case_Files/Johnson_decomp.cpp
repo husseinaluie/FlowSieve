@@ -409,6 +409,9 @@ int main(int argc, char *argv[]) {
     int perc_base = 5, perc = 0, perc_count = 0;
     int thread_id = omp_get_thread_num();  // thread ID
     double prev_scale = 0., scale_delta, scale_l2_d2;
+
+    const bool can_roll_in_longitude = ( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) );
+
     for (size_t ell_ind = MPI_quad_Rank; ell_ind < num_integration_steps; ell_ind += MPI_quad_Size) {
 
         // Trapezoidal
@@ -453,47 +456,65 @@ int main(int argc, char *argv[]) {
             filter_values_ptrs.resize( 2 );
             for ( Ivar = 0; Ivar < 2; Ivar++ ) { filter_values_ptrs.at(Ivar) = &(filter_values_doubles.at(Ivar)); }
 
-            #pragma omp for collapse(1) schedule(dynamic)
-            for (Ilat = 0; Ilat < Nlat; Ilat++) {
+            const int thread_id = omp_get_thread_num();  // thread ID
+            const int num_threads = omp_get_num_threads(); // number of threads
+            int prev_Ilat = -1; // forces kernel computation on first iteration
+
+            std::vector<double> null_vector(0);
+            
+            // Melt latitude and longitude into one loop
+            //   This is done manually (instead of simply using a 'collapse(2)'
+            //   for optimization purposes. If threads jump between latitudes, 
+            //   they need to keep recomputing the kernel, which is costly.
+            //   Here we force them to iterate through one latitude at a time, 
+            //   splitting the longitudes evenly between the group
+            // If cost per point varies heavily, this could have load balancing issues,
+            //   but in the case of filtering over land (the typical Helmholtz case)
+            //   there is no land/water distinction, and so filtering cost should be
+            //   similar at all longitudes.
+            for ( int Ilatlon = thread_id; Ilatlon < Nlat * Nlon; Ilatlon = Ilatlon + num_threads) {
+                Ilon = Ilatlon % Nlon;
+                Ilat = Ilatlon / Nlon;
+
                 get_lat_bounds(LAT_lb, LAT_ub, source_data.latitude,  Ilat, scale_delta); 
 
                 // If our longitude grid is uniform, and spans the full periodic domain,
-                // then we can just compute it once and translate it at each lon index
-                if ( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) {
-                    std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                    compute_local_kernel( local_kernel, null_vector, null_vector, scale_delta, source_data, 
-                            Ilat, 0, LAT_lb, LAT_ub );
+                // AND we're at the same latitude as the last iteration of the loop,
+                // then we can just re-use the kernel.
+                // Otherwise, we need to compute the kernel.
+                if ( can_roll_in_longitude and (Ilat == prev_Ilat) ) {
+                    // just re-use the kernel from last time
+                } else if ( can_roll_in_longitude ) {
+                    // At a new latitude, so compute kernel at reference longitude (index 0)
+                    compute_local_kernel( local_kernel, null_vector, null_vector,
+                            scale_delta, source_data, Ilat, 0, LAT_lb, LAT_ub );
+                } else {
+                    // Otherwise, we need to compute the whole kernel every time. Boo.
+                    compute_local_kernel( local_kernel, null_vector, null_vector,
+                            scale_delta, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
                 }
+                // And set prev_Ilat before we forget
+                prev_Ilat = Ilat;
 
-                for (Ilon = 0; Ilon < Nlon; Ilon++) {
+                for (Itime = 0; Itime < Ntime; Itime++) {
+                    for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
-                    if ( not( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) ) {
-                        // If we couldn't precompute the kernel earlier, then do it now
-                        std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                        compute_local_kernel( local_kernel, null_vector, null_vector, scale_delta, source_data, 
-                                Ilat, Ilon, LAT_lb, LAT_ub );
-                    }
+                        // Convert our four-index to a one-index
+                        index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
-                    for (Itime = 0; Itime < Ntime; Itime++) {
-                        for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+                        if ( not(constants::FILTER_OVER_LAND) and not(source_data.mask.at(index)) ) {
+                            coarse_Phi.at(index) = constants::fill_value;
+                            coarse_Psi.at(index) = constants::fill_value;
+                        } else{
+                            // Apply the filter at the point
+                            apply_filter_at_point(  filter_values_ptrs, null_ptrs_vector, null_ptrs_vector, 
+                                                    dl_kern, dll_kern,
+                                                    filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
+                                                    LAT_lb, LAT_ub, scale_delta, std::vector<bool>(2,false), 
+                                                    local_kernel, null_vector, null_vector );
 
-                            // Convert our four-index to a one-index
-                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
-
-                            if ( not(constants::FILTER_OVER_LAND) and not(source_data.mask.at(index)) ) {
-                                coarse_Phi.at(index) = constants::fill_value;
-                                coarse_Psi.at(index) = constants::fill_value;
-                            } else{
-                                // Apply the filter at the point
-                                apply_filter_at_point(  filter_values_ptrs, null_ptrs_vector, null_ptrs_vector, 
-                                                        dl_kern, dll_kern,
-                                                        filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
-                                                        LAT_lb, LAT_ub, scale_delta, std::vector<bool>(2,false), 
-                                                        local_kernel, null_vector, null_vector );
-
-                                coarse_Phi.at(index) = filter_values_doubles[0];
-                                coarse_Psi.at(index) = filter_values_doubles[1];
-                            }
+                            coarse_Phi.at(index) = filter_values_doubles[0];
+                            coarse_Psi.at(index) = filter_values_doubles[1];
                         }
                     }
                 }
@@ -559,51 +580,69 @@ int main(int argc, char *argv[]) {
             filter_values_ptrs.resize( 4 );
             for ( Ivar = 0; Ivar < 4; Ivar++ ) { filter_values_ptrs.at(Ivar) = &(filter_values_doubles.at(Ivar)); }
 
-            #pragma omp for collapse(1) schedule(dynamic)
-            for (Ilat = 0; Ilat < Nlat; Ilat++) {
+            const int thread_id = omp_get_thread_num();  // thread ID
+            const int num_threads = omp_get_num_threads(); // number of threads
+            int prev_Ilat = -1; // forces kernel computation on first iteration
+
+            std::vector<double> null_vector(0);
+            
+            // Melt latitude and longitude into one loop
+            //   This is done manually (instead of simply using a 'collapse(2)'
+            //   for optimization purposes. If threads jump between latitudes, 
+            //   they need to keep recomputing the kernel, which is costly.
+            //   Here we force them to iterate through one latitude at a time, 
+            //   splitting the longitudes evenly between the group
+            // If cost per point varies heavily, this could have load balancing issues,
+            //   but in the case of filtering over land (the typical Helmholtz case)
+            //   there is no land/water distinction, and so filtering cost should be
+            //   similar at all longitudes.
+            for ( int Ilatlon = thread_id; Ilatlon < Nlat * Nlon; Ilatlon = Ilatlon + num_threads) {
+                Ilon = Ilatlon % Nlon;
+                Ilat = Ilatlon / Nlon;
+
                 get_lat_bounds(LAT_lb, LAT_ub, source_data.latitude,  Ilat, scale_l2_d2); 
 
                 // If our longitude grid is uniform, and spans the full periodic domain,
-                // then we can just compute it once and translate it at each lon index
-                if ( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) {
-                    std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                    compute_local_kernel( local_kernel, null_vector, null_vector, scale_l2_d2, source_data, 
-                                            Ilat, 0, LAT_lb, LAT_ub );
+                // AND we're at the same latitude as the last iteration of the loop,
+                // then we can just re-use the kernel.
+                // Otherwise, we need to compute the kernel.
+                if ( can_roll_in_longitude and (Ilat == prev_Ilat) ) {
+                    // just re-use the kernel from last time
+                } else if ( can_roll_in_longitude ) {
+                    // At a new latitude, so compute kernel at reference longitude (index 0)
+                    compute_local_kernel( local_kernel, null_vector, null_vector,
+                            scale_l2_d2, source_data, Ilat, 0, LAT_lb, LAT_ub );
+                } else {
+                    // Otherwise, we need to compute the whole kernel every time. Boo.
+                    compute_local_kernel( local_kernel, null_vector, null_vector,
+                            scale_l2_d2, source_data, Ilat, Ilon, LAT_lb, LAT_ub );
                 }
+                // And set prev_Ilat before we forget
+                prev_Ilat = Ilat;
 
-                for (Ilon = 0; Ilon < Nlon; Ilon++) {
+                for (Itime = 0; Itime < Ntime; Itime++) {
+                    for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
-                    if ( not( (constants::PERIODIC_X) and (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) ) ) {
-                        // If we couldn't precompute the kernel earlier, then do it now
-                        std::fill(local_kernel.begin(), local_kernel.end(), 0);
-                        compute_local_kernel( local_kernel, null_vector, null_vector, scale_l2_d2, source_data, 
-                                                Ilat, Ilon, LAT_lb, LAT_ub );
-                    }
+                        // Convert our four-index to a one-index
+                        index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
 
-                    for (Itime = 0; Itime < Ntime; Itime++) {
-                        for (Idepth = 0; Idepth < Ndepth; Idepth++) {
+                        if ( not(constants::FILTER_OVER_LAND) and not(source_data.mask.at(index)) ) {
+                            current_divergent_strain.at(index) = constants::fill_value;
+                            current_traceless_strain.at(index) = constants::fill_value;
+                            current_cyclonic.at(index) = constants::fill_value;
+                            current_anticyclonic.at(index) = constants::fill_value;
+                        } else{
+                            // Apply the filter at the point
+                            apply_filter_at_point(  filter_values_ptrs, null_ptrs_vector, null_ptrs_vector, 
+                                                    dl_kern, dll_kern,
+                                                    filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
+                                                    LAT_lb, LAT_ub, scale_l2_d2, std::vector<bool>(3,false), 
+                                                    local_kernel, null_vector, null_vector );
 
-                            // Convert our four-index to a one-index
-                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
-
-                            if ( not(constants::FILTER_OVER_LAND) and not(source_data.mask.at(index)) ) {
-                                current_divergent_strain.at(index) = constants::fill_value;
-                                current_traceless_strain.at(index) = constants::fill_value;
-                                current_cyclonic.at(index) = constants::fill_value;
-                                current_anticyclonic.at(index) = constants::fill_value;
-                            } else{
-                                // Apply the filter at the point
-                                apply_filter_at_point(  filter_values_ptrs, null_ptrs_vector, null_ptrs_vector, 
-                                                        dl_kern, dll_kern,
-                                                        filter_fields, source_data, Itime, Idepth, Ilat, Ilon, 
-                                                        LAT_lb, LAT_ub, scale_l2_d2, std::vector<bool>(3,false), 
-                                                        local_kernel, null_vector, null_vector );
-
-                                current_divergent_strain.at(index) = filter_values_doubles[0];
-                                current_traceless_strain.at(index) = filter_values_doubles[1];
-                                current_cyclonic.at(index) = filter_values_doubles[2];
-                                current_anticyclonic.at(index) = filter_values_doubles[3];
-                            }
+                            current_divergent_strain.at(index) = filter_values_doubles[0];
+                            current_traceless_strain.at(index) = filter_values_doubles[1];
+                            current_cyclonic.at(index) = filter_values_doubles[2];
+                            current_anticyclonic.at(index) = filter_values_doubles[3];
                         }
                     }
                 }
