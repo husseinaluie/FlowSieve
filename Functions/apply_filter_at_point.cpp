@@ -79,7 +79,8 @@ void apply_filter_at_point(
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
         // Handle periodicity if necessary
-        if (constants::PERIODIC_Y) { curr_lat = ( LAT % Nlat + Nlat ) % Nlat; }
+        //if (constants::PERIODIC_Y) { curr_lat = ( LAT % Nlat + Nlat ) % Nlat; }
+        if (constants::PERIODIC_Y) { curr_lat = apply_periodicity(LAT, Nlat); }
         else                       { curr_lat = LAT; }
         lat_at_curr = latitude.at(curr_lat);
 
@@ -87,7 +88,8 @@ void apply_filter_at_point(
         for (int LON = LON_lb; LON < LON_ub; LON++ ) {
 
             // Handle periodicity if necessary
-            if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
+            //if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
+            if (constants::PERIODIC_X) { curr_lon = apply_periodicity(LON, Nlon); }
             else                       { curr_lon = LON; }
 
             index = Index(Itime, Idepth, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
@@ -95,7 +97,10 @@ void apply_filter_at_point(
             if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X) ) {
                 // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
                 //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
-                kernel_index = Index(0, 0, curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon, Ntime, Ndepth, Nlat, Nlon);
+                //const int shifted_lon = ( (LON - Ilon) % Nlon + Nlon ) % Nlon;
+                const int shifted_lon = apply_periodicity( curr_lon - Ilon, Nlon );
+                kernel_index = source_data.local_index(0, 0, curr_lat, shifted_lon);
+                //kernel_index = Index(0, 0, curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon, Ntime, Ndepth, Nlat, Nlon);
             } else {
                 kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
             }
