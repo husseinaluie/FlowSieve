@@ -161,6 +161,8 @@ void Index1to4( const size_t index,
         int & Itime, int & Idepth, int & Ilat, int & Ilon,
         const int & Ntime, const int & Ndepth, const int & Nlat, const int & Nlon  );
 
+int apply_periodicity( const int I, const int N );
+
 double distance(const double lon1,     const double lat1, 
                 const double lon2,     const double lat2,
                 const double Llon = 0, const double Llat = 0);
