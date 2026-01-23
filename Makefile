@@ -38,7 +38,7 @@ ifeq ($(EXTRA_OPT),true)
 endif
 
 ifeq ($(USE_GPROF),true)
-    LINKS:=$(LINKS) -pg
+    LINKS:=$(LINKS) -g #-pg
 endif
 
 CFLAGS:=$(CFLAGS) $(LIB_DIRS)
