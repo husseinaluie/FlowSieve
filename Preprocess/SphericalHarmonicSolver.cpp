@@ -40,13 +40,13 @@ void SphericalHarmonicSolver(
     #pragma omp parallel default(none) shared( source_data ) private(Ipt) \
     reduction( +:surface_area ) firstprivate( Npts )
     {
-        #pragma omp for collapse(1) schedule(guided)
+        #pragma omp for collapse(1) schedule(static)
         for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
             surface_area += source_data.areas[Ipt];
         }
     }
     surface_area /= pow( (long double) constants::R_earth, 2. );
-    fprintf( stdout, "Numerical Surface Area / True Surface Area = %.3e\n", (double) (surface_area / (4 * M_PI)) );
+    fprintf( stdout, "1 - Numerical Surface Area / True Surface Area = %.3e\n", (double) (1 - surface_area / (4 * M_PI)) );
 
 
     #pragma omp parallel \
@@ -59,15 +59,23 @@ void SphericalHarmonicSolver(
         // Loop over space to compute the inner produce of Lap_of_field with Y_L^M
         // Loop over the different spherical hamonic degrees and ordrs
         // We skip L = 0 since that's the mean
-        #pragma omp for collapse(2) schedule(guided)
+        #pragma omp for collapse(2) schedule(dynamic,16)
         for ( L_degree = 1; L_degree < max_L; L_degree++ ) {
             for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
 
-                // Divergence/Vorticity is zero of land, so avoid the computational cost
+                // Divergence/Vorticity is zero on land, so avoid the computational cost
                 if ( (vorticity[Ipt] == 0) and (divergence[Ipt] == 0) ) { continue; }
 
-                long double lon = source_data.longitude[Ipt];
-                long double lat = (M_PI/2) - source_data.latitude[Ipt]; //convert to polar angle
+                long double lon, lat;
+                if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+                    int Itime, Idepth, Ilat, Ilon;
+                    source_data.index1to4_local(Ipt, Itime, Idepth, Ilat, Ilon);
+                    lon = source_data.longitude[Ilon];
+                    lat = (M_PI/2) - source_data.latitude[Ilat];
+                } else {
+                    lon = source_data.longitude[Ipt];
+                    lat = (M_PI/2) - source_data.latitude[Ipt]; //convert to polar angle
+                }
 
                 for ( int M_order = -L_degree; M_order <= L_degree; M_order++ ) {
 
@@ -84,11 +92,13 @@ void SphericalHarmonicSolver(
                     long double div_L_M_Re = dA * Y_L_M * divergence[Ipt] * cos_M_lon;
                     long double div_L_M_Im = dA * Y_L_M * divergence[Ipt] * sin_M_lon;
 
-                    vort_coeffs_Real[ L_degree * (2*max_L+1) + (M_order + max_L) ] += vort_L_M_Re;
-                    vort_coeffs_Imag[ L_degree * (2*max_L+1) + (M_order + max_L) ] += vort_L_M_Im;
+                    const double m_factor = ( M_order == 0 ) ? 0.5 : 1.;
 
-                    div_coeffs_Real[ L_degree * (2*max_L+1) + (M_order + max_L) ] += div_L_M_Re;
-                    div_coeffs_Imag[ L_degree * (2*max_L+1) + (M_order + max_L) ] += div_L_M_Im;
+                    vort_coeffs_Real[ L_degree * (2*max_L+1) + (M_order + max_L) ] += vort_L_M_Re * m_factor;
+                    vort_coeffs_Imag[ L_degree * (2*max_L+1) + (M_order + max_L) ] += vort_L_M_Im * m_factor;
+
+                    div_coeffs_Real[ L_degree * (2*max_L+1) + (M_order + max_L) ] += div_L_M_Re * m_factor;
+                    div_coeffs_Imag[ L_degree * (2*max_L+1) + (M_order + max_L) ] += div_L_M_Im * m_factor;
                 }
             }
         }
@@ -105,11 +115,19 @@ void SphericalHarmonicSolver(
     firstprivate( Npts, surface_area )
     {
         // Loop over the different spherical hamonic degrees and ordrs
-        #pragma omp for collapse(1) schedule(guided)
+        #pragma omp for collapse(1) schedule(static)
         for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
 
-            long double lon = source_data.longitude[Ipt];
-            long double lat = (M_PI/2) - source_data.latitude[Ipt]; //convert to polar angle
+            long double lon, lat;
+            if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+                int Itime, Idepth, Ilat, Ilon;
+                source_data.index1to4_local(Ipt, Itime, Idepth, Ilat, Ilon);
+                lon = source_data.longitude[Ilon];
+                lat = (M_PI/2) - source_data.latitude[Ilat];
+            } else {
+                lon = source_data.longitude[Ipt];
+                lat = (M_PI/2) - source_data.latitude[Ipt]; //convert to polar angle
+            }
 
             for ( L_degree = 1; L_degree < max_L; L_degree++ ) {
                 for ( int M_order = -L_degree; M_order <= L_degree; M_order++ ) {
@@ -134,17 +152,24 @@ void SphericalHarmonicSolver(
                     long double Psi_from_real = vort_L_M_Re * Y_L_M * cos_M_lon;
                     long double Psi_from_imag = vort_L_M_Im * Y_L_M * sin_M_lon;
 
+                    #ifdef NDEBUG
                     long_Psi[Ipt] += (Psi_from_real + Psi_from_imag) * sqrt( surface_area );
+                    #else
+                    long_Psi.at(Ipt) += (Psi_from_real + Psi_from_imag) * sqrt( surface_area );
+                    #endif
 
                     long double Phi_from_real = div_L_M_Re * Y_L_M * cos_M_lon;
                     long double Phi_from_imag = div_L_M_Im * Y_L_M * sin_M_lon;
 
+                    #ifdef NDEBUG
                     long_Phi[Ipt] += (Phi_from_real + Phi_from_imag) * sqrt( surface_area );
+                    #else
+                    long_Phi.at(Ipt) += (Phi_from_real + Phi_from_imag) * sqrt( surface_area );
+                    #endif
                 }
             }
         }
     }
-
 
     // Finally, adjust so that Psi[0] = 0, Phi[0] = 0
     #pragma omp parallel \
