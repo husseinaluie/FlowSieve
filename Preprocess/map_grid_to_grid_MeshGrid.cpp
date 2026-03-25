@@ -20,16 +20,23 @@ void map_grid_to_grid_MeshGrid(
 
     const size_t Nvars = vars_to_map.size();
 
-    // Confirm that vars are in both source and target
+    // Confirm that the vars are in both source and target
     for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {
-        if ( not( source_data.variables.count( vars_to_map[Ivar] ) ) ) {
-            fprintf( stderr, "Source does not contain variable %s.\n", vars_to_map[Ivar].c_str() );
+        if ( not( source_data.variables.count( vars_to_map.at(Ivar) ) ) ) {
+            fprintf( stderr, "Source does not contain variable %s.\n", vars_to_map.at(Ivar).c_str() );
             throw std::invalid_argument( "Source does not contain requested variable.\n" );
         }
-        if ( not( target_data.variables.count( vars_to_map[Ivar] ) ) ) {
-            fprintf( stderr, "Target does not contain variable %s.\n", vars_to_map[Ivar].c_str() );
-            throw std::invalid_argument( "Source does not contain requested variable.\n" );
+        if ( not( target_data.variables.count( vars_to_map.at(Ivar) ) ) ) {
+            fprintf( stderr, "Target does not contain variable %s.\n", vars_to_map.at(Ivar).c_str() );
+            throw std::invalid_argument( "Target does not contain requested variable.\n" );
         }
+        #if DEBUG >= 1
+        fprintf( stdout, "Variable %'zu has source size %'zu and target size %'zu.\n", 
+                Ivar,
+                source_data.variables.at( vars_to_map.at(Ivar) ).size(),
+                target_data.variables.at( vars_to_map.at(Ivar) ).size()
+               );
+        #endif
     }
 
     const size_t Npts_target = target_data.mask.size();
@@ -46,37 +53,40 @@ void map_grid_to_grid_MeshGrid(
     fprintf( stdout, "Mapping from %'zu points to %'zu.\n", Npts_source, Npts_target );
     #endif
 
-    //if ( mapping_from_fine_to_coarse ) {
-    //} else {
-    { // for now just lazily nearest-neighbours it all
-
-        /*
-        for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {
-            fprintf( stdout, "var has len %'zu\n", target_data.variables.at(vars_to_map[Ivar]).size() );
-        }
-        */
-        // Here we're mapping from coarse to fine. Just use nearest neighbour.
-        int Ilat_target, Ilon_target;
+    int Ilat_target, Ilon_target;
+    #pragma omp parallel \
+    default(none) \
+    shared( source_data, target_data, vars_to_map ) \
+    private( Ilat_target, Ilon_target ) \
+    firstprivate( Npts_target,Nlat_target, Nlon_target, Npts_source, Nlat_source, Nlon_source, \
+           Nvars, mapping_from_fine_to_coarse )
+    { 
+        #pragma omp for collapse(2) schedule(static)
         for ( Ilat_target = 0; Ilat_target < Nlat_target; Ilat_target++ ) {
             for ( Ilon_target = 0; Ilon_target < Nlon_target; Ilon_target++ ) {
 
                 double target_lat = target_data.latitude[ Ilat_target];
                 double target_lon = target_data.longitude[Ilon_target];
 
-                // Get nearest lat index in the source
+                //
+                //// Get nearest lat index in the source
+                //
                 int Ilat_source_LB, Ilat_source_UB;
                 double perc_lat;
                 int test_Ilat = std::upper_bound( source_data.latitude.begin(), source_data.latitude.end(), target_lat )
                     - source_data.latitude.begin();
                 if ( test_Ilat == 0 ) {
+                    // if target point is out of bounds, just use nearest
                     Ilat_source_LB = 0;
                     Ilat_source_UB = 0;
                     perc_lat = 0.;
                 } else if ( test_Ilat >= Nlat_source ) {
+                    // if target point is out of bounds, just use nearest
                     Ilat_source_LB = Nlat_source - 1;
                     Ilat_source_UB = Nlat_source - 1;
                     perc_lat = 0.;
                 } else {
+                    // Otherwise, we'll linearly interpolate between lats
                     double Ldist = std::fabs( source_data.latitude[test_Ilat-1] - target_lat );
                     double Rdist = std::fabs( source_data.latitude[test_Ilat]   - target_lat );
                     perc_lat = Ldist / (Ldist+Rdist);
@@ -84,12 +94,16 @@ void map_grid_to_grid_MeshGrid(
                     Ilat_source_UB = test_Ilat;
                 }
 
-                // Get nearest lon index
+                //
+                //// Get nearest lon index
+                //
                 int Ilon_source_LB, Ilon_source_UB;
                 double perc_lon;
                 int test_Ilon = std::upper_bound( source_data.longitude.begin(), source_data.longitude.end(), target_lon )
                     - source_data.longitude.begin();
                 int Lind, Rind;
+                
+                // account for periodicity
                 if ( test_Ilon == 0 ) {
                     Lind = Nlon_source - 1;
                     Rind = 0;
@@ -100,6 +114,8 @@ void map_grid_to_grid_MeshGrid(
                     Lind = test_Ilon - 1;
                     Rind = test_Ilon;
                 }
+
+                // and set up to linearly interpolate
                 double Ldist = std::fabs( source_data.longitude[Lind] - target_lon );
                 if ( Ldist > M_PI ) { Ldist = 2*M_PI - Ldist; }
                 double Rdist = std::fabs( source_data.longitude[Rind] - target_lon );
@@ -109,15 +125,20 @@ void map_grid_to_grid_MeshGrid(
                 Ilon_source_UB = Rind;
 
 
-                size_t source_LL = Index( 0, 0, Ilat_source_LB, Ilon_source_LB, 1, 1, Nlat_source, Nlon_source ),
-                       source_UL = Index( 0, 0, Ilat_source_UB, Ilon_source_LB, 1, 1, Nlat_source, Nlon_source ),
-                       source_LU = Index( 0, 0, Ilat_source_LB, Ilon_source_UB, 1, 1, Nlat_source, Nlon_source ),
-                       source_UU = Index( 0, 0, Ilat_source_UB, Ilon_source_UB, 1, 1, Nlat_source, Nlon_source );
+                // Get (source) indices
+                size_t source_LL = source_data.local_index( 0, 0, Ilat_source_LB, Ilon_source_LB ),
+                       source_UL = source_data.local_index( 0, 0, Ilat_source_UB, Ilon_source_LB ),
+                       source_LU = source_data.local_index( 0, 0, Ilat_source_LB, Ilon_source_UB ),
+                       source_UU = source_data.local_index( 0, 0, Ilat_source_UB, Ilon_source_UB );
 
-                size_t target_index = Index( 0, 0, Ilat_target, Ilon_target, 1, 1, Nlat_target, Nlon_target );
+                size_t target_index = target_data.local_index( 0, 0, Ilat_target, Ilon_target );
 
+
+                // If we're coarsening, determine the new land mask
                 if ( mapping_from_fine_to_coarse ) {
+
                     unsigned int num_mask = 0;
+
                     num_mask += source_data.mask[source_LL];
                     num_mask += source_data.mask[source_UL];
                     num_mask += source_data.mask[source_LU];
@@ -127,7 +148,11 @@ void map_grid_to_grid_MeshGrid(
                     target_data.mask[target_index] = num_mask >= 2;
                 }
 
+                // If we're refining (no land, since working with Psi/Phi)
+                // or if the target point is water, compute the interpolation.
                 if ( (not(mapping_from_fine_to_coarse)) or (target_data.mask[target_index]) ) {
+
+                    // loop over all vars to process
                     for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {
 
                         // Linear interpolation between bounding box, in lat-lon coords
@@ -137,6 +162,7 @@ void map_grid_to_grid_MeshGrid(
                                val_LU = source_data.variables.at(vars_to_map[Ivar]).at(source_LU),
                                val_UU = source_data.variables.at(vars_to_map[Ivar]).at(source_UU);
 
+                        // First, perform latitude interpolation on "west" side
                         double val_L;
                         bool use_L = true;
                         if ( source_data.mask[source_LL] and source_data.mask[source_UL] ) {
@@ -150,6 +176,7 @@ void map_grid_to_grid_MeshGrid(
                             use_L = false;
                         }
 
+                        // Then perform latitude interpolation on "east" side
                         double val_U;
                         bool use_U = true;
                         if ( source_data.mask[source_LU] and source_data.mask[source_UU] ) {
@@ -163,6 +190,7 @@ void map_grid_to_grid_MeshGrid(
                             use_U = false;
                         }
 
+                        // Then perform the longitude interpolation
                         if ( use_L and use_U ) {
                             val = val_L * (1-perc_lon)  +  val_U * perc_lon;
                         } else if ( use_L ) {
