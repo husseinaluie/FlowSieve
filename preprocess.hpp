@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "ALGLIB/linalg.h"
+//#include "ALGLIB/linalg.h"
 #include <mpi.h>
 #include <vector>
 
@@ -191,6 +191,7 @@ class HelmholtzDataClass {
 
 };
 
+/*
 void Helmholtz_Solver(
         const std::string output_fname,
         dataset & source_data,
@@ -220,8 +221,9 @@ void Helmholtz_Solver_wSPH(
         const int num_refinements,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
+*/
 
-void Helmholtz_Solver_Diffusion(
+void Helmholtz_Solver_NonMeshGrid(
         const std::string output_fname,
         dataset & source_data,
         const double rel_tol,
@@ -240,19 +242,13 @@ void Helmholtz_Solver_Diffusion(
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
-void Helmholtz_Solver_Diffusion_implicit(
+void Helmholtz_Solver_MeshGrid(
         const std::string output_fname,
         dataset & source_data,
         const double rel_tol,
         const unsigned int max_iters,
         const unsigned int iters_per_batch,
-        const bool weight_err,
-        const bool use_mask,
-        const bool use_vel,
-        const bool use_vort_div,
-        const bool collapse_land, 
         const int num_refinements,
-        const double CFL,
         const bool seed_provided,
         const std::vector<double> & Psi_seed,
         const std::vector<double> & Phi_seed,
@@ -279,12 +275,29 @@ void get_vels_vort_and_div_fast(
         dataset & PsiPhi_grid
         );
 
-/*
 void get_vels_vort_and_div(
         dataset * coarsened_grid,
-        dataset & PsiPhi_grid
+        dataset & PsiPhi_grid,
+        std::vector<double> & cos_ip,
+        std::vector<double> & cos_im
         );
-*/
+
+void get_true_vort_div(
+        dataset * coarsened_grid,
+        dataset & PsiPhi_grid,
+        std::vector<double> & cos_ip,
+        std::vector<double> & cos_im
+        );
+
+void get_vort_div_of_pot_tor(
+        dataset * coarsened_grid,
+        std::vector<double> & cos_ip,
+        std::vector<double> & cos_im
+        );
+
+double get_mean( std::vector<double> & f,
+             dataset * data
+             );
 
 void demean( std::vector<double> & f,
              dataset * data,
@@ -309,6 +322,27 @@ void get_norms(
         double & div_2_ener,
         double & Psi_2_norm,
         double & Phi_2_norm,
+        dataset * coarsened_grid
+        );
+
+
+void get_norms_GS(
+        long double & vel_2_err,
+        long double & vort_2_err,
+        long double & div_2_err,
+        long double & vel_2_norm,
+        long double & vort_2_norm,
+        long double & div_2_norm,
+        long double & vel_inf_err,
+        long double & vort_inf_err,
+        long double & div_inf_err,
+        long double & vel_inf_norm,
+        long double & vort_inf_norm,
+        long double & div_inf_norm,
+        long double & vort_2_ener,
+        long double & div_2_ener,
+        long double & Psi_2_norm,
+        long double & Phi_2_norm,
         dataset * coarsened_grid
         );
 
@@ -604,6 +638,7 @@ void toroidal_curl_u_dot_er(
         );
 
 
+/*
 void toroidal_sparse_Lap(
         alglib::sparsematrix & Lap,
         const dataset & source_data,
@@ -623,6 +658,7 @@ void sparse_vel_from_PsiPhi(
         const std::vector<short int> & mask,
         const bool area_weight
         );
+*/
 
 
 /*!
