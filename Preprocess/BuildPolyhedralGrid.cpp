@@ -6,6 +6,7 @@
 #include <omp.h>
 #include <math.h>
 #include <unordered_map>
+#include <cassert>
 
 #include <Eigen/QR>
 #include <Eigen/Dense>
@@ -71,9 +72,11 @@ double SphericalTriangleArea(
                                0,0,0,0,0,0,0,0,0,0,false
                                ) / constants::R_earth;
 
+    #if DEBUG > 0
     assert( a > 0 );
     assert( b > 0 );
     assert( c > 0 );
+    #endif
 
     const double cos_a = cos(a), cos_b = cos(b), cos_c = cos(c),
                  sin_a = sin(a), sin_b = sin(b), sin_c = sin(c);
@@ -371,7 +374,7 @@ void BuildPolyhedralGrid(
     firstprivate( num_faces_final, size_neighbourhood ) \
     private( Iface )
     {
-        #pragma omp for collapse(1) schedule(static)
+        #pragma omp for collapse(1) schedule(dynamic,16)
         for ( Iface = 0; Iface < num_faces_final; Iface++ ) {
 
             // First, get the coordinates, the convert to spherical
@@ -415,20 +418,34 @@ void BuildPolyhedralGrid(
                 if ( Iface == Jface ) { continue; }
 
                 // Compare the vertices to see if Iface vertices are Jface vertices
-                bool has_vertex_zero = (vertices[ std::get<0>(faces[Iface])] == vertices[std::get<0>(faces[Jface])])
-                                    or (vertices[ std::get<0>(faces[Iface])] == vertices[std::get<1>(faces[Jface])])
-                                    or (vertices[ std::get<0>(faces[Iface])] == vertices[std::get<2>(faces[Jface])]);
+                const size_t Iface_0 = std::get<0>(faces[Iface]),
+                             Iface_1 = std::get<1>(faces[Iface]),
+                             Iface_2 = std::get<2>(faces[Iface]),
+                             Jface_0 = std::get<0>(faces[Jface]),
+                             Jface_1 = std::get<1>(faces[Jface]),
+                             Jface_2 = std::get<2>(faces[Jface]);
+                bool has_vertex_zero = ( Iface_0 == Jface_0 )
+                                    or ( Iface_0 == Jface_1 )
+                                    or ( Iface_0 == Jface_2 );
 
-                bool has_vertex_one =  (vertices[ std::get<1>(faces[Iface])] == vertices[std::get<0>(faces[Jface])])
-                                    or (vertices[ std::get<1>(faces[Iface])] == vertices[std::get<1>(faces[Jface])])
-                                    or (vertices[ std::get<1>(faces[Iface])] == vertices[std::get<2>(faces[Jface])]);
+                bool has_vertex_one =  ( Iface_1 == Jface_0 )
+                                    or ( Iface_1 == Jface_1 )
+                                    or ( Iface_1 == Jface_2 );
 
-                bool has_vertex_two =  (vertices[ std::get<2>(faces[Iface])] == vertices[std::get<0>(faces[Jface])])
-                                    or (vertices[ std::get<2>(faces[Iface])] == vertices[std::get<1>(faces[Jface])])
-                                    or (vertices[ std::get<2>(faces[Iface])] == vertices[std::get<2>(faces[Jface])]);
+                bool has_vertex_two =  ( Iface_2 == Jface_0 )
+                                    or ( Iface_2 == Jface_1 )
+                                    or ( Iface_2 == Jface_2 );
 
-                // Check if two of the vertices are equal
-                if ( has_vertex_zero + has_vertex_one + has_vertex_two == 2 ) {
+                // Check if exactly two of the vertices are equal
+                //   which would mean they are adjacent faces
+                const bool share_exactly_two_vertices = 
+                    ( has_vertex_zero and has_vertex_one and not(has_vertex_two) ) 
+                    or
+                    ( has_vertex_zero and not(has_vertex_one) and has_vertex_two ) 
+                    or
+                    ( not(has_vertex_zero) and has_vertex_one and has_vertex_two );
+
+                if ( share_exactly_two_vertices ) {
                     adjacency_indices[Iface][num_found] = Jface;
 
                     /* 
