@@ -301,12 +301,12 @@ void write_field_to_output(
     retval = nc_close(ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
-#if DEBUG >= 1
+    #if DEBUG >= 1
     if (wRank == 0) { 
         fprintf(stdout, "    wrote %s to %s \n", field_name.c_str(), filename.c_str());
         fflush(stdout);
     }
-#endif
+    #endif
 
     fesetenv( &fe_env );
 }
