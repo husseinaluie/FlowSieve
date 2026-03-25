@@ -9,6 +9,7 @@
 #include <omp.h>
 #include <cassert>
 #include <locale>
+#include <iostream>
 
 #include "../netcdf_io.hpp"
 #include "../functions.hpp"
@@ -29,6 +30,7 @@ int main(int argc, char *argv[]) {
 
     // Enable all floating point exceptions but FE_INEXACT
     //feenableexcept(FE_ALL_EXCEPT & ~FE_INEXACT);
+    feenableexcept( FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW );
 
     // Specify the number of OpenMP threads
     //   and initialize the MPI world
@@ -44,7 +46,7 @@ int main(int argc, char *argv[]) {
     //  [ this modifies how numbers are printed ]
     // on startup, the global locale is the "C" locale. we'll replace the C++ global 
     // locale and the "C" locale with the user-preferred locale for future wide character output
-    std::cout << L"User-preferred locale setting is " << std::locale("").name().c_str() << L'\n';
+    //std::cout << L"User-preferred locale setting is " << std::locale("").name().c_str() << L'\n';
     std::locale::global(std::locale(""));
     std::cout.imbue(std::locale());
 
@@ -197,7 +199,6 @@ int main(int argc, char *argv[]) {
     const bool use_area_weight = string_to_bool(use_area_weight_string);
 
     if (asked_help) { return 0; }
-    if ( not( use_vort_div or use_vel ) ) { throw std::runtime_error("Must turn on vort_div or vels."); }
 
     // Print processor assignments
     const int max_threads = omp_get_max_threads();
@@ -215,29 +216,35 @@ int main(int argc, char *argv[]) {
     #endif
 
     // Read in the grid coordinates
-    source_data.load_time(      time_dim_name,      input_fname );
-    source_data.load_depth(     depth_dim_name,     input_fname );
-    read_LLC_latlon_from_file( source_data.latitude,  latitude_dim_name,  input_fname );
-    read_LLC_latlon_from_file( source_data.longitude, longitude_dim_name, input_fname );
-
-    // Apply some cleaning to the processor allotments if necessary. 
-    source_data.Nlat = 1;
-    source_data.Nlon = 1;
-    source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
+    source_data.load_time(  time_dim_name,  input_fname );
+    source_data.load_depth( depth_dim_name, input_fname );
+    if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+        source_data.load_latitude(  latitude_dim_name,  input_fname );
+        source_data.load_longitude( longitude_dim_name, input_fname );
+    } else {
+        read_LLC_latlon_from_file( source_data.latitude,  latitude_dim_name,  input_fname );
+        read_LLC_latlon_from_file( source_data.longitude, longitude_dim_name, input_fname );
+    }
      
     // Convert to radians, if appropriate
     if ( (latlon_in_degrees == "true") and (not(constants::CARTESIAN)) ) {
         convert_coordinates( source_data.longitude, source_data.latitude );
     }
 
-    // Build the adjacency matrix and other adjacency-adjacent arrays
-    //  down the road, just load in a pre-built one, but for right now
-    //  this is easier.
-    source_data.load_adjacency( adjacency_fname );
+    // Apply some cleaning to the processor allotments if necessary. 
+    if ( not(constants::GRID_TYPE == constants::GridType::MeshGrid ) ) {
+        source_data.Nlat = 1;
+        source_data.Nlon = 1;
+    }
+    source_data.check_processor_divisions( Nprocs_in_time_input, Nprocs_in_depth_input );
 
     // Read in the velocity fields
     source_data.load_variable( "u_lon", zonal_vel_name, input_fname, true, true );
     source_data.load_variable( "u_lat", merid_vel_name, input_fname, true, true );
+
+    // Get the MPI-local dimension sizes
+    source_data.Ntime  = source_data.myCounts[0];
+    source_data.Ndepth = source_data.myCounts[1];
 
     // If we're using FILTER_OVER_LAND, then the mask has been wiped out. Load in a mask that still includes land references
     //      so that we have both. Will be used to get 'water-only' region areas.
@@ -246,14 +253,71 @@ int main(int argc, char *argv[]) {
                source_data.Nprocs_in_time, source_data.Nprocs_in_depth );
     }
 
-    // Get the MPI-local dimension sizes
-    source_data.Ntime  = source_data.myCounts[0];
-    source_data.Ndepth = source_data.myCounts[1];
+    if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+        source_data.compute_cell_areas();
+    } else {
+        // Compute the area of each 'cell' which will be necessary for integration
+        // Cell areas are trickier, so they will be passed in as an input.
+        read_LLC_latlon_from_file( source_data.areas, dArea_field_var_name, adjacency_fname );
 
-    // Compute the area of each 'cell' which will be necessary for integration
-    //source_data.compute_cell_areas();
-    // Cell areas are trickier, so they will be passed in as an input.
-    read_LLC_latlon_from_file( source_data.areas, dArea_field_var_name, adjacency_fname );
+        // Build the adjacency matrix and other adjacency-adjacent arrays
+        //  down the road, just load in a pre-built one, but for right now
+        //  this is easier.
+        // Need to have area loaded already!
+        source_data.load_adjacency( adjacency_fname );
+    }
+
+
+    if ( ( constants::EXTEND_DOMAIN_TO_POLES ) and 
+         ( constants::GRID_TYPE == constants::GridType::MeshGrid ) 
+    ) {
+
+        // Extend the latitude grid to reach the poles and update source_data with the new info.
+        std::vector<double> extended_latitude;
+        int orig_lat_start_in_extend;
+        #if DEBUG >= 2
+        if (wRank == 0) { fprintf( stdout, "    Extending latitude to poles\n" ); }
+        #endif
+        extend_latitude_to_poles( source_data.latitude, extended_latitude, orig_lat_start_in_extend );
+
+        // Extend out the mask
+        #if DEBUG >= 2
+        if (wRank == 0) { fprintf( stdout, "    Extending mask to poles\n" ); }
+        #endif
+        extend_mask_to_poles( source_data.mask, source_data, extended_latitude, orig_lat_start_in_extend );
+
+
+        extend_field_to_poles( source_data.variables.at("u_lon"), source_data, extended_latitude, orig_lat_start_in_extend );
+        extend_field_to_poles( source_data.variables.at("u_lat"), source_data, extended_latitude, orig_lat_start_in_extend );
+
+        // Extend out all of the region definitions
+        source_data.latitude = extended_latitude;
+        source_data.Nlat = extended_latitude.size();
+        source_data.myCounts[2] = source_data.Nlat;
+        source_data.compute_cell_areas();
+    }
+    source_data.initialize_index_functions();
+
+    // If requested, compute (and store) sin(lat) and cos(lat)
+    if ( constants::PRECOMPUTE_SIN_COS_LATITUDE ) {
+        source_data.compute_sin_cos_lat();
+    }
+
+    // Number of lat/lon points
+    size_t Npts;
+    if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+        Npts = source_data.areas.size();
+    } else {
+        Npts = source_data.latitude.size();
+    }
+
+    fprintf( stdout, "Npts (%'zu) len(uo) = %'zu, len(vo) = %'zu, len(dA) = %'zu, len(mask) = %'zu\n",
+          Npts, 
+          source_data.variables.at("u_lon").size(),
+          source_data.variables.at("u_lat").size(),
+          source_data.areas.size(),
+          source_data.mask.size()
+          );
 
     // Read in the seed
     // If extending to poles, then assume that the seed is already on the extended grid
@@ -261,41 +325,55 @@ int main(int argc, char *argv[]) {
     // the refine seed code includes the grid extensions
     double seed_count;
     bool single_seed;
-    const size_t Npts = source_data.latitude.size();
     std::vector<double> Psi_seed, Phi_seed;
+    bool seed_provided = false;
     if (seed_fname == "zero") {
         seed_count = 1.;
         single_seed = (seed_count == 1);
         Psi_seed.resize( Npts, 0.);
         Phi_seed.resize( Npts, 0.);
+
+        seed_provided = false;
+        fprintf( stdout, "No seed provided, will initialize with zeros.\n" );
     } else {
-        read_attr_from_file(seed_count, "seed_count", seed_fname);
-        const int Nprocs_in_time  = source_data.Nprocs_in_time,
-                  Nprocs_in_depth = source_data.Nprocs_in_depth;
-        single_seed = (seed_count == 1);
-        read_var_from_file( Psi_seed, tor_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed) );
-        read_var_from_file( Phi_seed, pot_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed) );
+        //read_attr_from_file(seed_count, "seed_count", seed_fname);
+        //const int Nprocs_in_time  = source_data.Nprocs_in_time,
+        //          Nprocs_in_depth = source_data.Nprocs_in_depth;
+        //single_seed = (seed_count == 1);
+        //read_var_from_file( Psi_seed, tor_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed) );
+        //read_var_from_file( Phi_seed, pot_seed_name, seed_fname, NULL, NULL, NULL, Nprocs_in_time, Nprocs_in_depth, not(single_seed) );
+
+        read_var_from_file( Psi_seed, tor_seed_name, seed_fname, NULL, NULL, NULL );
+        read_var_from_file( Phi_seed, pot_seed_name, seed_fname, NULL, NULL, NULL );
+
+        seed_provided = true;
+        fprintf( stdout, "Using provided seed.\n" );
     }
 
     // Auto-determine number of refinements if not set
     //  aims for ~1-degree at coarsest
     if ( num_refinements < 0 ) {
-        //double Nlat_approx = sqrt( Npts / 2 );  // a rough estimate, based on Nlon ~ 2 * Nlat
-        //                                        // for equivalent uniform
-        //num_refinements = (int) ceil( log2( Nlat_approx / 180. ) );
-        //num_refinements = (int) ceil( log2( Nlat_approx / 45 ) );
-        //num_refinements = std::max( 0, num_refinements );
         int counter = 0;
-        while ( 4000 * pow( 4, counter ) < Npts ) { counter++; };
-        num_refinements = counter;
+        if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+            while ( (180*360) * pow( 4, 2*counter ) < Npts ) { counter++; };
+        } else {
+            while ( 4000 * pow( 4, 2*counter ) < Npts ) { counter++; };
+            num_refinements = counter+1;
+        }
         #if DEBUG >= 0
         fprintf( stdout, "Setting the number of refinement levels to %d.\n", num_refinements );
         #endif
     }
 
     // Apply to projection routine
-    Helmholtz_Solver_Diffusion( "output.nc", source_data, tolerance, max_iterations, iters_per_cycle, use_area_weight,
-           use_mask, use_vel, use_vort_div, collapse_land, num_refinements, CFL, hyper_visc );
+    if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+        Helmholtz_Solver_MeshGrid( "output.nc", source_data, tolerance, max_iterations, iters_per_cycle,
+                num_refinements, seed_provided, Psi_seed, Phi_seed );
+    } else {
+        Helmholtz_Solver_NonMeshGrid( "output.nc", source_data, tolerance, max_iterations, iters_per_cycle, use_area_weight,
+                use_mask, use_vel, use_vort_div, collapse_land, num_refinements, CFL, 
+                seed_provided, Psi_seed, Phi_seed );
+    }
 
 
     // Done!
