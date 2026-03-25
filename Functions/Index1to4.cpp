@@ -28,6 +28,7 @@ void Index1to4(
         ){
 
     /*
+     * For reference, how the 1-index is built from the 4-indices
     int index =   Itime  * ( Ndepth * Nlat * Nlon )
                 + Idepth * (          Nlat * Nlon )
                 + Ilat   * (                 Nlon )
@@ -35,8 +36,17 @@ void Index1to4(
     */
 
     Ilon   = index % Nlon;
+    size_t residual = (index - Ilon) / Nlon;
+    Ilat   = residual % Nlat;
+    residual = (residual - Ilat) / Nlat;
+    Idepth = residual % Ndepth;
+    residual = (residual - Idepth) / Ndepth;
+    Itime  = residual;
+
+    /*
     Ilat   =   (index - Ilon) / Nlon  %  Nlat;
     Idepth =  ((index - Ilon) / Nlon - Ilat) / Nlat  %  Ndepth;
     Itime  = (((index - Ilon) / Nlon - Ilat) / Nlat - Idepth) / Ndepth;
+    */
 
 }
