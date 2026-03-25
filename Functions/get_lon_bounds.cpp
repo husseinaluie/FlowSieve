@@ -98,7 +98,9 @@ void get_lon_bounds(
                                          cos( (padded_scale / 2.) / constants::R_earth );
                 const double numer = cos_term - sin(centre_lat) * sin(curr_lat);
                 const double denom = cos(centre_lat) * cos(curr_lat);
-                const double del_lon = acos( numer / denom );
+                const double del_lon = ( numer / denom >= 1 ) ? 0.
+                                         : ( numer / denom <= -1 ) ? M_PI
+                                         : acos( numer / denom );
 
                 dlon_N = (int) ceil(del_lon / dlon);
             }
