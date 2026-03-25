@@ -32,7 +32,7 @@ void map_grid_to_grid(
     const bool mapping_from_fine_to_coarse = 
         ( source_data.latitude.size() > target_data.latitude.size() );
 
-    // Confirm that vars are in both source and target
+    // Confirm that the vars are in both source and target
     for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {
         if ( not( source_data.variables.count( vars_to_map[Ivar] ) ) ) {
             fprintf( stderr, "Source does not contain variable %s.\n", vars_to_map[Ivar].c_str() );
@@ -74,7 +74,7 @@ void map_grid_to_grid(
     {
         max_dist = 0.;
 
-        #pragma omp for collapse(1) schedule(guided)
+        #pragma omp for collapse(1) schedule(dynamic,16)
         for ( target_index = 0; target_index < Nlatlon_target; target_index++ ) {
 
             double target_lat = target_data.latitude.at(target_index),
@@ -92,10 +92,14 @@ void map_grid_to_grid(
             for ( int II = 0; II < 1000; II++ ) {
                 size_t source_index = random_index(random_generator);
 
+                /*
                 double source_lat = source_data.latitude.at(source_index),
                        source_lon = source_data.longitude.at(source_index);
+                */
 
-                double test_dist = distance( source_lon, source_lat, target_lon, target_lat );
+                //double test_dist = distance( source_lon, source_lat, target_lon, target_lat );
+                double test_dist = source_data.distance_between_datasets( 
+                       source_index, target_index, target_data );
 
                 if ( test_dist < best_dist ) {
                     best_dist = test_dist;
@@ -110,10 +114,14 @@ void map_grid_to_grid(
                 if ( nearest_source[neighbour_index] < Nlatlon_source ) {
                     size_t source_index = nearest_source[neighbour_index];
 
+                    /*
                     double source_lat = source_data.latitude.at(source_index),
                            source_lon = source_data.longitude.at(source_index);
-
                     double test_dist = distance( source_lat, source_lat, target_lon, target_lat );
+                    */
+
+                    double test_dist = source_data.distance_between_datasets( 
+                           source_index, target_index, target_data );
 
                     if ( test_dist < best_dist ) {
                         best_dist = test_dist;
@@ -124,8 +132,13 @@ void map_grid_to_grid(
 
             // and finally loop over space
             for ( size_t source_index = 0; source_index < Nlatlon_source; source_index++ ) {
+                #ifdef NDEBUG
+                double source_lat = source_data.latitude[source_index],
+                       source_lon = source_data.longitude[source_index];
+                #else
                 double source_lat = source_data.latitude.at(source_index),
                        source_lon = source_data.longitude.at(source_index);
+                #endif
 
                 // short-circuit quickly if obviously too far
                 double lat_dist = constants::R_earth * std::fabs( source_lat - target_lat );
@@ -138,7 +151,9 @@ void map_grid_to_grid(
                 if ( lon_dist > best_dist ) { continue; }
 
                 // otherwise compute the actual distance
-                double test_dist = distance( source_lon, source_lat, target_lon, target_lat );
+                //double test_dist = distance( source_lon, source_lat, target_lon, target_lat );
+                double test_dist = source_data.distance_between_datasets( 
+                        source_index, target_index, target_data );
 
                 if ( test_dist < best_dist ) {
                     best_dist = test_dist;
