@@ -10,6 +10,7 @@
 #include <omp.h>
 #include <math.h>
 #include <numeric> // std::accumulate
+#include <time.h>
 
 #include <Eigen/Core>
 //#include <Eigen/Dense>
@@ -1045,6 +1046,197 @@ void get_vels_vort_and_div_Eigen(
 
 }
 
+void get_norms_GS(
+        long double & vel_2_err,
+        long double & vort_2_err,
+        long double & div_2_err,
+        long double & vel_2_norm,
+        long double & vort_2_norm,
+        long double & div_2_norm,
+        long double & vel_inf_err,
+        long double & vort_inf_err,
+        long double & div_inf_err,
+        long double & vel_inf_norm,
+        long double & vort_inf_norm,
+        long double & div_inf_norm,
+        long double & vort_2_ener,
+        long double & div_2_ener,
+        long double & Psi_2_norm,
+        long double & Phi_2_norm,
+        dataset * coarsened_grid
+        ) {
+
+    size_t Ipt;
+    const size_t & Npts_coarse = coarsened_grid->mask.size();
+
+    // We lose precision when summing a lot of numbers, so
+    // step into higher precision for the accumulants
+    long double total_area = 0;
+    long double vel_2_err_L = 0, vort_2_err_L = 0, div_2_err_L = 0,
+                vel_2_norm_L = 0, vort_2_norm_L = 0, div_2_norm_L = 0, vort_2_ener_L = 0,
+                div_2_ener_L = 0, Phi_2_norm_L = 0, Psi_2_norm_L = 0;
+
+    // Make some short-hand references
+    std::vector<double> &proj_uo_tor = coarsened_grid->variables.at("proj_uo_tor"),
+                        &proj_vo_tor = coarsened_grid->variables.at("proj_vo_tor"),
+                        &proj_uo_pot = coarsened_grid->variables.at("proj_uo_pot"),
+                        &proj_vo_pot = coarsened_grid->variables.at("proj_vo_pot");
+
+    std::vector<double> &u_lon = coarsened_grid->variables.at("u_lon"),
+                        &u_lat = coarsened_grid->variables.at("u_lat");
+
+    std::vector<double> &vort = coarsened_grid->variables.at("vort"),
+                        &div  = coarsened_grid->variables.at("div"),
+                        &proj_vort = coarsened_grid->variables.at("proj_vort"),
+                        &proj_div  = coarsened_grid->variables.at("proj_div");
+
+    std::vector<double> &Phi = coarsened_grid->variables.at("Phi"),
+                        &Psi = coarsened_grid->variables.at("Psi");
+
+    const long double vort_mean = get_mean( vort, coarsened_grid ),
+                      proj_vort_mean = get_mean( proj_vort, coarsened_grid );
+
+    #pragma omp parallel default(none) \
+    shared( coarsened_grid, u_lon, u_lat, vort, div, Phi, Psi, \
+        proj_uo_tor, proj_vo_tor, proj_uo_pot, proj_vo_pot, proj_vort, proj_div ) \
+    private( Ipt ) \
+    firstprivate( Npts_coarse, vort_mean, proj_vort_mean ) \
+    reduction( +:total_area,vel_2_err_L,vort_2_err_L,div_2_err_L,vel_2_norm_L,vort_2_norm_L,div_2_norm_L ) \
+    reduction( +:vort_2_ener_L,div_2_ener_L,Phi_2_norm_L,Psi_2_norm_L )\
+    reduction( max:vel_inf_err,vort_inf_err,div_inf_err,vel_inf_norm,vort_inf_norm,div_inf_norm )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+
+            long double area = coarsened_grid->areas[Ipt];
+            long double incr;
+
+            total_area += area;
+
+            // Velocity Errors
+            #ifdef NDEBUG
+            incr = sqrt(
+                       pow( proj_uo_tor[Ipt] + proj_uo_pot[Ipt] - u_lon[Ipt], 2)
+                    +  pow( proj_vo_tor[Ipt] + proj_vo_pot[Ipt] - u_lat[Ipt], 2)
+                    );
+            #else
+            incr = sqrt(
+                    pow(
+                           coarsened_grid->variables.at("proj_uo_tor").at(Ipt)
+                         + coarsened_grid->variables.at("proj_uo_pot").at(Ipt)
+                         - coarsened_grid->variables.at("u_lon").at(Ipt)
+                        , 2)
+                    +  pow(
+                           coarsened_grid->variables.at("proj_vo_tor").at(Ipt)
+                         + coarsened_grid->variables.at("proj_vo_pot").at(Ipt)
+                         - coarsened_grid->variables.at("u_lat").at(Ipt)
+                        , 2)
+                    );
+            #endif
+            vel_inf_err = std::fmax( incr, vel_inf_err );
+
+            vel_2_err_L += area * pow( incr, 2 );
+
+            // Vorticity errors
+            #ifdef NDEBUG
+            incr = std::fabs( proj_vort[Ipt] - proj_vort_mean - (vort[Ipt] - vort_mean) );
+            #else
+            incr = std::fabs(
+                  coarsened_grid->variables.at("proj_vort").at(Ipt)
+                    - coarsened_grid->variables.at("vort").at(Ipt)
+                    - ( proj_vort_mean - vort_mean )
+                    );
+            #endif
+            vort_inf_err = std::fmax( incr, vort_inf_err );
+            vort_2_err_L += area * pow( incr, 2 );
+
+            #ifdef NDEBUG
+            incr = std::fabs( proj_vort[Ipt] );
+            #else
+            incr = std::fabs( coarsened_grid->variables.at("proj_vort").at(Ipt) );
+            #endif
+            vort_2_ener_L += area * pow( incr, 2 );
+
+            // Divergence errors
+            #ifdef NDEBUG
+            incr = std::fabs( proj_div[Ipt] - div[Ipt] );
+            #else
+            incr = std::fabs(
+                      coarsened_grid->variables.at("proj_div").at(Ipt)
+                    - coarsened_grid->variables.at("div").at(Ipt)
+                    );
+            #endif
+            div_inf_err = std::fmax( incr, div_inf_err );
+            div_2_err_L += area * pow( incr, 2 );
+
+            #ifdef NDEBUG
+            incr = std::fabs( proj_div[Ipt] );
+            #else
+            incr = std::fabs( coarsened_grid->variables.at("proj_div").at(Ipt) );
+            #endif
+            div_2_ener_L += area * pow( incr, 2 );
+
+            // Reference norms
+            #ifdef NDEBUG
+            incr = sqrt( pow( u_lon[Ipt], 2) + pow( u_lat[Ipt], 2) );
+            #else
+            incr = sqrt(   pow(  coarsened_grid->variables.at("u_lon").at(Ipt), 2)
+                         + pow(  coarsened_grid->variables.at("u_lat").at(Ipt), 2)
+                    );
+            #endif
+            vel_inf_norm = std::fmax( incr, vel_inf_norm );
+            vel_2_norm_L += area * pow( incr, 2 );
+
+            #ifdef NDEBUG
+            incr = std::fabs( vort[Ipt] );
+            #else
+            incr = std::fabs( coarsened_grid->variables.at("vort").at(Ipt) );
+            #endif
+            vort_inf_norm = std::fmax( incr, vort_inf_norm );
+            vort_2_norm_L += area * pow( incr, 2 );
+
+            #ifdef NDEBUG
+            incr = std::fabs( div.at(Ipt) );
+            #else
+            incr = std::fabs( coarsened_grid->variables.at("div")[Ipt] );
+           #endif
+            div_inf_norm = std::fmax( incr, div_inf_norm );
+            div_2_norm_L += area * pow( incr, 2 );
+
+            // Psi and Phi 2 norms
+            #ifdef NDEBUG
+            incr = std::fabs( Psi[Ipt] );
+            #else
+            incr = std::fabs( coarsened_grid->variables.at("Psi").at(Ipt) );
+            #endif
+            Psi_2_norm_L += area * pow( incr, 2 );
+
+            #ifdef NDEBUG
+            incr = std::fabs( Phi.at(Ipt) );
+            #else
+            incr = std::fabs( coarsened_grid->variables.at("Phi")[Ipt] );
+            #endif
+            Phi_2_norm_L += area * pow( incr, 2 );
+        }
+    }
+
+    const long double TA_inv = 1. / total_area;
+
+    vel_2_err  = sqrt( vel_2_err_L  * TA_inv );
+    vort_2_err = sqrt( vort_2_err_L * TA_inv );
+    div_2_err  = sqrt( div_2_err_L  * TA_inv );
+
+    vort_2_ener = sqrt( vort_2_ener_L * TA_inv );
+    div_2_ener  = sqrt( div_2_ener_L  * TA_inv );
+
+    vel_2_norm  = sqrt( vel_2_norm_L  * TA_inv );
+    vort_2_norm = sqrt( vort_2_norm_L * TA_inv );
+    div_2_norm  = sqrt( div_2_norm_L  * TA_inv );
+
+    Psi_2_norm = sqrt( Psi_2_norm_L * TA_inv );
+    Phi_2_norm = sqrt( Phi_2_norm_L * TA_inv );
+}
+
 void Helmholtz_Solver_MeshGrid(
         const std::string output_fname,
         dataset & source_data,
@@ -1690,8 +1882,14 @@ void Helmholtz_Solver_MeshGrid(
                 }
 
                 #if DEBUG >= 0
-                fprintf( stdout,"  Solver cycle %'zu complete. Relative 2-norm errors of vels, vort, and div are %.2e, %.2e%s, and %.2e%s\n", 
-                        iter_cycle,
+                time_t rawtime;
+                time(&rawtime);
+                struct tm *timeinfo;
+                timeinfo = localtime(&rawtime);
+                char time_buffer[80];
+                strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+                fprintf( stdout,"  Solver cycle %'zu complete at %s. \n", iter_cycle, time_buffer );
+                fprintf( stdout,"      Relative 2-norm errors of vels, vort, and div are %.2e, %.2e%s, and %.2e%s\n", 
                         Helmholtz_data.vel_2_errors.back()  / Helmholtz_data.vel_2_norms.back(),
                         Helmholtz_data.vort_2_errors.back() / Helmholtz_data.vort_2_norms.back(), 
                         vort_stagnation_count > 0 ? "(*)" : "",
