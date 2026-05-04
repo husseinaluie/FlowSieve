@@ -38,6 +38,10 @@ void compute_coarsened_map(
     size_t coarse_index, index;
     bool is_water;
 
+    //
+    //// First, compute area of each cell
+    //
+
     std::vector<double> coarsened_areas( postprocess_fields[0]->size(), 0. );
 
     #pragma omp parallel default(none)\
