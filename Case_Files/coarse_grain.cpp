@@ -232,8 +232,8 @@ int main(int argc, char *argv[]) {
     } else {
         // Otherwise, just make a single region which is the entire domain
         source_data.region_names.push_back("full_domain");
-        source_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
-                                    "full_domain", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
+        source_data.regions.insert( std::pair< std::string, std::vector<short int> >( 
+                                    "full_domain", std::vector<short int>( source_data.Nlat * source_data.Nlon, true) ) 
                 );
         source_data.compute_region_areas();
     }

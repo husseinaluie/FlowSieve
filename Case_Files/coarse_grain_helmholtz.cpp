@@ -278,6 +278,7 @@ int main(int argc, char *argv[]) {
     // Get the MPI-local dimension sizes
     source_data.Ntime  = source_data.myCounts[0];
     source_data.Ndepth = source_data.myCounts[1];
+    source_data.initialize_index_functions();
 
     // Get mask : read in velocity to get the mask, and extend to the poles if needed
     source_data.load_variable( "sample_velocity", vel_field_var_name, vel_input_fname, true, true);
@@ -346,8 +347,8 @@ int main(int argc, char *argv[]) {
         } else {
             // Otherwise, just make a single region which is the entire domain
             mask_data.region_names.push_back("full_domain");
-            mask_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
-                        "full_domain", std::vector<bool>( mask_data.Nlat * mask_data.Nlon, true) ) 
+            mask_data.regions.insert( std::pair< std::string, std::vector<short int> >( 
+                        "full_domain", std::vector<short int>( mask_data.Nlat * mask_data.Nlon, true) ) 
                     );
         }
 
@@ -359,12 +360,12 @@ int main(int argc, char *argv[]) {
 
             // After it's extended, copy it over into source data
             source_data.region_names.push_back(reg_data.first);
-            source_data.regions.insert( std::pair< std::string, std::vector<bool> >( reg_data.first, reg_data.second ) );
+            source_data.regions.insert( std::pair< std::string, std::vector<short int> >( reg_data.first, reg_data.second ) );
         }
 
         source_data.region_names.push_back("AUTO_ALL");
-        source_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
-                    "AUTO_ALL", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
+        source_data.regions.insert( std::pair< std::string, std::vector<short int> >( 
+                    "AUTO_ALL", std::vector<short int>( source_data.Nlat * source_data.Nlon, true) ) 
                 );
 
     } else {
@@ -376,8 +377,8 @@ int main(int argc, char *argv[]) {
         } else {
             // Otherwise, just make a single region which is the entire domain
             source_data.region_names.push_back("full_domain");
-            source_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
-                        "full_domain", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
+            source_data.regions.insert( std::pair< std::string, std::vector<short int> >( 
+                        "full_domain", std::vector<short int>( source_data.Nlat * source_data.Nlon, true) ) 
                     );
         }
     }

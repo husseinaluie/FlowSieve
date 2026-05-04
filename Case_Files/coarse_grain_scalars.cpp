@@ -110,13 +110,15 @@ int main(int argc, char *argv[]) {
     // Also read in the fields to be filtered from commandline
     //   e.g. --variables "rho salinity p" (names must match with input netcdf file)
     std::vector< std::string > vars_to_filter;
-    input.getListofStrings( vars_to_filter, "--variables", asked_help );
+    input.getListofStrings( vars_to_filter, "--variables", asked_help,
+           "e.g. --variables \"rho salinity p\" (names must match with input netcdf file)" );
     size_t Nvars = vars_to_filter.size();
 
     // Allow users to define scalar products for postprocessing ( bar(a) * bar(b) )
     //   e.g. --product_pars "a,b a,c b,c" (names must match with input netcdf file)
     std::vector< std::vector< std::string > > var_products;
-    input.getListofStringPairs( var_products, "--products", asked_help );
+    input.getListofStringPairs( var_products, "--products", asked_help,
+           "e.g. --product_pars \"a,b a,c b,c\" (names must match with input netcdf file)" );
     size_t Nproducts = var_products.size();
 
     // Also read in the filter scales from the commandline
@@ -153,6 +155,9 @@ int main(int argc, char *argv[]) {
     const bool one_snapshot = (     ( (time_dim_name  == "DNE") or (time_dim_name  == "DOES_NOT_EXIST") )
                                 and ( (depth_dim_name == "DNE") or (depth_dim_name == "DOES_NOT_EXIST") )
                               );
+    if ( one_snapshot ) {
+        fprintf( stdout, "Filtering a single time/depth snapshot!\n" );
+    }
     std::vector<double> null_vector(0);
     std::vector<double*> null_ptr_vector(0);
 
@@ -181,6 +186,7 @@ int main(int argc, char *argv[]) {
     if (wRank == 0) { fprintf( stdout, "Computing cell areas.\n" ); }
     #endif
     source_data.compute_cell_areas();
+    source_data.compute_sin_cos_lat();
 
     // Read in the scalar fields to filter
     #if DEBUG >= 1
@@ -194,6 +200,7 @@ int main(int argc, char *argv[]) {
     source_data.Ntime  = one_snapshot ? 1 : source_data.myCounts[0];
     source_data.Ndepth = one_snapshot ? 1 : source_data.myCounts[1];
     const size_t Npts = source_data.Ntime * source_data.Ndepth * source_data.Nlat * source_data.Nlon;
+    source_data.initialize_index_functions();
 
     const std::vector<int>  &myStarts = source_data.myStarts;
 
@@ -213,8 +220,8 @@ int main(int argc, char *argv[]) {
         } else {
             // Otherwise, just make a single region which is the entire domain
             source_data.region_names.push_back("full_domain");
-            source_data.regions.insert( std::pair< std::string, std::vector<bool> >( 
-                        "full_domain", std::vector<bool>( source_data.Nlat * source_data.Nlon, true) ) 
+            source_data.regions.insert( std::pair< std::string, std::vector<short int> >( 
+                        "full_domain", std::vector<short int>( source_data.Nlat * source_data.Nlon, true) ) 
                     );
             source_data.compute_region_areas();
         }
@@ -419,7 +426,7 @@ int main(int argc, char *argv[]) {
 
             thread_id = omp_get_thread_num();  // thread ID
 
-            #pragma omp for collapse(1) schedule(dynamic)
+            #pragma omp for collapse(1) schedule(dynamic,2)
             for (Ilat = 0; Ilat < Nlat; Ilat++) {
                 get_lat_bounds(LAT_lb, LAT_ub, source_data.latitude,  Ilat, scale); 
 
@@ -459,7 +466,8 @@ int main(int argc, char *argv[]) {
                         for (Idepth = 0; Idepth < Ndepth; Idepth++) {
 
                             // Convert our four-index to a one-index
-                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                            //index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                            index = source_data.local_index(Itime, Idepth, Ilat, Ilon);
 
                             if ( not(constants::FILTER_OVER_LAND) and not(source_data.mask.at(index)) ) {
                                 for ( Ivar = 0; Ivar < Nvars; Ivar++ ) { 
@@ -563,7 +571,12 @@ int main(int argc, char *argv[]) {
                 starts[2] = size_t(myStarts.at(2));
                 starts[3] = size_t(myStarts.at(3));
             }
-            size_t counts[ndims] = { size_t(Ntime),          size_t(Ndepth),         size_t(Nlat),           size_t(Nlon)           };
+            size_t counts[ndims] = { size_t(Ntime), size_t(Ndepth), size_t(Nlat), size_t(Nlon) };
+
+            #if DEBUG > 0
+            fprintf( stdout, "MPI Rank %d has starts [%zu %zu %zu %zu] and counts [%zu %zu %zu %zu],\n",
+                  wRank, starts[0], starts[1], starts[2], starts[3], counts[0], counts[1], counts[2], counts[3] );
+            #endif
 
             for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
                 write_field_to_output( coarse_fields.at(Ivar), vars_to_filter.at(Ivar), starts, counts, fname, &source_data.mask );
