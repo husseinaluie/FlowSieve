@@ -50,8 +50,10 @@ void Apply_Postprocess_Routines(
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
+    #if DEBUG>=1
     fprintf( stdout, "Rank %d of %d has starts %d,%d and counts %d,%d\n",
           wRank, wSize, Stime, Sdepth, Ntime, Ndepth );
+    #endif
 
     int Ilat, Ilon, Itime, Idepth;
     size_t index, area_index;
