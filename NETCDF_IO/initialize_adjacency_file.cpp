@@ -17,7 +17,9 @@ void initialize_adjacency_file(
     MPI_Comm_rank( MPI_COMM_WORLD, &wRank );
     MPI_Comm_size( MPI_COMM_WORLD, &wSize );
 
-    assert( constants::GRID_TYPE == constants::GridType::LLC ); // No adjacency to write otherwise
+    if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+        throw std::logic_error("Tried to write adjacency matrix, but MeshGrid does not have an adjacency.");
+    }
 
     const int NeighbourPopulation = source_data.num_neighbours;
 
@@ -36,14 +38,6 @@ void initialize_adjacency_file(
     snprintf(buffer, 50, filename);
     retval = nc_create_par(buffer, FLAG, comm, MPI_INFO_NULL, &ncid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-
-    #if DEBUG>=2
-    if (wRank == 0) { fprintf(stdout, "    Logging the filter scale\n"); }
-    #endif
-    if ( filter_scale >= 0 ) {
-        retval = nc_put_att_double(ncid, NC_GLOBAL, "filter_scale", NC_DOUBLE, 1, &filter_scale);
-        if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    }
 
     retval = nc_put_att_double(ncid, NC_GLOBAL, "rho0", NC_DOUBLE, 1, &constants::rho0);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
@@ -80,14 +74,13 @@ void initialize_adjacency_file(
     #if DEBUG>=2
     if (wRank == 0) { fprintf(stdout, "    Defining the dimension variables\n"); }
     #endif
-    int lat_varid, lon_varid;
+    int lat_varid, lon_varid, dA_varid;
     retval = nc_def_var(ncid, "latitude",  NC_DOUBLE, 1, &lat_dimid,   &lat_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    retval = nc_def_var(ncid, "longitude", NC_DOUBLE, 1, &lon_dimid,   &lon_varid);
+    retval = nc_def_var(ncid, "longitude", NC_DOUBLE, 1, &lat_dimid,   &lon_varid);
     if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    //int neighbour_varid;
-    //retval = nc_def_var(ncid, "neighbour", NC_DOUBLE, 1, &neighbour_dimid,   &neighbour_varid);
-    //if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
+    retval = nc_def_var(ncid, "dA", NC_DOUBLE, 1, &lat_dimid,   &dA_varid);
+    if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
 
     if (not(constants::CARTESIAN)) {
         #if DEBUG>=2

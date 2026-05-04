@@ -78,7 +78,7 @@ void initialize_output_file(
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
         retval = nc_def_dim(ncid, "longitude", Nlon,      &lon_dimid);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    } else if ( GridType == constants::GridType::LLC ) {
+    } else {
         retval = nc_def_dim(ncid, "latlon",  Nlat,      &lat_dimid);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
         lon_dimid = lat_dimid;
@@ -175,7 +175,7 @@ void initialize_output_file(
         for (size_t varInd = 0; varInd < vars.size(); ++varInd) {
             if ( GridType == constants::GridType::MeshGrid ) {
                 add_var_to_file( vars.at(varInd), dim_names_MeshGrid, ndims_MeshGrid, filename );
-            } else if ( GridType == constants::GridType::LLC ) {
+            } else {
                 add_var_to_file( vars.at(varInd), dim_names_LLC, ndims_LLC, filename );
             }
         }
