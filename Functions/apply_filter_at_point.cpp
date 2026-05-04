@@ -80,7 +80,6 @@ void apply_filter_at_point(
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
         // Handle periodicity if necessary
-        //if (constants::PERIODIC_Y) { curr_lat = ( LAT % Nlat + Nlat ) % Nlat; }
         if (constants::PERIODIC_Y) { curr_lat = apply_periodicity(LAT, Nlat); }
         else                       { curr_lat = LAT; }
         lat_at_curr = latitude.at(curr_lat);
@@ -89,11 +88,9 @@ void apply_filter_at_point(
         for (int LON = LON_lb; LON < LON_ub; LON++ ) {
 
             // Handle periodicity if necessary
-            //if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
             if (constants::PERIODIC_X) { curr_lon = apply_periodicity(LON, Nlon); }
             else                       { curr_lon = LON; }
 
-            //index = Index(Itime, Idepth, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
             index = source_data.local_index( Itime, Idepth, curr_lat, curr_lon );
 
             if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X) ) {
@@ -101,24 +98,22 @@ void apply_filter_at_point(
                 //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
                 //const int shifted_lon = ( (LON - Ilon) % Nlon + Nlon ) % Nlon;
                 const int shifted_lon = apply_periodicity( curr_lon - Ilon, Nlon );
-                //kernel_index = Index(0, 0, curr_lat, shifted_lon, Ntime, Ndepth, Nlat, Nlon);
                 kernel_index = source_data.local_index(0, 0, curr_lat, shifted_lon);
             } else {
-                //kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
                 kernel_index = source_data.local_index(0, 0, curr_lat, curr_lon);
             }
-            #if DEBUG >= 1
-            kern = local_kernel.at(kernel_index);
-            if (do_dl) { dl_kern  = local_dl_kernel.at(kernel_index); }
-            if (do_dll) { dll_kern = local_dll_kernel.at(kernel_index); }
-            area = dAreas.at(kernel_index);
-            bool is_water = mask.at(index);
-            #else
+            #ifdef NDEBUG
             kern = local_kernel[kernel_index];
-            if (do_dl) { dl_kern  = local_dl_kernel[kernel_index]; }
+            if (do_dl)  { dl_kern  = local_dl_kernel[kernel_index]; }
             if (do_dll) { dll_kern = local_dll_kernel[kernel_index]; }
             area = dAreas[kernel_index];
             bool is_water = mask[index];
+            #else
+            kern = local_kernel.at(kernel_index);
+            if (do_dl)  { dl_kern  = local_dl_kernel.at(kernel_index); }
+            if (do_dll) { dll_kern = local_dll_kernel.at(kernel_index); }
+            area = dAreas.at(kernel_index);
+            bool is_water = mask.at(index);
             #endif
             loc_weight = kern * area;
 
@@ -134,16 +129,16 @@ void apply_filter_at_point(
             // If we are not using the mask, or if we are on a water cell, include the value in the numerator
             if ( is_water ) {
                 for (size_t II = 0; II < Nfields; ++II) {
-                    #if DEBUG >= 1
+                    #ifdef NDEBUG
+                    loc_val = (*fields[II])[index];
+                    tmp_vals[II]     += loc_val * loc_weight;
+                    if (do_dl) { tmp_dl_vals[II]  += loc_val * dl_kern * area; }
+                    if (do_dl) { tmp_dll_vals[II] += loc_val * dll_kern * area; }
+                    #else
                     loc_val = fields.at(II)->at(index);
                     tmp_vals.at(II)     += loc_val * loc_weight;
                     if (do_dl) { tmp_dl_vals.at(II)  += loc_val * dl_kern * area; }
                     if (do_dl) { tmp_dll_vals.at(II) += loc_val * dll_kern * area; }
-                    #else
-                    loc_val = fields[II]->at(index);
-                    tmp_vals[II]     += loc_val * loc_weight;
-                    if (do_dl) { tmp_dl_vals[II]  += loc_val * dl_kern * area; }
-                    if (do_dl) { tmp_dll_vals[II] += loc_val * dll_kern * area; }
                     #endif
                 }
             }

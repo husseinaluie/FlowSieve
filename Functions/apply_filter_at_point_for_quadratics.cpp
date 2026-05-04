@@ -92,7 +92,7 @@ void apply_filter_at_point_for_quadratics(
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
         // Handle periodicity if necessary
-        if (constants::PERIODIC_Y) { curr_lat = ( LAT % Nlat + Nlat ) % Nlat; }
+        if (constants::PERIODIC_Y) { curr_lat = apply_periodicity(LAT, Nlat); }
         else                       { curr_lat = LAT; }
         lat_at_curr = latitude.at(curr_lat);
 
@@ -101,26 +101,27 @@ void apply_filter_at_point_for_quadratics(
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
             // Handle periodicity if necessary
-            if (constants::PERIODIC_X) { curr_lon = ( LON % Nlon + Nlon ) % Nlon; }
+            if (constants::PERIODIC_X) { curr_lon = apply_periodicity(LON, Nlon); }
             else                       { curr_lon = LON; }
 
-            index = Index(Itime, Idepth, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
+            index = source_data.local_index( Itime, Idepth, curr_lat, curr_lon );
 
             if ( (constants::UNIFORM_LON_GRID) and (constants::FULL_LON_SPAN) and (constants::PERIODIC_X ) ) {
                 // In this case, we can re-use the kernel from a previous Ilon value by just shifting our indices
                 //  This cuts back on the most computation-heavy part of the code (computing kernels / distances)
-                kernel_index = Index(0, 0, curr_lat, ( (LON - Ilon) % Nlon + Nlon ) % Nlon, Ntime, Ndepth, Nlat, Nlon);
+                const int shifted_lon = apply_periodicity( curr_lon - Ilon, Nlon );
+                kernel_index = source_data.local_index(0, 0, curr_lat, shifted_lon);
             } else {
-                kernel_index = Index(0, 0, curr_lat, curr_lon, Ntime, Ndepth, Nlat, Nlon);
+                kernel_index = source_data.local_index(0, 0, curr_lat, curr_lon);
             }
-            #if DEBUG >= 1
-            kern = local_kernel.at(kernel_index);
-            area = dAreas.at(kernel_index);
-            bool is_water = mask.at(index);
-            #else
+            #ifdef NDEBUG
             kern = local_kernel[kernel_index];
             area = dAreas[kernel_index];
             bool is_water = mask[index];
+            #else
+            kern = local_kernel.at(kernel_index);
+            area = dAreas.at(kernel_index);
+            bool is_water = mask.at(index);
             #endif
             local_weight = kern * area;
 
@@ -130,28 +131,32 @@ void apply_filter_at_point_for_quadratics(
 
             // If the cell is water, add to the numerator
             if ( is_water ) {
-                #if DEBUG >= 1
-                u_x_loc     = u_x.at(index);
-                u_y_loc     = u_y.at(index);
-                u_z_loc     = u_z.at(index);
-                vort_r_loc  = vort_r.at(index);
-                #else
+                #ifdef NDEBUG
                 u_x_loc     = u_x[index];
                 u_y_loc     = u_y[index];
                 u_z_loc     = u_z[index];
                 vort_r_loc  = vort_r[index];
+                #else
+                u_x_loc     = u_x.at(index);
+                u_y_loc     = u_y.at(index);
+                u_z_loc     = u_z.at(index);
+                vort_r_loc  = vort_r.at(index);
                 #endif
 
-                uxux_tmp += u_x_loc * u_x_loc * local_weight;
-                uxuy_tmp += u_x_loc * u_y_loc * local_weight;
-                uxuz_tmp += u_x_loc * u_z_loc * local_weight;
-                uyuy_tmp += u_y_loc * u_y_loc * local_weight;
-                uyuz_tmp += u_y_loc * u_z_loc * local_weight;
-                uzuz_tmp += u_z_loc * u_z_loc * local_weight;
+                double x_weight = u_x_loc * local_weight;
+                double y_weight = u_y_loc * local_weight;
+                double z_weight = u_z_loc * local_weight;
 
-                vort_ux_tmp += vort_r_loc * u_x_loc * local_weight;
-                vort_uy_tmp += vort_r_loc * u_y_loc * local_weight;
-                vort_uz_tmp += vort_r_loc * u_z_loc * local_weight;
+                uxux_tmp += u_x_loc * x_weight;
+                uxuy_tmp += u_x_loc * y_weight;
+                uxuz_tmp += u_x_loc * z_weight;
+                uyuy_tmp += u_y_loc * y_weight;
+                uyuz_tmp += u_y_loc * z_weight;
+                uzuz_tmp += u_z_loc * z_weight;
+
+                vort_ux_tmp += vort_r_loc * x_weight;
+                vort_uy_tmp += vort_r_loc * y_weight;
+                vort_uz_tmp += vort_r_loc * z_weight;
             }
         }
     }
