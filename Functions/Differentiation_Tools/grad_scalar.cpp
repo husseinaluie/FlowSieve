@@ -46,8 +46,7 @@ void grad_scalar(
 
             int Itime, Idepth, Ilat, Ilon;
             if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
-                Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                                 Ntime, Ndepth, Nlat, Nlon);
+                source_data.index1to4_local(index, Itime, Idepth, Ilat, Ilon);
 
                 spher_derivative_at_point(
                         lon_deriv_vals, deriv_fields, longitude, "lon", source_data,
@@ -77,8 +76,14 @@ void grad_scalar(
                 bool is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 1e-10;
                 double cos_lat = cos(local_lat);
 
-                tmp_lon = is_pole ? 0. : dFdlon / (constants::R_earth * cos_lat);
-                tmp_lat = is_pole ? 0. : dFdlat /  constants::R_earth;
+                if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
+                    tmp_lon = is_pole ? 0. : dFdlon / (constants::R_earth * cos_lat);
+                    tmp_lat = is_pole ? 0. : dFdlat /  constants::R_earth;
+                } else {
+                    // non-mesh grids have the R_earth baked in
+                    tmp_lon = is_pole ? 0. : dFdlon / cos_lat;
+                    tmp_lat = is_pole ? 0. : dFdlat;
+                }
             }
             vel_lon.at(index) = tmp_lon;
             vel_lat.at(index) = tmp_lat;

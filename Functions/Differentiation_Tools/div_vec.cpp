@@ -43,8 +43,7 @@ void div_vec(
             int Itime, Idepth, Ilat, Ilon;
 
             if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
-                Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                                 Ntime, Ndepth, Nlat, Nlon);
+                source_data.index1to4_local(index, Itime, Idepth, Ilat, Ilon);
             }
 
             // check if we're too close to the pole
@@ -76,8 +75,7 @@ void div_vec(
             int Itime, Idepth, Ilat, Ilon;
 
             if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
-                Index1to4(index, Itime, Idepth, Ilat, Ilon,
-                                 Ntime, Ndepth, Nlat, Nlon);
+                source_data.index1to4_local(index, Itime, Idepth, Ilat, Ilon);
 
                 spher_derivative_at_point(
                         lon_deriv_vals, deriv_fields, longitude, "lon",
@@ -103,7 +101,12 @@ void div_vec(
 
             // ret = ddlon(vel_lat) / cos_lat - ddlat( u_lon * cos_lat ) / cos_lat
             double tmp = dulon_dlon + dulatcoslat_dlat;
-            tmp *= 1. / ( cos(local_lat) * constants::R_earth );
+            if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
+                tmp *= 1. / ( cos(local_lat) * constants::R_earth );
+            } else {
+                // non-mesh grids have the R_earth baked in
+                tmp *= 1. / cos(local_lat);
+            }
 
             out_arr.at(index) = tmp;
 
