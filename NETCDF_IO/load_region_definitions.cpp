@@ -99,7 +99,7 @@ void dataset::load_region_definitions(
         retval = nc_get_vara_double(ncid, var_id, start, count, &var_buffer[0]);
         if (retval != NC_NOERR ) { NC_ERR(retval, __LINE__, __FILE__); }
 
-        regions.insert( std::pair< std::string, std::vector<bool> >( region_name, std::vector<bool>( var_buffer.size() ) ) );
+        regions.insert( std::pair< std::string, std::vector<short int> >( region_name, std::vector<short int>( var_buffer.size() ) ) );
         for (size_t II = 0; II < var_buffer.size(); ++II) {
             regions.at( region_name ).at( II ) = var_buffer.at( II ) == 1 ? true : false;
         }
