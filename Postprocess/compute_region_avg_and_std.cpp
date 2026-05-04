@@ -62,13 +62,13 @@ void compute_region_avg_and_std(
     firstprivate( Nlon, Nlat, Ndepth, Ntime, num_regions, num_fields ) \
     reduction(vec_long_double_plus : field_integrals)
     { 
-        #pragma omp for collapse(5) schedule(guided)
+        #pragma omp for collapse(5) schedule(dynamic)
         for (Iregion = 0; Iregion < num_regions; ++Iregion) {
             for (Itime = 0; Itime < Ntime; ++Itime) {
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                         for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                            index = source_data.local_index(Itime, Idepth, Ilat, Ilon);
 
                             if ( constants::FILTER_OVER_LAND or source_data.mask.at(index) ) { // Skip land areas
 
@@ -110,6 +110,7 @@ void compute_region_avg_and_std(
             }
         }
     }
+
     #pragma omp parallel default(none) \
     private( int_index, Ifield ) \
     shared( field_integrals, field_averages ) \
@@ -161,7 +162,7 @@ void compute_region_avg_and_std(
                 for (Idepth = 0; Idepth < Ndepth; ++Idepth) {
                     for (Ilat = 0; Ilat < Nlat; ++Ilat) {
                         for (Ilon = 0; Ilon < Nlon; ++Ilon) {
-                            index = Index(Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon);
+                            index = source_data.local_index(Itime, Idepth, Ilat, Ilon);
 
                             if ( constants::FILTER_OVER_LAND or source_data.mask.at(index) ) { // Skip land areas
 
