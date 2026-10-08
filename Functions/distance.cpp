@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <math.h>    
 #include "../constants.hpp"
+#include "../functions.hpp"
 
 
 double arccos_approx( const double arg ) {
@@ -173,8 +174,8 @@ double distance(
         } else {
             // If desired, use the more expensive distance calculator
             long double numer, denom;
-            numer =   pow(                                    cos_lat2 * sin(Delta_lon), 2 ) 
-                    + pow( cos_lat1 * sin_lat2  -  sin_lat1 * cos_lat2 * cos_Delta_lon , 2 );
+            numer =   my_pow<2>(                                    cos_lat2 * sin(Delta_lon)) 
+                    + my_pow<2>( cos_lat1 * sin_lat2  -  sin_lat1 * cos_lat2 * cos_Delta_lon );
             numer =  sqrt(numer);
 
             denom =        sin_lat1 * sin_lat2  +  cos_lat1 * cos_lat2 * cos_Delta_lon ;
