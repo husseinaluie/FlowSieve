@@ -71,7 +71,7 @@ void write_HelmholtzScalar_output(
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
         retval = nc_def_dim(ncid, "longitude", Nlon,      &lon_dimid);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    } else if ( GridType == constants::GridType::LLC ) {
+    } else { //( GridType == constants::GridType::LLC ) {
         retval = nc_def_dim(ncid, "latlon",  Nlat,      &lat_dimid);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
         lon_dimid = lat_dimid;
@@ -149,7 +149,7 @@ void write_HelmholtzScalar_output(
         area_count[1] = Nlon;
         retval = nc_put_vara_double(ncid, area_varid, area_start, area_count, &areas[0]);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    } else if ( GridType == constants::GridType::LLC ) {
+    } else { //( GridType == constants::GridType::LLC ) {
         #if DEBUG>=2
         if (wRank == 0) { fprintf(stdout, "    Write the cell areas\n"); }
         #endif
@@ -185,7 +185,7 @@ void write_HelmholtzScalar_output(
         for (size_t varInd = 0; varInd < vars.size(); ++varInd) {
             if ( GridType == constants::GridType::MeshGrid ) {
                 add_var_to_file( vars.at(varInd), dim_names_MeshGrid, ndims_MeshGrid, filename );
-            } else if ( GridType == constants::GridType::LLC ) {
+            } else { //( GridType == constants::GridType::LLC ) {
                 add_var_to_file( vars.at(varInd), dim_names_LLC, ndims_LLC, filename );
             }
         }

@@ -9,7 +9,8 @@ void add_var_to_file(
         const std::string var_name,
         const char ** dim_list,
         const int num_dims,
-        const std::string filename
+        const std::string filename,
+        const int datatype
         ) {
 
     static_assert( 
@@ -19,10 +20,12 @@ void add_var_to_file(
                    "Cannot cast to both single and int. Update cast flags in constants.hpp\n"
                  );
 
+    /*
     int datatype;
     if      (constants::CAST_TO_SINGLE) { datatype = NC_FLOAT;  }
     else if (constants::CAST_TO_INT   ) { datatype = NC_SHORT;  }
     else                                { datatype = NC_DOUBLE; }
+    */
 
     // Open the NETCDF file
     int FLAG = NC_WRITE;
@@ -52,9 +55,9 @@ void add_var_to_file(
     const double fill_value = constants::fill_value;
     const double fill_value_double = constants::fill_value_double;
     const signed short fill_value_s = constants::fill_value_s;
-    if (constants::CAST_TO_INT) {
+    if (datatype == NC_SHORT) {
         retval = nc_put_att_short( ncid, var_id, "_FillValue", datatype, 1, &fill_value_s);
-    } else if (constants::CAST_TO_SINGLE) {
+    } else if (datatype == NC_FLOAT) {
         retval = nc_put_att_double(ncid, var_id, "_FillValue", datatype, 1, &fill_value);
     } else {
         retval = nc_put_att_double(ncid, var_id, "_FillValue", datatype, 1, &fill_value_double);

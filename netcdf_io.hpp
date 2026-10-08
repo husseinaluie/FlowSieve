@@ -202,6 +202,15 @@ void write_field_to_output(
         MPI_Comm = MPI_COMM_WORLD
         );
 
+void write_mask_to_output(
+        const std::vector<short int> & field, 
+        const std::string & field_name,
+        const size_t * start, 
+        const size_t * count,
+        const std::string & filename,
+        MPI_Comm = MPI_COMM_WORLD
+        );
+
 
 void write_integral_to_post(
         const std::vector<
@@ -312,7 +321,10 @@ void add_var_to_file(
         const std::string var_name,
         const char ** dim_list,
         const int num_dims,
-        const std::string filename
+        const std::string filename,
+        const int datatype = (constants::CAST_TO_SINGLE) ? NC_FLOAT :
+                             (constants::CAST_TO_INT   ) ? NC_SHORT :
+                             NC_DOUBLE
         );
 
 

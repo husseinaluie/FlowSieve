@@ -71,7 +71,7 @@ void write_Helmholtz_output(
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
         retval = nc_def_dim(ncid, "longitude", Nlon,      &lon_dimid);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    } else if ( GridType == constants::GridType::LLC ) {
+    } else { //( GridType == constants::GridType::LLC ) {
         retval = nc_def_dim(ncid, "latlon",  Nlat,      &lat_dimid);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
         lon_dimid = lat_dimid;
@@ -149,7 +149,7 @@ void write_Helmholtz_output(
         area_count[1] = Nlon;
         retval = nc_put_vara_double(ncid, area_varid, area_start, area_count, &areas[0]);
         if (retval) { NC_ERR(retval, __LINE__, __FILE__); }
-    } else if ( GridType == constants::GridType::LLC ) {
+    } else { //( GridType == constants::GridType::LLC ) {
         #if DEBUG>=2
         if (wRank == 0) { fprintf(stdout, "    Write the cell areas\n"); }
         #endif
@@ -177,7 +177,8 @@ void write_Helmholtz_output(
     std::vector<std::string> vars = {"uo", "vo", "Psi", "Phi", "projected_uo", "projected_vo", 
                     "projected_uo_tor", "projected_uo_pot", "projected_vo_tor", "projected_vo_pot",
                     "vorticity", "divergence", "projected_vorticity", "projected_divergence",
-                    "vort_of_proj_vel", "div_of_proj_vel"
+                    "vort_of_pot_vel", "div_of_tor_vel"
+                   // "vort_of_proj_vel", "div_of_proj_vel"
     };
     if (wRank == 0) {
         // Loop through and add the desired variables
@@ -189,9 +190,16 @@ void write_Helmholtz_output(
         for (size_t varInd = 0; varInd < vars.size(); ++varInd) {
             if ( GridType == constants::GridType::MeshGrid ) {
                 add_var_to_file( vars.at(varInd), dim_names_MeshGrid, ndims_MeshGrid, filename );
-            } else if ( GridType == constants::GridType::LLC ) {
+            } else { //( GridType == constants::GridType::LLC ) {
                 add_var_to_file( vars.at(varInd), dim_names_LLC, ndims_LLC, filename );
             }
+        }
+
+        // add the land mask
+        if ( GridType == constants::GridType::MeshGrid ) {
+            add_var_to_file( "mask", dim_names_MeshGrid, ndims_MeshGrid, filename, NC_SHORT );
+        } else { //( GridType == constants::GridType::LLC ) {
+            add_var_to_file( "mask", dim_names_LLC, ndims_LLC, filename, NC_SHORT );
         }
     }
 
@@ -213,8 +221,10 @@ void write_Helmholtz_output(
     write_field_to_output( source_data.variables.at("u_lon"), "uo", starts, counts, filename, &source_data.mask);
     write_field_to_output( source_data.variables.at("u_lat"), "vo", starts, counts, filename, &source_data.mask);
 
-    write_field_to_output( source_data.variables.at("vort"), "vorticity", starts, counts, filename, &source_data.mask);
-    write_field_to_output( source_data.variables.at("div"), "divergence", starts, counts, filename, &source_data.mask);
+    //write_field_to_output( source_data.variables.at("vort"), "vorticity", starts, counts, filename, &source_data.mask);
+    //write_field_to_output( source_data.variables.at("div"), "divergence", starts, counts, filename, &source_data.mask);
+    write_field_to_output( source_data.variables.at("vort"), "vorticity", starts, counts, filename );
+    write_field_to_output( source_data.variables.at("div"), "divergence", starts, counts, filename );
 
     write_field_to_output( solution_data.variables.at("Psi"), "Psi", starts, counts, filename );
     write_field_to_output( solution_data.variables.at("Phi"), "Phi", starts, counts, filename );
@@ -230,8 +240,10 @@ void write_Helmholtz_output(
     write_field_to_output( source_data.variables.at("projected_vort"), "projected_vorticity", starts, counts, filename );
     write_field_to_output( source_data.variables.at("projected_div" ), "projected_divergence",  starts, counts, filename );
 
-    write_field_to_output( source_data.variables.at("proj_vort"), "vort_of_proj_vel", starts, counts, filename );
-    write_field_to_output( source_data.variables.at("proj_div" ), "div_of_proj_vel",  starts, counts, filename );
+    write_field_to_output( source_data.variables.at("proj_vort_of_pot"), "vort_of_pot_vel", starts, counts, filename );
+    write_field_to_output( source_data.variables.at("proj_div_of_tor" ), "div_of_tor_vel",  starts, counts, filename );
+
+    write_mask_to_output( source_data.mask, "mask",  starts, counts, filename );
 
 
     //
