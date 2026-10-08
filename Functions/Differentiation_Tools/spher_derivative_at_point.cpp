@@ -56,24 +56,9 @@ void spher_derivative_at_point(
         for (int ii = 0; ii < num_deriv; ii++) {
             if (deriv_vals.at(ii) == NULL) { continue; }
             long double deriv_val = 0.;
-            for ( size_t II = 0; II < source_data.num_neighbours+1; II++ ) {
-                #if DEBUG >= 1
-                if (do_lat) {
-                    if (order_of_deriv == 1) {
-                        weight = source_data.adjacency_ddlat_weights.at(index).at(II);
-                    } else {
-                        weight = source_data.adjacency_d2dlat2_weights.at(index).at(II);
-                    }
-                } else {
-                    if (order_of_deriv == 1) {
-                        weight = source_data.adjacency_ddlon_weights.at(index).at(II);
-                    } else {
-                        weight = source_data.adjacency_d2dlon2_weights.at(index).at(II);
-                    }
-                }
-                val_ind = source_data.adjacency_indices.at(index).at(II);
-                val = fields[ii]->at( val_ind );
-                #else
+            for ( size_t II = 0; II < source_data.num_neighbours; II++ ) {
+                #ifdef NDEBUG
+                /*
                 if (do_lat) {
                     if (order_of_deriv == 1) {
                         weight = source_data.adjacency_ddlat_weights[index][II];
@@ -87,8 +72,33 @@ void spher_derivative_at_point(
                         weight = source_data.adjacency_d2dlon2_weights[index][II];
                     }
                 }
+                */
+                //if (do_lat) { weight = source_data.adjacency_ddlat_weights[index][II]; }
+                //else {        weight = source_data.adjacency_ddlon_weights[index][II]; }
+                if (do_lat) { weight = source_data.grad_weights_lat[index][II]; }
+                else {        weight = source_data.grad_weights_lon[index][II]; }
                 val_ind = source_data.adjacency_indices[index][II];
                 val = (*fields[ii])[ val_ind ];
+                #else
+                /*
+                if (do_lat) {
+                    if (order_of_deriv == 1) {
+                        weight = source_data.adjacency_ddlat_weights.at(index).at(II);
+                    } else {
+                        weight = source_data.adjacency_d2dlat2_weights.at(index).at(II);
+                    }
+                } else {
+                    if (order_of_deriv == 1) {
+                        weight = source_data.adjacency_ddlon_weights.at(index).at(II);
+                    } else {
+                        weight = source_data.adjacency_d2dlon2_weights.at(index).at(II);
+                    }
+                }
+                */
+                if (do_lat) { weight = source_data.grad_weights_lat.at(index).at(II); }
+                else {        weight = source_data.grad_weights_lon.at(index).at(II); }
+                val_ind = source_data.adjacency_indices.at(index).at(II);
+                val = fields[ii]->at( val_ind );
                 #endif
                 deriv_val += val * weight;
             }
@@ -121,10 +131,39 @@ void spher_derivative_at_point(
 
         // Check if the next point would be land
         int ub = ( ( Iref + 1 ) % Nref + Nref ) % Nref;
-        size_t R_index = Index( Itime, do_dep ? lb : Idepth, do_lat ? lb : Ilat, do_lon ? lb : Ilon,
+        size_t R_index = Index( Itime, do_dep ? ub : Idepth, do_lat ? ub : Ilat, do_lon ? ub : Ilon,
                                 Ntime, Ndepth,               Nlat,               Nlon );
 
         double ldist = 1e15, rdist = 1e15;
+
+        // If lon and uniform periodic, just make it simple
+        if ( do_lon and ( constants::UNIFORM_LON_GRID ) and (constants::PERIODIC_X) ) {
+            rdist = grid[1] - grid[0];
+            for (int ii = 0; ii < num_deriv; ii++) {
+                if (deriv_vals.at(ii) != NULL) {
+                    *(deriv_vals.at(ii)) = ( (*fields[ii])[R_index] - (*fields[ii])[index] ) / rdist;
+                }
+            }
+            return;
+        }
+
+        // If lat and uniform, just make it simple
+        if ( do_lat and ( constants::UNIFORM_LAT_GRID ) ) {
+            rdist = grid[1] - grid[0];
+            size_t UB = R_index, LB = index;
+            if (Iref == Nref - 1) {
+                UB = index;
+                LB = L_index;
+            }
+            for (int ii = 0; ii < num_deriv; ii++) {
+                if (deriv_vals.at(ii) != NULL) {
+                    *(deriv_vals.at(ii)) = ( (*fields[ii])[UB] - (*fields[ii])[LB] ) / rdist;
+                }
+            }
+            return;
+        }
+
+
         if ( ( do_lon 
                     or 
                ( (do_lat or do_dep) and (Iref > 0 ) ) 
@@ -147,21 +186,21 @@ void spher_derivative_at_point(
 
         for (int ii = 0; ii < num_deriv; ii++) {
             if (deriv_vals.at(ii) != NULL) {
-                #if DEBUG >= 1
-                if ( (ldist == 1e15) and (rdist == 1e15) ) {
-                    *(deriv_vals.at(ii)) = 0.;
-                } else if ( rdist < ldist ) {
-                    *(deriv_vals.at(ii)) = ( fields[ii]->at(R_index) - fields[ii]->at(  index) ) / rdist;
-                } else {
-                    *(deriv_vals.at(ii)) = ( fields[ii]->at(  index) - fields[ii]->at(L_index) ) / ldist;
-                }
-                #else
+                #ifdef NDEBUG
                 if ( (ldist == 1e15) and (rdist == 1e15) ) {
                     *(deriv_vals.at(ii)) = 0.;
                 } else if ( rdist < ldist ) {
                     *(deriv_vals.at(ii)) = ( (*fields[ii])[R_index] - (*fields[ii])[  index] ) / rdist;
                 } else {
                     *(deriv_vals.at(ii)) = ( (*fields[ii])[  index] - (*fields[ii])[L_index] ) / ldist;
+                }
+                #else
+                if ( (ldist == 1e15) and (rdist == 1e15) ) {
+                    *(deriv_vals.at(ii)) = 0.;
+                } else if ( rdist < ldist ) {
+                    *(deriv_vals.at(ii)) = ( fields[ii]->at(R_index) - fields[ii]->at(  index) ) / rdist;
+                } else {
+                    *(deriv_vals.at(ii)) = ( fields[ii]->at(  index) - fields[ii]->at(L_index) ) / ldist;
                 }
                 #endif
             }
@@ -198,8 +237,9 @@ void spher_derivative_at_point(
        
         // Check if the next point would be land
         lb = ( ( LB - 1 ) % Nref + Nref ) % Nref;
-        index = Index( Itime, do_dep ? lb : Idepth, do_lat ? lb : Ilat, do_lon ? lb : Ilon,
-                       Ntime, Ndepth,               Nlat,               Nlon );
+        index = source_data.local_index( Itime, do_dep ? lb : Idepth, do_lat ? lb : Ilat, do_lon ? lb : Ilon );
+        //index = Index( Itime, do_dep ? lb : Idepth, do_lat ? lb : Ilat, do_lon ? lb : Ilon,
+        //               Ntime, Ndepth,               Nlat,               Nlon );
         
 
         #if DEBUG >= 1
@@ -219,8 +259,9 @@ void spher_derivative_at_point(
        
         // Check if the next point would be land
         ub = ( ( UB + 1 ) % Nref + Nref ) % Nref;
-        index = Index( Itime, do_dep ? ub : Idepth, do_lat ? ub : Ilat, do_lon ? ub : Ilon,
-                       Ntime, Ndepth,               Nlat,               Nlon );
+        index = source_data.local_index( Itime, do_dep ? ub : Idepth, do_lat ? ub : Ilat, do_lon ? ub : Ilon);
+        //index = Index( Itime, do_dep ? ub : Idepth, do_lat ? ub : Ilat, do_lon ? ub : Ilon,
+        //               Ntime, Ndepth,               Nlat,               Nlon );
 
         #if DEBUG >= 1
         if ( mask.at(index) )   { UB++;  }  // If next point is still water, extend stencil over it
@@ -269,8 +310,13 @@ void spher_derivative_at_point(
             //   (has no effect for non-periodic, since then LB >= 0 and UB < Nref)
             ind = ( IND % Nref + Nref ) % Nref;
 
-            index = Index( Itime, do_dep ? ind : Idepth, do_lat ? ind : Ilat, do_lon ? ind : Ilon,
-                           Ntime, Ndepth,                Nlat,                Nlon );
+            index = source_data.local_index(    Itime, 
+                                                do_dep ? ind : Idepth, 
+                                                do_lat ? ind : Ilat, 
+                                                do_lon ? ind : Ilon
+                                           );
+            //index = Index( Itime, do_dep ? ind : Idepth, do_lat ? ind : Ilat, do_lon ? ind : Ilon,
+            //               Ntime, Ndepth,                Nlat,                Nlon );
 
             for (int ii = 0; ii < num_deriv; ii++) {
                 if (deriv_vals.at(ii) != NULL) {

@@ -10,7 +10,7 @@
 #include "../../netcdf_io.hpp"
 #include "../../constants.hpp"
 #include "../../postprocess.hpp"
-#include "../../preprocess.hpp"
+#include "../../differentiation_tools.hpp"
 
 /*!
  * \brief Main filtering driver for Helmholtz decomposed data
@@ -169,6 +169,19 @@ void filtering_helmholtz(
         spec_slope_tor( num_pts, 0. ),
         spec_slope_pot( num_pts, 0. ),
 
+        u_spectrum_tot_HighPass( num_pts, 0. ),
+        v_spectrum_tot_HighPass( num_pts, 0. ),
+
+        u_spectrum_tor_HighPass( num_pts, 0. ),
+        v_spectrum_tor_HighPass( num_pts, 0. ),
+
+        u_spectrum_pot_HighPass( num_pts, 0. ),
+        v_spectrum_pot_HighPass( num_pts, 0. ),
+
+        spec_slope_tot_HighPass( num_pts, 0. ),
+        spec_slope_tor_HighPass( num_pts, 0. ),
+        spec_slope_pot_HighPass( num_pts, 0. ),
+
 
         // Energy transport
         div_J_tor( num_pts, 0. ),
@@ -264,12 +277,20 @@ void filtering_helmholtz(
         u_lon_pot( num_pts, 0. ),
         u_lon_tot( num_pts, 0. ),
 
+        u_lon_tor_unfilt( num_pts, 0. ),
+        u_lon_pot_unfilt( num_pts, 0. ),
+        u_lon_tot_unfilt( num_pts, 0. ),
+
         // Spherical - meridional velocities
         u_lat_tor( num_pts, 0. ),
         u_lat_pot( num_pts, 0. ),
         u_lat_tot( num_pts, 0. ),
 
-        // Spherical - dyadix products
+        u_lat_tor_unfilt( num_pts, 0. ),
+        u_lat_pot_unfilt( num_pts, 0. ),
+        u_lat_tot_unfilt( num_pts, 0. ),
+
+        // Spherical - dyadic products
         ulon_ulon( num_pts, 0. ),
         ulon_ulat( num_pts, 0. ),
         ulat_ulat( num_pts, 0. ),
@@ -339,8 +360,10 @@ void filtering_helmholtz(
     #endif
     // Get pot and tor velocities
     if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-    toroidal_vel_from_F(  u_lon_tor, u_lat_tor, F_toroidal,  source_data, mask );
-    potential_vel_from_F( u_lon_pot, u_lat_pot, F_potential, source_data, mask );
+    //toroidal_vel_from_F(  u_lon_tor, u_lat_tor, F_toroidal,  source_data, mask );
+    //potential_vel_from_F( u_lon_pot, u_lat_pot, F_potential, source_data, mask );
+    perp_grad_scalar( u_lon_tor_unfilt, u_lat_tor_unfilt, F_toroidal,  source_data, mask );
+    grad_scalar(      u_lon_pot_unfilt, u_lat_pot_unfilt, F_potential, source_data, mask );
     if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute velocities from F"); }
 
     #if DEBUG >= 2
@@ -349,23 +372,25 @@ void filtering_helmholtz(
     if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
     #pragma omp parallel \
     default( none ) \
-    shared( KE_tor_orig, KE_pot_orig, KE_tot_orig, mask, \
-            u_r, u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot, u_lon_tot, u_lat_tot) \
+    shared( KE_tor_orig, KE_pot_orig, KE_tot_orig, mask, u_r, \
+            u_lon_tor_unfilt, u_lat_tor_unfilt, \
+            u_lon_pot_unfilt, u_lat_pot_unfilt, \
+            u_lon_tot_unfilt, u_lat_tot_unfilt) \
     private( index )
     {
         #pragma omp for collapse(1) schedule(guided)
-        for (index = 0; index < u_lon_tor.size(); ++index) {
-            u_lon_tot.at(index) = u_lon_tor.at(index) + u_lon_pot.at(index);
-            u_lat_tot.at(index) = u_lat_tor.at(index) + u_lat_pot.at(index);
+        for (index = 0; index < u_lon_tor_unfilt.size(); ++index) {
+            u_lon_tot_unfilt.at(index) = u_lon_tor_unfilt.at(index) + u_lon_pot_unfilt.at(index);
+            u_lat_tot_unfilt.at(index) = u_lat_tor_unfilt.at(index) + u_lat_pot_unfilt.at(index);
             if ( mask.at(index) ) { 
-                KE_tor_orig.at(index) = 0.5 * constants::rho0 * (   pow(u_lon_tor.at(index), 2.) 
-                                                                  + pow(u_lat_tor.at(index), 2.) );
-                KE_pot_orig.at(index) = 0.5 * constants::rho0 * (   pow(u_lon_pot.at(index), 2.) 
-                                                                  + pow(u_lat_pot.at(index), 2.)
-                                                                  + pow(u_r.at(      index), 2.) );
-                KE_tot_orig.at(index) = 0.5 * constants::rho0 * (   pow(u_lon_tot.at(index), 2.) 
-                                                                  + pow(u_lat_tot.at(index), 2.)
-                                                                  + pow(u_r.at(      index), 2.) );
+                KE_tor_orig.at(index) = 0.5 * constants::rho0 * (   my_pow<2>(u_lon_tor_unfilt.at(index)) 
+                                                                  + my_pow<2>(u_lat_tor_unfilt.at(index)) );
+                KE_pot_orig.at(index) = 0.5 * constants::rho0 * (   my_pow<2>(u_lon_pot_unfilt.at(index)) 
+                                                                  + my_pow<2>(u_lat_pot_unfilt.at(index))
+                                                                  + my_pow<2>(u_r.at(      index)) );
+                KE_tot_orig.at(index) = 0.5 * constants::rho0 * (   my_pow<2>(u_lon_tot_unfilt.at(index)) 
+                                                                  + my_pow<2>(u_lat_tot_unfilt.at(index))
+                                                                  + my_pow<2>(u_r.at(      index)) );
             } else {
                 KE_tor_orig.at(index) = 0.;
                 KE_pot_orig.at(index) = 0.;
@@ -377,24 +402,26 @@ void filtering_helmholtz(
 
     // Also get some wind-based terms, if applicable
     if ( constants::COMP_WIND_FORCE ){ 
-        toroidal_vel_from_F(  tau_wind_x_tor, tau_wind_y_tor, wind_tau_Psi, source_data, mask );
-        potential_vel_from_F( tau_wind_x_pot, tau_wind_y_pot, wind_tau_Phi, source_data, mask );
+        //toroidal_vel_from_F(  tau_wind_x_tor, tau_wind_y_tor, wind_tau_Psi, source_data, mask );
+        //potential_vel_from_F( tau_wind_x_pot, tau_wind_y_pot, wind_tau_Phi, source_data, mask );
+        perp_grad_scalar(  tau_wind_x_tor, tau_wind_y_tor, wind_tau_Psi, source_data, mask );
+        grad_scalar(       tau_wind_x_pot, tau_wind_y_pot, wind_tau_Phi, source_data, mask );
 
         #pragma omp parallel \
         default( none ) \
         shared( tau_wind_dot_u_tor, tau_wind_dot_u_pot, mask, \
                 tau_wind_x_tor, tau_wind_x_pot, tau_wind_y_tor, tau_wind_y_pot, \
-                u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot ) \
+                u_lon_tor_unfilt, u_lat_tor_unfilt, u_lon_pot_unfilt, u_lat_pot_unfilt ) \
         private( index )
         {
             #pragma omp for collapse(1) schedule(guided)
-            for (index = 0; index < u_lon_tor.size(); ++index) {
+            for (index = 0; index < u_lon_tor_unfilt.size(); ++index) {
 
                 if ( mask.at(index) ) { 
-                    tau_wind_dot_u_tor.at( index ) =    u_lon_tor.at(index) * ( tau_wind_x_tor.at( index ) + tau_wind_x_pot.at( index ) )
-                                                      + u_lat_tor.at(index) * ( tau_wind_y_tor.at( index ) + tau_wind_y_pot.at( index ) );
-                    tau_wind_dot_u_pot.at( index ) =    u_lon_pot.at(index) * ( tau_wind_x_tor.at( index ) + tau_wind_x_pot.at( index ) )
-                                                      + u_lat_pot.at(index) * ( tau_wind_y_tor.at( index ) + tau_wind_y_pot.at( index ) );
+                    tau_wind_dot_u_tor.at( index ) =    u_lon_tor_unfilt.at(index) * ( tau_wind_x_tor.at( index ) + tau_wind_x_pot.at( index ) )
+                                                      + u_lat_tor_unfilt.at(index) * ( tau_wind_y_tor.at( index ) + tau_wind_y_pot.at( index ) );
+                    tau_wind_dot_u_pot.at( index ) =    u_lon_pot_unfilt.at(index) * ( tau_wind_x_tor.at( index ) + tau_wind_x_pot.at( index ) )
+                                                      + u_lat_pot_unfilt.at(index) * ( tau_wind_y_tor.at( index ) + tau_wind_y_pot.at( index ) );
                 } else {
                     tau_wind_dot_u_tor.at( index ) = 0.;
                     tau_wind_dot_u_pot.at( index ) = 0.;
@@ -407,13 +434,13 @@ void filtering_helmholtz(
     if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
     compute_vorticity( full_vort_tor_r, null_vector, null_vector, null_vector, null_vector,
                 null_vector, null_vector, null_vector, null_vector,
-                source_data, zero_array, u_lon_tor, u_lat_tor);
+                source_data, zero_array, u_lon_tor_unfilt, u_lat_tor_unfilt);
     compute_vorticity( full_vort_pot_r, null_vector, null_vector, null_vector, null_vector,
                 null_vector, null_vector, null_vector, null_vector,
-                source_data, u_r, u_lon_pot, u_lat_pot);
+                source_data, u_r, u_lon_pot_unfilt, u_lat_pot_unfilt);
     compute_vorticity( full_vort_tot_r, null_vector, null_vector, null_vector, null_vector,
                 null_vector, null_vector, null_vector, null_vector,
-                source_data, u_r, u_lon_tot, u_lat_tot);
+                source_data, u_r, u_lon_tot_unfilt, u_lat_tot_unfilt);
     if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "compute vorticity"); }
 
 
@@ -422,9 +449,9 @@ void filtering_helmholtz(
     #endif
     // Get Cartesian velocities, will need them for Pi
     if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-    vel_Spher_to_Cart( u_x_tor, u_y_tor, u_z_tor, zero_array, u_lon_tor, u_lat_tor, source_data );
-    vel_Spher_to_Cart( u_x_pot, u_y_pot, u_z_pot, u_r,        u_lon_pot, u_lat_pot, source_data );
-    vel_Spher_to_Cart( u_x_tot, u_y_tot, u_z_tot, u_r,        u_lon_tot, u_lat_tot, source_data );
+    vel_Spher_to_Cart( u_x_tor, u_y_tor, u_z_tor, zero_array, u_lon_tor_unfilt, u_lat_tor_unfilt, source_data );
+    vel_Spher_to_Cart( u_x_pot, u_y_pot, u_z_pot, u_r,        u_lon_pot_unfilt, u_lat_pot_unfilt, source_data );
+    vel_Spher_to_Cart( u_x_tot, u_y_tot, u_z_tot, u_r,        u_lon_tot_unfilt, u_lat_tot_unfilt, source_data );
     if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Sphere to Cart Conversion"); }
 
     #if DEBUG >= 2
@@ -467,20 +494,6 @@ void filtering_helmholtz(
         vars_to_write.push_back("KE_pot_fine");
         vars_to_write.push_back("KE_tot_fine");
 
-        // KE spectra and spectral slopes
-        vars_to_write.push_back("u_spectrum_tot");
-        vars_to_write.push_back("v_spectrum_tot");
-
-        vars_to_write.push_back("u_spectrum_tor");
-        vars_to_write.push_back("v_spectrum_tor");
-
-        vars_to_write.push_back("u_spectrum_pot");
-        vars_to_write.push_back("v_spectrum_pot");
-
-        vars_to_write.push_back("KE_spectral_slope_tot");
-        vars_to_write.push_back("KE_spectral_slope_tor");
-        vars_to_write.push_back("KE_spectral_slope_pot");
-
         // KE scale-transfer
         vars_to_write.push_back("Pi_tor");
         vars_to_write.push_back("Pi_pot");
@@ -513,9 +526,36 @@ void filtering_helmholtz(
         // These outputs are only included if not set to minimal outputs
         //
 
-        vars_to_write.push_back("KE_tor_fine_mod");
-        vars_to_write.push_back("KE_pot_fine_mod");
-        vars_to_write.push_back("KE_tot_fine_mod");
+        // KE spectra and spectral slopes
+        vars_to_write.push_back("u_spectrum_tot");
+        vars_to_write.push_back("v_spectrum_tot");
+
+        vars_to_write.push_back("u_spectrum_tor");
+        vars_to_write.push_back("v_spectrum_tor");
+
+        vars_to_write.push_back("u_spectrum_pot");
+        vars_to_write.push_back("v_spectrum_pot");
+
+        vars_to_write.push_back("KE_spectral_slope_tot");
+        vars_to_write.push_back("KE_spectral_slope_tor");
+        vars_to_write.push_back("KE_spectral_slope_pot");
+
+        vars_to_write.push_back("u_spectrum_HighPass_tot");
+        vars_to_write.push_back("v_spectrum_HighPass_tot");
+
+        vars_to_write.push_back("u_spectrum_HighPass_tor");
+        vars_to_write.push_back("v_spectrum_HighPass_tor");
+
+        vars_to_write.push_back("u_spectrum_HighPass_pot");
+        vars_to_write.push_back("v_spectrum_HighPass_pot");
+
+        vars_to_write.push_back("KE_spectral_slope_HighPass_tot");
+        vars_to_write.push_back("KE_spectral_slope_HighPass_tor");
+        vars_to_write.push_back("KE_spectral_slope_HighPass_pot");
+
+        vars_to_write.push_back("KE_of_fine_vel_tor");
+        vars_to_write.push_back("KE_of_fine_vel_pot");
+        vars_to_write.push_back("KE_of_fine_vel_tot");
 
         vars_to_write.push_back("div_tor");
         vars_to_write.push_back("div_pot");
@@ -653,12 +693,10 @@ void filtering_helmholtz(
     postprocess_fields_pot.push_back( &KE_pot_fine );
     postprocess_fields_tot.push_back( &KE_tot_fine );
 
-    /*
-    postprocess_names.push_back( "Fine_KE_mod" );
+    postprocess_names.push_back( "KE_of_fine_vel" );
     postprocess_fields_tor.push_back( &KE_tor_fine_mod );
     postprocess_fields_pot.push_back( &KE_pot_fine_mod );
     postprocess_fields_tot.push_back( &KE_tot_fine_mod );
-    */
 
     // KE spectra
     postprocess_names.push_back( "u_lon_spectrum" );
@@ -676,6 +714,23 @@ void filtering_helmholtz(
     postprocess_fields_tor.push_back( &spec_slope_tor );
     postprocess_fields_pot.push_back( &spec_slope_pot );
     postprocess_fields_tot.push_back( &spec_slope_tot );
+
+    // KE spectra - HighPass
+    postprocess_names.push_back( "u_lon_spectrum_HighPass" );
+    postprocess_fields_tor.push_back( &u_spectrum_tor_HighPass );
+    postprocess_fields_pot.push_back( &u_spectrum_pot_HighPass );
+    postprocess_fields_tot.push_back( &u_spectrum_tot_HighPass );
+
+    postprocess_names.push_back( "u_lat_spectrum_HighPass" );
+    postprocess_fields_tor.push_back( &v_spectrum_tor_HighPass );
+    postprocess_fields_pot.push_back( &v_spectrum_pot_HighPass );
+    postprocess_fields_tot.push_back( &v_spectrum_tot_HighPass );
+
+    // KE spectral slopes - HighPass
+    postprocess_names.push_back( "KE_spectral_slope_HighPass" );
+    postprocess_fields_tor.push_back( &spec_slope_tor_HighPass );
+    postprocess_fields_pot.push_back( &spec_slope_pot_HighPass );
+    postprocess_fields_tot.push_back( &spec_slope_tot_HighPass );
 
     /*
     postprocess_names.push_back( "div_J_transport" );
@@ -1147,16 +1202,22 @@ void filtering_helmholtz(
                 write_field_to_output(coarse_uiuj_F_Psi, "coarse_uiuj_F_Psi", starts, counts, fname, NULL);
             }
 
-            write_field_to_output( coarse_pressure, "coarse_pressure", starts, counts, fname, &mask );
-            write_field_to_output( coarse_density, "coarse_density", starts, counts, fname, &mask );
+            if ( source_data.has_pressure ) {
+                write_field_to_output( coarse_pressure, "coarse_pressure", starts, counts, fname, &mask );
+            }
+            if ( source_data.has_density ) {
+                write_field_to_output( coarse_density, "coarse_density", starts, counts, fname, &mask );
+            }
 
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");  }
         }
 
         // Get pot and tor velocities
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-        toroidal_vel_from_F( u_lon_tor, u_lat_tor, coarse_F_tor, source_data, mask);
-        potential_vel_from_F(u_lon_pot, u_lat_pot, coarse_F_pot, source_data, mask);
+        //toroidal_vel_from_F( u_lon_tor, u_lat_tor, coarse_F_tor, source_data, mask);
+        //potential_vel_from_F(u_lon_pot, u_lat_pot, coarse_F_pot, source_data, mask);
+        perp_grad_scalar( u_lon_tor, u_lat_tor, coarse_F_tor, source_data, mask);
+        grad_scalar(      u_lon_pot, u_lat_pot, coarse_F_pot, source_data, mask);
 
         #pragma omp parallel \
         default( none ) \
@@ -1199,13 +1260,18 @@ void filtering_helmholtz(
                 u_spectrum_tot, u_spectrum_tor, u_spectrum_pot,
                 v_spectrum_tot, v_spectrum_tor, v_spectrum_pot,
                 spec_slope_tot, spec_slope_tor, spec_slope_pot,
+                u_spectrum_tot_HighPass, u_spectrum_tor_HighPass, u_spectrum_pot_HighPass,
+                v_spectrum_tot_HighPass, v_spectrum_tor_HighPass, v_spectrum_pot_HighPass,
+                spec_slope_tot_HighPass, spec_slope_tor_HighPass, spec_slope_pot_HighPass,
                 u_lon_tot, u_lon_tor, u_lon_pot,
                 u_lat_tot, u_lat_tor, u_lat_pot,
+                u_lon_tor_unfilt, u_lon_pot_unfilt,
+                u_lat_tor_unfilt, u_lat_pot_unfilt,
                 dl_coarse_Phi, dl_coarse_Psi,
                 dll_coarse_Phi, dll_coarse_Psi,
                 source_data, scale
                 );
-        if (not(constants::NO_FULL_OUTPUTS)) {
+        if (not(constants::MINIMAL_OUTPUT)) {
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
 
             write_field_to_output( u_spectrum_tot, "u_spectrum_tot", starts, counts, fname, &mask);
@@ -1221,10 +1287,24 @@ void filtering_helmholtz(
             write_field_to_output( spec_slope_tor, "KE_spectral_slope_tor", starts, counts, fname, &mask);
             write_field_to_output( spec_slope_pot, "KE_spectral_slope_pot", starts, counts, fname, &mask);
 
+            write_field_to_output( u_spectrum_tot_HighPass, "u_spectrum_HighPass_tot", starts, counts, fname, &mask);
+            write_field_to_output( v_spectrum_tot_HighPass, "v_spectrum_HighPass_tot", starts, counts, fname, &mask);
+
+            write_field_to_output( u_spectrum_tor_HighPass, "u_spectrum_HighPass_tor", starts, counts, fname, &mask);
+            write_field_to_output( v_spectrum_tor_HighPass, "v_spectrum_HighPass_tor", starts, counts, fname, &mask);
+
+            write_field_to_output( u_spectrum_pot_HighPass, "u_spectrum_HighPass_pot", starts, counts, fname, &mask);
+            write_field_to_output( v_spectrum_pot_HighPass, "v_spectrum_HighPass_pot", starts, counts, fname, &mask);
+
+            write_field_to_output( spec_slope_tot_HighPass, "KE_spectral_slope_HighPass_tot", starts, counts, fname, &mask);
+            write_field_to_output( spec_slope_tor_HighPass, "KE_spectral_slope_HighPass_tor", starts, counts, fname, &mask);
+            write_field_to_output( spec_slope_pot_HighPass, "KE_spectral_slope_HighPass_pot", starts, counts, fname, &mask);
+
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");  }
         }
 
         // Get uiuj from corresponding Helmholtz
+        /*
         if ( constants::COMP_PI_HELMHOLTZ ) {
             uiuj_from_Helmholtz( ulon_ulon, ulon_ulat, ulat_ulat, coarse_uiuj_F_r, coarse_uiuj_F_Phi, coarse_uiuj_F_Psi, source_data );
 
@@ -1236,6 +1316,7 @@ void filtering_helmholtz(
                 if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "writing");  }
             }
         }
+        */
 
         // compute_vorticity gives vorticity, divergence, and OkuboWeiss
         if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
@@ -1503,6 +1584,7 @@ void filtering_helmholtz(
                 KE_pot_coarse, KE_pot_fine, KE_pot_filt, KE_pot_fine_mod, KE_pot_orig, \
                 KE_tot_coarse, KE_tot_fine, KE_tot_filt, KE_tot_fine_mod, KE_tot_orig, \
                 Enst_tor, Enst_pot, Enst_tot, mask, \
+                u_lon_tor_unfilt, u_lat_tor_unfilt, u_lon_pot_unfilt, u_lat_pot_unfilt,\
                 u_lon_tor, u_lat_tor, u_lon_pot, u_lat_pot, u_lon_tot, u_lat_tot, \
                 vort_tor_r, vort_pot_r, vort_tot_r ) \
         private( index ) \
@@ -1511,17 +1593,35 @@ void filtering_helmholtz(
             #pragma omp for collapse(1) schedule(guided)
             for (index = 0; index < u_lon_tor.size(); ++index) {
                 if ( mask.at(index) ) { 
+
+                    // This is bar(u)^2 = KE(bar(u))
                     KE_tor_coarse.at(index) = 0.5 * rho0 * ( pow(u_lon_tor.at(index), 2.) + pow(u_lat_tor.at(index), 2.) );
                     KE_pot_coarse.at(index) = 0.5 * rho0 * ( pow(u_lon_pot.at(index), 2.) + pow(u_lat_pot.at(index), 2.) );
                     KE_tot_coarse.at(index) = 0.5 * rho0 * ( pow(u_lon_tot.at(index), 2.) + pow(u_lat_tot.at(index), 2.) );
 
+                    // This is tau(u,u) = bar(u,u) - bar(u)*bar(u) = bar(KE(u)) - KE(bar(u))
                     KE_tor_fine.at(index) = KE_tor_filt.at(index) - KE_tor_coarse.at(index);
                     KE_pot_fine.at(index) = KE_pot_filt.at(index) - KE_pot_coarse.at(index);
                     KE_tot_fine.at(index) = KE_tot_filt.at(index) - KE_tot_coarse.at(index);
 
+                    /*
                     KE_tor_fine_mod.at(index) = KE_tor_orig.at(index) - KE_tor_coarse.at(index);
                     KE_pot_fine_mod.at(index) = KE_pot_orig.at(index) - KE_pot_coarse.at(index);
                     KE_tot_fine_mod.at(index) = KE_tot_orig.at(index) - KE_tot_coarse.at(index);
+                    */
+                    // This is (u-bar(u))^2 = KE(u - bar(u))
+                    double u_lon_tor_fine = u_lon_tor_unfilt[index] - u_lon_tor.at(index);
+                    double u_lat_tor_fine = u_lat_tor_unfilt[index] - u_lat_tor.at(index);
+
+                    double u_lon_pot_fine = u_lon_pot_unfilt[index] - u_lon_pot.at(index);
+                    double u_lat_pot_fine = u_lat_pot_unfilt[index] - u_lat_pot.at(index);
+
+                    double u_lon_tot_fine = u_lon_tor_fine + u_lon_pot_fine;
+                    double u_lat_tot_fine = u_lat_tor_fine + u_lat_pot_fine;
+
+                    KE_tor_fine_mod.at(index) = 0.5 * rho0 * ( my_pow<2>( u_lon_tor_fine ) + my_pow<2>( u_lat_tor_fine ) );
+                    KE_pot_fine_mod.at(index) = 0.5 * rho0 * ( my_pow<2>( u_lon_pot_fine ) + my_pow<2>( u_lat_pot_fine ) );
+                    KE_tot_fine_mod.at(index) = 0.5 * rho0 * ( my_pow<2>( u_lon_tot_fine ) + my_pow<2>( u_lat_tot_fine ) );
 
                     Enst_tor.at(index) = 0.5 * rho0 * ( pow(vort_tor_r.at(index), 2.) );
                     Enst_pot.at(index) = 0.5 * rho0 * ( pow(vort_pot_r.at(index), 2.) );
@@ -1533,9 +1633,9 @@ void filtering_helmholtz(
 
         if (not(constants::NO_FULL_OUTPUTS)) {
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-            write_field_to_output( KE_tor_filt, "KE_tor_filt", starts, counts, fname, &mask);
-            write_field_to_output( KE_pot_filt, "KE_pot_filt", starts, counts, fname, &mask);
-            write_field_to_output( KE_tot_filt, "KE_tot_filt", starts, counts, fname, &mask);
+            //write_field_to_output( KE_tor_filt, "KE_tor_filt", starts, counts, fname, &mask);
+            //write_field_to_output( KE_pot_filt, "KE_pot_filt", starts, counts, fname, &mask);
+            //write_field_to_output( KE_tot_filt, "KE_tot_filt", starts, counts, fname, &mask);
 
             write_field_to_output( KE_tor_fine, "KE_tor_fine", starts, counts, fname, &mask);
             write_field_to_output( KE_pot_fine, "KE_pot_fine", starts, counts, fname, &mask);
@@ -1545,9 +1645,9 @@ void filtering_helmholtz(
 
         if (not(constants::MINIMAL_OUTPUT)) {
             if (constants::DO_TIMING) { clock_on = MPI_Wtime(); }
-            write_field_to_output( KE_tor_fine_mod, "KE_tor_fine_mod", starts, counts, fname, &mask);
-            write_field_to_output( KE_pot_fine_mod, "KE_pot_fine_mod", starts, counts, fname, &mask);
-            write_field_to_output( KE_tot_fine_mod, "KE_tot_fine_mod", starts, counts, fname, &mask);
+            write_field_to_output( KE_tor_fine_mod, "KE_of_fine_vel_tor", starts, counts, fname, &mask);
+            write_field_to_output( KE_pot_fine_mod, "KE_of_fine_vel_pot", starts, counts, fname, &mask);
+            write_field_to_output( KE_tot_fine_mod, "KE_of_fine_vel_tot", starts, counts, fname, &mask);
 
             write_field_to_output( Enst_tor, "Enstrophy_tor", starts, counts, fname, &mask);
             write_field_to_output( Enst_pot, "Enstrophy_pot", starts, counts, fname, &mask);
@@ -1562,8 +1662,10 @@ void filtering_helmholtz(
         
         // Compute some wind-based terms, if applicable
         if ( constants::COMP_WIND_FORCE ){ 
-            toroidal_vel_from_F(  tau_wind_x_tor, tau_wind_y_tor, coarse_wind_tau_Psi, source_data, mask );
-            potential_vel_from_F( tau_wind_x_pot, tau_wind_y_pot, coarse_wind_tau_Phi, source_data, mask );
+            //toroidal_vel_from_F(  tau_wind_x_tor, tau_wind_y_tor, coarse_wind_tau_Psi, source_data, mask );
+            //potential_vel_from_F( tau_wind_x_pot, tau_wind_y_pot, coarse_wind_tau_Phi, source_data, mask );
+            perp_grad_scalar(  tau_wind_x_tor, tau_wind_y_tor, coarse_wind_tau_Psi, source_data, mask );
+            grad_scalar(       tau_wind_x_pot, tau_wind_y_pot, coarse_wind_tau_Phi, source_data, mask );
 
             #pragma omp parallel \
             default( none ) \
@@ -1619,14 +1721,21 @@ void filtering_helmholtz(
             shared( spec_slope_tot, u_spectrum_tot, v_spectrum_tot, \
                     spec_slope_pot, u_spectrum_pot, v_spectrum_pot, \
                     spec_slope_tor, u_spectrum_tor, v_spectrum_tor, \
+                    spec_slope_tot_HighPass, u_spectrum_tot_HighPass, v_spectrum_tot_HighPass, \
+                    spec_slope_pot_HighPass, u_spectrum_pot_HighPass, v_spectrum_pot_HighPass, \
+                    spec_slope_tor_HighPass, u_spectrum_tor_HighPass, v_spectrum_tor_HighPass, \
                     mask )
             {
                 #pragma omp for schedule(static)
                 for ( index = 0; index < spec_slope_tot.size(); index++ ) {
                     if ( mask.at(index) ) {
-                        spec_slope_tot.at(index) *= u_spectrum_tot.at(index) + v_spectrum_tot.at(index);
-                        spec_slope_pot.at(index) *= u_spectrum_pot.at(index) + v_spectrum_pot.at(index);
-                        spec_slope_tor.at(index) *= u_spectrum_tor.at(index) + v_spectrum_tor.at(index);
+                        spec_slope_tot.at(index) *= ( u_spectrum_tot.at(index) + v_spectrum_tot.at(index) );
+                        spec_slope_tor.at(index) *= ( u_spectrum_tor.at(index) + v_spectrum_tor.at(index) );
+                        spec_slope_pot.at(index) *= ( u_spectrum_pot.at(index) + v_spectrum_pot.at(index) );
+
+                        spec_slope_tot_HighPass.at(index) *= ( u_spectrum_tot_HighPass.at(index) + v_spectrum_tot_HighPass.at(index) );
+                        spec_slope_tor_HighPass.at(index) *= ( u_spectrum_tor_HighPass.at(index) + v_spectrum_tor_HighPass.at(index) );
+                        spec_slope_pot_HighPass.at(index) *= ( u_spectrum_pot_HighPass.at(index) + v_spectrum_pot_HighPass.at(index) );
                     }
                 }
             }

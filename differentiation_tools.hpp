@@ -37,6 +37,15 @@ void grad_scalar(
         const std::vector<short int> & mask
     );
 
+void grad_scalar_T(  
+        std::vector<double> & out_arr,
+        const std::vector<double> & u_lon,
+        const std::vector<double> & u_lat,
+        const dataset & source_data,
+        const std::vector<short int> & mask,
+        const bool scale_vels_by_cos
+    );
+
 void perp_grad_scalar(  
         std::vector<double> & vel_lon,
         std::vector<double> & vel_lat,
@@ -45,11 +54,22 @@ void perp_grad_scalar(
         const std::vector<short int> & mask
     );
 
+void perp_grad_scalar_T(  
+        std::vector<double> & out_arr,
+        const std::vector<double> & u_lon,
+        const std::vector<double> & u_lat,
+        const dataset & source_data,
+        const std::vector<short int> & mask,
+        const bool scale_vels_by_cos
+    );
+
 void scalar_laplacian(  
         std::vector<double> & Lap_scalar,
         const std::vector<double> & scalar,
         const dataset & source_data,
-        const std::vector<short int> & mask
+        const std::vector<short int> & mask,
+        std::vector<double>* work_grad_comp_1 = nullptr,
+        std::vector<double>* work_grad_comp_2 = nullptr
     );
 
 
@@ -81,6 +101,16 @@ void differentiation_vector(
         const int index,
         const int order_of_deriv = 1,
         const int diff_ord = constants::DiffOrd
+        );
+
+// sub-vector of transpose of differentiation matrix
+void differentiation_vector_T(
+        std::vector<double> & diff_array,
+        int & index_in_stencil,
+        const double delta,
+        const int Idim,
+        const int Ndim,
+        const int diff_ord
         );
 
 
@@ -142,6 +172,59 @@ void spher_derivative_at_point(
         const int diff_ord = constants::DiffOrd
         );
 
+void spher_derivative_transpose_at_point(
+        const std::vector<double*> & deriv_vals,
+        const std::vector<const std::vector<double>*> & fields,
+        const std::vector<double> & grid,
+        const std::string & dim,
+        const dataset & source_data,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const std::vector<short int> & mask,
+        const int order_of_deriv = 1,
+        const int diff_ord = constants::DiffOrd
+        );
+
+void longitude_derivative_at_point(
+        const std::vector<double*> & deriv_vals,
+        const std::vector<const std::vector<double>*> & fields,
+        const dataset & source_data,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const std::vector<short int> & mask,
+        const int order_of_deriv = 1,
+        const int diff_ord = constants::DiffOrd
+        );
+
+void latitude_derivative_at_point(
+        const std::vector<double*> & deriv_vals,
+        const std::vector<const std::vector<double>*> & fields,
+        const dataset & source_data,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const std::vector<short int> & mask,
+        const bool polar_smoothing = false,
+        const int order_of_deriv = 1,
+        const int diff_ord = constants::DiffOrd
+        );
+
+void longitude_derivative_transpose_at_point(
+        const std::vector<double*> & deriv_vals,
+        const std::vector<const std::vector<double>*> & fields,
+        const dataset & source_data,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const std::vector<short int> & mask,
+        const int order_of_deriv = 1,
+        const int diff_ord = constants::DiffOrd
+        );
+
+void latitude_derivative_transpose_at_point(
+        const std::vector<double*> & deriv_vals,
+        const std::vector<const std::vector<double>*> & fields,
+        const dataset & source_data,
+        const int Itime, const int Idepth, const int Ilat, const int Ilon,
+        const std::vector<short int> & mask,
+        const bool polar_smoothing = false,
+        const int order_of_deriv = 1,
+        const int diff_ord = constants::DiffOrd
+        );
 
 
 /*!

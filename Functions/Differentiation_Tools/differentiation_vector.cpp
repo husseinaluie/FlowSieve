@@ -23,6 +23,9 @@ void differentiation_vector(
         assert( (diff_ord == 2) or (diff_ord == 3) or (diff_ord == 4) or (diff_ord == 6) );
     }
 
+    diff_array.clear();
+    diff_array.reserve(32);
+
     std::vector<double>::iterator i0;
     i0 = diff_array.begin();
 
@@ -128,7 +131,7 @@ void differentiation_vector(
                         diff_array.insert(i0, {  45., -154.,  214., -156.,  61.,  -10. });
                         break;
                     case 1 :              // [   10.,  -15.,   -4.,   14.,  -6.,    1. ]
-                        diff_array.insert(i0, {  10.,  -15.,    4.,   14.,  -6.,    1. });
+                        diff_array.insert(i0, {  10.,  -15.,   -4.,   14.,  -6.,    1. });
                         break;
                     case 2 :              // [   -1.,   16.,  -30.,   16.,   -1.,   0. ]
                         diff_array.insert(i0, {  -1.,   16.,  -30.,   16.,   -1.,   0. });
@@ -204,8 +207,11 @@ void differentiation_vector(
     }
 
     for (size_t II = 0; II < diff_array.size(); II++) {
-        diff_array.at(II) = 
-            diff_array.at(II) / ( pow(delta, order_of_deriv) * scale_factor);
+        #ifdef NDEBUG
+        diff_array[II] = diff_array[II] / ( pow(delta, order_of_deriv) * scale_factor);
+        #else
+        diff_array.at(II) = diff_array.at(II) / ( pow(delta, order_of_deriv) * scale_factor);
+        #endif
     }
 
 }

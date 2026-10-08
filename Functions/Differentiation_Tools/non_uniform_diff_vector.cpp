@@ -5,6 +5,7 @@
 #include "../../differentiation_tools.hpp"
 #include "../../constants.hpp"
 
+#include <Eigen/Dense>
 
 void non_uniform_diff_vector(
         std::vector<double> & diff_array,
@@ -15,139 +16,57 @@ void non_uniform_diff_vector(
         const int diff_ord) {
 
     // For now, only works for diff_ord == 2
-    assert(diff_ord == 2);
+    /*
+    if ( diff_ord != 2 ) {
+        throw std::runtime_error("non-uniform derivatives currently only implemented for 2nd order accuracy");
+    }
+    */
 
-    int order_of_deriv = 1;
-
-    std::vector<double>::iterator start;
-    start = diff_array.begin();
+    const size_t Ndpts = UB-LB+1;
+    const int Nconds = constants::DiffOrd + 0; //2;
 
     double scale_factor = 1.;
-    double c1, c2, c3, c4;
-    double xn1, x0, xp1;
+    
+    // Calculate S1, Sx, Sxx, etc, and store into A (LHS)
+    Eigen::Matrix<double, Nconds, Nconds> A;
+    for ( int i = 0; i < Nconds; i++ ) {
+        for ( int j = 0; j <= i; j++ ) {
 
-    if (diff_ord == 2) {  // second order accurate
-        switch (order_of_deriv) {
-            case 1: // first derivative
-                xn1 = grid.at(LB);
-                x0  = grid.at(LB+1);
-                xp1 = grid.at(UB);
-                if (Iref == LB) {
-                    c2 = -1. / ( 0.5 * pow(x0  - xn1, 2.) );
-                    c3 =  1. / ( 0.5 * pow(xp1 - xn1, 2.) );
-                    c1 = -(c3 + c2);
-                    scale_factor = (2/(xp1-xn1)) - (2/(x0-xn1));
-                } else if (Iref == UB) {
-                    c1 = -1. / ( 0.5 * pow(xn1 - xp1, 2.) );
-                    c2 =  1. / ( 0.5 * pow(x0  - xp1, 2.) );
-                    c3 = -(c2 + c1);
-                    scale_factor = (2/(x0-xp1)) - (2/(xn1-xp1));
-                } else {
-                    c1 = -1. / ( 0.5 * pow(xn1 - x0, 2.) );
-                    c3 =  1. / ( 0.5 * pow(xp1 - x0, 2.) );
-                    c2 = -(c3 + c1);
-                    scale_factor = (2/(xp1-x0)) - (2/(xn1-x0));
-                }
-                diff_array.insert(start, {c1, c2, c3});
-                break;
-            case 2: // second derivative
-                if (Iref == LB) {
+            double Sij_value = 0.;
 
-                    double dp1 = grid.at(Iref+1) - grid.at(Iref);
-                    double dp2 = grid.at(Iref+2) - grid.at(Iref);
-                    double dp3 = grid.at(Iref+3) - grid.at(Iref);
+            for ( size_t In = LB; In <= UB; In++ ) {
 
-                    double Ap1 = ( pow(1./dp1,1) - pow(1./dp3,1) );
-                    double Ap2 = ( pow(1./dp2,1) - pow(1./dp3,1) );
+                double dA = 1.;
+                double x = grid.at(In) - grid.at(Iref);
+                
+                Sij_value += pow( x, i+j ) * dA;
 
-                    double Bp1 = ( pow(1./dp1,2) - pow(1./dp3,2) );
-                    double Bp2 = ( pow(1./dp2,2) - pow(1./dp3,2) );
+            }
 
-                    double Cp1 = ( pow(1./dp1,3) - pow(1./dp3,3) );
-                    double Cp2 = ( pow(1./dp2,3) - pow(1./dp3,3) );
-
-                    c1 = - ( (Cp2 / Bp2) - (Cp1 / Bp1) );
-                    c2 = - 1. / ( Bp1 * pow(dp1, 3) );
-                    c3 =   1. / ( Bp2 * pow(dp2, 3) );
-                    c4 = - ( (1./Bp2) - (1./Bp1) ) * pow(1./dp3,3);
-
-                    scale_factor = 0.5 * ( (Ap2/Bp2) - (Ap1/Bp1) );
-
-                } else if (Iref == LB + 1) {
-
-                    double dn1 = grid.at(Iref-1) - grid.at(Iref);
-                    double dp1 = grid.at(Iref+1) - grid.at(Iref);
-                    double dp2 = grid.at(Iref+2) - grid.at(Iref);
-
-                    double An1 = ( pow(1./dn1,1) - pow(1./dp2,1) );
-                    double Ap1 = ( pow(1./dp1,1) - pow(1./dp2,1) );
-
-                    double Bn1 = ( pow(1./dn1,2) - pow(1./dp2,2) );
-                    double Bp1 = ( pow(1./dp1,2) - pow(1./dp2,2) );
-
-                    double Cn1 = ( pow(1./dn1,3) - pow(1./dp2,3) );
-                    double Cp1 = ( pow(1./dp1,3) - pow(1./dp2,3) );
-
-                    c1 =   1. / ( Bn1 * pow(dn1, 3) );
-                    c2 = - ( (Cn1 / Bn1) - (Cp1 / Bp1) );
-                    c3 = - 1. / ( Bp1 * pow(dp1, 3) );
-                    c4 = - ( (1./Bn1) - (1./Bp1) ) * pow(1./dp2,3);
-
-                    scale_factor = 0.5 * ( (An1/Bn1) - (Ap1/Bp1) );
-
-                } else if (Iref == LB + 2) {
-
-                    double dn2 = grid.at(Iref-2) - grid.at(Iref);
-                    double dn1 = grid.at(Iref-1) - grid.at(Iref);
-                    double dp1 = grid.at(Iref+1) - grid.at(Iref);
-
-                    double An1 = 1/dn1 - 1/dn2;
-                    double Ap1 = 1/dp1 - 1/dn2;
-
-                    double Bn1 = pow(1/dn1,2) - pow(1/dn2,2);
-                    double Bp1 = pow(1/dp1,2) - pow(1/dn2,2);
-
-                    double Cn1 = pow(1/dn1,3) - pow(1/dn2,3);
-                    double Cp1 = pow(1/dp1,3) - pow(1/dn2,3);
-
-                    c1 = - ( (1/Bn1 - 1/Bp1) * pow(1/dn2,3) );
-                    c2 = ( 1 / (Bn1 * pow(dn1,3) ) );
-                    c3 = - ( (Cn1/Bn1) - (Cp1/Bp1) );
-                    c4 = - ( 1 / (Bp1 * pow(dp1,3) ) );
-
-                    scale_factor = ( (An1/Bn1) - (Ap1/Bp1) ) / 2;
-
-
-                } else if (Iref == UB) {
-
-                    double dn3 = grid.at(Iref-3) - grid.at(Iref);
-                    double dn2 = grid.at(Iref-2) - grid.at(Iref);
-                    double dn1 = grid.at(Iref-1) - grid.at(Iref);
-
-                    double An1 = 1/dn1 - 1/dn3;
-                    double An2 = 1/dn2 - 1/dn3;
-
-                    double Bn1 = pow(1/dn1,2) - pow(1/dn3,2);
-                    double Bn2 = pow(1/dn2,2) - pow(1/dn3,2);
-
-                    double Cn1 = pow(1/dn1,3) - pow(1/dn3,3);
-                    double Cn2 = pow(1/dn2,3) - pow(1/dn3,3);
-
-                    c1 = - ( (1/Bn2 - 1/Bn1) * pow(1/dn3,3) );
-                    c2 =   ( 1 / (Bn2 * pow(dn2,3) ) );
-                    c3 = - ( 1 / (Bn1 * pow(dn1,3) ) );
-                    c4 =  - ( (Cn2 / Bn2) - (Cn1 / Bn1)    );
-
-                    scale_factor = ( (An2/Bn2) - (An1/Bn1) ) / 2;
-
-                }
-                diff_array.insert(start, {c1, c2, c3, c4});
-                break;
+            A(i,j) = Sij_value;
+            A(j,i) = Sij_value;
         }
     }
 
-    for (size_t II = 0; II < diff_array.size(); II++) {
-        diff_array.at(II) = diff_array.at(II) / scale_factor;
-    }
+    // Precompute the LDLt solver
+    Eigen::LDLT<Eigen::MatrixXd> ldlt;
+    ldlt.compute(A);
 
+    // Build the RHS and solve at each point
+    diff_array.resize(Ndpts, 0.);
+    for ( size_t In = LB; In <= UB; In++ ) {
+        Eigen::Vector<double, Nconds> RHS, sol;
+
+        double dA = 1.;
+        double x = grid.at(In) - grid.at(Iref);
+
+        for ( int i = 0; i < Nconds; i++ ) {
+            RHS[i] = pow(x, i) * dA;
+        }
+
+        //sol = A.completeOrthogonalDecomposition().solve(RHS);
+        //sol = A.ldlt().solve(RHS);
+        sol = ldlt.solve(RHS);
+        diff_array.at(In-LB) = sol[1];
+    }
 }

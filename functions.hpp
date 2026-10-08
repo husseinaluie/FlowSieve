@@ -9,11 +9,53 @@
 #include <mpi.h>
 #include "constants.hpp"
 #include <stdexcept>
+#include <algorithm>
+#include <math.h>
+#include <Eigen/QR>
 
 /*!
  * \file
  * \brief Collection of all computation-related functions.
  */
+
+// A cost-effective pow function for integer powers
+template<unsigned int power>
+double my_pow(double x) {
+    if      constexpr (power == 0) { return 1.0; }
+    else if constexpr (power == 1) { return x; }
+    else                           { return x * my_pow<power-1>(x); }
+}
+
+/* =======================
+   Basic vector utilities
+   ======================= */
+
+using Vec3 = std::array<double,3>;
+using Vec2 = std::array<double,2>;
+
+inline Vec3 operator+(const Vec3& a, const Vec3& b) {
+    return {a[0]+b[0], a[1]+b[1], a[2]+b[2]};
+}
+
+inline Vec3 operator-(const Vec3& a, const Vec3& b) {
+    return {a[0]-b[0], a[1]-b[1], a[2]-b[2]};
+}
+
+inline Vec3 operator*(double s, const Vec3& a) {
+    return {s*a[0], s*a[1], s*a[2]};
+}
+
+inline double dot(const Vec3& a, const Vec3& b) {
+    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+
+inline Vec3 cross(const Vec3& a, const Vec3& b) {
+    return {
+        a[1]*b[2] - a[2]*b[1],
+        a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0]
+    };
+}
 
 /*!
  * \brief Class to store main variables.
@@ -80,15 +122,18 @@ class dataset {
         std::vector<double> coarse_map_lat, coarse_map_lon, coarse_map_areas;
 
         // Store mask data (i.e. land vs water)
-        std::vector<short int> mask, reference_mask, mask_DEPTH;
+        std::vector<short int> mask, reference_mask, mask_DEPTH, coast;
+        std::vector< size_t > pt_maps_to; // for land collapsing maps
+
+        // Indices for coastal land points
+        std::vector<size_t> coastal_indices, inner_coastal_indices;
 
         // Store data-chunking info. These keep track of the MPI divisions to ensure 
         // that the output is in the same order as the input.
         std::vector<int> myCounts, myStarts;
 
         // Variables for unstructured grids
-        //size_t num_neighbours;
-        const size_t num_neighbours = constants::ADJACENCY_SIZE;
+        size_t num_neighbours = constants::ADJACENCY_SIZE;
         std::vector< std::vector< size_t > >    adjacency_indices,
                                                 adjacency_indices_adjoint;
         std::vector< std::vector< double > >    adjacency_projected_x,
@@ -98,7 +143,11 @@ class dataset {
                                                 adjacency_ddlat_weights,
                                                 adjacency_d2dlon2_weights,
                                                 adjacency_d2dlat2_weights,
-                                                adjecency_DEC_Tij;
+                                                adjecency_DEC_Tij,
+                                                grad_weights_lon,
+                                                grad_weights_lat,
+                                                perp_grad_weights_lon,
+                                                perp_grad_weights_lat;
         std::vector<double>                     adjacency_voronoi_areas;
         std::vector< std::vector< double > >    interface_lengths;
 
@@ -134,9 +183,17 @@ class dataset {
         // Distance wrapper
         double distance_from_indices( const size_t Ipt, const size_t Jpt ) const;
 
+        double distance_between_datasets( const size_t Ipt, const size_t Jpt, const dataset & Jset ) const;
+
         double distance_from_IlatIlon(
                 const size_t Ilat, const size_t Ilon,
                 const size_t Jlat, const size_t Jlon
+                ) const;
+
+        double distance_between_datasets_from_IlatIlon(
+                const size_t Ilat, const size_t Ilon,
+                const size_t Jlat, const size_t Jlon,
+                const dataset & Jset
                 ) const;
 
         // Load in variable and store in dictionary
@@ -202,6 +259,7 @@ class dataset {
                               const MPI_Comm comm = MPI_COMM_WORLD );
         void load_adjacency_indices(  const std::string filename, 
                                       const MPI_Comm comm = MPI_COMM_WORLD );
+        void build_differentiation_weights(  const MPI_Comm comm = MPI_COMM_WORLD );
 
 };
 
@@ -504,12 +562,25 @@ void compute_KE_spectra_and_slopes(
         std::vector<double> & spec_slope_tot, 
         std::vector<double> & spec_slope_tor, 
         std::vector<double> & spec_slope_pot,
+        std::vector<double> & u_spectrum_tot_HighPass, 
+        std::vector<double> & u_spectrum_tor_HighPass, 
+        std::vector<double> & u_spectrum_pot_HighPass,
+        std::vector<double> & v_spectrum_tot_HighPass, 
+        std::vector<double> & v_spectrum_tor_HighPass, 
+        std::vector<double> & v_spectrum_pot_HighPass,
+        std::vector<double> & spec_slope_tot_HighPass, 
+        std::vector<double> & spec_slope_tor_HighPass, 
+        std::vector<double> & spec_slope_pot_HighPass,
         const std::vector<double> & u_lon_tot, 
         const std::vector<double> & u_lon_tor, 
         const std::vector<double> & u_lon_pot,
         const std::vector<double> & u_lat_tot, 
         const std::vector<double> & u_lat_tor, 
         const std::vector<double> & u_lat_pot,
+        const std::vector<double> & u_lon_tor_unfilt, 
+        const std::vector<double> & u_lon_pot_unfit,
+        const std::vector<double> & u_lat_tor_unfilt, 
+        const std::vector<double> & u_lat_pot_unfilt,
         const std::vector<double> & dl_coarse_Phi, 
         const std::vector<double> & dl_coarse_Psi,
         const std::vector<double> & dll_coarse_Phi, 

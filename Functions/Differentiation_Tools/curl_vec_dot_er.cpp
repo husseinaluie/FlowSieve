@@ -14,28 +14,19 @@ void curl_vec_dot_er(
         const std::vector<short int> & mask
         ) {
 
-    // ret = ddlon(vel_lat) / cos_lat - ddlat( u_lon * cos_lat ) / cos_lat 
+    // compute perp_grad_T( cos(lat) * u, cos(lat) * v )
+    perp_grad_scalar_T( out_arr, u_lon, u_lat, source_data, mask, true );
+
+    // vort = - (1/cos(lat)) * perp_grad_T( cos(lat) * u, cos(lat) * v )
 
     const size_t Npts  = u_lon.size();
     size_t index;
-    const std::vector<double>   &latitude   = source_data.latitude,
-                                &longitude  = source_data.longitude;
-
-    const std::vector<int>  &myCounts = source_data.myCounts;
-
-    const int   Ntime  = myCounts.at(0),
-                Ndepth = myCounts.at(1),
-                Nlat   = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? myCounts.at(2) : 1,
-                Nlon   = (constants::GRID_TYPE == constants::GridType::MeshGrid) ? myCounts.at(3) : 1;
-
-    // Store u_lon * cos_lat in an array
-    std::vector<double> cos_lat_u_lon( Npts, 0. );
+    const std::vector<double>   &latitude   = source_data.latitude;
 
     #pragma omp parallel \
     default(none) \
-    shared( latitude, source_data, u_lon, cos_lat_u_lon )\
-    private( index )\
-    firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
+    shared( latitude, source_data, out_arr )\
+    private( index ) firstprivate( Npts )
     {
         #pragma omp for collapse(1) schedule(guided)
         for (index = 0; index < Npts; ++index) {
@@ -46,78 +37,11 @@ void curl_vec_dot_er(
                 source_data.index1to4_local(index, Itime, Idepth, Ilat, Ilon);
             }
 
-            // check if we're too close to the pole
             double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
                             ? latitude.at(Ilat)
                             : latitude.at(index);
 
-            cos_lat_u_lon[index] = cos(local_lat) * u_lon[index];
-        }
-    } // end pragma
-
-    std::vector<const std::vector<double>*> deriv_fields = { &cos_lat_u_lon, &u_lat };
-    
-    #pragma omp parallel \
-    default(none) \
-    shared( out_arr, latitude, longitude, mask, source_data, deriv_fields, stdout )\
-    private( index ) \
-    firstprivate( Nlon, Nlat, Ndepth, Ntime, Npts )
-    {
-
-        double dulat_dlon, duloncoslat_dlat;
-
-        std::vector<double*> lon_deriv_vals = { NULL, &dulat_dlon }, 
-                             lat_deriv_vals = { &duloncoslat_dlat, NULL };
-
-        #pragma omp for collapse(1) schedule(guided)
-        for (index = 0; index < Npts; ++index) {
-
-            int Itime, Idepth, Ilat, Ilon;
-
-            if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
-                source_data.index1to4_local(index, Itime, Idepth, Ilat, Ilon);
-
-                spher_derivative_at_point(
-                        lon_deriv_vals, deriv_fields, longitude, "lon",
-                        source_data, Itime, Idepth, Ilat, Ilon, mask);
-
-                spher_derivative_at_point(
-                        lat_deriv_vals, deriv_fields, latitude, "lat",
-                        source_data, Itime, Idepth, Ilat, Ilon, mask);
-            } else {
-                spher_derivative_at_point(
-                        lon_deriv_vals, deriv_fields, longitude, "lon",
-                        source_data, 0, 0, index, index, mask);
-
-                spher_derivative_at_point(
-                        lat_deriv_vals, deriv_fields, latitude, "lat",
-                        source_data, 0, 0, index, index, mask);
-            }
-
-            // check if we're too close to the pole
-            double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
-                            ? latitude.at(Ilat)
-                            : latitude.at(index);
-
-            // ret = ddlon(vel_lat) / cos_lat - ddlat( u_lon * cos_lat ) / cos_lat
-            double tmp = dulat_dlon - duloncoslat_dlat;
-            if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
-                tmp *= 1. / ( cos(local_lat) * constants::R_earth );
-            } else {
-                // non-mesh grids have the R_earth baked in
-                tmp *= 1. / cos(local_lat);
-            }
-
-            #ifndef NDEBUG
-            if ( isnan(tmp) ) {
-                fprintf( stdout, "d(ulat)/dlat = %.4e, d(ulon*coslat)/dlat = %.4e, cos(lat) = %.4e\n",
-                      dulat_dlon, duloncoslat_dlat, cos(local_lat) );
-                throw std::runtime_error("NaN value detected.\n");
-            }
-            #endif
-
-            out_arr.at(index) = tmp;
-
+            out_arr[index] = - out_arr[index] / cos(local_lat);
         }
     } // end pragma
 }

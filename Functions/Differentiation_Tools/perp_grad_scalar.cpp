@@ -48,20 +48,21 @@ void perp_grad_scalar(
             if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
                 source_data.index1to4_local(index, Itime, Idepth, Ilat, Ilon);
 
-                spher_derivative_at_point(
-                        lon_deriv_vals, deriv_fields, longitude, "lon", source_data,
+                longitude_derivative_at_point(
+                        lon_deriv_vals, deriv_fields, source_data,
                         Itime, Idepth, Ilat, Ilon, mask);
 
-                spher_derivative_at_point(
-                        lat_deriv_vals, deriv_fields, latitude, "lat", source_data,
-                        Itime, Idepth, Ilat, Ilon, mask);
+                latitude_derivative_at_point(
+                        lat_deriv_vals, deriv_fields, source_data,
+                        Itime, Idepth, Ilat, Ilon, mask, true);
+                // if mesh grid and latitude, use a stabilizing scheme at the poles
             } else {
-                spher_derivative_at_point(
-                        lon_deriv_vals, deriv_fields, longitude, "lon", source_data,
+                longitude_derivative_at_point(
+                        lon_deriv_vals, deriv_fields, source_data,
                         0, 0, index, index, mask);
 
-                spher_derivative_at_point(
-                        lat_deriv_vals, deriv_fields, latitude, "lat", source_data,
+                latitude_derivative_at_point(
+                        lat_deriv_vals, deriv_fields, source_data,
                         0, 0, index, index, mask);
             }
 
@@ -69,18 +70,39 @@ void perp_grad_scalar(
                 tmp_lon = - dFdlat;
                 tmp_lat =   dFdlon;
             } else {
-                double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
-                                ? latitude.at(Ilat)
-                                : latitude.at(index);
-                bool is_pole = std::fabs( std::fabs( local_lat * 180.0 / M_PI ) - 90 ) < 1e-10;
-                double cos_lat = cos(local_lat);
+
+                const bool pre_comp = 
+                    constants::PRECOMPUTE_SIN_COS_LATITUDE 
+                    and source_data.sin_cos_lat_pre_comp;
+
+                double cos_lat;
+                if ( pre_comp ) {
+                    #ifdef NDEBUG
+                    cos_lat = source_data.cos_lat[Ilat];
+                    #else
+                    cos_lat = source_data.cos_lat.at(Ilat);
+                    #endif
+                } else {
+                    #ifdef NDEBUG
+                    double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
+                        ? latitude[Ilat]
+                        : latitude[index];
+                    #else
+                    double local_lat = (constants::GRID_TYPE == constants::GridType::MeshGrid) 
+                        ? latitude.at(Ilat)
+                        : latitude.at(index);
+                    #endif
+
+                    cos_lat = cos(local_lat);
+                }
+                bool is_pole = ( std::fabs(cos_lat) < 1e-15 );
 
                 if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
-                    tmp_lon = is_pole ? 0. : - dFdlat /  constants::R_earth;
+                    tmp_lon = - dFdlat /  constants::R_earth;
                     tmp_lat = is_pole ? 0. :   dFdlon / (constants::R_earth * cos_lat);
                 } else {
                     // non-mesh grids have the R_earth baked in
-                    tmp_lon = is_pole ? 0. : - dFdlat;
+                    tmp_lon = - dFdlat;
                     tmp_lat = is_pole ? 0. :   dFdlon / cos_lat;
                 }
             }
