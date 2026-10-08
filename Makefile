@@ -5,13 +5,13 @@ include system.mk
 include VERSION
 
 # Debug output level
-CFLAGS:=-DDEBUG=2 $(CFLAGS)
+CFLAGS:=-DDEBUG=0 $(CFLAGS)
 
 # Turn on/off debug flags or additional optimization flags
 OPT:=true
-DEBUG:=true
+DEBUG:=false
 EXTRA_OPT:=false
-USE_GPROF:=false
+PROFILE:=false
 
 ##
 ## Shouldn't need to modify anything beyond this point
@@ -26,6 +26,8 @@ VERSION:=${VERSION} -DGIT_VERSION=\"$(GIT_VERSION)\"
 ifeq ($(DEBUG),true)
     CFLAGS:=$(CFLAGS) $(DEBUG_FLAGS)
     LINKS:=$(LINKS) $(DEBUG_LDFLAGS)
+else
+    CFLAGS:=$(CFLAGS) -DNDEBUG # this disables 'assert' as well as Eigen bounds checking
 endif
 
 ifeq ($(OPT),true)
@@ -37,8 +39,9 @@ ifeq ($(EXTRA_OPT),true)
     ALGLIB_OPT_FLAGS:=$(ALGLIB_OPT_FLAGS) $(EXTRA_OPT_FLAGS)
 endif
 
-ifeq ($(USE_GPROF),true)
-    LINKS:=$(LINKS) -pg
+ifeq ($(PROFILE),true)
+    LINKS:=$(LINKS) -g
+    #LINKS:=$(LINKS) -pg
 endif
 
 CFLAGS:=$(CFLAGS) $(LIB_DIRS)
@@ -135,11 +138,14 @@ ALGLIB/%.o: ALGLIB/%.cpp
 
 
 # Get the list of preprocessing  cpp files
+# this line removed from the preprocess compile set, since we aren't
+# using alglib any more
+#$(MPICXX) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
 PREPROCESS_CPPS := $(wildcard  Preprocess/*.cpp)
 PREPROCESS_OBJS := $(addprefix Preprocess/,$(notdir $(PREPROCESS_CPPS:.cpp=.o)))
 
 $(PREPROCESS_OBJS): %.o : %.cpp constants.hpp
-	$(MPICXX) $(LDFLAGS) -I ./ALGLIB -c $(CFLAGS) -o $@ $< $(LINKS) 
+	$(MPICXX) $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
 
 # Get list of test executables
@@ -214,23 +220,24 @@ CORE_TARGET_OBJS := Case_Files/coarse_grain.o \
 $(CORE_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
 
-$(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} ${ALGLIB_OBJS} ${DIRECT_FILTER_OBJS} %.o
+#$(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} ${ALGLIB_OBJS} ${DIRECT_FILTER_OBJS} %.o
+$(CORE_TARGET_EXES): %.x : ${CORE_OBJS} ${INTERFACE_OBJS} ${PREPROCESS_OBJS} ${DIRECT_FILTER_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 
 # Helmholtz
 HELM_TARGET_EXES := Case_Files/coarse_grain_helmholtz.x  \
 					Case_Files/coarse_grain_scalars.x \
+					Case_Files/coarse_grain_fractals.x \
 					Case_Files/coarse_grain_scalars_aniso.x \
-					Case_Files/Spherical_RBF.x \
-					Case_Files/Spherical_RBF_Eigen.x \
-					Case_Files/Spherical_RBF_Eigen_ReMap.x
+					Case_Files/Helmholtz_Solver.x \
+					Case_Files/grid_regularizer.x
 HELM_TARGET_OBJS := Case_Files/coarse_grain_helmholtz.o  \
 					Case_Files/coarse_grain_scalars.o \
+					Case_Files/coarse_grain_fractals.o \
 					Case_Files/coarse_grain_scalars_aniso.o \
-					Case_Files/Spherical_RBF.o \
-					Case_Files/Spherical_RBF_Eigen.o \
-					Case_Files/Spherical_RBF_Eigen_ReMap.o
+					Case_Files/Helmholtz_Solver.o \
+					Case_Files/grid_regularizer.o
 
 $(HELM_TARGET_OBJS): %.o : %.cpp constants.hpp
 	$(MPICXX) ${VERSION} $(LDFLAGS) -c $(CFLAGS) -o $@ $< $(LINKS) 
@@ -249,33 +256,31 @@ $(SW_TARGET_EXES): %.x : ${SW_TOOL_OBJS} ${CORE_OBJS} ${INTERFACE_OBJS} %.o
 	$(MPICXX) ${VERSION} $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LINKS) 
 
 # Building toroidal projection
-TOROID_TARGET_EXES := 	Case_Files/Helmholtz_projection.x \
-						Case_Files/Helmholtz_projection_SymTensor.x \
-						Case_Files/Helmholtz_projection_uiuj.x \
-						Case_Files/LLC_Helmholtz_projections.x \
+TOROID_TARGET_EXES := 	Case_Files/Verify_Derivatives.x \
+						Case_Files/PolyhedralGrid.x \
+						Case_Files/Scalar_Landfill.x \
 						Case_Files/LLC_interpolator_simple.x \
 						Case_Files/LLC_build_adjacency.x \
 						Case_Files/LLC_map_between_grids.x \
+						Case_Files/LLC_map_to_mesh.x \
 						Case_Files/interpolator.x \
 						Case_Files/geostrophic_vel.x \
 						Case_Files/coarsen_grid_linear.x \
-						Case_Files/refine_Helmholtz_seed.x \
 						Case_Files/Pi_helm_breakdown.x \
 						Case_Files/thermal_wind.x \
 						Case_Files/compute_radial_velocity.x \
 						Case_Files/Johnson_decomp.x
 
-TOROID_TARGET_OBJS :=   Case_Files/Helmholtz_projection.o \
-						Case_Files/Helmholtz_projection_SymTensor.o \
-						Case_Files/Helmholtz_projection_uiuj.o \
-						Case_Files/LLC_Helmholtz_projections.o \
+TOROID_TARGET_OBJS :=   Case_Files/Verify_Derivatives.o \
+						Case_Files/PolyhedralGrid.o \
+						Case_Files/Scalar_Landfill.o \
 						Case_Files/LLC_interpolator_simple.o \
 						Case_Files/LLC_build_adjacency.o \
 						Case_Files/LLC_map_between_grids.o \
+						Case_Files/LLC_map_to_mesh.o \
 						Case_Files/interpolator.o \
 						Case_Files/geostrophic_vel.o \
 						Case_Files/coarsen_grid_linear.o \
-						Case_Files/refine_Helmholtz_seed.o \
 						Case_Files/Pi_helm_breakdown.o \
 						Case_Files/thermal_wind.o \
 						Case_Files/compute_radial_velocity.o \
