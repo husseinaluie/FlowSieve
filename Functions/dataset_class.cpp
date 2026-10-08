@@ -7,6 +7,7 @@
 #include <Eigen/QR>
 
 
+
 // Class constructor
 dataset::dataset() {
 };
@@ -63,6 +64,8 @@ void dataset::copy_from_ptr( const dataset *source ) {
 
     Ntime = source->Ntime;
     Ndepth = source->Ndepth;
+    Nlat = source->Nlat;
+    Nlon = source->Nlon;
 
     time = source->time;
     depth = source->depth;
@@ -138,6 +141,10 @@ void dataset::initialize_index_functions() {
     stride_lat   = Nlon;
     stride_depth = Nlat   * stride_lat;
     stride_time  = Ndepth * stride_depth;
+    #if DEBUG>0
+    fprintf(stdout, "Index strides are: (time) %zu, (depth) %zu, (latitude) %zu.\n",
+            stride_time, stride_depth, stride_lat);
+    #endif
 }
 
 void dataset::compute_cell_areas() {
@@ -220,6 +227,39 @@ double dataset::distance_from_indices(
 }
 
 // This is a wrapper for Functions/distance 
+// that takes in indices
+double dataset::distance_between_datasets(
+        const size_t Ipt,
+        const size_t Jpt,
+        const dataset & Jset
+        ) const {
+
+    const bool pre_comp = 
+        constants::PRECOMPUTE_SIN_COS_LATITUDE 
+        and sin_cos_lat_pre_comp
+        and Jset.sin_cos_lat_pre_comp;
+
+    return distance(
+                longitude[Ipt],
+                latitude[ Ipt],
+                Jset.longitude[Jpt],
+                Jset.latitude[ Jpt],
+                Cartesian_x_range,
+                Cartesian_y_range,
+                pre_comp ?      cos_lat[Ipt] : 0.,
+                pre_comp ? Jset.cos_lat[Jpt] : 0.,
+                pre_comp ?      sin_lat[Ipt] : 0.,
+                pre_comp ? Jset.sin_lat[Jpt] : 0.,
+                pre_comp ?      cos_lon[Ipt] : 0.,
+                pre_comp ? Jset.cos_lon[Jpt] : 0.,
+                pre_comp ?      sin_lon[Ipt] : 0.,
+                pre_comp ? Jset.sin_lon[Jpt] : 0.,
+                pre_comp
+            );
+
+}
+
+// This is a wrapper for Functions/distance 
 // that takes in Ilat,Ilon indices
 double dataset::distance_from_IlatIlon(
         const size_t Ilat,
@@ -249,7 +289,39 @@ double dataset::distance_from_IlatIlon(
                 pre_comp ? sin_lon[Jlon] : 0.,
                 pre_comp
             );
+}
 
+// This is a wrapper for Functions/distance 
+// that takes in Ilat,Ilon indices
+double dataset::distance_between_datasets_from_IlatIlon(
+        const size_t Ilat,
+        const size_t Ilon,
+        const size_t Jlat,
+        const size_t Jlon,
+        const dataset & Jset
+        ) const {
+
+    const bool pre_comp = 
+        constants::PRECOMPUTE_SIN_COS_LATITUDE 
+        and sin_cos_lat_pre_comp
+        and Jset.sin_cos_lat_pre_comp;
+    return distance(
+                longitude[Ilon],
+                latitude[ Ilat],
+                Jset.longitude[Jlon],
+                Jset.latitude[ Jlat],
+                Cartesian_x_range,
+                Cartesian_y_range,
+                pre_comp ?      cos_lat[Ilat] : 0.,
+                pre_comp ? Jset.cos_lat[Jlat] : 0.,
+                pre_comp ?      sin_lat[Ilat] : 0.,
+                pre_comp ? Jset.sin_lat[Jlat] : 0.,
+                pre_comp ?      cos_lon[Ilon] : 0.,
+                pre_comp ? Jset.cos_lon[Jlon] : 0.,
+                pre_comp ?      sin_lon[Ilon] : 0.,
+                pre_comp ? Jset.sin_lon[Jlon] : 0.,
+                pre_comp
+            );
 }
 
 void dataset::load_variable( 
@@ -584,7 +656,17 @@ size_t dataset::index_global_to_local(  const size_t index, const std::string me
 void dataset::index1to4_local(  const size_t index, 
                                 int & Itime, int & Idepth, int & Ilat, int & Ilon 
                               ) const {
-    Index1to4( index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+    //Index1to4( index, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+    size_t tmp_index = index;
+
+    Itime      = tmp_index / stride_time;
+    tmp_index -= Itime * stride_time;
+
+    Idepth     = tmp_index / stride_depth;
+    tmp_index -= Idepth * stride_depth;
+
+    Ilat = tmp_index / stride_lat;
+    Ilon = tmp_index - Ilat * stride_lat;
 }
 
 void dataset::index1to4_global( const size_t index, 
@@ -726,6 +808,9 @@ void dataset::load_adjacency(
             adjacency_indices[II][JJ] = (size_t) round(tmp_var.at(II*(Nneighbours+1) + JJ));
         } 
     }
+}
+
+/*
     size_t Ipt;
     #pragma omp parallel default(none) private( Ipt ) \
     firstprivate(Nneighbours, Npts) 
@@ -789,8 +874,7 @@ void dataset::load_adjacency(
             const long double x_scale = max_x - min_x,
                               y_scale = max_y - min_y;
 
-            /* Regression
-            */
+            // Regression
             std::map< std::string, long double > Sij;
             std::vector< std::string > S_comps = 
                 (Nconds == 10) ? std::vector<std::string> {"", "x", "y", "xy", "xx", "yy", "xxx", "xxy", "xyy", "yyy"}
@@ -904,6 +988,7 @@ void dataset::load_adjacency(
                 const bool DDLAT_IS_ZERO = false;//std::fabs(max_lat - min_lat) < 1e-4;
                 adjacency_ddlat_weights[Ipt][In] = DDLAT_IS_ZERO ? 0. : sol[2] / mean_dist;
             }
+*/
 
             /* Polynomial fit
             // use a local Cartesian projection to get derivative weights near the poles
@@ -993,6 +1078,275 @@ void dataset::load_adjacency(
             */
 
 
+//        }
+//    }
+        
+    //
+    //// Setting up a least-squares adjoint system for div and grad
+    //
+    /*
+
+    grad_weights_lon.resize(Npts);
+    grad_weights_lat.resize(Npts);
+
+    perp_grad_weights_lon.resize(Npts);
+    perp_grad_weights_lat.resize(Npts);
+
+    for ( size_t II = 0; II < Npts; II++ ) {
+        grad_weights_lon.at(II).resize(Nneighbours);
+        grad_weights_lat.at(II).resize(Nneighbours);
+        perp_grad_weights_lon.at(II).resize(Nneighbours);
+        perp_grad_weights_lat.at(II).resize(Nneighbours);
+    }
+    //size_t Ipt;
+    size_t tikhov_regularized = 0;
+    #pragma omp parallel default(none) private( Ipt ) \
+    firstprivate(Nneighbours, Npts) \
+    reduction( +:tikhov_regularized )
+    {
+        const size_t size_neighbourhood = Nneighbours;
+
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+
+            const double lat_i = latitude[ Ipt];
+            const double lon_i = longitude[Ipt];
+
+            // outward normal vector
+            Vec3 x_i = { cos(lat_i) * cos(lon_i), 
+                         cos(lat_i) * sin(lon_i), 
+                         sin(lat_i) 
+            };
+
+            // get tangent plane basis vectrs
+            Vec3 e_lon = { -sin(lon_i), 
+                            cos(lon_i), 
+                            0.0 
+            };
+            Vec3 e_lat = cross( x_i, e_lon );
+            //Vec3 e_lat = { - cos(lon_i) * sin(lat_i),
+            //               - sin(lon_i) * sin(lat_i),
+            //                 cos(lat_i)
+            //};
+
+            std::vector<double> A(4, 0.);
+
+            for ( size_t In = 0; In < size_neighbourhood; In++ ) {
+                const size_t Jpt = adjacency_indices[Ipt][In];
+
+                const double lat_j = latitude[ Jpt];
+                const double lon_j = longitude[Jpt];
+
+                Vec3 x_j = { cos(lat_j) * cos(lon_j), 
+                             cos(lat_j) * sin(lon_j), 
+                             sin(lat_j) 
+                };
+
+                // get displacement in local tangent plane
+                Vec3 r_ij_3d = x_j - dot( x_j, x_i ) * x_i;
+
+                // convert displacement to a 2-vector in local tangent plane
+                Vec2 r_ij_2d = { dot(r_ij_3d, e_lon ), dot(r_ij_3d, e_lat) };
+
+                // Accumulate A = sum( r_ij r_ij^T )
+                A[0] += r_ij_2d[0] * r_ij_2d[0];
+                A[1] += r_ij_2d[1] * r_ij_2d[0];
+                A[2] += r_ij_2d[0] * r_ij_2d[1];
+                A[3] += r_ij_2d[1] * r_ij_2d[1];
+            }
+
+            //
+            //// Invert A (Tikhov regularize if necessary)
+            //
+            double det = A[0]*A[3] - A[1]*A[2];
+            const double trace = A[0] + A[3];
+
+            const double eigen_1 = 0.5 * ( trace + sqrt( trace*trace - 4 * det ) );
+            const double eigen_2 = 0.5 * ( trace - sqrt( trace*trace - 4 * det ) );
+            const double kappa = (eigen_2 == 0) ? 1e100 : eigen_1 / eigen_2;
+
+            if ( kappa > 1e2 ) {
+                tikhov_regularized += 1;
+                const double alpha = 1e-6;
+                const double eps_abs = 1e-12;
+
+                const double eps_tikhov = std::fmax( alpha * trace, eps_abs );
+
+                // change from A to A + eps*I
+                A[0] += eps_tikhov;
+                A[3] += eps_tikhov;
+                det = A[0]*A[3] - A[1]*A[2];
+            }
+
+            const double invdet = 1.0 / det;
+            std::vector<double> invA(4, 0.);
+            invA[0] =  A[3] * invdet;
+            invA[1] = -A[1] * invdet;
+            invA[2] = -A[2] * invdet;
+            invA[3] =  A[0] * invdet;
+
+            for ( size_t In = 0; In < size_neighbourhood; In++ ) {
+                const size_t Jpt = adjacency_indices[Ipt][In];
+
+                const double lat_j = latitude[ Jpt];
+                const double lon_j = longitude[Jpt];
+
+                Vec3 x_j = { cos(lat_j) * cos(lon_j), 
+                             cos(lat_j) * sin(lon_j), 
+                             sin(lat_j) 
+                };
+
+                // get displacement in local tangent plane
+                Vec3 r_ij_3d = x_j - dot( x_j, x_i ) * x_i;
+
+                // convert displacement to a 2-vector in local tangent plane
+                Vec2 r_ij_2d = { dot(r_ij_3d, e_lon ), dot(r_ij_3d, e_lat) };
+
+                // Compute and store w_ij as gradient weights
+                grad_weights_lon[Ipt][In] = ( invA[0] * r_ij_2d[0] + invA[1] * r_ij_2d[1] ) / constants::R_earth;
+                grad_weights_lat[Ipt][In] = ( invA[2] * r_ij_2d[0] + invA[3] * r_ij_2d[1] ) / constants::R_earth;
+
+                perp_grad_weights_lon[Ipt][In] = - grad_weights_lat[Ipt][In];
+                perp_grad_weights_lat[Ipt][In] =   grad_weights_lon[Ipt][In];
+
+                // get the perpendicular weights, as a 3-vector
+                //const Vec3 w_ij_perp_3d =   grad_weights_lon[Ipt][In] * cross( x_i, e_lon )
+                //                          + grad_weights_lat[Ipt][In] * cross( x_i, e_lat );
+
+                // convert to a 2-vector in local tangent plane and store
+                //perp_grad_weights_lon[Ipt][In] = dot(w_ij_perp_3d, e_lat );
+                //perp_grad_weights_lat[Ipt][In] = dot(w_ij_perp_3d, e_lon );
+            }
+        }
+    }
+    fprintf(stdout, "  !! %'zu points were tikhov regularized.\n", tikhov_regularized);
+
+    // THIS ONLY POSSIBLE IF GUARANTEED MUTUAL NEIGHBOURS
+    // Symmetrize the gradient weights
+    #pragma omp parallel default(none) private( Ipt ) shared(stdout) \
+    firstprivate(Nneighbours, Npts)
+    {
+        const size_t size_neighbourhood = Nneighbours;
+
+        #pragma omp for collapse(1) schedule(static,4)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+            for ( size_t In = 0; In < size_neighbourhood; In++ ) {
+                const size_t Jpt = adjacency_indices[Ipt][In];
+
+                if ( Jpt >= Ipt ) { continue; }
+
+                size_t Jn;
+                for ( Jn = 0; Jn < size_neighbourhood; Jn++ ) {
+                    if ( Ipt == adjacency_indices[Jpt][Jn] ) { break; }
+                }
+                if ( Jn >= size_neighbourhood ) {
+                    fprintf( stdout, "!! Pt %'zu N %'zu (p %'zu) are not mutual neighbours.",
+                            Ipt, In, Jpt );
+                    throw std::runtime_error("Unable to symmetric gradient weights. Adjacency is not mutual.");
+                }
+
+                double w_ij_lon = 0.5 * ( grad_weights_lon[Ipt][In] + grad_weights_lon[Jpt][Jn] );
+                double w_ij_lat = 0.5 * ( grad_weights_lat[Ipt][In] + grad_weights_lat[Jpt][Jn] );
+
+                grad_weights_lon[Ipt][In] = w_ij_lon;
+                grad_weights_lon[Jpt][Jn] = w_ij_lon;
+
+                grad_weights_lat[Ipt][In] = w_ij_lat;
+                grad_weights_lat[Jpt][Jn] = w_ij_lat;
+
+                perp_grad_weights_lon[Ipt][In] = - w_ij_lat;
+                perp_grad_weights_lon[Jpt][Jn] = - w_ij_lat;
+
+                perp_grad_weights_lat[Ipt][In] =   w_ij_lon;
+                perp_grad_weights_lat[Jpt][Jn] =   w_ij_lon;
+            }
+        }
+    }
+    */
+
+
+void dataset::build_differentiation_weights(
+        const MPI_Comm comm
+        ) {
+
+    const size_t Npts = longitude.size(),
+                 Nneighbours = num_neighbours;
+
+    //
+    //// A DEC-type scheme for differentiation weights
+    //
+    grad_weights_lon.resize(Npts);
+    grad_weights_lat.resize(Npts);
+
+    perp_grad_weights_lon.resize(Npts);
+    perp_grad_weights_lat.resize(Npts);
+
+    for ( size_t II = 0; II < Npts; II++ ) {
+        grad_weights_lon.at(II).resize(Nneighbours);
+        grad_weights_lat.at(II).resize(Nneighbours);
+        perp_grad_weights_lon.at(II).resize(Nneighbours);
+        perp_grad_weights_lat.at(II).resize(Nneighbours);
+    }
+    size_t Ipt;
+    #pragma omp parallel default(none) private( Ipt ) \
+    firstprivate(Nneighbours, Npts)
+    {
+        const size_t size_neighbourhood = Nneighbours;
+
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+
+            const double lat_i = latitude[ Ipt];
+            const double lon_i = longitude[Ipt];
+
+            // outward normal vector
+            Vec3 x_i = { cos(lat_i) * cos(lon_i), 
+                         cos(lat_i) * sin(lon_i), 
+                         sin(lat_i) 
+            };
+
+            // eastward basis vector
+            Vec3 e_lon = { -sin(lon_i), 
+                            cos(lon_i), 
+                            0.0 
+            };
+
+            // northward basis vector
+            //Vec3 e_lat = cross( x_i, e_lon );
+            Vec3 e_lat = { - cos(lon_i) * sin(lat_i),
+                           - sin(lon_i) * sin(lat_i),
+                             cos(lat_i)
+            };
+
+            const double A_i = areas[Ipt];
+
+            for ( size_t In = 0; In < size_neighbourhood; In++ ) {
+                const size_t Jpt = adjacency_indices[Ipt][In];
+
+                // Distance between points
+                const double ell_ij = distance_from_indices( Ipt, Jpt );
+
+                const double lat_j = latitude[ Jpt];
+                const double lon_j = longitude[Jpt];
+
+                Vec3 x_j = { cos(lat_j) * cos(lon_j), 
+                             cos(lat_j) * sin(lon_j), 
+                             sin(lat_j) 
+                };
+
+                // get displacement in local tangent plane
+                Vec3 v_ij = x_j - dot( x_j, x_i ) * x_i;
+
+                Vec3 e_ij_hat = ( 1. / sqrt( dot( v_ij, v_ij ) ) ) * v_ij;
+                Vec3 t_ij_hat = cross( x_i, e_ij_hat );
+
+                // Compute and store w_ij as gradient weights
+                grad_weights_lon[Ipt][In] = (ell_ij / A_i) * dot( e_ij_hat, e_lon ); // / constants::R_earth;
+                grad_weights_lat[Ipt][In] = (ell_ij / A_i) * dot( e_ij_hat, e_lat ); // / constants::R_earth;
+
+                perp_grad_weights_lon[Ipt][In] = - grad_weights_lat[Ipt][In];
+                perp_grad_weights_lat[Ipt][In] =   grad_weights_lon[Ipt][In];
+            }
         }
     }
 
