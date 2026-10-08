@@ -53,7 +53,8 @@ void compute_local_kernel(
     for (int LAT = LAT_lb; LAT < LAT_ub; LAT++) {
 
         // Handle periodicity
-        if (constants::PERIODIC_Y) { Jlat = ( LAT % Nlat + Nlat ) % Nlat; }
+        //if (constants::PERIODIC_Y) { Jlat = ( LAT % Nlat + Nlat ) % Nlat; }
+        if (constants::PERIODIC_Y) { Jlat = apply_periodicity( LAT, Nlat ); }
         else                       { Jlat = LAT; }
         #ifdef NDEBUG
         lat_at_jlat = latitude[Jlat];
@@ -67,10 +68,12 @@ void compute_local_kernel(
         for (int LON = LON_lb; LON < LON_ub; LON++) {
 
             // Handle periodicity
-            if (constants::PERIODIC_X) { Jlon = ( LON % Nlon + Nlon ) % Nlon; }
+            //if (constants::PERIODIC_X) { Jlon = ( LON % Nlon + Nlon ) % Nlon; }
+            if (constants::PERIODIC_X) { Jlon = apply_periodicity( LON, Nlon ); }
             else                       { Jlon = LON; }
 
-            index = Index(0, 0, Jlat, Jlon, Ntime, Ndepth, Nlat, Nlon);
+            //index = Index(0, 0, Jlat, Jlon, Ntime, Ndepth, Nlat, Nlon);
+            index = source_data.local_index(0, 0, Jlat, Jlon);
 
             #ifdef NDEBUG
             lon_at_jlon = longitude[Jlon];
@@ -97,7 +100,11 @@ void compute_local_kernel(
                 dist = source_data.distance_from_IlatIlon( Ilat, Ilon, Jlat, Jlon );
             }
             kern = kernel(dist, scale);
+            #ifdef NDEBUG
+            local_kernel[index] = kern;
+            #else
             local_kernel.at(index) = kern;
+            #endif
 
             // Also get the first and second ell-derivatives of the kernel
             if (do_dl) { local_dl_kernel.at(index)  = kernel(dist, scale, 1); }
