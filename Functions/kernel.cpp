@@ -18,12 +18,17 @@ double sinc(const double &x) {
     return s;
 }
 
+double my_sech( const double &x ) {
+    if ( fabs(x) > 100 ) { return 0.; }
+    return 1. / cosh(x);
+}
+
 double dsincdx(const double &x) {
     double s;
 
     // to avoid some numerical issues, use series expansion for small x
     if (fabs(x) < 1e-9) { s = - x/6.; }
-    else                { s = ( x*cos(x) -  sin(x)) / pow(x,2); }
+    else                { s = ( x*cos(x) -  sin(x)) / my_pow<2>(x); }
 
     return s;
 }
@@ -111,8 +116,8 @@ double kernel(
    
     double kern = 0.;
     const double D        = ( scale > 0 ) ? ( dist / ( scale / 2. ) )   : ( dist == 0 ) ? 1. : 0.;
-    const double dDdell   = ( ( scale > 0 ) and (deriv_order > 0) ) ? ( -2 * dist / pow(scale,2) ) : 0.,
-                 d2Ddell2 = ( ( scale > 0 ) and (deriv_order > 1) ) ? (  4 * dist / pow(scale,3) ) : 0.;
+    const double dDdell   = ( ( scale > 0 ) and (deriv_order > 0) ) ? ( -2 * dist / my_pow<2>(scale) ) : 0.,
+                 d2Ddell2 = ( ( scale > 0 ) and (deriv_order > 1) ) ? (  4 * dist / my_pow<3>(scale) ) : 0.;
 
     const double arg = (D - 1) / 0.1;
 
@@ -123,29 +128,29 @@ double kernel(
                 break;
         case constants::KernelType::HyperGaussian: 
                 if ( deriv_order == 0 ) {
-                    kern = exp( -pow( D, 4) );
+                    kern = exp( -my_pow<4>(D) );
                 } else if (deriv_order == 1 ) {
-                    kern = exp( -pow( D, 4) ) * (-4*pow(D,3)) * dDdell;
+                    kern = exp( -my_pow<4>(D) ) * (-4*my_pow<3>(D)) * dDdell;
                 } else if (deriv_order == 2 ) {
-                    kern = (4*D*D) * exp( -pow( D, 4) ) * ( 
-                            (4*pow(D,4) - 3) * pow(dDdell,2) - D * d2Ddell2 ) ;
+                    kern = (4*D*D) * exp( -my_pow<4>(D) ) * ( 
+                            (4*my_pow<4>(D) - 3) * my_pow<2>(dDdell) - D * d2Ddell2 ) ;
                 }
                 break;
         case constants::KernelType::Gaussian: 
                 if ( deriv_order == 0 ) {
-                    kern = exp( -pow( D, 2) );
+                    kern = exp( -my_pow<2>(D) );
                 } else if (deriv_order == 1 ) {
-                    kern = exp( -pow( D, 2) ) * (-2*D) * dDdell;
+                    kern = exp( -my_pow<2>(D) ) * (-2*D) * dDdell;
                 } else if (deriv_order == 2 ) {
-                    kern = exp( -pow( D, 2) ) * ( 
-                            (4*D*D-2) * pow(dDdell,2) - 2 * D * d2Ddell2 ) ;
+                    kern = exp( -my_pow<2>(D) ) * ( 
+                            (4*D*D-2) * my_pow<2>(dDdell) - 2 * D * d2Ddell2 ) ;
                 }
                 break;
         case constants::KernelType::JohnsonGaussian: 
                 if ( deriv_order == 0 ) {
-                    kern = exp( -pow( D, 2)/8 );
+                    kern = exp( -my_pow<2>(D)/8 );
                 } else if (deriv_order == 1 ) {
-                    kern = exp( -pow( D, 2)/8 ) * (-2*D/8) * dDdell;
+                    kern = exp( -my_pow<2>(D) / 8 ) * (-2*D/8) * dDdell;
                 } else if (deriv_order == 2 ) {
                     kern = 0.;
                 }
@@ -168,22 +173,22 @@ double kernel(
                     */
                     kern = 0.5 * ( 1 - tanh_approx( arg ) );
                 } else if (deriv_order == 1 ) {
-                    kern = -5 * pow(1./cosh(arg), 2) * dDdell;
+                    kern = -5 * my_pow<2>(my_sech(arg)) * dDdell;
                 } else if (deriv_order == 2 ) {
-                    kern = 5 * pow(1./cosh(arg), 2) * ( 20 * tanh_approx(arg) * pow(dDdell,2) - d2Ddell2 );
+                    kern = 5 * my_pow<2>(my_sech(arg)) * ( 20 * tanh_approx(arg) * my_pow<2>(dDdell) - d2Ddell2 );
                 }
                 break;
         case constants::KernelType::HighOrder: 
                 const double arg2 = (D - 1) / 0.5;
                 const double c2 = 0.21534029041474162;
                 if ( deriv_order == 0 ) {
-                    kern = 0.5 * (1 - tanh( arg )) - c2 * exp( -pow(arg2,2.) );
+                    kern = 0.5 * (1 - tanh( arg )) - c2 * exp( -my_pow<2>(arg2) );
                 } else if (deriv_order == 1 ) {
-                    kern = -5 * pow(1./cosh(arg), 2) * dDdell
-                        + c2 * 4 * arg2 * exp( -pow(arg2,2.) ) * dDdell;
+                    kern = -5 * my_pow<2>(1./cosh(arg)) * dDdell
+                        + c2 * 4 * arg2 * exp( -my_pow<2>(arg2) ) * dDdell;
                 } else if (deriv_order == 2 ) {
-                    kern = 5 * pow(1./cosh(arg), 2) * ( 20 * tanh(arg) * pow(dDdell,2) - d2Ddell2 )
-                        + c2 * 4 * exp( -pow(arg2,2.) ) * ( 2 * (1 - 2*pow(arg2,2)) * pow( dDdell, 2 ) 
+                    kern = 5 * my_pow<2>(1./cosh(arg)) * ( 20 * tanh(arg) * my_pow<2>(dDdell) - d2Ddell2 )
+                        + c2 * 4 * exp( -my_pow<2>(arg2) ) * ( 2 * (1 - 2*my_pow<2>(arg2)) * my_pow<2>(dDdell) 
                                                             + arg2 * d2Ddell2 
                                                           );
                 }
