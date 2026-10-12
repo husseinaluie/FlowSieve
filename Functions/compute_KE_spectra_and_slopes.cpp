@@ -58,10 +58,15 @@ void compute_KE_spectra_and_slopes(
     //// first ell derivatives
     //
 
+    // makes the first derivative wrt ell of rotational velocity (u') label is u_lon_tor_tmp
     toroidal_vel_from_F( u_lon_tor_tmp, u_lat_tor_tmp, dl_coarse_Psi, 
-            longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+            longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask); 
+    // makes the first derivative wrt ell of divergent velocity         
     potential_vel_from_F( u_lon_pot_tmp, u_lat_pot_tmp, dl_coarse_Phi, 
             longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+
+    // F(ell) = |u|^2, F'(ell) = 2 u . u', F''(ell) = 2 |u'|^2 + 2 u . u''
+    // slope = -2 - ell*(F''(ell) / F'(ell)) 
 
     #pragma omp parallel \
     default( none ) \
@@ -83,7 +88,7 @@ void compute_KE_spectra_and_slopes(
                 u_lon_tot_tmp.at(index) = u_lon_tor_tmp.at(index) + u_lon_pot_tmp.at(index);
                 u_lat_tot_tmp.at(index) = u_lat_tor_tmp.at(index) + u_lat_pot_tmp.at(index);
 
-                // Totoidal spectrum
+                // Toroidal spectrum
                 u_spectrum_tor.at(index) = 2 * u_lon_tor.at(index) * u_lon_tor_tmp.at(index);
                 v_spectrum_tor.at(index) = 2 * u_lat_tor.at(index) * u_lat_tor_tmp.at(index);
 
@@ -97,7 +102,7 @@ void compute_KE_spectra_and_slopes(
 
                 // Contributions of first derivatives to slopes
                 spec_slope_tor.at(index) =    pow( u_lon_tor_tmp.at(index), 2 ) 
-                                            + pow( u_lat_tor_tmp.at(index), 2 );
+                                            + pow( u_lat_tor_tmp.at(index), 2 ); //(|u'|^2)
                 spec_slope_pot.at(index) =    pow( u_lon_pot_tmp.at(index), 2 ) 
                                             + pow( u_lat_pot_tmp.at(index), 2 );
                 spec_slope_tot.at(index) =    pow( u_lon_tot_tmp.at(index), 2 ) 
@@ -110,10 +115,15 @@ void compute_KE_spectra_and_slopes(
     //// second ell derivatives
     //
 
+    // makes the second derivative wrt ell of rotational velocity (u'') label is again u_lon_tor_tmp
     toroidal_vel_from_F( u_lon_tor_tmp, u_lat_tor_tmp, dll_coarse_Psi, 
             longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+    // makes the second derivative wrt ell of divergent velocity
     potential_vel_from_F( u_lon_pot_tmp, u_lat_pot_tmp, dll_coarse_Phi, 
             longitude, latitude, Ntime, Ndepth, Nlat, Nlon, mask);
+
+    // F(ell) = |u|^2, F'(ell) = 2 u . u', F''(ell) = 2 |u'|^2 + 2 u . u''
+    // slope = -2 - ell*(F''(ell) / F'(ell)) 
 
     double numer, denom;
 
@@ -139,7 +149,7 @@ void compute_KE_spectra_and_slopes(
 
                 // Contributions of first derivatives to slopes
                 spec_slope_tor.at(index) +=   u_lon_tor.at(index) * u_lon_tor_tmp.at(index)
-                                            + u_lat_tor.at(index) * u_lat_tor_tmp.at(index);
+                                            + u_lat_tor.at(index) * u_lat_tor_tmp.at(index); // was |u'|^2, now |u'|^2 + u . u''
                 spec_slope_pot.at(index) +=   u_lon_pot.at(index) * u_lon_pot_tmp.at(index)
                                             + u_lat_pot.at(index) * u_lat_pot_tmp.at(index);
                 spec_slope_tot.at(index) +=   u_lon_tot.at(index) * u_lon_tot_tmp.at(index)
@@ -148,15 +158,15 @@ void compute_KE_spectra_and_slopes(
 
                 // And now apply the scaling factors
                 // If there's too little energy, then just set the slope to zero
-                numer = filter_scale * spec_slope_tor.at(index);
-                denom = u_spectrum_tor.at(index) + v_spectrum_tor.at(index);
-                spec_slope_tor.at(index) = (fabs(denom) < 1e-20 ) ? 0. : - 2 - (numer / denom);
+                numer = 2 * filter_scale * spec_slope_tor.at(index); // 2 * ell (|u'|^2 + u . u'')
+                denom = u_spectrum_tor.at(index) + v_spectrum_tor.at(index); // F'(ell)
+                spec_slope_tor.at(index) = (fabs(denom) < 1e-20 ) ? 0. : - 2 - (numer / denom); // slope = -2 - ell*(F''(ell) / F'(ell)) 
 
-                numer = filter_scale * spec_slope_pot.at(index);
+                numer = 2 * filter_scale * spec_slope_pot.at(index);
                 denom = u_spectrum_pot.at(index) + v_spectrum_pot.at(index);
                 spec_slope_pot.at(index) = (fabs(denom) < 1e-20 ) ? 0. : - 2 - (numer / denom);
 
-                numer = filter_scale * spec_slope_tot.at(index);
+                numer = 2 * filter_scale * spec_slope_tot.at(index);
                 denom = u_spectrum_tot.at(index) + v_spectrum_tot.at(index);
                 spec_slope_tot.at(index) = (fabs(denom) < 1e-20 ) ? 0. : - 2 - (numer / denom);
 
