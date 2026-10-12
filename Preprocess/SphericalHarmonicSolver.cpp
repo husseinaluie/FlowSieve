@@ -23,10 +23,11 @@ void SphericalHarmonicSolver(
         std::vector<double> & Phi,
         const dataset & source_data,
         const std::vector<double> & vorticity,
-        const std::vector<double> & divergence
+        const std::vector<double> & divergence,
+        const int max_L
         ) {
 
-    const int max_L = 128;
+    //const int max_L = 16;
     const size_t Npts = source_data.mask.size();
     std::vector<long double> vort_coeffs_Real( max_L * (2 * max_L + 1), 0 ),
                              vort_coeffs_Imag( max_L * (2 * max_L + 1), 0 ),
@@ -53,7 +54,7 @@ void SphericalHarmonicSolver(
     default(none) \
     shared( source_data, vorticity, divergence ) \
     private( Ipt, L_degree ) \
-    firstprivate( Npts ) \
+    firstprivate( Npts, max_L ) \
     reduction( vec_long_double_plus:vort_coeffs_Real,vort_coeffs_Imag,div_coeffs_Real,div_coeffs_Imag )
     {
         // Loop over space to compute the inner produce of Lap_of_field with Y_L^M
@@ -112,7 +113,7 @@ void SphericalHarmonicSolver(
     default(none) \
     shared( source_data, long_Psi, long_Phi, vort_coeffs_Real, vort_coeffs_Imag, div_coeffs_Real, div_coeffs_Imag ) \
     private( Ipt, L_degree ) \
-    firstprivate( Npts, surface_area )
+    firstprivate( Npts, surface_area, max_L )
     {
         // Loop over the different spherical hamonic degrees and ordrs
         #pragma omp for collapse(1) schedule(static)

@@ -10,9 +10,12 @@
 #include <omp.h>
 #include <math.h>
 #include <numeric> // std::accumulate
-#include <Eigen/Sparse>
+#include <random>
+#include <Eigen/Core>
 #include <Eigen/IterativeLinearSolvers>
-#include <Eigen/QR>
+#include <unsupported/Eigen/IterativeSolvers>
+//#include <Eigen/QR>
+//#include <Eigen/Sparse>
 
 // Pragma-magic to allow reduction over vector operator
 //      thanks to: https://stackoverflow.com/questions/43168661/openmp-and-reduction-on-stdvector
@@ -24,178 +27,182 @@ template <typename T> int sgn(T val) {
     return (T(0) < val) - (val < T(0));
 }
 
-void SouthPolar_Bivariate_Regression(
-        double & alpha_const,
-        double & beta_x,
-        double & beta_y,
-        double & gamma_xx,
-        double & gamma_xy,
-        double & gamma_yy,
-        double & delta_xxx,
-        double & delta_xxy,
-        double & delta_xyy,
-        double & delta_yyy,
-        double & x0,
-        double & y0,
-        const std::vector<double> & lons,
-        const std::vector<double> & lats,
-        const std::vector<double> & vals,
-        const bool SouthPolarProjection = true
-        ){
+void Laplace_of_Scalar(
+        std::vector<double> & input,
+        std::vector<double> & output,
+        const dataset * coarsened_grid,
+        const std::vector<short int> & mask,
+        const std::vector<double> & fixed_water_values,
+        std::vector<double> & work1,
+        std::vector<double> & work2
+            ) {
 
-    const size_t Nvals = vals.size();
-    const size_t Nconds = 6; //3;
+    size_t Ipt, Npts = fixed_water_values.size();
+    Npts = coarsened_grid->variables.at("land_filled").size();
+    work1 = fixed_water_values;
 
-    std::map< std::string, long double > Sij;
-    std::vector< std::string > S_comps = 
-        (Nconds == 10) ? std::vector<std::string> {"", "x", "y", "xx", "xy", "yy", "xxx", "xxy", "xyy", "yyy"}
-      : (Nconds ==  6) ? std::vector<std::string> {"", "x", "y", "xx", "xy", "yy"}
-      :                  std::vector<std::string> {"", "x", "y"};
-    for ( size_t i = 0; i < S_comps.size(); i++ ) {
-        for ( size_t j = 0; j <= i; j++ ) {
-            std::string name = S_comps[i] + S_comps[j];
-            Sij.insert( std::pair< std::string, long double >(name, 0.) );
+    size_t Ifill = 0, Nfill = input.size();
+    for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+        if ( not(mask[Ipt]) ) { 
+            work1[Ipt] = input[Ifill];
+            Ifill++;
+        } else {
+            work1[Ipt] = coarsened_grid->variables.at("land_filled")[Ipt];
         }
+        if ( Ifill >= Nfill ) { break; }
     }
 
+    /*
+    // fix land values [lazy approach]
+    #pragma omp parallel default(none) private( Ipt ) \
+    shared( coarsened_grid, mask, input ) firstprivate( Npts )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+            if ( mask[Ipt] ) { input[Ipt] = coarsened_grid->variables.at("land_filled")[Ipt]; }
+        }
+    }
+    */
 
-    // Compute the Sx, Sxx, Sxy, etc. values
-    //  and build the RHS
-    Eigen::VectorXd RHS, sol;
-    RHS.resize(Nconds);
-    for ( size_t In = 0; In < Nconds; In++ ) { RHS[In] = 0.; }
+    // get the scalar Laplacian
+    //scalar_laplacian( output, input, *coarsened_grid, coarsened_grid->mask );
+    scalar_laplacian( work2, work1, *coarsened_grid, coarsened_grid->mask );
+
+    // copy to output
+    Ifill = 0;
+    double max_output = 0;
+    for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+        if ( not(mask[Ipt]) ) { 
+            output[Ifill] = work2[Ipt];
+            max_output = std::fmax( max_output, std::fabs(work2[Ipt]) );
+            Ifill++;
+        }
+        if ( Ifill >= Nfill ) { break; }
+    }
+    fprintf( stdout, "Max output = %g\n", max_output );
+
+    // zero it out over water
+    /*
+    #pragma omp parallel default(none) private( Ipt ) \
+    shared( mask, output ) firstprivate( Npts )
+    {
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+            if ( mask[Ipt] ) { output[Ipt] = 0.; }
+        }
+    }
+    */
+}
+
+class ScalarLaplaceOperator; // declaring existence
+namespace Eigen {
+    namespace internal {
+
+        template<>
+            struct traits<ScalarLaplaceOperator>
+            {
+                using Scalar = double;
+                using StorageKind = Dense;
+                using StorageIndex = Eigen::Index;
+                using XprKind = MatrixXpr;
+
+                enum {
+                    RowsAtCompileTime = Dynamic,
+                    ColsAtCompileTime = Dynamic,
+                    MaxRowsAtCompileTime = Dynamic,
+                    MaxColsAtCompileTime = Dynamic,
+                    Flags = 0
+                };
+            };
+
+    } // namespace internal
+} // namespace Eigen
 
 
-    for ( size_t In = 0; In < Nvals; In++ ) {
 
-        long double local_lon = lons[In];
-        long double local_lat = lats[In];
+class ScalarLaplaceOperator : public Eigen::EigenBase<ScalarLaplaceOperator>
+{
+    public:
 
-        long double x,y;
-        x = sin( local_lon ) * cos( local_lat );
-        y = cos( local_lon ) * cos( local_lat );
+        using Scalar = double;
+        using RealScalar = double;
+        using StorageIndex = Eigen::Index;
 
-        long double dA = 1.;
+        enum {
+            ColsAtCompileTime = Eigen::Dynamic,
+            RowsAtCompileTime = Eigen::Dynamic,
+            MaxColsAtCompileTime = Eigen::Dynamic,
+            MaxRowsAtCompileTime = Eigen::Dynamic
+        };
 
-        for (auto const& sij : Sij ) {
-            std::string name = sij.first;
-            long double value = 1.;
-            for ( size_t i = 0; i < name.size(); i++ ) {
-                if ( name[i] == 'x' ) { value *= x; }
-                else {                  value *= y; }
+        ScalarLaplaceOperator(
+                const dataset* grid_,
+                const std::vector<short int>& mask_,
+                const std::vector<double> fixed_water_values_,
+                const size_t num_land_
+                )
+            :
+                num_land(num_land_),
+                grid(grid_),
+                mask(mask_),
+                fixed_water_values(fixed_water_values_),
+                vin(num_land_),
+                vout(num_land_),
+                work1(grid_->areas.size()),
+                work2(grid_->areas.size())
+    {}
+
+        int rows() const { return grid->areas.size(); }
+        int cols() const { return grid->areas.size(); }
+
+        //template<typename Vec>
+        //    void perform_op(const Vec& x, Vec& y) const
+        //void _mul_vector(const Eigen::VectorXd& x,
+        //                       Eigen::VectorXd& y) const
+        // Matrix-vector product
+        Eigen::VectorXd operator*(const Eigen::VectorXd& x) const 
+            {
+
+                /* copy Eigen → std::vector */
+                for( size_t i=0; i<num_land; i++) {
+                    vin[i] = x[i];
+                }
+
+                /* apply Laplacian */
+                Laplace_of_Scalar(
+                        vin,
+                        vout,
+                        grid,
+                        mask,
+                        fixed_water_values,
+                        work1,
+                        work2
+                       );
+
+                //const size_t N = grid->areas.size();
+                Eigen::VectorXd y(num_land);
+                for( size_t i=0; i<num_land; i++) {
+                    y[i] = vout[i];
+                }
+                return y;
             }
-            Sij[name] += value * dA;
-        }
 
-        RHS[0] += dA * vals[In];
-        RHS[1] += dA * vals[In] * x;
-        RHS[2] += dA * vals[In] * y;
-        if ( Nconds > 3 ) {
-            RHS[3] += dA * vals[In] * x * x;
-            RHS[4] += dA * vals[In] * x * y;
-            RHS[5] += dA * vals[In] * y * y;
-        }
-        if ( Nconds > 6 ) {
-            RHS[6] += dA * vals[In] * x * x * x;
-            RHS[7] += dA * vals[In] * x * x * y;
-            RHS[8] += dA * vals[In] * x * y * y;
-            RHS[9] += dA * vals[In] * y * y * y;
-        }
-    }
+    private:
 
-    // Assemble info a matrix
-    Eigen::MatrixXd A;
-    A.resize(Nconds, Nconds);
-    for ( size_t i = 0; i < S_comps.size(); i++ ) {
-        for ( size_t j = 0; j <= i; j++ ) {
-            std::string name = S_comps[i] + S_comps[j];
-            A(i,j) = Sij[name];
-            A(j,i) = Sij[name];
-        }
-    }
+        const size_t num_land;
 
-    // Get the coefficients
-    sol = A.completeOrthogonalDecomposition().solve(RHS);
+        const dataset* grid;
 
-    alpha_const = sol[0];
+        const std::vector<short int>& mask;
+        const std::vector<double>& fixed_water_values;
 
-    beta_x = sol[1];
-    beta_y = sol[2];
+        /* persistent buffers */
+        mutable std::vector<double> vin;
+        mutable std::vector<double> vout;
 
-    gamma_xx = (Nconds > 3) ? sol[3] : 0.;
-    gamma_xy = (Nconds > 3) ? sol[4] : 0.;
-    gamma_yy = (Nconds > 3) ? sol[5] : 0.;
-
-    delta_xxx = (Nconds > 6) ? sol[6] : 0.;
-    delta_xxy = (Nconds > 6) ? sol[7] : 0.;
-    delta_xyy = (Nconds > 6) ? sol[8] : 0.;
-    delta_yyy = (Nconds > 6) ? sol[9] : 0.;
-
-    x0 = 0.; //centre_lon;
-    y0 = 0.; //centre_lat;
-
-}
-
-void SouthPolar_ApplyHaloRegression(
-        const std::vector<size_t> & halo_indices,
-        const std::vector<size_t> & core_indices,
-        const dataset & grid,
-        std::vector<double> & data,
-        const bool SouthPolarProjection = true
-        ){
-
-    const size_t NHalo = halo_indices.size();
-
-    std::vector<double> lons(NHalo, 0.), lats(NHalo, 0.), vals(NHalo, 0.);
-    for ( size_t IHalo = 0; IHalo < NHalo; IHalo++ ) {
-        size_t HaloPt = halo_indices[IHalo];
-
-        lons[IHalo] = grid.longitude[HaloPt];
-        lats[IHalo] = grid.latitude[HaloPt];
-        vals[IHalo] = data[HaloPt];
-    }
-
-    double alpha_const, beta_x, beta_y, gamma_xx, gamma_xy, gamma_yy, x0, y0,
-           delta_xxx, delta_xxy, delta_xyy, delta_yyy;
-
-    SouthPolar_Bivariate_Regression(
-            alpha_const, beta_x, beta_y,
-            gamma_xx, gamma_xy, gamma_yy,
-            delta_xxx, delta_xxy, delta_xyy, delta_yyy,
-            x0, y0,
-            lons, lats, vals
-            );
-
-    //fprintf( stdout, "Regression params: %.2e (%.2e %.2e) (%.2e %.2e %.2e) (%.2e %.2e %.2e %.2e)\n", 
-    //        alpha_const, beta_x, beta_y, gamma_xx, gamma_xy, gamma_yy, 
-    //        delta_xxx, delta_xxy, delta_xyy, delta_yyy );
-
-
-    const size_t NCore = core_indices.size();
-    for ( size_t ICore = 0; ICore < NCore; ICore++ ) {
-        size_t CorePt = core_indices[ICore];
-
-        double x, y;
-        double local_lon = grid.longitude[CorePt];
-        double local_lat = grid.latitude[ CorePt];
-
-        x = sin( local_lon ) * cos( local_lat );
-        y = cos( local_lon ) * cos( local_lat );
-
-        double f = alpha_const 
-                    + beta_x * x
-                    + beta_y * y 
-                    + gamma_xx * x * x
-                    + gamma_xy * x * y
-                    + gamma_yy * y * y
-                    + delta_xxx * x * x * x
-                    + delta_xxy * x * x * y
-                    + delta_xyy * x * y * y
-                    + delta_yyy * y * y * y;
-        data[CorePt] = f;
-    }
-
-}
+        mutable std::vector<double> work1;
+        mutable std::vector<double> work2;
+};
 
 void Scalar_Land_Filler(
         const std::string output_fname,
@@ -293,7 +300,7 @@ void Scalar_Land_Filler(
         // To avoid having to re-build, just copy from the coarsened grid
         solution_grid.clear();
         solution_grid.copy_from_ptr( coarsened_grid );
-        std::fill( solution_grid.mask.begin(), solution_grid.mask.end(), true ); 
+        //std::fill( solution_grid.mask.begin(), solution_grid.mask.end(), true ); 
 
         solution_grid.variables.insert( std::pair< std::string, std::vector<double> >(
                     "land_filled", std::vector<double>(Npts_coarse, 0.) ) );
@@ -314,74 +321,136 @@ void Scalar_Land_Filler(
                 }
             }
         }
+        coarsened_grid->variables.at("land_filled") = solution_grid.variables.at("land_filled");
 
         // Reset the Helmholtz data for this resolution
         Helmholtz_data.clear();
-        Helmholtz_data.iteration_max = Npts_coarse * 10;
-        Helmholtz_data.iterations_per_cycle = std::fmin( 10000, Npts_coarse / 100 );
+        //Helmholtz_data.iteration_max = Npts_coarse * 10;
+        //Helmholtz_data.iterations_per_cycle = std::fmin( 10000, Npts_coarse / 100 );
+        Helmholtz_data.iteration_max = 10;
+        Helmholtz_data.iterations_per_cycle = 10;
 
         // Seed with zonal average on coarsest grid
-        if ( refine_level == num_refinements ) {
-            int Ilat;
-            std::vector<int> zonal_counts(Nlat_coarse, 0);
-            std::vector<double> zonal_means(Nlat_coarse, 0.);
-            #pragma omp parallel default(none) private( Ilat ) \
-            shared( solution_grid, coarsened_grid, zonal_counts, zonal_means ) \
-            firstprivate( Nlat_coarse, Nlon_coarse )
-            {
-                #pragma omp for collapse(1) schedule(static)
-                for ( Ilat = 0; Ilat < Nlat_coarse; Ilat++ ) {
-                    long double zonal_mean = 0.;
-                    size_t zonal_count = 0;
-                    for ( int Ilon = 0; Ilon < Nlon_coarse; Ilon++ ) {
-                        size_t index = Ilat*Nlon_coarse + Ilon;
-                        if (coarsened_grid->mask[index]) {
-                            zonal_mean += solution_grid.variables["land_filled"][index];
-                            zonal_count++;
+        if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+            if ( refine_level == num_refinements ) {
+                int Ilat;
+                std::vector<int> zonal_counts(Nlat_coarse, 0);
+                std::vector<double> zonal_means(Nlat_coarse, 0.);
+                #pragma omp parallel default(none) private( Ilat ) \
+                shared( solution_grid, coarsened_grid, zonal_counts, zonal_means ) \
+                firstprivate( Nlat_coarse, Nlon_coarse )
+                {
+                    #pragma omp for collapse(1) schedule(static)
+                    for ( Ilat = 0; Ilat < Nlat_coarse; Ilat++ ) {
+                        long double zonal_mean = 0.;
+                        size_t zonal_count = 0;
+                        for ( int Ilon = 0; Ilon < Nlon_coarse; Ilon++ ) {
+                            size_t index = Ilat*Nlon_coarse + Ilon;
+                            if (coarsened_grid->mask[index]) {
+                                zonal_mean += solution_grid.variables["land_filled"][index];
+                                zonal_count++;
+                            }
+                        }
+                        zonal_counts[Ilat] = zonal_count;
+                        zonal_mean = (zonal_count == 0) ? 0. : zonal_mean / zonal_count;
+                        zonal_means[Ilat] = zonal_mean;
+                        for ( int Ilon = 0; Ilon < Nlon_coarse; Ilon++ ) {
+                            size_t index = Ilat*Nlon_coarse + Ilon;
+                            if (not(coarsened_grid->mask[index])) {
+                                solution_grid.variables["land_filled"][index] = zonal_mean;
+                            }
                         }
                     }
-                    zonal_counts[Ilat] = zonal_count;
-                    zonal_mean = (zonal_count == 0) ? 0. : zonal_mean / zonal_count;
-                    zonal_means[Ilat] = zonal_mean;
+                }
+
+                // Account for south polar region, which has no zonal average to use
+                size_t good_index = std::upper_bound (zonal_counts.begin(), zonal_counts.end(), 0) - zonal_counts.begin();
+                for ( Ilat = 0; Ilat < good_index; Ilat++ ) {
                     for ( int Ilon = 0; Ilon < Nlon_coarse; Ilon++ ) {
                         size_t index = Ilat*Nlon_coarse + Ilon;
                         if (not(coarsened_grid->mask[index])) {
-                            solution_grid.variables["land_filled"][index] = zonal_mean;
+                            solution_grid.variables["land_filled"][index] = zonal_means[good_index];
                         }
                     }
                 }
-            }
 
-            // Account for south polar region, which has no zonal average to use
-            size_t good_index = std::upper_bound (zonal_counts.begin(), zonal_counts.end(), 0) - zonal_counts.begin();
-            for ( Ilat = 0; Ilat < good_index; Ilat++ ) {
-                for ( int Ilon = 0; Ilon < Nlon_coarse; Ilon++ ) {
-                    size_t index = Ilat*Nlon_coarse + Ilon;
-                    if (not(coarsened_grid->mask[index])) {
-                        solution_grid.variables["land_filled"][index] = zonal_means[good_index];
-                    }
-                }
-            }
-
-            coarsened_grid->variables.at("land_filled") = solution_grid.variables.at("land_filled");
-        }
-
-        std::vector<double> min_delta(Npts_coarse, 0.);
-        {
-            int Ilat, Ilon;
-            #pragma omp parallel default(none) private( Ilat, Ilon ) shared( min_delta, coarsened_grid ) \
-            firstprivate( Nlat_coarse, Nlon_coarse )
-            {
-                #pragma omp for collapse(2) schedule(static)
-                for ( Ilat = 0; Ilat < Nlat_coarse; Ilat++ ) {
-                    for ( int Ilon = 0; Ilon < Nlon_coarse; Ilon++ ) {
-                        size_t index = Ilat*Nlon_coarse + Ilon;
-                        double cos_lat = cos( coarsened_grid->latitude[Ilat] );
-                        min_delta[index] = constants::R_earth * ( 2 * M_PI / Nlon_coarse ) * cos_lat;
-                    }
-                }
+                coarsened_grid->variables.at("land_filled") = solution_grid.variables.at("land_filled");
             }
         }
+
+        // Impose boundary conditions with one layer of replicate padding
+        size_t num_coast = 0;
+        double max_boundary_fill = 0, min_boundary_fill = 1e10;
+        for (Ipt = 0; Ipt < Npts; Ipt++) {
+
+            if ( coarsened_grid->mask[Ipt]) { 
+                // if water, skip
+                continue;
+            } else {
+                double neigh_sum = 0, neigh_count = 0;
+                size_t Jpt;
+                if (constants::GRID_TYPE == constants::GridType::MeshGrid) {
+                    /*
+                    // Get coordinates
+                    int Itime, Idepth, Ilat, Ilon;
+                    Index1to4( Ipt, Itime, Idepth, Ilat, Ilon, Ntime, Ndepth, Nlat, Nlon );
+
+                    // check each neighbour
+                    Ineigh = ( (Ilon+1) % Nlon + Nlon ) % Nlon;
+                    Jpt = Index(0, 0, Ilat, Ineigh, 1, 1, Nlat, Nlon);
+                    if ( coarsened_grid->mask[Jpt] ) { 
+                        neigh_count++;
+                        neigh_sum += coarsened_grid->variables.at("land_filled")[Jpt];
+                    }
+
+                    Ineigh = ( (Ilon-1) % Nlon + Nlon ) % Nlon;
+                    Jpt = Index(0, 0, Ilat, Ineigh, 1, 1, Nlat, Nlon);
+                    if ( coarsened_grid->mask[Jpt] ) { 
+                        neigh_count++;
+                        neigh_sum += coarsened_grid->variables.at("land_filled")[Jpt];
+                    }
+
+                    if (Ilat > 0) {
+                        Jpt = Index(0, 0, Ilat-1, Ilon, 1, 1, Nlat, Nlon);
+                        if ( coarsened_grid->mask[Jpt] ) { 
+                            neigh_count++;
+                            neigh_sum += coarsened_grid->variables.at("land_filled")[Jpt];
+                        }
+                    }
+                    if (Ilat < Nlat-1) {
+                        Jpt = Index(0, 0, Ilat+1, Ilon, 1, 1, Nlat, Nlon);
+                        if ( coarsened_grid->mask[Jpt] ) { 
+                            neigh_count++;
+                            neigh_sum += coarsened_grid->variables.at("land_filled")[Jpt];
+                        }
+                    }
+                    */
+                } else {
+                    for (size_t neighbour_ind = 0; neighbour_ind < coarsened_grid->num_neighbours; neighbour_ind++ ) {
+                        Jpt = coarsened_grid->adjacency_indices.at(Ipt)[neighbour_ind];
+                        if ( coarsened_grid->mask[Jpt] ) { 
+                            neigh_count++;
+                            neigh_sum += coarsened_grid->variables.at("land_filled")[Jpt];
+                        }
+                    }
+                }
+
+                // coastal points will be updated and flagged as water to fix them
+                /*
+                if ( neigh_count > 0 ) {
+                    coarsened_grid->variables.at("land_filled")[Ipt] = neigh_sum / neigh_count;
+                    coarsened_grid->mask[Ipt] = true;
+
+                    num_coast++;
+                    max_boundary_fill = std::fmax( max_boundary_fill, std::fabs(neigh_sum / neigh_count) );
+                    min_boundary_fill = std::fmin( min_boundary_fill, std::fabs(neigh_sum / neigh_count) );
+                }
+                */
+            }
+        }
+        fprintf( stdout, "Filled %'zu coastal values. Max fill was %g. Min fill was %g.\n", 
+                num_coast, max_boundary_fill, min_boundary_fill );
+        solution_grid.variables.at("land_filled") = coarsened_grid->variables.at("land_filled");
 
         bool keep_solving = true;
         unsigned long int iter_cycle = 0;
@@ -398,12 +467,59 @@ void Scalar_Land_Filler(
             std::vector<std::string> vars_to_write = { scalar_name, "Laplacian" };
             initialize_output_file( *coarsened_grid, vars_to_write, output_filename, -1 );
 
-            const int ndims = 4;
-            size_t starts[ndims] = { 0, 0, 0, 0 };
-            size_t counts[ndims] = { 1, 1, size_t(coarsened_grid->Nlat), size_t(coarsened_grid->Nlon) };
-            write_field_to_output( solution_grid.variables.at("land_filled"), 
-                    scalar_name, starts, counts, output_filename, NULL );
-            write_field_to_output( Laplace_of_Scalar, "Laplacian", starts, counts, output_filename, NULL );
+            if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+                const int ndims = 4;
+                size_t starts[ndims] = { 0, 0, 0, 0 };
+                size_t counts[ndims] = { 1, 1, size_t(coarsened_grid->Nlat), size_t(coarsened_grid->Nlon) };
+                write_field_to_output( solution_grid.variables.at("land_filled"), 
+                        scalar_name, starts, counts, output_filename, NULL );
+                write_field_to_output( Laplace_of_Scalar, "Laplacian", starts, counts, output_filename, NULL );
+            } else {
+                const int ndims = 3;
+                size_t starts[ndims] = { 0, 0, 0 };
+                size_t counts[ndims] = { 1, 1, size_t(Npts_coarse) };
+                write_field_to_output( solution_grid.variables.at("land_filled"), 
+                        scalar_name, starts, counts, output_filename, NULL );
+                write_field_to_output( Laplace_of_Scalar, "Laplacian", starts, counts, output_filename, NULL );
+            }
+        }
+
+        size_t num_land = 0;
+        for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+            if ( not( coarsened_grid->mask[Ipt] ) ) { num_land++; }
+        }
+        fprintf(stdout, "Will solver over the remaining %'zu land points.\n", num_land);
+
+        // Declare the solver
+        ScalarLaplaceOperator A( 
+                coarsened_grid, 
+                coarsened_grid->mask,
+                solution_grid.variables.at("land_filled"),
+                num_land 
+                );
+        Eigen::GMRES<ScalarLaplaceOperator, Eigen::IdentityPreconditioner> GMRES_solver;
+        GMRES_solver.compute(A);
+        GMRES_solver.setTolerance(1e-100);
+        GMRES_solver.setMaxIterations(Helmholtz_data.iterations_per_cycle);
+
+        // And make some mappings between std::vector objects and Eigen::VectorXd objects
+        /*
+        std::vector<double> output_vec(Npts_coarse, 0.), rhs( Npts_coarse, 0. );
+        Eigen::Map<Eigen::VectorXd> solver_rhs( rhs.data(), Npts_coarse ),
+                                    solver_seed( coarsened_grid->variables.at("land_filled").data(), Npts_coarse ),
+                                    solver_output( output_vec.data(),   Npts_coarse );
+        */
+        std::vector<double> output_vec(num_land, 0.), rhs( num_land, 0. ), seed( num_land, 0 );
+        Eigen::Map<Eigen::VectorXd> solver_rhs( rhs.data(), num_land ),
+                                    solver_seed( seed.data(), num_land ),
+                                    solver_output( output_vec.data(), num_land );
+
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<double> dis(4.0, 40.0);
+        for ( size_t Ifill = 0; Ifill < num_land; Ifill++ ) {
+            seed[Ifill] = dis(gen);
         }
 
         #if DEBUG >= 0
@@ -411,7 +527,32 @@ void Scalar_Land_Filler(
         #endif
         while ( keep_solving ) {
 
+            // apply GMRERS solver
+            solver_output = GMRES_solver.solveWithGuess( solver_rhs, solver_seed );
+            //solver_output = GMRES_solver.solve( solver_rhs );
+            fprintf( stdout, "    GMRES : solver halted after %ld iterations to error of %.5e\n",
+                  GMRES_solver.iterations(), GMRES_solver.error() );
 
+            size_t Ifill = 0, Nfill = num_land;
+            double max_abs_output = 0.;
+            for ( Ipt = 0; Ipt < Npts_coarse; Ipt++ ) {
+                if ( not(coarsened_grid->mask[Ipt]) ) { 
+                    //coarsened_grid->variables.at("land_filled")[Ipt] = solver_output[Ifill];
+                    //solution_grid.variables.at("land_filled")[Ipt] = solver_output[Ifill];
+                    double rand_val = dis(gen);
+                    coarsened_grid->variables.at("land_filled")[Ipt] = rand_val;
+                    solution_grid.variables.at("land_filled")[Ipt] = rand_val;
+                    max_abs_output = std::fmax( max_abs_output, std::fabs( solver_output[Ifill] ) );
+                    Ifill++;
+                }
+                if ( Ifill >= Nfill ) { break; }
+            }
+            fprintf( stdout, "max(abs(fill)) = %g\n", max_abs_output);
+            //std::copy( solver_output.data(), solver_output.data() + solver_output.size(), 
+            //           solution_grid.variables.at("land_filled").begin() );
+
+
+            /*
             scalar_laplacian( Laplace_of_Scalar, solution_grid.variables["land_filled"],
                               *coarsened_grid, solution_grid.mask );
 
@@ -472,10 +613,17 @@ void Scalar_Land_Filler(
                 }
             }
             if (constants::DO_TIMING) { timing_records.add_to_record(MPI_Wtime() - clock_on, "Solving"); }
+            */
 
-            iter_cycle++;
-            if ( iter_cycle > Helmholtz_data.iteration_max ) { keep_solving = false; }
+            //iter_cycle++;
+            iter_cycle += Helmholtz_data.iterations_per_cycle;
+            if ( iter_cycle >= Helmholtz_data.iteration_max ) { keep_solving = false; }
 
+            #if DEBUG >= 0
+            fprintf( stdout,"  Solver cycle %'zu complete.\n", iter_cycle );
+            #endif
+
+            /*
             if ( iter_cycle % Helmholtz_data.iterations_per_cycle == 0 ) {
                 long double Laplace_2_norm = (laplace_norm_denom == 0) ? -1 : sqrt( laplace_norm_numer / laplace_norm_denom );
 
@@ -488,9 +636,12 @@ void Scalar_Land_Filler(
                 const double ref_val = 0.5 * ( std::fabs(min_filled_scalar) + std::fabs(max_filled_scalar) );
                 if ( Laplace_2_norm < rel_tol * ref_val ) { keep_solving = false; }
             }
+            */
         }
 
         coarsened_grid->variables.at("land_filled") = solution_grid.variables.at("land_filled");
+        scalar_laplacian( Laplace_of_Scalar, solution_grid.variables["land_filled"],
+                *coarsened_grid, solution_grid.mask );
 
         std::ostringstream name_stream;
         name_stream << "scalar_landfill_R" << (refine_level) << "_" << (scalar_name) <<  ".nc";
@@ -498,13 +649,21 @@ void Scalar_Land_Filler(
         std::vector<std::string> vars_to_write = { scalar_name, "Laplacian" };
         initialize_output_file( *coarsened_grid, vars_to_write, output_filename, -1 );
 
-        const int ndims = 4;
-        size_t starts[ndims] = { 0, 0, 0, 0 };
-        size_t counts[ndims] = { 1, 1, size_t(coarsened_grid->Nlat), size_t(coarsened_grid->Nlon) };
-        write_field_to_output( coarsened_grid->variables.at("land_filled"), 
-                               scalar_name, starts, counts, output_filename, NULL );
-        write_field_to_output( Laplace_of_Scalar, "Laplacian", starts, counts, output_filename, NULL );
-        add_attr_to_file( "CFL", CFL, output_filename );
+        if ( constants::GRID_TYPE == constants::GridType::MeshGrid ) {
+            const int ndims = 4;
+            size_t starts[ndims] = { 0, 0, 0, 0 };
+            size_t counts[ndims] = { 1, 1, size_t(coarsened_grid->Nlat), size_t(coarsened_grid->Nlon) };
+            write_field_to_output( coarsened_grid->variables.at("land_filled"), 
+                                   scalar_name, starts, counts, output_filename, NULL );
+            write_field_to_output( Laplace_of_Scalar, "Laplacian", starts, counts, output_filename, NULL );
+        } else {
+            const int ndims = 4;
+            size_t starts[ndims] = { 0, 0, 0 };
+            size_t counts[ndims] = { 1, 1, Npts_coarse };
+            write_field_to_output( coarsened_grid->variables.at("land_filled"), 
+                                   scalar_name, starts, counts, output_filename, NULL );
+            write_field_to_output( Laplace_of_Scalar, "Laplacian", starts, counts, output_filename, NULL );
+        }
 
         // If we're doing timings, then print out and reset values now
         if (constants::DO_TIMING) { 

@@ -108,6 +108,7 @@ void map_grid_to_grid(
             }
 
             // also check our neighbours, see if they already have their nearest source set
+            // and see if it's better than our current best
             for ( size_t II = 0; II < target_data.num_neighbours; II++ ) {
                 size_t neighbour_index = target_data.adjacency_indices.at(target_index).at(II);
 
@@ -313,8 +314,9 @@ void map_grid_to_grid(
             if ( mapping_from_fine_to_coarse ) {
                 // Only set the mask if we're coarsening
                 //target_data.mask[target_index] = source_data.mask[ nearest_source[target_index] ];
-                target_data.mask[target_index] = ( water_area > 0 );
+                //target_data.mask[target_index] = ( water_area > 0 );
                 //target_data.mask[target_index] = ( water_area > land_area );
+                target_data.mask[target_index] = ( water_area > 0.5 * land_area );
             }
             for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {
                 target_data.variables.at(vars_to_map[Ivar]).at(target_index) = 

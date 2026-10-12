@@ -34,6 +34,21 @@ void initialize_coarsened_grid(
         Npts = coarsened_grid.longitude.size();
         coarsened_grid.mask.resize( Npts, true );
 
+        // the polyhedral grid has lons from -pi to pi
+        // if needed, adjust grid to 0,2*pi
+        const auto [min, max] = std::minmax_element(begin(reference_grid.longitude), 
+                                                    end(  reference_grid.longitude));
+        const double min_lon = *min;
+        const double max_lon = *max;
+
+        if ( max_lon > 1.1 * M_PI ) {
+            size_t Ipt;
+            for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+                double ref_val = coarsened_grid.longitude[Ipt];
+                coarsened_grid.longitude[Ipt] = ref_val + ( ref_val < 0 ? 2 * M_PI : 0. );
+            }
+        }
+
         // Setting myCounts and myStarts
         coarsened_grid.myCounts.resize(3);
         coarsened_grid.myCounts = { reference_grid.myCounts[0], reference_grid.myCounts[1], Npts };
@@ -48,11 +63,17 @@ void initialize_coarsened_grid(
     coarsened_grid.Nlat = Nlat_coarse;
     coarsened_grid.Nlon = Nlon_coarse;
 
+    //fprintf(stdout, "Counts are: %'u %'u %'u %'u.\n", reference_grid.myCounts.at(0), reference_grid.myCounts.at(1),
+    //        reference_grid.myCounts.at(2), reference_grid.myCounts.at(3));
+
     coarsened_grid.myCounts.resize(4);
-    coarsened_grid.myCounts = { reference_grid.myCounts[0], reference_grid.myCounts[1], Nlat_coarse, Nlon_coarse };
+    coarsened_grid.myCounts = { reference_grid.myCounts.at(0), reference_grid.myCounts.at(1), Nlat_coarse, Nlon_coarse };
+
+    //fprintf(stdout, "Counts are: %'u %'u %'u %'u.\n", coarsened_grid.myCounts.at(0), coarsened_grid.myCounts.at(1),
+    //        coarsened_grid.myCounts.at(2), coarsened_grid.myCounts.at(3));
 
     coarsened_grid.myStarts.resize(4);
-    coarsened_grid.myStarts = { reference_grid.myStarts[0], reference_grid.myStarts[1], 0, 0 };
+    coarsened_grid.myStarts = { reference_grid.myStarts.at(0), reference_grid.myStarts.at(1), 0, 0 };
 
     // Make a new mask variable of appropriate size.
     const size_t Npts = Nlat_coarse * (size_t) Nlon_coarse;
@@ -67,9 +88,16 @@ void initialize_coarsened_grid(
         coarsened_grid.latitude[Ilat] = (Ilat+1)*dlat - (M_PI/2.);
     }
 
+    // determine if lon grid should be [0,2pi] or [-pi,pi]
+    const auto [min, max] = std::minmax_element(begin(reference_grid.longitude), 
+                                                end(  reference_grid.longitude));
+    const double min_lon = *min;
+    const double max_lon = *max;
+    double ref_lon = ( max_lon > 1.1 * M_PI ) ? 0. : -M_PI;
+
     coarsened_grid.longitude.resize(Nlon_coarse, 0.);
     for ( int Ilon = 0; Ilon < Nlon_coarse; Ilon++ ) {
-        coarsened_grid.longitude[Ilon] = Ilon*dlon - M_PI;
+        coarsened_grid.longitude[Ilon] = Ilon*dlon + ref_lon;
     }
 
     // Compute cell areas

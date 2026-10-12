@@ -38,16 +38,16 @@ void HelmholtzDataClass::Solve() {
 // In the case of small grids, do a direct solve
 void HelmholtzDataClass::DirectSolve() {
     direct_solver.compute(LHS);
-    if ( solver.info() == Eigen::NumericalIssue ) {
+    if ( direct_solver.info() == Eigen::NumericalIssue ) {
         fprintf( stderr, "The provided data did not satisfy the prerequisites..\n" );
         throw std::runtime_error("Failed to initialize the solver.");
-    } else if ( solver.info() == Eigen::NoConvergence ) {
+    } else if ( direct_solver.info() == Eigen::NoConvergence ) {
         fprintf( stderr, "Iterative procedure did not converge.\n" );
         throw std::runtime_error("Failed to initialize the solver.");
-    } else if ( solver.info() == Eigen::InvalidInput ) {
+    } else if ( direct_solver.info() == Eigen::InvalidInput ) {
         fprintf( stderr, "The inputs are invalid, or the algorithm has been improperly called.\n" );
         throw std::runtime_error("Failed to initialize the solver.");
-    } else if ( solver.info() != Eigen::Success ) {
+    } else if ( direct_solver.info() != Eigen::Success ) {
         fprintf( stderr, "Eigen decomposition failed in an unknown way.\n" );
         throw std::runtime_error("Failed to initialize the solver.");
     }

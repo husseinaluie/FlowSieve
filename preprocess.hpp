@@ -57,19 +57,8 @@ void interpolate_over_land_from_coast(
  * @ingroup InterpolationRoutines
  */
 void get_coast(
-        std::vector<double> &lon_coast,
-        std::vector<double> &lat_coast,
-        std::vector<double> &field_coast,
-        const std::vector<double> &lon_full,
-        const std::vector<double> &lat_full,
-        const std::vector<double> &field_full,
-        const std::vector<short int> &mask,
-        const int Itime,
-        const int Idepth,
-        const int Ntime,
-        const int Ndepth,
-        const int Nlat,
-        const int Nlon);
+        dataset & source_data
+        );
 
 void depth_integrate(
         std::vector<double> & depth_integral,
@@ -91,6 +80,9 @@ void map_grid_to_grid_MeshGrid(
         std::vector<std::string> vars_to_map,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
+
+// Create land-collapsing map [i.e. map continguous land to single point]
+void CreateLandCollapsingMap( dataset & data );
 
 /*!
  * \brief Class to store relevant variables for Helmholtz projections
@@ -146,9 +138,6 @@ class HelmholtzDataClass {
         // Identify which points have land-only neighbours
         void IdentifyLandlockedPoints( const dataset & data, 
                                        const bool second_order_adjacency = true );
-
-        // Create land-collapsing map [i.e. map continguous land to single point]
-        void CreateLandCollapsingMap( const dataset & data );
 
         // Build the LHS and RHS part of the problem
         void Build_LHS( const dataset & data );
@@ -229,11 +218,7 @@ void Helmholtz_Solver_NonMeshGrid(
         const double rel_tol,
         const unsigned int max_iters,
         const unsigned int iters_per_batch,
-        const bool weight_err,
-        const bool use_mask,
-        const bool use_vel,
-        const bool use_vort_div,
-        const bool collapse_land, 
+        const bool vort_div_given,
         const int num_refinements,
         const double CFL,
         const bool seed_provided,
@@ -252,6 +237,23 @@ void Helmholtz_Solver_MeshGrid(
         const bool seed_provided,
         const std::vector<double> & Psi_seed,
         const std::vector<double> & Phi_seed,
+        const bool land_as_holes,
+        const MPI_Comm comm = MPI_COMM_WORLD
+        );
+
+void Helmholtz_Solver_MeshGrid_Petsc(
+        const std::string output_fname,
+        dataset & source_data,
+        const double rel_tol,
+        const unsigned int max_iters,
+        const unsigned int iters_per_batch,
+        const int num_refinements,
+        const bool seed_provided,
+        const std::vector<double> & Psi_seed,
+        const std::vector<double> & Phi_seed,
+        const bool land_as_holes,
+        int argc,
+        char** argv,
         const MPI_Comm comm = MPI_COMM_WORLD
         );
 
@@ -275,6 +277,14 @@ void get_vels_vort_and_div_fast(
         dataset & PsiPhi_grid
         );
 
+void get_vels_vort_and_div_Eigen(
+        dataset * coarsened_grid,
+        dataset & PsiPhi_grid,
+        const bool cos_prefactor,
+        const bool land_as_holes,
+        std::vector<short int> * mask
+        );
+
 void get_vels_vort_and_div(
         dataset * coarsened_grid,
         dataset & PsiPhi_grid,
@@ -296,7 +306,8 @@ void get_vort_div_of_pot_tor(
         );
 
 double get_mean( std::vector<double> & f,
-             dataset * data
+             dataset * data,
+             const bool include_land = false
              );
 
 void demean( std::vector<double> & f,
@@ -375,8 +386,11 @@ void SphericalHarmonicSolver(
         std::vector<double> & Phi,
         const dataset & source_data,
         const std::vector<double> & vorticity,
-        const std::vector<double> & divergence
+        const std::vector<double> & divergence,
+        const int max_L = 64
         );
+
+void TestAdjointProperties( const dataset & grid );
 
 
 

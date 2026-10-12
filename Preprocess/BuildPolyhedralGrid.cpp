@@ -340,7 +340,9 @@ void BuildPolyhedralGrid(
     //// Convert to the dual to get the actual working map
     //
     const size_t num_faces_final = faces.size();
-    const size_t size_neighbourhood = constants::ADJACENCY_SIZE+1;
+    //const size_t size_neighbourhood = constants::ADJACENCY_SIZE+1;
+    const size_t size_neighbourhood = 3+1; // icosahedral base has triangular faces
+    polyhedral_grid.num_neighbours = size_neighbourhood-1;
     #if DEBUG >= 2
     fprintf( stdout, "BuildPolyhedralGrid: The final polyhedron has %'zu faces.\n", num_faces_final );
     #endif
@@ -498,7 +500,7 @@ void BuildPolyhedralGrid(
     //  [hence a separate loop block]
     #pragma omp parallel \
     default(none) \
-    shared( longitude, latitude, areas, adjacency_indices, ddlon_weights, ddlat_weights ) \
+    shared( longitude, latitude, areas, adjacency_indices ) \
     firstprivate( num_faces_final, size_neighbourhood ) \
     private( Iface )
     {
@@ -508,7 +510,6 @@ void BuildPolyhedralGrid(
 
             // -1 on size_neighbourhood because we want to preserve the last point as self
             while ( num_found < size_neighbourhood-1 ) {
-                //for ( size_t In = 0; In < num_found; In++ ) {
                 size_t In = 0;
                 while ( In < num_found ) { // this accounts for the expanding neighbourhood
                     size_t Jface = adjacency_indices[Iface][In];
@@ -544,11 +545,103 @@ void BuildPolyhedralGrid(
                 }
                 if ( num_found == size_neighbourhood-1 ) { break; }
             }
+        }
+    }
+
+    const size_t Npts = num_faces_final;
+    const size_t Nneighbours = polyhedral_grid.num_neighbours;
+    size_t Ipt;
+    std::vector< std::vector<double> > &grad_weights_lon = polyhedral_grid.grad_weights_lon,
+                                       &grad_weights_lat = polyhedral_grid.grad_weights_lat,
+                                       &perp_grad_weights_lon = polyhedral_grid.perp_grad_weights_lon,
+                                       &perp_grad_weights_lat = polyhedral_grid.perp_grad_weights_lat;
+    grad_weights_lon.resize(Npts);
+    grad_weights_lat.resize(Npts);
+
+    perp_grad_weights_lon.resize(Npts);
+    perp_grad_weights_lat.resize(Npts);
+
+    for ( size_t II = 0; II < Npts; II++ ) {
+        grad_weights_lon.at(II).resize(Nneighbours);
+        grad_weights_lat.at(II).resize(Nneighbours);
+        perp_grad_weights_lon.at(II).resize(Nneighbours);
+        perp_grad_weights_lat.at(II).resize(Nneighbours);
+    }
+
+                    
+    //
+    //// A DEC-type scheme for differentiation weights
+    //
+    #pragma omp parallel default(none) private( Ipt ) \
+    shared( grad_weights_lon, grad_weights_lat, perp_grad_weights_lon, perp_grad_weights_lat, \
+            latitude, longitude, areas, adjacency_indices ) \
+    firstprivate(Nneighbours, Npts)
+    {
+
+        #pragma omp for collapse(1) schedule(static)
+        for ( Ipt = 0; Ipt < Npts; Ipt++ ) {
+
+            const double lat_i = latitude[ Ipt];
+            const double lon_i = longitude[Ipt];
+
+            // outward normal vector
+            Vec3 x_i = { cos(lat_i) * cos(lon_i), 
+                         cos(lat_i) * sin(lon_i), 
+                         sin(lat_i) 
+            };
+
+            // eastward basis vector
+            Vec3 e_lon = { -sin(lon_i), 
+                            cos(lon_i), 
+                            0.0 
+            };
+
+            // northward basis vector
+            //Vec3 e_lat = cross( x_i, e_lon );
+            Vec3 e_lat = { - cos(lon_i) * sin(lat_i),
+                           - sin(lon_i) * sin(lat_i),
+                             cos(lat_i)
+            };
+
+            const double A_i = areas[Ipt];
+
+            for ( size_t In = 0; In < Nneighbours; In++ ) {
+                const size_t Jpt = adjacency_indices[Ipt][In];
+
+                const double lat_j = latitude[ Jpt];
+                const double lon_j = longitude[Jpt];
+
+                // Distance between points
+                //const double ell_ij = distance_from_indices( Ipt, Jpt );
+                const double ell_ij = distance( lon_i, lat_i, lon_j, lat_j );
+
+                Vec3 x_j = { cos(lat_j) * cos(lon_j), 
+                             cos(lat_j) * sin(lon_j), 
+                             sin(lat_j) 
+                };
+
+                // get displacement in local tangent plane
+                Vec3 v_ij = x_j - dot( x_j, x_i ) * x_i;
+
+                Vec3 e_ij_hat = ( 1. / sqrt( dot( v_ij, v_ij ) ) ) * v_ij;
+                Vec3 t_ij_hat = cross( x_i, e_ij_hat );
+
+                // Compute and store w_ij as gradient weights
+                grad_weights_lon[Ipt][In] = (ell_ij / A_i) * dot( e_ij_hat, e_lon ); // / constants::R_earth;
+                grad_weights_lat[Ipt][In] = (ell_ij / A_i) * dot( e_ij_hat, e_lat ); // / constants::R_earth;
+
+                perp_grad_weights_lon[Ipt][In] = - grad_weights_lat[Ipt][In];
+                perp_grad_weights_lat[Ipt][In] =   grad_weights_lon[Ipt][In];
+            }
+        }
+    }
+}
 
 
             //
             //// And, at last, compute the differentiation weights
             //
+            /*
             const size_t Nderiv = size_neighbourhood-1;
             const int Nconds = 3; //10;
 
@@ -573,9 +666,9 @@ void BuildPolyhedralGrid(
 
                 mean_dist += sqrt( x*x + y*y ) / Nderiv;
             }
+            */
 
             /* Regression
-            */
             std::map< std::string, long double > Sij;
             std::vector< std::string > S_comps = 
                 (Nconds == 10) ? std::vector<std::string> {"", "x", "y", "xx", "xy", "yy", "xxx", "xxy", "xyy", "yyy"}
@@ -670,6 +763,7 @@ void BuildPolyhedralGrid(
                 ddlon_weights[Iface][In] = sol[1] * cos(centre_lat) / mean_dist;
                 ddlat_weights[Iface][In] = sol[2]                   / mean_dist;
             }
+            */
 
             /* Polynomial fit
             // use a local Cartesian projection to get derivative weights near the poles
@@ -735,6 +829,6 @@ void BuildPolyhedralGrid(
                 ddlat_weights[Iface][In] = ddy(In)                   / mean_dist;
             }
             */
-        }
-    }
-}
+//        }
+//    }
+//}

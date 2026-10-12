@@ -53,13 +53,20 @@ void map_grid_to_grid_MeshGrid(
     fprintf( stdout, "Mapping from %'zu points to %'zu.\n", Npts_source, Npts_target );
     #endif
 
+    // we're mapping onto a coarse grid
+    //  for this, we'll filter using 2*delta as the
+    //  target scale
+    const double filter_ell = 2 * ( M_PI * constants::R_earth / std::fmin(Nlat_target, Nlat_source) );
+
+    fprintf( stdout, "Mapping between grids will coarsen at ell = %.0f km\n", filter_ell/1e3 );
+
     int Ilat_target, Ilon_target;
     #pragma omp parallel \
     default(none) \
     shared( source_data, target_data, vars_to_map ) \
     private( Ilat_target, Ilon_target ) \
     firstprivate( Npts_target,Nlat_target, Nlon_target, Npts_source, Nlat_source, Nlon_source, \
-           Nvars, mapping_from_fine_to_coarse )
+            Nvars, filter_ell, mapping_from_fine_to_coarse )
     { 
         #pragma omp for collapse(2) schedule(static)
         for ( Ilat_target = 0; Ilat_target < Nlat_target; Ilat_target++ ) {
@@ -71,143 +78,74 @@ void map_grid_to_grid_MeshGrid(
                 //
                 //// Get nearest lat index in the source
                 //
-                int Ilat_source_LB, Ilat_source_UB;
-                double perc_lat;
-                int test_Ilat = std::upper_bound( source_data.latitude.begin(), source_data.latitude.end(), target_lat )
+                int centre_Ilat = std::upper_bound( source_data.latitude.begin(), source_data.latitude.end(), target_lat )
                     - source_data.latitude.begin();
-                if ( test_Ilat == 0 ) {
-                    // if target point is out of bounds, just use nearest
-                    Ilat_source_LB = 0;
-                    Ilat_source_UB = 0;
-                    perc_lat = 0.;
-                } else if ( test_Ilat >= Nlat_source ) {
-                    // if target point is out of bounds, just use nearest
-                    Ilat_source_LB = Nlat_source - 1;
-                    Ilat_source_UB = Nlat_source - 1;
-                    perc_lat = 0.;
-                } else {
-                    // Otherwise, we'll linearly interpolate between lats
-                    double Ldist = std::fabs( source_data.latitude[test_Ilat-1] - target_lat );
-                    double Rdist = std::fabs( source_data.latitude[test_Ilat]   - target_lat );
-                    perc_lat = Ldist / (Ldist+Rdist);
-                    Ilat_source_LB = test_Ilat-1;
-                    Ilat_source_UB = test_Ilat;
-                }
+                if ( centre_Ilat >= Nlat_source ) { centre_Ilat = Nlat_source - 1; }
 
                 //
                 //// Get nearest lon index
                 //
-                int Ilon_source_LB, Ilon_source_UB;
-                double perc_lon;
-                int test_Ilon = std::upper_bound( source_data.longitude.begin(), source_data.longitude.end(), target_lon )
-                    - source_data.longitude.begin();
-                int Lind, Rind;
-                
-                // account for periodicity
-                if ( test_Ilon == 0 ) {
-                    Lind = Nlon_source - 1;
-                    Rind = 0;
-                } else if ( test_Ilon >= Nlon_source ) {
-                    Lind = Nlon_source - 1;
-                    Rind = 0;
-                } else {
-                    Lind = test_Ilon - 1;
-                    Rind = test_Ilon;
+                //int centre_Ilon = std::upper_bound( source_data.longitude.begin(), source_data.longitude.end(), target_lon )
+                //    - source_data.longitude.begin();
+                //if ( centre_Ilon >= Nlon_source ) { centre_Ilon = Nlon_source - 1; }
+
+
+                // We're fixing the scale at 2 delta, so just go +/- two latitude indices
+                std::vector<double> numer_accum( Nvars );
+                const int del_lat_logical = 
+                    mapping_from_fine_to_coarse ?
+                        (int) ceil( (double)Nlat_source / Nlat_target )
+                        : 2; // if source is the coarse grid, just do a couple lats
+                double denom_accum = 0., water_area_accum = 0.;
+                for ( int source_Ilat = std::fmax( centre_Ilat-2*del_lat_logical, 0 );
+                        source_Ilat < std::fmin( centre_Ilat+2*del_lat_logical+1, Nlat_source-1 );
+                        source_Ilat++
+                    ) {
+                    for ( int source_Ilon = 0; source_Ilon < Nlon_source; source_Ilon++ ) {
+                        size_t source_index = source_data.local_index( 0, 0, source_Ilat, source_Ilon );
+
+                        double dist = source_data.distance_between_datasets_from_IlatIlon( 
+                                source_Ilat, source_Ilon, 
+                                Ilat_target, Ilon_target,
+                                target_data );
+                        double kern = kernel(dist, filter_ell);
+
+                        double dA = source_data.areas[source_index];
+                        double coeff = dA * kern;
+
+                        for ( int Ivar = 0; Ivar < Nvars; Ivar++ ) {
+                            numer_accum[Ivar]+= coeff * source_data.variables.at(vars_to_map[Ivar])[source_index];
+                        }
+
+                        denom_accum += coeff;
+
+                        if ( source_data.mask[source_index] ) {
+                            water_area_accum += coeff;
+                        }
+
+                    }
                 }
-
-                // and set up to linearly interpolate
-                double Ldist = std::fabs( source_data.longitude[Lind] - target_lon );
-                if ( Ldist > M_PI ) { Ldist = 2*M_PI - Ldist; }
-                double Rdist = std::fabs( source_data.longitude[Rind] - target_lon );
-                if ( Rdist > M_PI ) { Rdist = 2*M_PI - Rdist; }
-                perc_lon = Ldist / (Ldist + Rdist);
-                Ilon_source_LB = Lind;
-                Ilon_source_UB = Rind;
-
-
-                // Get (source) indices
-                size_t source_LL = source_data.local_index( 0, 0, Ilat_source_LB, Ilon_source_LB ),
-                       source_UL = source_data.local_index( 0, 0, Ilat_source_UB, Ilon_source_LB ),
-                       source_LU = source_data.local_index( 0, 0, Ilat_source_LB, Ilon_source_UB ),
-                       source_UU = source_data.local_index( 0, 0, Ilat_source_UB, Ilon_source_UB );
 
                 size_t target_index = target_data.local_index( 0, 0, Ilat_target, Ilon_target );
-
-
-                // If we're coarsening, determine the new land mask
                 if ( mapping_from_fine_to_coarse ) {
-
-                    unsigned int num_mask = 0;
-
-                    num_mask += source_data.mask[source_LL];
-                    num_mask += source_data.mask[source_UL];
-                    num_mask += source_data.mask[source_LU];
-                    num_mask += source_data.mask[source_UU];
-
-                    // if at least two neighbours land, then we're land
-                    target_data.mask[target_index] = num_mask >= 2;
+                    //target_data.mask[target_index] = ( water_area_accum >= 0.5 * denom_accum );
+                    //target_data.mask[target_index] = ( water_area_accum >= 0.25 * denom_accum );
+                    target_data.mask[target_index] = ( water_area_accum >= 0.10 * denom_accum );
+                    //target_data.mask[target_index] = ( water_area_accum >= 0.05 * denom_accum );
+                    //target_data.mask[target_index] = ( water_area_accum > 0. );
+                } else {
+                    // if we're refining, don't worry about land
+                    //target_data.mask[target_index] = true;
                 }
-
-                // If we're refining (no land, since working with Psi/Phi)
-                // or if the target point is water, compute the interpolation.
-                if ( (not(mapping_from_fine_to_coarse)) or (target_data.mask[target_index]) ) {
-
-                    // loop over all vars to process
-                    for ( size_t Ivar = 0; Ivar < Nvars; Ivar++ ) {
-
-                        // Linear interpolation between bounding box, in lat-lon coords
-                        double val = 0;
-                        double val_LL = source_data.variables.at(vars_to_map[Ivar]).at(source_LL),
-                               val_UL = source_data.variables.at(vars_to_map[Ivar]).at(source_UL),
-                               val_LU = source_data.variables.at(vars_to_map[Ivar]).at(source_LU),
-                               val_UU = source_data.variables.at(vars_to_map[Ivar]).at(source_UU);
-
-                        // First, perform latitude interpolation on "west" side
-                        double val_L;
-                        bool use_L = true;
-                        if ( source_data.mask[source_LL] and source_data.mask[source_UL] ) {
-                            val_L = val_LL * (1-perc_lat)  +  val_UL * perc_lat;
-                        } else if ( source_data.mask[source_LL] ) {
-                            val_L = val_LL;
-                        } else if ( source_data.mask[source_UL] ) {
-                            val_L = val_UL;
-                        } else {
-                            val_L = 0;
-                            use_L = false;
-                        }
-
-                        // Then perform latitude interpolation on "east" side
-                        double val_U;
-                        bool use_U = true;
-                        if ( source_data.mask[source_LU] and source_data.mask[source_UU] ) {
-                            val_U = val_LU * (1-perc_lat)  +  val_UU * perc_lat;
-                        } else if ( source_data.mask[source_LU] ) {
-                            val_U = val_LU;
-                        } else if ( source_data.mask[source_UU] ) {
-                            val_U = val_UU;
-                        } else {
-                            val_U = 0;
-                            use_U = false;
-                        }
-
-                        // Then perform the longitude interpolation
-                        if ( use_L and use_U ) {
-                            val = val_L * (1-perc_lon)  +  val_U * perc_lon;
-                        } else if ( use_L ) {
-                            val = val_L;
-                        } else if ( use_U ) {
-                            val = val_U;
-                        } else {
-                            throw std::runtime_error("Unable to perform interpolation.");
-                        }
-
-                        target_data.variables.at(vars_to_map[Ivar]).at(target_index) = val;
-                    }
+                for ( int Ivar = 0; Ivar < Nvars; Ivar++ ) {
+                    target_data.variables.at(vars_to_map[Ivar]).at(target_index) = 
+                        ( denom_accum > 0 ) ?
+                        numer_accum[Ivar] / denom_accum :
+                        0.;
                 }
 
             }
         }
-
     }
 
 }
