@@ -3,6 +3,7 @@
 
 #include <map>
 #include <string>
+#include <cmath>
 
 /*!
  * \param DEBUG
@@ -52,6 +53,14 @@ namespace constants
     const double R_earth = 6371e3;
 
     /*!
+     * \param Omega
+     * \brief Rotational frequency of Earth [Hz | 1/s]
+     * @ingroup constants
+     */
+    const double Omega = 2. * M_PI / (24. * 60. * 60.);
+
+
+    /*!
      * \param USE_HIGH_PRECISION_DISTANCE
      * \brief If spatial resolution is very high on sphere (less than ~50 metres or so), 
      * and high presision is needed in distance calculations, turn this on.
@@ -67,6 +76,9 @@ namespace constants
      * @ingroup constants
      */
     const bool USE_HIGH_PRECISION_DISTANCE = false;
+
+
+    const bool PRECOMPUTE_SIN_COS_LATITUDE = true;
 
     /*!
      * \param rho0
@@ -95,7 +107,7 @@ namespace constants
      * @ingroup constants
      */
     const double fill_value = -1e8;
-    const double fill_value_double = -1e15;
+    const double fill_value_double = -1e12;
 
     /*!
      * \param fill_value_s
@@ -138,23 +150,25 @@ namespace constants
      * \param EXTEND_DOMAIN_TO_POLES
      * \brief Boolean to indicate whether or not the input domain should have the latitude extended to reach the poles.
      *
-     * If true, 'land' is added with a uniform grid spacing to make the domain reach both north and south poles
+     * If true, 'land' is added with a uniform grid spacing to make the domain reach both north and south polesA
      * If false, nothing happens.
      *
      * Set to false if not on a sphere
      *
      * @ingroup constants
      */
-    const bool EXTEND_DOMAIN_TO_POLES = false;
+    const bool EXTEND_DOMAIN_TO_POLES = true;
 
     /*!
      * \param GRID_TYPE
      * \brief Variable indicating type of grid system (e.g. LLC, Meshgrid)
      * @ingroup constants
      */
-    enum GridType : int { LLC, MeshGrid };
-    const int GRID_TYPE = GridType::LLC;
-    const size_t ADJACENCY_SIZE = 4; //8
+    enum GridType : int { LLC, NEMO_Tripole, MeshGrid };
+    const int GRID_TYPE = GridType::MeshGrid;
+    //const int GRID_TYPE = GridType::NEMO_Tripole;
+    //const size_t ADJACENCY_SIZE = 8;
+    const size_t ADJACENCY_SIZE = 4;
 
     /*!
      * \param CARTESIAN
@@ -218,7 +232,7 @@ namespace constants
      * For coarse_grain.x, this is required to get fine (sub-filter) KE
      * @ingroup constants
      */
-    const bool COMP_TRANSFERS = true;
+    const bool COMP_TRANSFERS = false;
     const bool COMP_PI_HELMHOLTZ = false;
 
     /*!
@@ -299,7 +313,7 @@ namespace constants
      * \brief Boolean indicating whether or not the postprocess routines should be applied
      * @ingroup constants
      */
-    const bool APPLY_POSTPROCESS = false;
+    const bool APPLY_POSTPROCESS = true;
 
     /*!
      * \param POSTPROCESS_DO_ZONAL_MEANS
@@ -326,7 +340,6 @@ namespace constants
      *  4 = tanh        ( 1 - tanh( (x - 1) / (0.1) )  )
      * @ingroup constants
      */
-    //const int KERNEL_OPT = 4;
     enum KernelType : int { TopHat, HyperGaussian, Gaussian, JohnsonGaussian, 
                             Sinc, SmoothHat, HighOrder };
     const int KERNEL_OPT = KernelType::SmoothHat;
@@ -345,7 +358,7 @@ namespace constants
                            ( KERNEL_OPT == KernelType::JohnsonGaussian ) ? 15. :
                            ( KERNEL_OPT == KernelType::Sinc ) ? -1 :
                            ( KERNEL_OPT == KernelType::SmoothHat ) ? 2.5 :
-                           ( KERNEL_OPT == KernelType::HighOrder ) ? 2.5 :
+                           ( KERNEL_OPT == KernelType::HighOrder ) ? 3.5 :
                            -1;
 
     /*!

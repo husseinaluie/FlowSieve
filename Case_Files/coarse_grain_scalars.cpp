@@ -271,9 +271,44 @@ int main(int argc, char *argv[]) {
         source_data.variables.insert( std::pair< std::string, std::vector<double> >( "Lambda_g", std::vector<double>(Npts,0.) ) );
     }
 
+    #if DEBUG >= 1
+    if (wRank == 0) { fprintf( stdout, "Setting up for requested products\n" ); fflush(stdout); }
+    #endif
+    // Add the requested product terms to the postprocessing
+    std::vector< std::vector<double> > product_fields( Nproducts );
+    for ( size_t Ipair = 0; Ipair < Nproducts; Ipair++ ) {
+
+        // Set up storage for bar(var1) * bar(var2)
+        product_fields[Ipair].resize( Npts );
+
+        // Also add var1*var2 to core fields to get bar(var1*var2) in outputs
+        std::string new_var_name = "bar(" + var_products[Ipair][0] + "_times_" + var_products[Ipair][1] + ")";
+        vars_to_filter.push_back( new_var_name );
+        Nvars++;
+        source_data.variables.insert( std::pair< std::string, std::vector<double> >( new_var_name, std::vector<double>(Npts, 0.) ) );
+        #pragma omp parallel \
+        default (none) shared( source_data, var_products ) \
+        private( index ) firstprivate( Ipair, Nvars, Npts, new_var_name )
+        {
+            #pragma omp for collapse(1) schedule(static)
+            for ( index = 0; index < Npts; index++ ) {
+                source_data.variables.at(new_var_name).at(index) = 
+                      source_data.variables.at( var_products[Ipair][0] ).at(index)
+                    * source_data.variables.at( var_products[Ipair][1] ).at(index);
+            }
+        }
+    }
+
     // Set up storage of the coarsened fields
     #if DEBUG >= 1
     if (wRank == 0) { fprintf( stdout, "Setting up %'zu coarse fields.\n", Nvars ); fflush(stdout); }
+    #endif
+    #if DEBUG >= 2
+    if (wRank == 0) {
+        for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
+            fprintf( stdout, "  var %02ld is %s\n", Ivar, vars_to_filter[Ivar].c_str() );
+        }
+    }
     #endif
     std::vector< std::vector<double> > coarse_fields(Nvars), 
         dl_coarse_fields(do_spectra ? Nvars : 0), dll_coarse_fields(do_spectra ? Nvars : 0),
@@ -335,15 +370,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    #if DEBUG >= 1
-    if (wRank == 0) { fprintf( stdout, "Setting up for requested products\n" ); fflush(stdout); }
-    #endif
-    // Add the requested product terms to the postprocessing
-    std::vector< std::vector<double> > product_fields( Nproducts );
+    // Add bar(var1) * bar(var2) to post-processing
     for ( size_t Ipair = 0; Ipair < Nproducts; Ipair++ ) {
-        product_fields[Ipair].resize( Npts );
         postprocess_fields.push_back( &product_fields[Ipair] );
-        postprocess_names.push_back( var_products[Ipair][0] + "_times_" + var_products[Ipair][1] );
+        postprocess_names.push_back( "bar(" + var_products[Ipair][0] + ")_times_bar(" + var_products[Ipair][1] + ")" );
     }
 
     // This stuff to be fixed with new method
@@ -471,10 +501,18 @@ int main(int argc, char *argv[]) {
 
                             if ( not(constants::FILTER_OVER_LAND) and not(source_data.mask.at(index)) ) {
                                 for ( Ivar = 0; Ivar < Nvars; Ivar++ ) { 
+                                    #ifdef NDEBUG
+                                    coarse_fields[Ivar][index] = constants::fill_value; 
+                                    #else
                                     coarse_fields.at(Ivar).at(index) = constants::fill_value; 
+                                    #endif
                                 }
                                 if ( compute_PEKE_conv == "true" ) {
+                                    #ifdef NDEBUG
+                                    barrho_barwo[index] = constants::fill_value;
+                                    #else
                                     barrho_barwo.at(index) = constants::fill_value;
+                                    #endif
                                 }
                             } else{
                                 // Apply the filter at the point
@@ -487,16 +525,36 @@ int main(int argc, char *argv[]) {
 
                                 // Store the filtered values in the appropriate arrays
                                 for ( Ivar = 0; Ivar < Nvars; Ivar++ ) {
+                                    #ifdef NDEBUG
                                     coarse_fields.at(Ivar).at(index) = filter_values_doubles.at(Ivar);
+                                    #else
+                                    coarse_fields[Ivar][index] = filter_values_doubles[Ivar];
+                                    #endif
 
                                     if ( do_spectra ) {
                                         // The ell-derivative of the filtered field
+                                        #ifdef NDEBUG
+                                        dl_coarse_fields[Ivar][index] = 
+                                            (   filter_dl_values_doubles[Ivar]
+                                              - filter_values_doubles[Ivar] ) 
+                                            * dl_kernel_val;
+                                        #else
                                         dl_coarse_fields.at(Ivar).at(index) = 
                                             (   filter_dl_values_doubles.at(Ivar)
                                               - filter_values_doubles.at(Ivar) ) 
                                             * dl_kernel_val;
+                                        #endif
                                         
                                         // The second ell-derivative of the filtered field
+                                        #ifdef NDEBUG
+                                        dll_coarse_fields[Ivar][index] = 
+                                            (   filter_dll_values_doubles[Ivar]
+                                              - filter_values_doubles[Ivar] ) 
+                                            * dll_kernel_val
+                                            - 2 * (   filter_dl_values_doubles[Ivar]
+                                              - filter_values_doubles[Ivar] ) 
+                                            * pow(dl_kernel_val, 2);
+                                        #else
                                         dll_coarse_fields.at(Ivar).at(index) = 
                                             (   filter_dll_values_doubles.at(Ivar)
                                               - filter_values_doubles.at(Ivar) ) 
@@ -504,11 +562,18 @@ int main(int argc, char *argv[]) {
                                             - 2 * (   filter_dl_values_doubles.at(Ivar)
                                               - filter_values_doubles.at(Ivar) ) 
                                             * pow(dl_kernel_val, 2);
+                                        #endif
     
                                         // Also compute the spectra and spectral slopes
+                                        #ifdef NDEBUG
+                                        coarse_spectra[Ivar][index] = -2 * scale*scale * 
+                                            coarse_fields[Ivar][index] * dl_coarse_fields[Ivar][index];
+                                        #else
                                         coarse_spectra.at(Ivar).at(index) = -2 * pow(scale,2) * 
                                             coarse_fields[Ivar][index] * dl_coarse_fields[Ivar][index];
+                                        #endif
     
+                                        #ifdef NDEBUG
                                         coarse_spectral_slopes.at(Ivar).at(index) = 
                                             fabs( coarse_fields[Ivar][index] * dl_coarse_fields[Ivar][index] ) < 1e-20 ?
                                             0 
@@ -518,20 +583,36 @@ int main(int argc, char *argv[]) {
                                                     + pow( dl_coarse_fields[Ivar][index], 2 )
                                                     ) / ( coarse_fields[Ivar][index] * dl_coarse_fields[Ivar][index] )
                                                 );
+                                        #else
+                                        #endif
                                     }
                                 }
 
                                 if ( compute_PEKE_conv == "true" ) {
+                                    #ifdef NDEBUG
+                                    barrho_barwo[index] = coarse_fields[rho_ind][index] * coarse_fields[wo_ind][index];
+                                    #else
                                     barrho_barwo.at(index) = coarse_fields.at(rho_ind).at(index) * coarse_fields.at(wo_ind).at(index);
+                                    #endif
                                     if ( do_spectra ) {
+                                        #ifdef NDEBUG
                                         dl_barrho_barwo.at(index) = 
                                             coarse_fields.at(rho_ind).at(index) * dl_coarse_fields.at(wo_ind).at(index)
                                             + dl_coarse_fields.at(rho_ind).at(index) * coarse_fields.at(wo_ind).at(index);
+                                        #else
+                                        #endif
                                     }
+                                    #ifdef NDEBUG
+                                    coarse_fields[Lambda_g_ind][index] = 
+                                        - constants::g * ( coarse_fields[rhowo_ind][index]
+                                                           - barrho_barwo[index] 
+                                                );
+                                    #else
                                     coarse_fields.at(Lambda_g_ind)[index] = 
                                         - constants::g * ( coarse_fields.at(rhowo_ind).at(index)
                                                            - barrho_barwo[index] 
                                                 );
+                                    #endif
 
                                     /*
                                     if ( do_spectra ) {
