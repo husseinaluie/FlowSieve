@@ -164,8 +164,8 @@ void apply_filter_at_point_for_quadratics(
     uyuz_tmp = (kA_sum == 0) ? 0. : uyuz_tmp / kA_sum;
     uzuz_tmp = (kA_sum == 0) ? 0. : uzuz_tmp / kA_sum;
 
-    vort_ux_tmp *= (kA_sum == 0) ? 0. : vort_ux_tmp / kA_sum;
-    vort_uy_tmp *= (kA_sum == 0) ? 0. : vort_uy_tmp / kA_sum;
-    vort_uz_tmp *= (kA_sum == 0) ? 0. : vort_uz_tmp / kA_sum;
+    vort_ux_tmp = (kA_sum == 0) ? 0. : vort_ux_tmp / kA_sum;
+    vort_uy_tmp = (kA_sum == 0) ? 0. : vort_uy_tmp / kA_sum;
+    vort_uz_tmp = (kA_sum == 0) ? 0. : vort_uz_tmp / kA_sum;
 }
 
